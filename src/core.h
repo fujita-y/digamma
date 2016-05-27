@@ -85,8 +85,8 @@
 
 #if USE_GCC_EXTENSION
     #define USE_SYMBOL_THREAD       0
-    #define USE_FIXNUM_THREAD       0
-    #define USE_DIRECT_THREAD       1
+    #define USE_FIXNUM_THREAD       1
+    #define USE_DIRECT_THREAD       0
 #else
     #define USE_SYMBOL_THREAD       0
     #define USE_FIXNUM_THREAD       1

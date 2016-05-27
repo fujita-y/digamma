@@ -36,10 +36,20 @@ endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
   CXXFLAGS += -pthread -fomit-frame-pointer
-  ifeq ($(DATAMODEL), ILP32)
-    CXXFLAGS += -march=armv7
-  else
-    CXXFLAGS += -march=armv8-a
+  ifneq (,$(findstring arm, $(UNAME)))
+    ifeq ($(DATAMODEL), ILP32)
+      CXXFLAGS += -march=armv7-a
+    else
+      CXXFLAGS += -march=armv8-a
+    endif
+  endif
+  ifneq (,$(findstring x86, $(UNAME)))
+    CXXFLAGS += -momit-leaf-frame-pointer
+    ifeq ($(DATAMODEL), ILP32)
+      CXXFLAGS += -march=x86
+    else
+      CXXFLAGS += -march=x86-64
+    endif
   endif
   LDLIBS = -pthread -Wl,--no-as-needed -ldl
 endif
