@@ -217,52 +217,9 @@ VM::lookup_iloc(scm_obj_t operands)
     return (scm_obj_t*)env - env->count + FIXNUM(CDR(operands));
 }
 
-#if USE_GCC_EXTENSION
-  #if USE_DIRECT_THREAD
-    volatile void* s_volatile_stub;
-    #define PIN(tag)        do { s_volatile_stub = &&tag; } while(0)
-    #if ARCH_IA32 || ARCH_X64
-      #define CASE(code)    M_##code: \
-                            __asm__ ("ud2"); \
-                            __asm__ (".p2align 3"); \
-                            L_##code: \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("/* "#code" */");
-    #else
-      #define CASE(code)    M_##code: \
-                            __asm__ (".p2align 3"); \
-                            L_##code: \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("nop"); \
-                            __asm__ ("/* "#code" */");
-    #endif
-    #define LABEL(code)     do { \
-                                assert(code < array_sizeof(m_dispatch_table)); \
-                                m_dispatch_table[code] = &&L_##code; \
-                                s_volatile_stub = &&M_##code; \
-                            } while(0)
-    #define SWITCH()        goto *instruction_to_adrs(CAAR(m_pc));
-  #else
-    volatile void* s_volatile_stub;
-    #define CASE(code)      M_##code: __asm__ ("/* "#code" */"); L_##code:
-    #define LABEL(code)     do { \
-                                assert(code < array_sizeof(m_dispatch_table)); \
-                                m_dispatch_table[code] = &&L_##code; \
-                                s_volatile_stub = &&M_##code; \
-                            } while(0)
-    #define SWITCH()        goto *m_dispatch_table[instruction_to_opcode(CAAR(m_pc))];
-  #endif
-#else
-  #define CASE(code)        case code:
-  #define SWITCH()          switch (instruction_to_opcode(CAAR(m_pc)))
-#endif
-
-#define OPERANDS            (CDAR(m_pc))
+#define CASE(code)      case code:
+#define SWITCH()        switch (instruction_to_opcode(CAAR(m_pc)))
+#define OPERANDS        (CDAR(m_pc))
 
 /*
 C-SUBR return state
@@ -419,141 +376,17 @@ again:
     }
 }
 
-#if USE_NATIVE_CODE
-void* VM::s_return_loop;
-void* VM::s_return_apply;
-void* VM::s_return_pop_cont;
-#endif
-
 void
 VM::loop(bool init, bool resume)
 {
-#if USE_GCC_EXTENSION
-    if (init) {
-        for (int i = 0; i < array_sizeof(m_dispatch_table); i++) m_dispatch_table[i] = &&ERROR_BAD_INSTRUCTION;
-        assert(VMOP_INSTRUCTION_COUNT < 128);
-        LABEL(VMOP_EXTEND_ENCLOSE);
-        LABEL(VMOP_EXTEND_ENCLOSE_LOCAL);
-        LABEL(VMOP_EXTEND_UNBOUND);
-        LABEL(VMOP_PUSH_CLOSE);
-        LABEL(VMOP_PUSH_CLOSE_LOCAL);
-        LABEL(VMOP_ENCLOSE);
-        LABEL(VMOP_EXTEND);
-        LABEL(VMOP_PUSH);
-        LABEL(VMOP_CALL);
-        LABEL(VMOP_PUSH_CONST);
-        LABEL(VMOP_PUSH_GLOC);
-        LABEL(VMOP_PUSH_ILOC);
-        LABEL(VMOP_PUSH_ILOC0);
-        LABEL(VMOP_PUSH_ILOC1);
-        LABEL(VMOP_PUSH_SUBR);
-        LABEL(VMOP_PUSH_CAR_ILOC);
-        LABEL(VMOP_PUSH_CDR_ILOC);
-        LABEL(VMOP_PUSH_CADR_ILOC);
-        LABEL(VMOP_PUSH_CDDR_ILOC);
-        LABEL(VMOP_PUSH_NADD_ILOC);
-        LABEL(VMOP_NADD_ILOC);
-        LABEL(VMOP_PUSH_CONS);
-        LABEL(VMOP_RET_SUBR);
-        LABEL(VMOP_APPLY_GLOC);
-        LABEL(VMOP_APPLY_ILOC);
-        LABEL(VMOP_APPLY_ILOC_LOCAL);
-        LABEL(VMOP_RET_CONS);
-        LABEL(VMOP_RET_EQP);
-        LABEL(VMOP_RET_NULLP);
-        LABEL(VMOP_RET_PAIRP);
-        LABEL(VMOP_APPLY);
-        LABEL(VMOP_CONST);
-        LABEL(VMOP_SUBR);
-        LABEL(VMOP_CAR_ILOC);
-        LABEL(VMOP_CDR_ILOC);
-        LABEL(VMOP_CADR_ILOC);
-        LABEL(VMOP_CDDR_ILOC);
-        LABEL(VMOP_GLOC);
-        LABEL(VMOP_ILOC);
-        LABEL(VMOP_ILOC0);
-        LABEL(VMOP_ILOC1);
-        LABEL(VMOP_IF_TRUE);
-        LABEL(VMOP_IF_FALSE_CALL);
-        LABEL(VMOP_IF_NULLP);
-        LABEL(VMOP_IF_PAIRP);
-        LABEL(VMOP_IF_SYMBOLP);
-        LABEL(VMOP_IF_EQP);
-        LABEL(VMOP_RET_CONST);
-        LABEL(VMOP_RET_GLOC);
-        LABEL(VMOP_RET_ILOC);
-        LABEL(VMOP_IF_TRUE_RET);
-        LABEL(VMOP_IF_FALSE_RET);
-        LABEL(VMOP_IF_TRUE_RET_CONST);
-        LABEL(VMOP_IF_FALSE_RET_CONST);
-        LABEL(VMOP_IF_NULLP_RET_CONST);
-        LABEL(VMOP_IF_NOT_NULLP_RET_CONST);
-        LABEL(VMOP_IF_PAIRP_RET_CONST);
-        LABEL(VMOP_IF_NOT_PAIRP_RET_CONST);
-        LABEL(VMOP_IF_SYMBOLP_RET_CONST);
-        LABEL(VMOP_IF_NOT_SYMBOLP_RET_CONST);
-        LABEL(VMOP_IF_EQP_RET_CONST);
-        LABEL(VMOP_IF_NOT_EQP_RET_CONST);
-        LABEL(VMOP_EQ_N_ILOC);
-        LABEL(VMOP_LT_N_ILOC);
-        LABEL(VMOP_LE_N_ILOC);
-        LABEL(VMOP_GT_N_ILOC);
-        LABEL(VMOP_GE_N_ILOC);
-        LABEL(VMOP_CLOSE);
-        LABEL(VMOP_SET_ILOC);
-        LABEL(VMOP_SET_GLOC);
-        LABEL(VMOP_RET_CLOSE);
-        LABEL(VMOP_VM_ESCAPE);
-        LABEL(VMOP_TOUCH_GLOC);
-        LABEL(VMOP_SUBR_GLOC_OF);
-        LABEL(VMOP_RET_SUBR_GLOC_OF);
-        LABEL(VMOP_PUSH_SUBR_GLOC_OF);
-        LABEL(VMOP_EQ_ILOC);
-        LABEL(VMOP_LT_ILOC);
-        LABEL(VMOP_LE_ILOC);
-        LABEL(VMOP_GT_ILOC);
-        LABEL(VMOP_GE_ILOC);
-        LABEL(VMOP_PUSH_VECTREF_ILOC);
-        LABEL(VMOP_VECTREF_ILOC);
-  #if USE_DIRECT_THREAD && !defined(NDEBUG)
-        for (int i = 0; i < array_sizeof(m_dispatch_table); i++) {
-            if ((uintptr_t)m_dispatch_table[i] & 1) {
-                fatal("%s:%u failed to initialize virtual machine for USE_DIRECT_THREAD", __FILE__, __LINE__);
-            }
-        }
-        if ((uintptr_t)(&&ERROR_BAD_INSTRUCTION) & 1) {
-            fatal("%s:%u failed to initialize virtual machine for USE_DIRECT_THREAD", __FILE__, __LINE__);
-        }
-  #endif
-  #if USE_NATIVE_CODE
-        s_return_loop = &&return_loop;
-        s_return_apply = &&return_apply;
-        s_return_pop_cont = &&return_pop_cont;
-  #endif
-        return;
-    }
-#else
     if (init) return;
-#endif
     scm_obj_t operand_trace;
     scm_obj_t obj;
     assert(PAIRP(m_pc));
     if (resume) goto pop_cont;
     goto loop;
 
-#if USE_GCC_EXTENSION
-    begin:
-        __asm__ ("/* BEGIN */");
-        __asm__ (".p2align 4");
-#endif
-
     apply:
-#if USE_GCC_EXTENSION
-        __asm__ ("/* APPLY */");
-#endif
-#if USE_NATIVE_CODE
-        __asm__ ("apply:");
-#endif
         if (CLOSUREP(m_value)) {
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
@@ -613,9 +446,6 @@ VM::loop(bool init, bool resume)
         goto loop;
 
     pop_cont:
-#if USE_NATIVE_CODE
-        __asm__ ("pop_cont:");
-#endif
         if (m_cont == NULL) return;
         {
             vm_cont_t cont = (vm_cont_t)((intptr_t)m_cont - offsetof(vm_cont_rec_t, up));
@@ -641,19 +471,8 @@ VM::loop(bool init, bool resume)
         if (m_heap->m_stop_the_world) stop();
 
     loop:
-#if USE_NATIVE_CODE
-        __asm__ ("loop:");
-#endif
         assert(m_sp <= m_stack_limit);
-#if USE_DIRECT_THREAD
-        assert(VMINSTP(CAAR(m_pc)));
-#endif
-#if USE_FIXNUM_THREAD
-        assert(FIXNUMP(CAAR(m_pc)));
-#endif
-#if USE_SYMBOL_THREAD
         assert(OPCODESYMBOLP(CAAR(m_pc)));
-#endif
 #if PROFILE_OPCODE
         {
             static int last_opecode;
@@ -1304,9 +1123,6 @@ VM::loop(bool init, bool resume)
             }
 
             CASE(VMOP_RET_CONS) {
-#if USE_NATIVE_CODE
-                __asm__ ("ret_cons:");
-#endif
                 m_value = make_pair(m_heap, m_sp[-1], m_value);
                 goto pop_cont;
             }
@@ -2135,26 +1951,7 @@ VM::loop(bool init, bool resume)
         m_pc = CDR(m_pc);
         goto trace_n_loop;
 
-#if USE_GCC_EXTENSION
-    ERROR_BAD_INSTRUCTION_ALIGN_STUB:
-        __asm__ ("/* ERROR_BAD_INSTRUCTION */");
-        __asm__ (".p2align 3");
     ERROR_BAD_INSTRUCTION:
-        __asm__ ("nop");
-        __asm__ ("nop");
-        __asm__ ("nop");
-        __asm__ ("nop");
-#else
-    ERROR_BAD_INSTRUCTION:
-#endif
         system_error("system error: invalid vm instruction %d", instruction_to_opcode(CAAR(m_pc)));
         return;
-#if USE_NATIVE_CODE
-    return_pop_cont:
-        __asm__ ("jmp pop_cont");
-    return_apply:
-        __asm__ ("jmp apply");
-    return_loop:
-        __asm__ ("jmp loop");
-#endif
 }

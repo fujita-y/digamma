@@ -98,12 +98,6 @@ void
 VM::prebind_list(scm_obj_t code)
 {
     while (PAIRP(code)) {
-#if USE_DIRECT_THREAD
-        assert(!VMINSTP(CAAR(code)));
-#endif
-#if USE_FIXNUM_THREAD
-        assert(!FIXNUMP(CAAR(code)));
-#endif
         scm_symbol_t symbol = (scm_symbol_t)CAAR(code);
         assert(INHERENTSYMBOLP(symbol));
         int opcode = HDR_SYMBOL_CODE(symbol->hdr);
@@ -261,9 +255,7 @@ VM::prebind_list(scm_obj_t code)
 
             case VMOP_PUSH_CLOSE_LOCAL:
             case VMOP_EXTEND_ENCLOSE_LOCAL:
-#if USE_SYMBOL_THREAD
                 if (SYMBOLP(CAAR(operands))) break;
-#endif
                 prebind_list(CDR(operands));
                 m_heap->write_barrier(CDR(operands));
                 CDAR(code) = CDR(operands);
@@ -276,9 +268,7 @@ VM::prebind_list(scm_obj_t code)
             case VMOP_RET_CLOSE:
             case VMOP_PUSH_CLOSE:
             case VMOP_EXTEND_ENCLOSE: {
-#if USE_SYMBOL_THREAD
                 if (CLOSUREP(operands)) break;
-#endif
                 prebind_list(CDR(operands));
 #if PREBIND_CLOSE
                 scm_obj_t spec = CAR(operands);
@@ -331,11 +321,5 @@ VM::prebind_list(scm_obj_t code)
 void
 VM::prebind(scm_obj_t code)
 {
-#if USE_DIRECT_THREAD
-    if (VMINSTP(CAAR(code))) return;
-#endif
-#if USE_FIXNUM_THREAD
-    if (FIXNUMP(CAAR(code))) return;
-#endif
     prebind_list(code);
 }

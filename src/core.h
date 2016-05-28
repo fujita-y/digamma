@@ -28,12 +28,6 @@
   #define DEFAULT_HEAP_LIMIT        32  // 32MB
 #endif
 
-#if _MSC_VER
-  #define USE_GCC_EXTENSION         0
-#else
-  #define USE_GCC_EXTENSION         1
-#endif
-
 #define array_sizeof(a) ((int)(sizeof(a)/sizeof(a[0])))
 
 #ifdef NDEBUG
@@ -63,9 +57,8 @@
 #define LOCKFREE_ALLOC              1
 #define CONCURRENT_COLLECT          1
 #define PARALLEL_COLLECT            0
-#define BOOT_R6RS_COMPLIANT_SYNTAX  1
+#define BOOT_R6RS_COMPLIANT_SYNTAX  0
 #define UNSPECIFIED_GLOC_IS_SPECIAL 0
-
 #define UNBOUND_GLOC_RETURN_UNSPEC  0
 
 #define USE_DEBUG_BOOT              0
@@ -80,18 +73,7 @@
 #define USE_CONST_LITERAL           1
 #define USE_MULTIBYTE_READ          1
 #define USE_MULTIBYTE_WRITE         1
-#define USE_NATIVE_CODE             0
 #define USE_CLOEXEC                 defined(FD_CLOEXEC)
-
-#if USE_GCC_EXTENSION
-    #define USE_SYMBOL_THREAD       0
-    #define USE_FIXNUM_THREAD       1
-    #define USE_DIRECT_THREAD       0
-#else
-    #define USE_SYMBOL_THREAD       0
-    #define USE_FIXNUM_THREAD       1
-    #define USE_DIRECT_THREAD       0
-#endif
 
 #if _MSC_VER
   #define USE_CRITICAL_SECTION      1

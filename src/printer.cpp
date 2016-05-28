@@ -35,7 +35,7 @@ printer_t::printer_t(VM* vm, scm_port_t port)
     m_tuple_nest = 0;
     m_tuple_nest_limit = FIXNUM(vm->flags.m_record_print_nesting_limit);
     m_flush = false;
-    m_r6rs = true;
+    m_r6rs = (vm->flags.m_extend_lexical_syntax != scm_true);
 }
 
 printer_t::~printer_t()

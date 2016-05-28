@@ -40,9 +40,6 @@ public:
     int             m_stack_size;
     int             m_stack_busy;
 
-#if USE_GCC_EXTENSION
-    void*           m_dispatch_table[VMOP_INSTRUCTION_COUNT];
-#endif
     bool            init(object_heap_t* heap);
     void            boot();
     void            standalone();
@@ -149,62 +146,6 @@ public:
     void display_subr_profile();
 #endif
 
-#if USE_DIRECT_THREAD
-    scm_obj_t symbol_to_instruction(scm_obj_t obj) {
-        assert(OPCODESYMBOLP(obj));
-        scm_symbol_t symbol = (scm_symbol_t)obj;
-        int opcode = HDR_SYMBOL_CODE(symbol->hdr);
-        assert(((uintptr_t)m_dispatch_table[opcode] & 7) == 0);
-        return MAKEVMINST(m_dispatch_table[opcode]);
-    }
-
-    int instruction_to_opcode(scm_obj_t obj) {
-        assert(VMINSTP(obj));
-        uintptr_t adrs = (((uintptr_t)obj) & (~7));
-        for (int i = 0; i < array_sizeof(m_dispatch_table); i++) {
-            if ((uintptr_t)m_dispatch_table[i] == adrs) return i;
-        }
-  #ifndef NDEBUG
-        printf("bad instruction 0x%p\n", obj);
-  #endif
-        assert(false);
-        return 0;
-    }
-
-    scm_obj_t opcode_to_instruction(int opcode) {
-        assert(opcode >= 0 && opcode < array_sizeof(m_dispatch_table));
-        assert(((uintptr_t)m_dispatch_table[opcode] & 7) == 0);
-        return MAKEVMINST(m_dispatch_table[opcode]);
-    }
-
-    void* instruction_to_adrs(scm_obj_t obj) {
-        assert(VMINSTP(obj));
-        return (void*)((uintptr_t)obj);
-    }
-
-#endif
-
-#if USE_FIXNUM_THREAD
-    #define FIXNUM_OPCODE_SHIFT 7
-
-    scm_obj_t symbol_to_instruction(scm_obj_t obj) {
-        assert(OPCODESYMBOLP(obj));
-        scm_symbol_t symbol = (scm_symbol_t)obj;
-        return MAKEFIXNUM(HDR_SYMBOL_CODE(symbol->hdr) << FIXNUM_OPCODE_SHIFT);
-    }
-
-    int instruction_to_opcode(scm_obj_t obj) {
-        assert(FIXNUMP(obj));
-        int opcode = (((uintptr_t)obj) & 0xff00) >> (FIXNUM_OPCODE_SHIFT + 1);
-        assert(opcode >= 0 && opcode < VMOP_INSTRUCTION_COUNT);
-        return opcode;
-    }
-
-    scm_obj_t opcode_to_instruction(int opcode) {
-        return MAKEFIXNUM((intptr_t)opcode << FIXNUM_OPCODE_SHIFT);
-    }
-#endif
-#if USE_SYMBOL_THREAD
     scm_obj_t symbol_to_instruction(scm_obj_t obj) {
         assert(OPCODESYMBOLP(obj));
         return obj;
@@ -219,12 +160,6 @@ public:
         assert(opcode >= 0 && opcode < VMOP_INSTRUCTION_COUNT);
         return m_heap->inherent_symbol(opcode);
     }
-#endif
-#if USE_NATIVE_CODE
-    static void* s_return_loop;
-    static void* s_return_apply;
-    static void* s_return_pop_cont;
-#endif
 } ATTRIBUTE(aligned(16));
 
 
