@@ -84,17 +84,13 @@ vm1.o: vm1.cpp
 
 install: all stdlib sitelib extension
 	mkdir -p -m755 $(DESTDIR)$(PREFIX)/bin
-	mkdir -p -m755 $(DESTDIR)$(PREFIX)/share/man/man1
 	cp $(PROG) $(DESTDIR)$(PREFIX)/bin/$(PROG)
-	cp $(PROG).1 $(DESTDIR)$(PREFIX)/share/man/man1/$(PROG).1
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(PROG)
-	chmod 644 $(DESTDIR)$(PREFIX)/share/man/man1/$(PROG).1
 
 uninstall:
 	-rm -rf $(DESTDIR)$(PREFIX)/share/$(PROG)/stdlib
 	-rm -rf $(DESTDIR)$(PREFIX)/share/$(PROG)/sitelib
 	-rm -rf $(DESTDIR)$(PREFIX)/lib/$(PROG)
-	-rm -f $(DESTDIR)$(PREFIX)/share/man/man1/$(PROG).1
 	-rm -f $(DESTDIR)$(PREFIX)/bin/$(PROG)
 	-rmdir $(DESTDIR)$(PREFIX)/share/$(PROG)
 
