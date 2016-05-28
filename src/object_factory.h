@@ -65,7 +65,7 @@ scm_port_t          make_socket_port(object_heap_t* heap, scm_socket_t socket, s
 scm_port_t          make_transcoded_port(object_heap_t* heap, scm_obj_t name, scm_port_t port, scm_bvector_t transcoder);
 scm_port_t          make_temp_file_port(object_heap_t* heap, scm_obj_t name, int buffer_mode, scm_obj_t transcoder);
 scm_socket_t        make_socket(object_heap_t* heap);
-scm_socket_t        make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int flags);
+scm_socket_t        make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int m_flags);
 scm_sharedqueue_t   make_sharedqueue(object_heap_t* heap, int n);
 scm_sharedbag_t     make_sharedbag(object_heap_t* heap, int depth);
 

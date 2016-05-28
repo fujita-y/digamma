@@ -60,7 +60,7 @@ letrec_violation(VM* vm)
 {
     vm->backtrace_seek();
     scm_obj_t proc = vm->lookup_system_closure(".@assertion-violation");
-    if (vm->flags.m_warning_level == scm_false) {
+    if (vm->m_flags.warning_level == scm_false) {
         vm->apply_scheme(proc, 2, scm_false, make_string_literal(vm->m_heap,
                          "binding construct attempt to reference uninitialized variable, use '--warning' to perform expansion time check"));
     } else {

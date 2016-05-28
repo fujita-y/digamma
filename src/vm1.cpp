@@ -93,7 +93,7 @@ VM::collect_stack(intptr_t acquire)
 {
     if (m_stack_busy) {
         save_stack();
-        if (flags.m_collect_stack_notify != scm_false) {
+        if (m_flags.collect_stack_notify != scm_false) {
             scoped_lock lock(m_current_output->lock);
             printer_t prt(this, m_current_output);
             prt.format("~&;; [collect-stack: store*]~%~!");
@@ -125,14 +125,14 @@ VM::collect_stack(intptr_t acquire)
     m_to_stack_limit = tmp;
     if ((uintptr_t)m_sp + acquire >= (uintptr_t)m_stack_limit) {
         save_stack();
-        if (flags.m_collect_stack_notify != scm_false) {
+        if (m_flags.collect_stack_notify != scm_false) {
             scoped_lock lock(m_current_output->lock);
             printer_t prt(this, m_current_output);
             prt.format("~&;; [collect-stack: store**]~%~!");
         }
         m_stack_busy = true;
     } else {
-        if (flags.m_collect_stack_notify != scm_false) {
+        if (m_flags.collect_stack_notify != scm_false) {
             char buf[16];
             double rate = 1.0 - ((double)(m_sp - m_stack_top) / (double)(m_stack_limit - m_stack_top));
             snprintf(buf, sizeof(buf), "%.1lf%%", rate * 100.0);

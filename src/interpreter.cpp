@@ -102,7 +102,7 @@ again:
                 vm->m_recursion_level = 0;
                 vm->m_shared_object_errno = 0;
                 vm->m_shared_object_win32_lasterror = 0;
-                memcpy(&vm->flags, &parent->flags, sizeof(parent->flags));
+                memcpy(&vm->m_flags, &parent->m_flags, sizeof(parent->m_flags));
                 vm->run(true);
                 vm->reset();
                 for (int n = 0; n < argc; n++) vm->m_sp[n] = argv[n];
@@ -148,7 +148,7 @@ again:
     }
     if (timeout == 0.0 || timeout > msec()) {
         usleep(SPAWN_TIMEOUT_USLEEP);
-        if (timeout == 0.0 && parent->flags.m_warning_level != scm_false) {
+        if (timeout == 0.0 && parent->m_flags.warning_level != scm_false) {
             if (msec() > warning) {
                 printer_t(parent, parent->m_current_error).format("~&warning: spawn blocked in thread %d:0x%x [%d seconds elapsed]~%~!", parent->m_id, parent, (int)((msec() - start) / 1000));
                 warning = msec() + SPAWN_WARNING_MSEC;

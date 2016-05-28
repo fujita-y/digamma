@@ -22,17 +22,17 @@ subr_make_socket(VM* vm, int argc, scm_obj_t argv[])
                 int family;
                 int socktype;
                 int protocol;
-                int flags;
+                int m_flags;
                 CONVERT_TO_MACHINE_INT(2, "make-socket", &family);
                 CONVERT_TO_MACHINE_INT(3, "make-socket", &socktype);
                 CONVERT_TO_MACHINE_INT(4, "make-socket", &protocol);
-                CONVERT_TO_MACHINE_INT(5, "make-socket", &flags);
+                CONVERT_TO_MACHINE_INT(5, "make-socket", &m_flags);
                 try {
                     const char* node = NULL;
                     const char* service = NULL;
                     if (STRINGP(argv[0])) node = ((scm_string_t)argv[0])->name;
                     if (STRINGP(argv[1])) service = ((scm_string_t)argv[1])->name;
-                    scm_socket_t socket = make_socket(vm->m_heap, node, service, family, socktype, protocol, flags);
+                    scm_socket_t socket = make_socket(vm->m_heap, node, service, family, socktype, protocol, m_flags);
                     return socket;
                 } catch (io_exception_t& e) {
                     raise_io_error(vm, "make-socket", e.m_operation, e.m_message, e.m_err, scm_false, scm_false);
@@ -105,13 +105,13 @@ subr_socket_send(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 3) {
         if (SOCKETP(argv[0])) {
             if (BVECTORP(argv[1])) {
-                int flags;
-                CONVERT_TO_MACHINE_INT(2, "socket-send", &flags);
+                int m_flags;
+                CONVERT_TO_MACHINE_INT(2, "socket-send", &m_flags);
                 scm_socket_t socket = (scm_socket_t)argv[0];
                 if (socket->fd != INVALID_SOCKET) {
                     try {
                         scm_bvector_t bv = (scm_bvector_t)argv[1];
-                        return MAKEFIXNUM(socket_send(socket, bv->elts, bv->count, flags));
+                        return MAKEFIXNUM(socket_send(socket, bv->elts, bv->count, m_flags));
                     } catch (io_exception_t& e) {
                         raise_io_error(vm, "socket-send", e.m_operation, e.m_message, e.m_err, socket, scm_false);
                         return scm_undef;
@@ -137,15 +137,15 @@ subr_socket_recv(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 3) {
         if (SOCKETP(argv[0])) {
             int len;
-            int flags;
+            int m_flags;
             CONVERT_TO_MACHINE_INT(1, "socket-recv", &len);
-            CONVERT_TO_MACHINE_INT(2, "socket-recv", &flags);
+            CONVERT_TO_MACHINE_INT(2, "socket-recv", &m_flags);
             scm_socket_t socket = (scm_socket_t)argv[0];
             if (socket->fd != INVALID_SOCKET) {
                 try {
                     scm_bvector_t bv = make_bvector(vm->m_heap, len);
                     bool again = false;
-                    int n = socket_recv(socket, bv->elts, bv->count, flags, &again);
+                    int n = socket_recv(socket, bv->elts, bv->count, m_flags, &again);
                     if (n == 0) {
                         if (again) return scm_false;
                         if (socket->socktype == SOCK_STREAM) return scm_eof;

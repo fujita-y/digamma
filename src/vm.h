@@ -53,16 +53,16 @@ public:
 
     struct {
         // note: no gc protect
-        scm_obj_t   m_extend_lexical_syntax;        // #t or #f
-        scm_obj_t   m_mutable_literals;             // #t ot #f
-        scm_obj_t   m_collect_notify;               // #t or #f
-        scm_obj_t   m_collect_stack_notify;         // #t or #f
-        scm_obj_t   m_backtrace;                    // #t or #f or fixnum
-        scm_obj_t   m_backtrace_line_length;        // fixnum
-        scm_obj_t   m_restricted_print_line_length; // fixnum
-        scm_obj_t   m_record_print_nesting_limit;   // fixnum
-        scm_obj_t   m_warning_level;                // #t or #f or fixnum
-    } flags;
+        scm_obj_t   extend_lexical_syntax;        // #t or #f
+        scm_obj_t   mutable_literals;             // #t ot #f
+        scm_obj_t   collect_notify;               // #t or #f
+        scm_obj_t   collect_stack_notify;         // #t or #f
+        scm_obj_t   backtrace;                    // #t or #f or fixnum
+        scm_obj_t   backtrace_line_length;        // fixnum
+        scm_obj_t   restricted_print_line_length; // fixnum
+        scm_obj_t   record_print_nesting_limit;   // fixnum
+        scm_obj_t   warning_level;                // #t or #f or fixnum
+    } m_flags;
 
     scm_port_t          m_bootport;
     scm_port_t          m_current_input;

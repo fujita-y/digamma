@@ -33,9 +33,9 @@ printer_t::printer_t(VM* vm, scm_port_t port)
     m_shared_tag = 1;
     m_column_limit = 0; // no limit
     m_tuple_nest = 0;
-    m_tuple_nest_limit = FIXNUM(vm->flags.m_record_print_nesting_limit);
+    m_tuple_nest_limit = FIXNUM(vm->m_flags.record_print_nesting_limit);
     m_flush = false;
-    m_r6rs = (vm->flags.m_extend_lexical_syntax != scm_true);
+    m_r6rs = (vm->m_flags.extend_lexical_syntax != scm_true);
 }
 
 printer_t::~printer_t()
@@ -254,7 +254,7 @@ printer_t::format_va_list(const char* fmt, va_list ap)
                         m_unwrap = true;
                         m_radix = 10;
                         int save_limit = m_column_limit;
-                        m_column_limit = m_port->column + FIXNUM(m_vm->flags.m_restricted_print_line_length);
+                        m_column_limit = m_port->column + FIXNUM(m_vm->m_flags.restricted_print_line_length);
                         scm_obj_t expr = va_arg(ap, scm_obj_t);
                         write(expr);
                         m_column_limit = save_limit;
@@ -262,7 +262,7 @@ printer_t::format_va_list(const char* fmt, va_list ap)
 
                     case 'm': { // macro form
                         int save_limit = m_column_limit;
-                        m_column_limit = m_column_limit ? m_column_limit : FIXNUM(m_vm->flags.m_backtrace_line_length);
+                        m_column_limit = m_column_limit ? m_column_limit : FIXNUM(m_vm->m_flags.backtrace_line_length);
                         m_escape = true;
                         m_unwrap = true;
                         m_radix = 10;

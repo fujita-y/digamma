@@ -736,13 +736,13 @@ make_shared_weakhashtable(object_heap_t* heap, int n)
 }
 
 scm_socket_t
-make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int flags)
+make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int m_flags)
 {
     scm_socket_t obj = (scm_socket_t)heap->allocate_collectible(sizeof(scm_socket_rec_t));
     memset(obj, 0 , sizeof(scm_socket_rec_t));
     obj->hdr = scm_hdr_socket;
     obj->fd = INVALID_SOCKET;
-    socket_open(obj, node, service, family, type, protocol, flags);
+    socket_open(obj, node, service, family, type, protocol, m_flags);
     return obj;
 }
 

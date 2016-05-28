@@ -136,18 +136,18 @@ VM::init(object_heap_t* heap)
         m_shared_object_errno = 0;
         m_shared_object_win32_lasterror = 0;
 #if BOOT_R6RS_COMPLIANT_SYNTAX
-        flags.m_extend_lexical_syntax = scm_false;
+        m_flags.extend_lexical_syntax = scm_false;
 #else
-        flags.m_extend_lexical_syntax = scm_true;
+        m_flags.extend_lexical_syntax = scm_true;
 #endif
-        flags.m_mutable_literals = scm_false;
-        flags.m_collect_notify = scm_false;
-        flags.m_collect_stack_notify = scm_false;
-        flags.m_backtrace = scm_true;
-        flags.m_backtrace_line_length = MAKEFIXNUM(80);
-        flags.m_restricted_print_line_length = MAKEFIXNUM(40);
-        flags.m_record_print_nesting_limit = MAKEFIXNUM(2);
-        flags.m_warning_level = scm_false;
+        m_flags.mutable_literals = scm_false;
+        m_flags.collect_notify = scm_false;
+        m_flags.collect_stack_notify = scm_false;
+        m_flags.backtrace = scm_true;
+        m_flags.backtrace_line_length = MAKEFIXNUM(80);
+        m_flags.restricted_print_line_length = MAKEFIXNUM(40);
+        m_flags.record_print_nesting_limit = MAKEFIXNUM(2);
+        m_flags.warning_level = scm_false;
         run(true);
         return true;
     } catch (io_exception_t& e) {
@@ -262,7 +262,7 @@ VM::backtrace_seek_make_cont(scm_obj_t note)
 void
 VM::backtrace_seek()
 {
-    if (flags.m_backtrace != scm_false) {
+    if (m_flags.backtrace != scm_false) {
         backtrace_seek_make_cont(m_trace);
         backtrace_seek_make_cont(m_trace_tail);
         m_trace = m_trace_tail = scm_unspecified;
@@ -437,7 +437,7 @@ VM::backtrace_each(printer_t* prt, int n, scm_obj_t note)
 bool
 VM::backtrace(scm_port_t port)
 {
-    if (flags.m_backtrace == scm_false) return false;
+    if (m_flags.backtrace == scm_false) return false;
 
     scoped_lock lock(port->lock);
     printer_t prt(this, port);
@@ -459,11 +459,11 @@ VM::backtrace(scm_port_t port)
         }
     }
     if (obj == scm_unspecified) return false;
-    int bt_level = (int)(FIXNUMP(flags.m_backtrace) ? FIXNUM(flags.m_backtrace) : FIXNUM_MAX);
+    int bt_level = (int)(FIXNUMP(m_flags.backtrace) ? FIXNUM(m_flags.backtrace) : FIXNUM_MAX);
     int n = 0;
     if (n == bt_level) return false;
     prt.format("~%backtrace:~%");
-    prt.column_limit(FIXNUM(flags.m_backtrace_line_length));
+    prt.column_limit(FIXNUM(m_flags.backtrace_line_length));
     if (m_trace_tail != scm_unspecified) {
         backtrace_each(&prt, n++, m_trace_tail);
         if (n == bt_level) return true;
@@ -790,7 +790,7 @@ VM::stop()
     }
 
     char usage[128];
-    if (flags.m_collect_notify != scm_false) {
+    if (m_flags.collect_notify != scm_false) {
         if (last_usage.m_recorded) {
             if (DETAILED_STATISTIC) {
                 if (last_usage.m_synchronized) {

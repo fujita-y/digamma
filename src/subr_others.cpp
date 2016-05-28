@@ -582,14 +582,14 @@ subr_backtrace(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (argv[0] == scm_false || argv[0] == scm_true || (FIXNUMP(argv[0]) && FIXNUM(argv[0]) >= 0)) {
-            vm->flags.m_backtrace = argv[0];
+            vm->m_flags.backtrace = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "backtrace", 0, "#t, #f, or non-negative fixnum", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_backtrace;
+    if (argc == 0) return vm->m_flags.backtrace;
     wrong_number_of_arguments_violation(vm, "backtrace", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -600,14 +600,14 @@ subr_warning_level(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (argv[0] == scm_false || argv[0] == scm_true || (FIXNUMP(argv[0]) && FIXNUM(argv[0]) >= 0)) {
-            vm->flags.m_warning_level = argv[0];
+            vm->m_flags.warning_level = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "warning-level", 0, "#t, #f, or non-negative fixnum", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_warning_level;
+    if (argc == 0) return vm->m_flags.warning_level;
     wrong_number_of_arguments_violation(vm, "warning-level", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -618,14 +618,14 @@ subr_extend_lexical_syntax(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (argv[0] == scm_false || argv[0] == scm_true) {
-            vm->flags.m_extend_lexical_syntax = argv[0];
+            vm->m_flags.extend_lexical_syntax = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "extend-lexical-syntax", 0, "#t or #f", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_extend_lexical_syntax;
+    if (argc == 0) return vm->m_flags.extend_lexical_syntax;
     wrong_number_of_arguments_violation(vm, "extend-lexical-syntax", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -636,14 +636,14 @@ subr_mutable_literals(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (argv[0] == scm_false || argv[0] == scm_true) {
-            vm->flags.m_mutable_literals = argv[0];
+            vm->m_flags.mutable_literals = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "mutable-literals", 0, "#t or #f", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_mutable_literals;
+    if (argc == 0) return vm->m_flags.mutable_literals;
     wrong_number_of_arguments_violation(vm, "mutable-literals", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -674,14 +674,14 @@ subr_backtrace_line_length(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (FIXNUMP(argv[0]) && FIXNUM(argv[0]) >= 0) {
-            vm->flags.m_backtrace_line_length = argv[0];
+            vm->m_flags.backtrace_line_length = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "backtrace-line-length", 0, "non-negative fixnum", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_backtrace_line_length;
+    if (argc == 0) return vm->m_flags.backtrace_line_length;
     wrong_number_of_arguments_violation(vm, "backtrace-line-length", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -692,14 +692,14 @@ subr_restricted_print_line_length(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (FIXNUMP(argv[0]) && FIXNUM(argv[0]) >= 0) {
-            vm->flags.m_restricted_print_line_length = argv[0];
+            vm->m_flags.restricted_print_line_length = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "restricted-print-line-length", 0, "non-negative fixnum", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_restricted_print_line_length;
+    if (argc == 0) return vm->m_flags.restricted_print_line_length;
     wrong_number_of_arguments_violation(vm, "restricted-print-line-length", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -710,14 +710,14 @@ subr_record_print_nesting_limit(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (FIXNUMP(argv[0]) && FIXNUM(argv[0]) >= 0) {
-            vm->flags.m_record_print_nesting_limit = argv[0];
+            vm->m_flags.record_print_nesting_limit = argv[0];
             return scm_unspecified;
         } else {
             wrong_type_argument_violation(vm, "record-print-nesting-limit", 0, "non-negative fixnum", argv[0], argc, argv);
             return scm_undef;
         }
     }
-    if (argc == 0) return vm->flags.m_record_print_nesting_limit;
+    if (argc == 0) return vm->m_flags.record_print_nesting_limit;
     wrong_number_of_arguments_violation(vm, "record-print-nesting-limit", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -727,10 +727,10 @@ scm_obj_t
 subr_collect_notify(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
-        vm->flags.m_collect_notify = (argv[0] != scm_false) ? scm_true : scm_false;
+        vm->m_flags.collect_notify = (argv[0] != scm_false) ? scm_true : scm_false;
         return scm_unspecified;
     }
-    if (argc == 0) return vm->flags.m_collect_notify;
+    if (argc == 0) return vm->m_flags.collect_notify;
     wrong_number_of_arguments_violation(vm, "collect-notify", 0, 1, argc, argv);
     return scm_undef;
 }
@@ -740,10 +740,10 @@ scm_obj_t
 subr_collect_stack_notify(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
-        vm->flags.m_collect_stack_notify = (argv[0] != scm_false) ? scm_true : scm_false;
+        vm->m_flags.collect_stack_notify = (argv[0] != scm_false) ? scm_true : scm_false;
         return scm_unspecified;
     }
-    if (argc == 0) return vm->flags.m_collect_stack_notify;
+    if (argc == 0) return vm->m_flags.collect_stack_notify;
     wrong_number_of_arguments_violation(vm, "collect-stack-notify", 0, 1, argc, argv);
     return scm_undef;
 }

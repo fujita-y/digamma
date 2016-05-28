@@ -149,14 +149,14 @@ socket_name_string(object_heap_t* heap, scm_socket_t s)
 }
 
 int
-socket_send(scm_socket_t s, uint8_t* buf, int len, int flags)
+socket_send(scm_socket_t s, uint8_t* buf, int len, int m_flags)
 {
     assert(s->fd != INVALID_SOCKET);
     uint8_t* p = buf;
     int rest = len;
     int written = 0;
     while (rest > 0) {
-        int n = send(s->fd, (const char*)p, rest, flags);
+        int n = send(s->fd, (const char*)p, rest, m_flags);
         if (n < 0) {
             if (errno == EAGAIN) return written;
             if (errno == EINTR) continue;
@@ -170,12 +170,12 @@ socket_send(scm_socket_t s, uint8_t* buf, int len, int flags)
 }
 
 int
-socket_recv(scm_socket_t s, uint8_t* buf, int len, int flags, bool* again)
+socket_recv(scm_socket_t s, uint8_t* buf, int len, int m_flags, bool* again)
 {
     assert(s->fd != INVALID_SOCKET);
 
 loop:
-    int n = recv(s->fd, (char*)buf, len, flags);
+    int n = recv(s->fd, (char*)buf, len, m_flags);
     if (n < 0) {
         if (errno == EAGAIN) {
             if (again == NULL) goto loop;

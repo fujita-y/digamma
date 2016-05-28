@@ -118,7 +118,7 @@ VM::prebind_list(scm_obj_t code)
             case VMOP_IF_NOT_PAIRP_RET_CONST:
             case VMOP_IF_NOT_NULLP_RET_CONST:
             case VMOP_IF_NOT_SYMBOLP_RET_CONST: {
-                if (flags.m_mutable_literals == scm_false) {
+                if (m_flags.mutable_literals == scm_false) {
                     scm_obj_t datum = CDAR(code);
                     if ((PAIRP(datum))) {
                         if (m_heap->is_immutable_pair(datum)) break;
