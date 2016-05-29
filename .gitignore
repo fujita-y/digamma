@@ -33,3 +33,4 @@
 *.sublime-workspace
 spheres.pgm
 digamma
+.vscode
