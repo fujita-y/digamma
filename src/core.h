@@ -73,8 +73,11 @@
 #define USE_CONST_LITERAL           1
 #define USE_MULTIBYTE_READ          1
 #define USE_MULTIBYTE_WRITE         1
-#define USE_CLOEXEC                 defined(FD_CLOEXEC)
-
+#if defined(FD_CLOEXEC)
+  #define USE_CLOEXEC               1
+#else
+  #define USE_CLOEXEC               0
+#endif
 #if _MSC_VER
   #define USE_CRITICAL_SECTION      1
   #define USE_SPINLOCK              0

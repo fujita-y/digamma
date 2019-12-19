@@ -479,8 +479,8 @@ reader_t::read_string()
 {
     char small_buf[READ_STRING_SMALL_BUFFER_SIZE];
     char* buf = small_buf;
+    int bufsize = sizeof(small_buf);
     try {
-        int bufsize = array_sizeof(buf);
         int i = 0;
         while (true) {
             if (bufsize <= i + 4) {
