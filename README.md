@@ -1,6 +1,6 @@
 # Digamma
 
-Digamma is a R7RS Scheme system based on Ypsilon (fujita-y/ypsilon).
+Digamma is a R7RS Scheme system derived from Ypsilon (fujita-y/ypsilon).
 
 Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 See LICENSE file for terms and conditions of use.
