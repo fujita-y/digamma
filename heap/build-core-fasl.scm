@@ -1,13 +1,11 @@
-;;; Ypsilon Scheme System
-;;; Copyright (c) 2004-2008 Y.FUJITA, LittleWing Company Limited.
-;;; See license.txt for terms and conditions of use.
+;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
 
-;;
-;; if libraries have (define foo <subr-id>) form and foo is referenced within same library, prebind may screwed up
-;; to avoid problem, erase contents of core.vmi, restart, then build new core.vmi
-;; or replace foo with identifier <subr-id>
+;; If libraries have (define <id> <subr>) form and <id> is referenced within same
+;; library, prebind could be screwed up, to workaround this issue, replace <id> with <subr> in offending reference.
+;; ex. [(define first car) ... (first '(1 2))] => [(define first car) ... (car '(1 2))]
 
-;; to implement (compile-library)
+;; To implement (compile-library)
 ;; check that library imported or not, if imported, abort compile with warning
 ;; this should avoid problem
 

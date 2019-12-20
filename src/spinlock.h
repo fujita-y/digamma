@@ -91,7 +91,7 @@ public:
         assert(lock_count >= 0);
 #endif
       spinlock = 0;
-      MEM_STORE_FENCE; // do not remove this because ypsilon assume memory barrier here
+      MEM_STORE_FENCE; // do not remove this because ypsilon/digamma assume memory barrier here
     }
 
     void verify_locked()

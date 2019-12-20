@@ -28,7 +28,7 @@
   #define DEFAULT_HEAP_LIMIT        32  // 32MB
 #endif
 
-#define array_sizeof(a) ((int)(sizeof(a)/sizeof(a[0])))
+#define UNBOUND_GLOC_RETURN_UNSPEC  0
 
 #ifdef NDEBUG
     #define MTDEBUG                 0
@@ -59,7 +59,6 @@
 #define PARALLEL_COLLECT            0
 #define BOOT_R6RS_COMPLIANT_SYNTAX  0
 #define UNSPECIFIED_GLOC_IS_SPECIAL 0
-#define UNBOUND_GLOC_RETURN_UNSPEC  0
 
 #define USE_DEBUG_BOOT              0
 #define USE_DEBUG_CORE              0
@@ -88,21 +87,23 @@
 
 #ifndef SYSTEM_SHARE_PATH
   #if _MSC_VER
-    #define SYSTEM_SHARE_PATH       "C:/Program Files/Ypsilon"
+    #define SYSTEM_SHARE_PATH       "C:/Program Files/Digamma"
   #else
-    #define SYSTEM_SHARE_PATH       "/usr/local/share/ypsilon"
+    #define SYSTEM_SHARE_PATH       "/usr/local/share/digamma"
   #endif
 #endif
 
 #ifndef SYSTEM_EXTENSION_PATH
   #if _MSC_VER
-    #define SYSTEM_EXTENSION_PATH   "C:/Program Files/Ypsilon"
+    #define SYSTEM_EXTENSION_PATH   "C:/Program Files/Digamma"
   #else
-    #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/ypsilon"
+    #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/digamma"
   #endif
 #endif
 
 #define MAX_VIRTUAL_MACHINE         32
+
+#define array_sizeof(a) ((int)(sizeof(a)/sizeof(a[0])))
 
 class VM;
 

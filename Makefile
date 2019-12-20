@@ -69,7 +69,7 @@ DEPS = $(patsubst %.cpp, %.d, $(filter %.cpp, $(SRCS)))
 .PHONY: all install uninstall sitelib stdlib extension check bench clean distclean
 
 all: $(PROG) $(EXTS)
-	@mkdir -p -m755 $(HOME)/.ypsilon
+	@mkdir -p -m755 $(HOME)/.digamma
 
 $(PROG): $(OBJS)
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
@@ -146,8 +146,8 @@ bench: all
 
 clean:
 	rm -f *.o *.d *.dylib
-	rm -f $(HOME)/.ypsilon/*.cache
-	rm -f $(HOME)/.ypsilon/*.time
+	rm -f $(HOME)/.digamma/*.cache
+	rm -f $(HOME)/.digamma/*.time
 
 distclean: clean
 	rm -f tmp1 tmp2 tmp3 spheres.pgm

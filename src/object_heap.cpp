@@ -1721,7 +1721,7 @@ object_heap_t::init_architecture_feature()
 
 #define ARCH_FIXNUM(name, value) put_hashtable(m_architecture_feature, make_symbol(this, #name), MAKEFIXNUM(value))
 #define ARCH_ALIGNOF(name, type) { int n; struct x { char y; type z; }; n = offsetof(x, z); ARCH_FIXNUM(name, n); }
-    ARCH_FIXNUM(ypsilon-revision, PROGRAM_REVISION);
+    ARCH_FIXNUM(program-revision, PROGRAM_REVISION);
     ARCH_FIXNUM(sizeof:bool,        sizeof(bool));
     ARCH_FIXNUM(sizeof:short,       sizeof(short));
     ARCH_FIXNUM(sizeof:int,         sizeof(int));

@@ -1,4 +1,4 @@
-#!/usr/bin/env ypsilon
+#!/usr/bin/env digamma
 
 (import (core))
 

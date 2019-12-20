@@ -1,8 +1,7 @@
-;;; Ypsilon Scheme System
-;;; Copyright (c) 2004-2009 Y.FUJITA /  LittleWing Company Limited.
-;;; See license.txt for terms and conditions of use.
+;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
 
-(define auto-compile-cache-validation-signature (string->symbol (format "ypsilon-0.9.6/r~a" (architecture-feature 'ypsilon-revision))))
+(define auto-compile-cache-validation-signature (string->symbol (format "digamma-0.9.6/r~a" (architecture-feature 'program-revision))))
 (define auto-compile-verbose (make-parameter #f))
 (define scheme-load-verbose (make-parameter #f))
 (define scheme-load-paths (make-parameter '()))
@@ -17,9 +16,9 @@
 
 (define library-extensions
   (make-parameter
-   (list ".ypsilon.sls"
-         ".ypsilon.ss"
-         ".ypsilon.scm"
+   (list ".digamma.sls"
+         ".digamma.ss"
+         ".digamma.scm"
          ".sls"
          ".ss"
          ".scm")

@@ -1,6 +1,5 @@
-;;; Ypsilon Scheme System
-;;; Copyright (c) 2004-2009 Y.FUJITA / LittleWing Company Limited.
-;;; See license.txt for terms and conditions of use.
+;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
 
 (define dump-condition (make-parameter #f))
 
@@ -365,48 +364,48 @@
                (cond ((lookup-process-environment "TEMP")
                       => (lambda (path)
                            (cond ((directory-exists? path)
-                                  (or (directory-exists? (format "~//Ypsilon" path))
-                                      (create-directory (format "~//Ypsilon" path)))
-                                  (auto-compile-cache (format "~//Ypsilon" path))))))))
+                                  (or (directory-exists? (format "~//Digamma" path))
+                                      (create-directory (format "~//Digamma" path)))
+                                  (auto-compile-cache (format "~//Digamma" path))))))))
               ((home-directory)
                => (lambda (home)
-                    (and (directory-exists? (format "~//.ypsilon" home))
-                         (auto-compile-cache (format "~//.ypsilon" home))))))))
+                    (and (directory-exists? (format "~//.digamma" home))
+                         (auto-compile-cache (format "~//.digamma" home))))))))
 
     (define init-env-acc
       (lambda ()
-        (cond ((lookup-process-environment "YPSILON_ACC")
+        (cond ((lookup-process-environment "DIGAMMA_ACC")
                => (lambda (path)
                     (cond ((directory-exists? (expand-path path))
                            (auto-compile-cache (expand-path path)))
                           (else
-                           (format (current-error-port) "** ERROR in environment variable 'YPSILON_ACC': directory ~s not exist~%" path)
+                           (format (current-error-port) "** ERROR in environment variable 'DIGAMMA_ACC': directory ~s not exist~%" path)
                            (auto-compile-cache #f))))))))
 
     (define init-env-sitelib
       (lambda ()
-        (cond ((lookup-process-environment "YPSILON_SITELIB")
+        (cond ((lookup-process-environment "DIGAMMA_SITELIB")
                => (lambda (paths)
                     (for-each
                      (lambda (path)
                        (cond ((directory-exists? (expand-path path))
                               (add-library-path (expand-path path)))
                              (else
-                              (format (current-error-port) "** ERROR in environment variable 'YPSILON_SITELIB': directory ~s not exist~%" path))))
+                              (format (current-error-port) "** ERROR in environment variable 'DIGAMMA_SITELIB': directory ~s not exist~%" path))))
                      (reverse (if (string-contains (architecture-feature 'operating-system) "windows")
                                   (string-split paths #\;)
                                   (string-split paths #\:)))))))))
 
     (define init-env-loadpath
       (lambda ()
-        (cond ((lookup-process-environment "YPSILON_LOADPATH")
+        (cond ((lookup-process-environment "DIGAMMA_LOADPATH")
                => (lambda (paths)
                     (for-each
                      (lambda (path)
                        (cond ((directory-exists? (expand-path path))
                               (add-load-path (expand-path path)))
                              (else
-                              (format (current-error-port) "** ERROR in environment variable 'YPSILON_LOADPATH': directory ~s not exist~%" path))))
+                              (format (current-error-port) "** ERROR in environment variable 'DIGAMMA_LOADPATH': directory ~s not exist~%" path))))
                      (reverse (if (string-contains (architecture-feature 'operating-system) "windows")
                                   (string-split paths #\;)
                                   (string-split paths #\:)))))))))
@@ -451,7 +450,7 @@
 
     (define show-usage
       (lambda ()
-        (format #t "usage: ypsilon [options] [--] [file] [arguments]~%")
+        (format #t "usage: digamma [options] [--] [file] [arguments]~%")
         (format #t "options:~%")
         (format #t "  --r6rs (-6)            conforms r6rs top-level program syntax and semantics~%")
         (format #t "  --mute (-m)            suppresses greeting~%")
@@ -460,9 +459,9 @@
         (format #t "  --warning (-w)         prints warnings~%")
         (format #t "  --interactive (-i)     enters repl after running the script file~%")
         (format #t "  --compatible (-c)      extends lexical syntax for compatibility~%")
-        (format #t "  --sitelib=path         adds sitelib path (YPSILON_SITELIB)~%")
-        (format #t "  --loadpath=path        adds load search path (YPSILON_LOADPATH)~%")
-        (format #t "  --acc=dir              sets a auto-compile-cache directory (YPSILON_ACC)~%")
+        (format #t "  --sitelib=path         adds sitelib path (DIGAMMA_SITELIB)~%")
+        (format #t "  --loadpath=path        adds load search path (DIGAMMA_LOADPATH)~%")
+        (format #t "  --acc=dir              sets a auto-compile-cache directory (DIGAMMA_ACC)~%")
         (format #t "  --heap-limit=mbytes    sets a total heap limit in MBytes~%")
         (format #t "  --dump-condition       default exception handler dumps condition~%")
         (format #t "  --disable-acc          disables auto-compile-cache~%")
@@ -473,20 +472,20 @@
 
     (define show-banner
       (lambda ()
-       (format #t "ypsilon-digamma r~a~%" (architecture-feature 'ypsilon-revision))))
+       (format #t "digamma r~a~%" (architecture-feature 'program-revision))))
 
     (define show-info
       (lambda ()
         (show-banner)
-        (cond ((lookup-process-environment "YPSILON_ACC")
-               => (lambda (path) (format #t ";; YPSILON_ACC=~a~%" path)))
-              (else (format #t ";; YPSILON_ACC unspecified~%")))
-        (cond ((lookup-process-environment "YPSILON_SITELIB")
-               => (lambda (path) (format #t ";; YPSILON_SITELIB=~a~%" path)))
-              (else (format #t ";; YPSILON_SITELIB unspecified~%")))
-        (cond ((lookup-process-environment "YPSILON_LOADPATH")
-               => (lambda (path) (format #t ";; YPSILON_LOADPATH=~a~%" path)))
-              (else (format #t ";; YPSILON_LOADPATH unspecified~%")))
+        (cond ((lookup-process-environment "DIGAMMA_ACC")
+               => (lambda (path) (format #t ";; DIGAMMA_ACC=~a~%" path)))
+              (else (format #t ";; DIGAMMA_ACC unspecified~%")))
+        (cond ((lookup-process-environment "DIGAMMA_SITELIB")
+               => (lambda (path) (format #t ";; DIGAMMA_SITELIB=~a~%" path)))
+              (else (format #t ";; DIGAMMA_SITELIB unspecified~%")))
+        (cond ((lookup-process-environment "DIGAMMA_LOADPATH")
+               => (lambda (path) (format #t ";; DIGAMMA_LOADPATH=~a~%" path)))
+              (else (format #t ";; DIGAMMA_LOADPATH unspecified~%")))
         (format #t ";; (auto-compile-cache) => ~s~%" (auto-compile-cache))
         (format #t ";; (scheme-library-paths) => ~s~%" (scheme-library-paths))
         (format #t ";; (scheme-load-paths) => ~s~%" (scheme-load-paths))))
