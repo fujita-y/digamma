@@ -1,4 +1,4 @@
-# digamma
+# Ypsilon::Digamma
 
 Note: How to rebuild heap on changing identifiers
 
