@@ -8,14 +8,14 @@ See LICENSE file for terms and conditions of use.
 ## How to rebuild heap on changing identifiers
 
 * Open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
-* '$ make'
-* '$ cd heap'
+* $ make
+* $ cd heap
 * Open 'boot/library.scm' and edit
-* '$ make'
-* '$ cd ..'
-* '$ make'
-* '$ cd heap'
-* '$ make'
-* '$ cd ..'
+* $ make
+* $ cd ..
+* $ make
+* $ cd heap
+* $ make
+* $ cd ..
 * Open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '0'
-* '$ make'
+* $ make
