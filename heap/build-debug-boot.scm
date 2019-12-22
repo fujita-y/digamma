@@ -28,6 +28,8 @@
       "./boot/macro/synrule.scm"
       "./boot/macro/syncase.scm"
       "./boot/macro/library.scm"
+      "./boot/macro/program.scm"
+      "./boot/macro/r7rs.scm"
       "./boot/macro/synenv.scm"
       "./boot/compile.scm"
       "./boot/dynamic-wind.scm"
