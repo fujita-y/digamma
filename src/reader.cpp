@@ -570,7 +570,7 @@ reader_t::read_quoted_symbol()
             buf[i] = 0;
             return make_symbol(m_vm->m_heap, buf, i);
         }
-        if (c == '\\') c = get_ucs4();
+        if (c == '\\') c = read_escape_sequence();
         if (c < 128) buf[i++] = c;
         else i += cnvt_ucs4_to_utf8(ensure_ucs4(c), (uint8_t*)buf + i);
     }

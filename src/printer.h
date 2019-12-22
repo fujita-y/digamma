@@ -34,7 +34,7 @@ private:
     void            write_string(const uint8_t* utf8, int n);
     void            write_ucs4(uint32_t c);
     void            scan(scm_hashtable_t ht, scm_obj_t obj);
-    bool            symbol_need_bar(const char* s, int n);
+    bool            symbol_need_bar(const uint8_t* s, int n);
 
     VM*             m_vm;
     scm_port_t      m_port;

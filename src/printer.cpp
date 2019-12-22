@@ -56,8 +56,9 @@ printer_t::column_limit(int limit)
 }
 
 bool
-printer_t::symbol_need_bar(const char* s, int n)
+printer_t::symbol_need_bar(const uint8_t* s, int n)
 {
+    if (s[0] == 0 || isdigit(s[0])) return true;
     switch (s[0]) {
     case '@':
         return true;
@@ -77,15 +78,11 @@ printer_t::symbol_need_bar(const char* s, int n)
         if (s[3] == '`' && m_unwrap) return false;
         return true;
     }
-    if (isdigit(s[0])) return true;
-    char c;
-    while ((c = *s++) != 0 && n--) {
-        if (c < 32) continue;
-        if (c == 127) continue;
-        if (c & 0x80) continue;
-        if (isalnum(c)) continue;
-        if (strchr("!$%&/:*<=>?^_~+-.@", c)) continue;
-        return true;
+    int i = 0;
+    while (i < n && s[i] != 0) {
+        uint8_t c = s[i];
+        if (c < 128 && !isalnum(c) && !strchr("!$%&/:*<=>?^_~+-.@", c)) return true;
+        i = i + utf8_byte_count(c);
     }
     return false;
 }
@@ -136,7 +133,7 @@ printer_t::write_string(const uint8_t* utf8, int n)
 void
 printer_t::write_pretty_symbol(const uint8_t* utf8, int n)
 {
-    bool quote = symbol_need_bar((const char*)utf8, n);
+    bool quote = symbol_need_bar(utf8, n);
     if (quote) port_put_byte(m_port, '|');
     uint32_t ucs4;
     int i = 0;
