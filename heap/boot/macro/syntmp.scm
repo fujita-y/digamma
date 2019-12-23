@@ -14,7 +14,7 @@
 (define parse-ellipsis-splicing
   (lambda (form)
     (let loop ((len 2) (tail (cdddr form)))
-      (cond ((and (pair? tail) (eq? (car tail) '...))
+      (cond ((and (pair? tail) (ellipsis-id? (car tail)))
              (loop (+ len 1) (cdr tail)))
             (else
              (values (list-head form len) tail len))))))
@@ -57,11 +57,11 @@
                 ((vector? lst)
                  (loop (vector->list lst)))))))
 
-    (if (and (= (safe-length tmpl) 2) (eq? (car tmpl) '...))
+    (if (and (= (safe-length tmpl) 2) (ellipsis-id? (car tmpl)))
         (check-escaped (cadr tmpl) 0)
         (let loop ((lst tmpl) (depth 0))
           (cond ((symbol? lst)
-                 (and (eq? lst '...)
+                 (and (ellipsis-id? lst)
                       (syntax-violation "syntax template" "misplaced ellipsis" tmpl))
                  (and (> (rank-of lst ranks) depth)
                       (syntax-violation "syntax template" "too few ellipsis following subtemplate" tmpl lst)))
@@ -226,10 +226,10 @@
                                 (traverse-escaped (cdr lst) depth)))
                          ((ellipsis-splicing-pair? lst)
                           (let-values (((body tail len) (parse-ellipsis-splicing lst)))
-                            (append (loop body (+ depth 1)) (cons '... (loop tail depth)))))
+                            (append (loop body (+ depth 1)) (cons (ellipsis-id) (loop tail depth)))))
                          ((ellipsis-pair? lst)
                           (cons (loop (car lst) (+ depth 1))
-                                (cons '... (loop (cddr lst) depth))))
+                                (cons (ellipsis-id) (loop (cddr lst) depth))))
                          ((pair? lst)
                           (cons (loop (car lst) depth)
                                 (loop (cdr lst) depth)))
@@ -347,6 +347,6 @@
                  (list->vector (expand-template (vector->list tmpl) depth vars)))
                 (else tmpl))))
 
-      (if (and (= (safe-length tmpl) 2) (eq? (car tmpl) '...))
+      (if (and (= (safe-length tmpl) 2) (ellipsis-id? (car tmpl)))
           (expand-escaped-template (cadr tmpl) 0 vars)
           (expand-template tmpl 0 vars)))))

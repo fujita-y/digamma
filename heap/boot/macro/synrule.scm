@@ -71,7 +71,6 @@
               (else #f))))
 
     (parameterize ((ellipsis-id (if ellipsis (unrename-syntax ellipsis env) '...)))
-      (pretty-print (ellipsis-id))(newline)
       (let ((lites (unrename-syntax lites env)) (clauses (unrename-syntax clauses env)))
         (cons*
           (ellipsis-id)

@@ -11,30 +11,30 @@
   (lambda (form)
     (and (pair? form)
          (pair? (cdr form))
-         (eq? (cadr form) '...))))
+         (ellipsis-id? (cadr form)))))
 
 (define ellipsis-splicing-pair?
   (lambda (form)
     (and (pair? form)
          (pair? (cdr form))
-         (eq? (cadr form) '...)
+         (ellipsis-id? (cadr form))
          (pair? (cddr form))
-         (eq? (caddr form) '...))))
+         (ellipsis-id? (caddr form)))))
 
 (define ellipsis-quote?
   (lambda (form)
     (and (pair? form)
-         (eq? (car form) '...)
+         (ellipsis-id? (car form))
          (pair? (cdr form))
          (null? (cddr form)))))
 
-(define collect-unique-ids ; exclude '...
+(define collect-unique-ids ; exclude ellipsis-id
   (lambda (expr)
     (let loop ((lst expr) (ans '()))
       (cond ((pair? lst)
              (loop (cdr lst)
                    (loop (car lst) ans)))
-            ((eq? lst '...) ans)
+            ((ellipsis-id? lst) ans)
             ((symbol? lst)
              (if (memq lst ans) ans (cons lst ans)))
             ((vector? lst)
@@ -69,7 +69,7 @@
           (cond ((pair? lst)
                  (loop (cdr lst)
                        (loop (car lst) pool)))
-                ((eq? lst '...) pool)
+                ((ellipsis-id? lst) pool)
                 ((eq? lst '_) pool)
                 ((symbol? lst)
                  (if (memq lst lites)
@@ -84,7 +84,7 @@
     (define check-misplaced-ellipsis
       (lambda (pat lites)
         (let loop ((lst pat))
-          (cond ((eq? lst '...)
+          (cond ((ellipsis-id? lst)
                  (syntax-violation "syntax pattern" "improper use of ellipsis" pat))
                 ((ellipsis-pair? lst)
                  (and (symbol? (car lst))
@@ -92,7 +92,7 @@
                       (syntax-violation "syntax pattern" "ellipsis following literal" pat lst))
                  (let loop ((lst (cddr lst)))
                    (and (pair? lst)
-                        (if (eq? (car lst) '...)
+                        (if (ellipsis-id? (car lst))
                             (syntax-violation "syntax pattern" "ambiguous use of ellipsis" pat)
                             (loop (cdr lst))))))
                 ((pair? lst)
