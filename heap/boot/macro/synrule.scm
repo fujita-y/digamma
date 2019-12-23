@@ -25,28 +25,31 @@
                          aliases))))))
 
     (define compiled->source
-      (lambda (lites lst)
-        `(syntax-rules ,lites ,@(map (lambda (e) `(,(car e) ,(cadr e))) lst))))
+      (lambda (ellipsis lites lst)
+        (if (eq? ellipsis '...)
+            `(syntax-rules ,lites ,@(map (lambda (e) `(,(car e) ,(cadr e))) lst))
+            `(syntax-rules ,ellipsis ,lites ,@(map (lambda (e) `(,(car e) ,(cadr e))) lst)))))
 
     (or (pair? form)
         (syntax-violation form "misplaced syntactic keyword" form))
 
     (destructuring-match spec
-      ((lites remark rules ...)
-       (let loop ((rules rules))
-         (if (null? rules)
-             (if remark
-                 (syntax-violation
-                   (car form)
-                   "invalid syntax"
-                   form
-                   (put-annotation (compiled->source lites (cddr spec)) remark))
-                 (syntax-violation (car form) "invalid syntax" form))
-             (let* ((rule (car rules))
-                    (pattern (car rule))
-                    (vars
-                      (and (match-pattern? form pattern lites) (bind-pattern form pattern lites '()))))
-               (if vars (transcribe-compiled-templete (cdr rule) vars) (loop (cdr rules))))))))))
+      ((ellipsis lites remark rules ...)
+       (parameterize ((ellipsis-id ellipsis))
+           (let loop ((rules rules))
+             (if (null? rules)
+                 (if remark
+                     (syntax-violation
+                       (car form)
+                       "invalid syntax"
+                       form
+                       (put-annotation (compiled->source ellipsis lites rules) remark))
+                     (syntax-violation (car form) "invalid syntax" form))
+                 (let* ((rule (car rules))
+                        (pattern (car rule))
+                        (vars
+                          (and (match-pattern? form pattern lites) (bind-pattern form pattern lites '()))))
+                   (if vars (transcribe-compiled-templete (cdr rule) vars) (loop (cdr rules)))))))))))
 
 (define parse-syntax-rule
   (lambda (lites clause env)
@@ -68,8 +71,10 @@
               (else #f))))
 
     (parameterize ((ellipsis-id (if ellipsis (unrename-syntax ellipsis env) '...)))
+      (pretty-print (ellipsis-id))(newline)
       (let ((lites (unrename-syntax lites env)) (clauses (unrename-syntax clauses env)))
         (cons*
+          (ellipsis-id)
           lites
           (make-remark form)
           (map (lambda (clause)
