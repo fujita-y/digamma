@@ -222,7 +222,7 @@
                         (_
                           (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer rule))))
                     rules)
-          (compile-syntax-rules transformer lites rules env))))
+          (compile-syntax-rules transformer ellipsis lites rules env))))
       (_ (compile-transformer transformer env)))))
 
 (define expand-let-syntax-bindings

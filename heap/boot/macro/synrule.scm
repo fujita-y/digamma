@@ -31,19 +31,20 @@
     (or (pair? form)
         (syntax-violation form "misplaced syntactic keyword" form))
 
-    (let ((lites (car spec)) (remark (cadr spec)) (rules (cddr spec)))
-      (let loop ((rules rules))
-        (if (null? rules)
-            (if remark
-                (syntax-violation (car form) "invalid syntax" form (put-annotation (compiled->source lites (cddr spec)) remark))
-                (syntax-violation (car form) "invalid syntax" form))
-            (let* ((rule (car rules))
-                   (pattern (car rule))
-                   (vars (and (match-pattern? form pattern lites)
-                              (bind-pattern form pattern lites '()))))
-              (if vars
-                  (transcribe-compiled-templete (cdr rule) vars)
-                  (loop (cdr rules)))))))))
+    (destructuring-match spec
+      ((lites remark rules ...)
+        (let loop ((rules rules))
+          (if (null? rules)
+              (if remark
+                  (syntax-violation (car form) "invalid syntax" form (put-annotation (compiled->source lites (cddr spec)) remark))
+                  (syntax-violation (car form) "invalid syntax" form))
+              (let* ((rule (car rules))
+                    (pattern (car rule))
+                    (vars (and (match-pattern? form pattern lites)
+                                (bind-pattern form pattern lites '()))))
+                (if vars
+                    (transcribe-compiled-templete (cdr rule) vars)
+                    (loop (cdr rules))))))))))
 
 (define parse-syntax-rule
   (lambda (lites clause env)
@@ -54,7 +55,7 @@
         (values pattern template ranks (collect-rename-ids template ranks))))))
 
 (define compile-syntax-rules
-  (lambda (form lites clauses env)
+  (lambda (form ellipsis lites clauses env)
 
     (define make-remark
       (lambda (form)
@@ -64,10 +65,11 @@
                           comment)))
               (else #f))))
 
-    (let ((lites (unrename-syntax lites env)) (clauses (unrename-syntax clauses env)))
-      (cons lites
-            (cons (make-remark form)
-                  (map (lambda (clause)
-                         (let-values (((pattern template ranks renames) (parse-syntax-rule lites clause env)))
-                           (list pattern template ranks renames)))
-                       clauses))))))
+    (parameterize ((ellipsis-id (if ellipsis (unrename-synatx ellipsis env) '...)))
+      (let ((lites (unrename-syntax lites env)) (clauses (unrename-syntax clauses env)))
+        (cons lites
+              (cons (make-remark form)
+                    (map (lambda (clause)
+                          (let-values (((pattern template ranks renames) (parse-syntax-rule lites clause env)))
+                            (list pattern template ranks renames)))
+                        clauses)))))))

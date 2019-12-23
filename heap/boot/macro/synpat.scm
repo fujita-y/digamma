@@ -1,6 +1,12 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
+(define ellipsis-id (make-parameter '...))
+
+(define ellipsis-id?
+  (lambda (form)
+    (eq? form (ellipsis-id))))
+
 (define ellipsis-pair?
   (lambda (form)
     (and (pair? form)
