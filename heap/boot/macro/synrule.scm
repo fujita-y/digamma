@@ -67,7 +67,7 @@
                           comment)))
               (else #f))))
 
-    (parameterize ((ellipsis-id (if ellipsis (unrename-synatx ellipsis env) '...)))
+    (parameterize ((ellipsis-id (if ellipsis (unrename-syntax ellipsis env) '...)))
       (let ((lites (unrename-syntax lites env)) (clauses (unrename-syntax clauses env)))
         (cons*
           lites
