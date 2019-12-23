@@ -204,14 +204,16 @@
       (((? syntax-rules? _) clauses ...)
        (begin
         (let* ((ellipsis (and (pair? clauses) (symbol? (car clauses)) (car clauses)))
-                (lites (if ellipsis (cadr clauses) (car clauses)))
-                (rules (if ellipsis (cddr clauses) (cdr clauses))))
+               (lites (if ellipsis (cadr clauses) (car clauses)))
+               (rules (if ellipsis (cddr clauses) (cdr clauses))))
           (or (and (list? lites) (every1 symbol? lites))
               (syntax-violation 'syntax-rules "invalid literals" transformer lites))
           (or (unique-id-list? lites)
               (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
           (and (memq '_ lites) (syntax-violation 'syntax-rules "_ in literals" transformer lites))
-          (and (memq '... lites) (syntax-violation 'syntax-rules "... in literals" transformer lites))
+          (if ellipsis
+              (and (memq ellipsis lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))
+              (and (memq '... lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites)))
           (for-each (lambda (rule)
                       (destructuring-match rule
                         ((((? symbol? _) . _) _) #t)
