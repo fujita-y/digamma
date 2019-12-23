@@ -200,31 +200,30 @@
         (denote-syntax-rules? env id)))
 
     (destructuring-match transformer
-      (((? syntax-rules? _))
-       (syntax-violation 'syntax-rules "expected literals and rules" transformer))
-      (((? syntax-rules? _) lites clauses ...)
+      (((? syntax-rules? _)) (syntax-violation 'syntax-rules "expected literals and rules" transformer))
+      (((? syntax-rules? _) clauses ...)
        (begin
-         (or (and (list? lites) (every1 symbol? lites))
-             (syntax-violation 'syntax-rules "invalid literals" transformer lites))
-         (or (unique-id-list? lites)
-             (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
-         (and (memq '_ lites)
-              (syntax-violation 'syntax-rules "_ in literals" transformer lites))
-         (and (memq '... lites)
-              (syntax-violation 'syntax-rules "... in literals" transformer lites))
-         (for-each (lambda (clause)
-                     (destructuring-match clause
-                       ((((? symbol? _) . _) _) #t)
-                       (((_ . _) _)
-                        (syntax-violation 'syntax-rules "expected identifer for first subform of pattern" transformer clause))
-                       ((_ _)
-                        (syntax-violation 'syntax-rules "expected list for pattern" transformer clause))
-                       (_
-                        (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer clause))))
-                   clauses)
-         (compile-syntax-rules transformer lites clauses env)))
-      (_
-       (compile-transformer transformer env)))))
+        (let* ((ellipsis (and (pair? clauses) (symbol? (car clauses)) (car clauses)))
+                (lites (if ellipsis (cadr clauses) (car clauses)))
+                (rules (if ellipsis (cddr clauses) (cdr clauses))))
+          (or (and (list? lites) (every1 symbol? lites))
+              (syntax-violation 'syntax-rules "invalid literals" transformer lites))
+          (or (unique-id-list? lites)
+              (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
+          (and (memq '_ lites) (syntax-violation 'syntax-rules "_ in literals" transformer lites))
+          (and (memq '... lites) (syntax-violation 'syntax-rules "... in literals" transformer lites))
+          (for-each (lambda (rule)
+                      (destructuring-match rule
+                        ((((? symbol? _) . _) _) #t)
+                        (((_ . _) _)
+                          (syntax-violation 'syntax-rules "expected identifer for first subform of pattern" transformer rule))
+                        ((_ _)
+                          (syntax-violation 'syntax-rules "expected list for pattern" transformer rule))
+                        (_
+                          (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer rule))))
+                    rules)
+          (compile-syntax-rules transformer lites rules env))))
+      (_ (compile-transformer transformer env)))))
 
 (define expand-let-syntax-bindings
   (lambda (form bindings env)
