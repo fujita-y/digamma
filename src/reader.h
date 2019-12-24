@@ -12,7 +12,7 @@
 
 class reader_t {
 public:
-    reader_t(VM* vm, scm_port_t input);
+    reader_t(VM* vm, scm_port_t input, bool foldcase = false);
     scm_obj_t read(scm_hashtable_t note);
     scm_obj_t read_graph(scm_hashtable_t note);
 private:
@@ -60,6 +60,7 @@ private:
     VM*             m_vm;
     scm_port_t      m_in;
     bool            m_file;
+    bool            m_foldcase;
     static bool     s_char_map_ready;
     static uint8_t  s_char_map[128];
     static void     make_char_map();

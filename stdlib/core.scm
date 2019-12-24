@@ -305,6 +305,7 @@
     define
     define-condition-type
     define-enumeration
+    define-library
     define-macro
     define-record-type
     define-struct
@@ -894,7 +895,6 @@
     timeout-object?
     top-level-bound?
     top-level-value
-    track-file-open
     transcoded-port
     transcoder-codec
     transcoder-eol-style

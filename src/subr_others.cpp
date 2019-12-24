@@ -65,6 +65,7 @@ subr_core_read(VM* vm, int argc, scm_obj_t argv[])
             return scm_undef;
         }
         try {
+            if (strcmp(who->name, "include-ci") == 0) return reader_t(vm, port, true).read(note);
             return reader_t(vm, port).read(note);
         } catch (reader_exception_t& exception) {
             lexical_violation(vm, who, exception.m_message);

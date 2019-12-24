@@ -68,7 +68,7 @@
                                            (core-hashtable-ref ht from '()))))))
 
   (setup-intrinsic-macros
-   '(core intrinsics) '( library define define-syntax
+   '(core intrinsics) '( library define-library define define-syntax
                          quote lambda if set!
                          cond case and or
                          let let* letrec letrec* let-values let*-values
@@ -499,8 +499,6 @@
                         socket-send socket-recv socket-accept
                         shutdown-output-port
                         port-closed?
-
-                        track-file-open
 
                         getenv
                         gethostname
