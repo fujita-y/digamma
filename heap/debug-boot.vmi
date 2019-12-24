@@ -274,35 +274,6 @@
  (set.gloc.of gcd)
  (ret.const.unspec))
 ((close
-   (2 0 . lcm2)
-   (call
-     (=n.iloc (0 . 0) 0 "./boot/r6rs-aux.scm" . 63505)
-     (if.true.ret)
-     (push.iloc.0 . 1)
-     (push.const . 0)
-     (ret.subr.gloc.of = "./boot/r6rs-aux.scm" . 63513))
-   (if.true
-     (call
-       (push.iloc.0 . 0)
-       (subr.gloc.of exact? 1 "./boot/r6rs-aux.scm" . 64534)
-       (if.false.ret)
-       (push.iloc.0 . 1)
-       (ret.subr.gloc.of exact? "./boot/r6rs-aux.scm" . 64545))
-     (if.true.ret.const . 0)
-     (ret.const . 0.0))
-   (push.iloc.0 . 0)
-   (call
-     (touch.gloc.of gcd2)
-     (push.iloc.0 . 0)
-     (push.iloc.0 . 1)
-     (apply.gloc.of gcd2 "./boot/r6rs-aux.scm" . 65569))
-   (push)
-   (push.subr.gloc.of quotient 2 "./boot/r6rs-aux.scm" . 65557)
-   (push.iloc.0 . 1)
-   (push.subr.gloc.of * 2 "./boot/r6rs-aux.scm" . 65554)
-   (ret.subr.gloc.of abs "./boot/r6rs-aux.scm" . 65549))
- (set.gloc.of |lcm2`57*|)
- (close
    (1 0 . loop)
    (push.iloc.0 . 0)
    (push.subr.gloc.of length 1 "./boot/r6rs-aux.scm" . 72717)
@@ -333,6 +304,35 @@
    (push.cons)
    (apply.gloc.of |loop`64*| "./boot/r6rs-aux.scm" . 76815))
  (set.gloc.of |loop`64*|)
+ (close
+   (2 0 . lcm2)
+   (call
+     (=n.iloc (0 . 0) 0 "./boot/r6rs-aux.scm" . 63505)
+     (if.true.ret)
+     (push.iloc.0 . 1)
+     (push.const . 0)
+     (ret.subr.gloc.of = "./boot/r6rs-aux.scm" . 63513))
+   (if.true
+     (call
+       (push.iloc.0 . 0)
+       (subr.gloc.of exact? 1 "./boot/r6rs-aux.scm" . 64534)
+       (if.false.ret)
+       (push.iloc.0 . 1)
+       (ret.subr.gloc.of exact? "./boot/r6rs-aux.scm" . 64545))
+     (if.true.ret.const . 0)
+     (ret.const . 0.0))
+   (push.iloc.0 . 0)
+   (call
+     (touch.gloc.of gcd2)
+     (push.iloc.0 . 0)
+     (push.iloc.0 . 1)
+     (apply.gloc.of gcd2 "./boot/r6rs-aux.scm" . 65569))
+   (push)
+   (push.subr.gloc.of quotient 2 "./boot/r6rs-aux.scm" . 65557)
+   (push.iloc.0 . 1)
+   (push.subr.gloc.of * 2 "./boot/r6rs-aux.scm" . 65554)
+   (ret.subr.gloc.of abs "./boot/r6rs-aux.scm" . 65549))
+ (set.gloc.of |lcm2`57*|)
  (close
    (0 1 . lcm)
    (call
@@ -467,6 +467,21 @@
  (set.gloc.of string->list)
  (ret.const.unspec))
 ((close
+   (2 0 . map-1)
+   (iloc.0 . 1)
+   (if.null?.ret.const)
+   (call
+     (push.car.iloc (0 . 1) "./boot/r6rs-aux.scm" . 116764)
+     (apply.iloc (0 . 0) "./boot/r6rs-aux.scm" . 116758))
+   (push)
+   (call
+     (touch.gloc.of |map-1`97*|)
+     (push.iloc.0 . 0)
+     (push.cdr.iloc (0 . 1) "./boot/r6rs-aux.scm" . 117794)
+     (apply.gloc.of |map-1`97*| "./boot/r6rs-aux.scm" . 117782))
+   (ret.cons "./boot/r6rs-aux.scm" . 116752))
+ (set.gloc.of |map-1`97*|)
+ (close
    (2 0 . map-n)
    (iloc.0 . 1)
    (if.null?.ret.const)
@@ -482,21 +497,6 @@
      (apply.gloc.of |map-n`97*| "./boot/r6rs-aux.scm" . 124950))
    (ret.cons "./boot/r6rs-aux.scm" . 123920))
  (set.gloc.of |map-n`97*|)
- (close
-   (2 0 . map-1)
-   (iloc.0 . 1)
-   (if.null?.ret.const)
-   (call
-     (push.car.iloc (0 . 1) "./boot/r6rs-aux.scm" . 116764)
-     (apply.iloc (0 . 0) "./boot/r6rs-aux.scm" . 116758))
-   (push)
-   (call
-     (touch.gloc.of |map-1`97*|)
-     (push.iloc.0 . 0)
-     (push.cdr.iloc (0 . 1) "./boot/r6rs-aux.scm" . 117794)
-     (apply.gloc.of |map-1`97*| "./boot/r6rs-aux.scm" . 117782))
-   (ret.cons "./boot/r6rs-aux.scm" . 116752))
- (set.gloc.of |map-1`97*|)
  (close
    (2 1 . map)
    (iloc.0 . 2)
@@ -2061,40 +2061,6 @@
  (set.gloc.of check-let-bindings)
  (ret.const.unspec))
 ((close
-   (2 0 . loop)
-   (iloc.0 . 0)
-   (if.pair?
-     (touch.gloc.of |loop`400*|)
-     (push.cdr.iloc (0 . 0) "./boot/macro/expand.scm" . 66584)
-     (call
-       (touch.gloc.of |loop`400*|)
-       (push.car.iloc (0 . 0) "./boot/macro/expand.scm" . 67614)
-       (push.iloc.0 . 1)
-       (apply.gloc.of |loop`400*| "./boot/macro/expand.scm" . 67608))
-     (push)
-     (apply.gloc.of |loop`400*| "./boot/macro/expand.scm" . 66578))
-   (iloc.0 . 0)
-   (if.symbol?
-     (push.iloc.0 . 0)
-     (push.iloc.0 . 1)
-     (subr.gloc.of memq 2 "./boot/macro/expand.scm" . 69657)
-     (if.true (ret.iloc 0 . 1))
-     (push.iloc.0 . 0)
-     (iloc.0 . 1)
-     (ret.cons "./boot/macro/expand.scm" . 70686))
-   (ret.iloc 0 . 1))
- (set.gloc.of |loop`400*|)
- (close
-   (1 0 . collect-ids)
-   (touch.gloc.of |filter-unique-ids`395*|)
-   (call
-     (touch.gloc.of |loop`408*|)
-     (push.iloc.0 . 0)
-     (apply.gloc.of |loop`408*| "./boot/macro/expand.scm" . 77836))
-   (push)
-   (apply.gloc.of |filter-unique-ids`395*| (|filter-unique-ids`395*| (|loop`408*| |lst`404*|))))
- (set.gloc.of |collect-ids`395*|)
- (close
    (1 0 . loop)
    (iloc.0 . 0)
    (if.symbol? (ret.iloc 0 . 0))
@@ -2118,6 +2084,40 @@
    (push.const)
    (apply.gloc.of |loop`400*| "./boot/macro/expand.scm" . 65547))
  (set.gloc.of |filter-unique-ids`395*|)
+ (close
+   (1 0 . collect-ids)
+   (touch.gloc.of |filter-unique-ids`395*|)
+   (call
+     (touch.gloc.of |loop`408*|)
+     (push.iloc.0 . 0)
+     (apply.gloc.of |loop`408*| "./boot/macro/expand.scm" . 77836))
+   (push)
+   (apply.gloc.of |filter-unique-ids`395*| (|filter-unique-ids`395*| (|loop`408*| |lst`404*|))))
+ (set.gloc.of |collect-ids`395*|)
+ (close
+   (2 0 . loop)
+   (iloc.0 . 0)
+   (if.pair?
+     (touch.gloc.of |loop`400*|)
+     (push.cdr.iloc (0 . 0) "./boot/macro/expand.scm" . 66584)
+     (call
+       (touch.gloc.of |loop`400*|)
+       (push.car.iloc (0 . 0) "./boot/macro/expand.scm" . 67614)
+       (push.iloc.0 . 1)
+       (apply.gloc.of |loop`400*| "./boot/macro/expand.scm" . 67608))
+     (push)
+     (apply.gloc.of |loop`400*| "./boot/macro/expand.scm" . 66578))
+   (iloc.0 . 0)
+   (if.symbol?
+     (push.iloc.0 . 0)
+     (push.iloc.0 . 1)
+     (subr.gloc.of memq 2 "./boot/macro/expand.scm" . 69657)
+     (if.true (ret.iloc 0 . 1))
+     (push.iloc.0 . 0)
+     (iloc.0 . 1)
+     (ret.cons "./boot/macro/expand.scm" . 70686))
+   (ret.iloc 0 . 1))
+ (set.gloc.of |loop`400*|)
  (close
    (2 0 . check-internal-def-contract-violation)
    (call
@@ -2156,6 +2156,13 @@
    (ret.const))
  (set.gloc.of |loop`430*|)
  (close
+   (1 0 . filter-unique-ids)
+   (touch.gloc.of |loop`422*|)
+   (push.iloc.0 . 0)
+   (push.const)
+   (apply.gloc.of |loop`422*| "./boot/macro/expand.scm" . 93195))
+ (set.gloc.of |filter-unique-ids`417*|)
+ (close
    (1 0 . collect-ids)
    (touch.gloc.of |filter-unique-ids`417*|)
    (call
@@ -2189,13 +2196,6 @@
      (ret.cons "./boot/macro/expand.scm" . 98334))
    (ret.iloc 0 . 1))
  (set.gloc.of |loop`422*|)
- (close
-   (1 0 . filter-unique-ids)
-   (touch.gloc.of |loop`422*|)
-   (push.iloc.0 . 0)
-   (push.const)
-   (apply.gloc.of |loop`422*| "./boot/macro/expand.scm" . 93195))
- (set.gloc.of |filter-unique-ids`417*|)
  (close
    (2 0 . check-rec-contract-violation)
    (call
@@ -2775,7 +2775,7 @@
      (push.iloc.0 . 1)
      (apply.gloc.of generate-local-macro-symbol "./boot/macro/expand.scm" . 261202))
    (ret.cons "./boot/macro/expand.scm" . 261182))
- (set.gloc.of |.L220|)
+ (set.gloc.of |.L221|)
  (close
    (3 0 . expand-letrec-syntax-bindings)
    (extend.enclose
@@ -2810,7 +2810,7 @@
    (call
      (touch.gloc.of extend-env)
      (call
-       (push.gloc.of |.L220|)
+       (push.gloc.of |.L221|)
        (push.iloc.0 . 0)
        (push.iloc.1 . 0)
        (apply.gloc.of map "./boot/macro/expand.scm" . 261149))
@@ -2942,43 +2942,6 @@
  (set.gloc.of expand-macro-use)
  (ret.const.unspec))
 ((close
-   (2 0 . rewrite-letrec-syntax)
-   (call
-     (iloc.0 . 0)
-     (if.not.pair?.ret.const . #f)
-     (cdr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
-     (if.not.pair?.ret.const . #f)
-     (push.cddr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
-     (ret.subr.gloc.of list? "./boot/macro/expand.scm" . 299017))
-   (if.true
-     (push.cddr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
-     (push.cadr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
-     (extend . 2)
-     (call
-       (touch.gloc.of check-let-bindings)
-       (push.iloc.1 . 0)
-       (push.iloc.0 . 1)
-       (apply.gloc.of check-let-bindings "./boot/macro/expand.scm" . 299017))
-     (call
-       (touch.gloc.of fresh-rename-count)
-       (apply.gloc.of fresh-rename-count "./boot/macro/expand.scm" . 299017))
-     (push.const . |.BEGIN|)
-     (iloc.0 . 0)
-     (push.cons)
-     (call
-       (touch.gloc.of expand-letrec-syntax-bindings)
-       (push.iloc.1 . 0)
-       (push.iloc.0 . 1)
-       (push.iloc.1 . 1)
-       (apply.gloc.of expand-letrec-syntax-bindings "./boot/macro/expand.scm" . 299017))
-     (push)
-     (ret.subr.gloc.of values "./boot/macro/expand.scm" . 299017))
-   (push.car.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
-   (push.const . "missing clause")
-   (push.iloc.0 . 0)
-   (apply.gloc.of syntax-violation "./boot/macro/expand.scm" . 299017))
- (set.gloc.of |rewrite-letrec-syntax`568*|)
- (close
    (2 0 . rewrite-let-syntax)
    (call
      (iloc.0 . 0)
@@ -3015,6 +2978,43 @@
    (push.iloc.0 . 0)
    (apply.gloc.of syntax-violation "./boot/macro/expand.scm" . 287753))
  (set.gloc.of |rewrite-let-syntax`568*|)
+ (close
+   (2 0 . rewrite-letrec-syntax)
+   (call
+     (iloc.0 . 0)
+     (if.not.pair?.ret.const . #f)
+     (cdr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
+     (if.not.pair?.ret.const . #f)
+     (push.cddr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
+     (ret.subr.gloc.of list? "./boot/macro/expand.scm" . 299017))
+   (if.true
+     (push.cddr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
+     (push.cadr.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
+     (extend . 2)
+     (call
+       (touch.gloc.of check-let-bindings)
+       (push.iloc.1 . 0)
+       (push.iloc.0 . 1)
+       (apply.gloc.of check-let-bindings "./boot/macro/expand.scm" . 299017))
+     (call
+       (touch.gloc.of fresh-rename-count)
+       (apply.gloc.of fresh-rename-count "./boot/macro/expand.scm" . 299017))
+     (push.const . |.BEGIN|)
+     (iloc.0 . 0)
+     (push.cons)
+     (call
+       (touch.gloc.of expand-letrec-syntax-bindings)
+       (push.iloc.1 . 0)
+       (push.iloc.0 . 1)
+       (push.iloc.1 . 1)
+       (apply.gloc.of expand-letrec-syntax-bindings "./boot/macro/expand.scm" . 299017))
+     (push)
+     (ret.subr.gloc.of values "./boot/macro/expand.scm" . 299017))
+   (push.car.iloc (0 . 0) "./boot/macro/expand.scm" . 299017)
+   (push.const . "missing clause")
+   (push.iloc.0 . 0)
+   (apply.gloc.of syntax-violation "./boot/macro/expand.scm" . 299017))
+ (set.gloc.of |rewrite-letrec-syntax`568*|)
  (close
    (2 0 . expand-initial-forms)
    (call
@@ -5391,7 +5391,7 @@
    (push.iloc.0 . 0)
    (push.const . |.&UNDEF|)
    (ret.subr.gloc.of list "./boot/macro/derived.scm" . 48131))
- (set.gloc.of |.L293|)
+ (set.gloc.of |.L292|)
  (close
    (2 0)
    (push.const . set!)
@@ -5532,7 +5532,7 @@
      (touch.gloc.of annotate)
      (push.const . let)
      (call
-       (push.gloc.of |.L293|)
+       (push.gloc.of |.L292|)
        (push.iloc 3 . 0)
        (apply.gloc.of map "./boot/macro/derived.scm" . 48131))
      (push)
@@ -5571,18 +5571,18 @@
  (set.gloc.of expand-letrec*)
  (ret.const.unspec))
 ((close
-   (1 0)
-   (push.iloc.0 . 0)
-   (push.const . |.&UNDEF|)
-   (ret.subr.gloc.of list "./boot/macro/derived.scm" . 76803))
- (set.gloc.of |.L303|)
- (close
    (2 0)
    (push.const . set!)
    (push.iloc.0 . 0)
    (push.iloc.0 . 1)
    (ret.subr.gloc.of |.list| "./boot/macro/derived.scm" . 76803))
  (set.gloc.of |.L301|)
+ (close
+   (1 0)
+   (push.iloc.0 . 0)
+   (push.const . |.&UNDEF|)
+   (ret.subr.gloc.of list "./boot/macro/derived.scm" . 76803))
+ (set.gloc.of |.L303|)
  (close
    (2 0 . expand-letrec)
    (call
@@ -9533,16 +9533,6 @@
  (set.gloc.of contain-rank-moved-var?)
  (ret.const.unspec))
 ((close
-   (1 0 . make-infinite-list)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of list 1 "./boot/macro/syntmp.scm" . 195610)
-   (extend . 1)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 0)
-   (subr.gloc.of set-cdr! 2 "./boot/macro/syntmp.scm" . 196632)
-   (ret.iloc 0 . 0))
- (set.gloc.of |make-infinite-list`1437*|)
- (close
    (3 0 . rewrite-template-ranks-vars)
    (subr.gloc.of make-core-hashtable 0)
    (push)
@@ -9794,6 +9784,16 @@
        (append |vars`1434*| (core-hashtable->alist |moved-vars`1436*|)))))
  (set.gloc.of |rewrite-template-ranks-vars`1433*|)
  (close
+   (1 0 . make-infinite-list)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of list 1 "./boot/macro/syntmp.scm" . 195610)
+   (extend . 1)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 0)
+   (subr.gloc.of set-cdr! 2 "./boot/macro/syntmp.scm" . 196632)
+   (ret.iloc 0 . 0))
+ (set.gloc.of |make-infinite-list`1437*|)
+ (close
    (3 0 . adapt-to-rank-moved-vars)
    (call
      (touch.gloc.of contain-rank-moved-var?)
@@ -9814,6 +9814,26 @@
  (set.gloc.of adapt-to-rank-moved-vars)
  (ret.const.unspec))
 ((close
+   (2 0 . loop)
+   (iloc.0 . 0)
+   (if.null? (ret.iloc 0 . 1))
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of caar 1 "./boot/macro/syntmp.scm" . 264220)
+   (push.iloc.0 . 1)
+   (subr.gloc.of assq 2 "./boot/macro/syntmp.scm" . 264214)
+   (if.true
+     (touch.gloc.of |loop`1482*|)
+     (push.cdr.iloc (0 . 0) "./boot/macro/syntmp.scm" . 265244)
+     (push.iloc.0 . 1)
+     (apply.gloc.of |loop`1482*| "./boot/macro/syntmp.scm" . 265238))
+   (touch.gloc.of |loop`1482*|)
+   (push.cdr.iloc (0 . 0) "./boot/macro/syntmp.scm" . 267292)
+   (push.car.iloc (0 . 0) "./boot/macro/syntmp.scm" . 267308)
+   (iloc.0 . 1)
+   (push.cons)
+   (apply.gloc.of |loop`1482*| "./boot/macro/syntmp.scm" . 267286))
+ (set.gloc.of |loop`1482*|)
+ (close
    (1 0 . remove-duplicates)
    (call
      (extend.enclose+
@@ -9835,26 +9855,6 @@
    (push.const)
    (apply.gloc.of |loop`1482*| "./boot/macro/syntmp.scm" . 263183))
  (set.gloc.of |remove-duplicates`1471*|)
- (close
-   (2 0 . loop)
-   (iloc.0 . 0)
-   (if.null? (ret.iloc 0 . 1))
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of caar 1 "./boot/macro/syntmp.scm" . 264220)
-   (push.iloc.0 . 1)
-   (subr.gloc.of assq 2 "./boot/macro/syntmp.scm" . 264214)
-   (if.true
-     (touch.gloc.of |loop`1482*|)
-     (push.cdr.iloc (0 . 0) "./boot/macro/syntmp.scm" . 265244)
-     (push.iloc.0 . 1)
-     (apply.gloc.of |loop`1482*| "./boot/macro/syntmp.scm" . 265238))
-   (touch.gloc.of |loop`1482*|)
-   (push.cdr.iloc (0 . 0) "./boot/macro/syntmp.scm" . 267292)
-   (push.car.iloc (0 . 0) "./boot/macro/syntmp.scm" . 267308)
-   (iloc.0 . 1)
-   (push.cons)
-   (apply.gloc.of |loop`1482*| "./boot/macro/syntmp.scm" . 267286))
- (set.gloc.of |loop`1482*|)
  (close
    (5 0 . transcribe-template)
    (push.close
@@ -10421,6 +10421,41 @@
 
 ;
 ((close
+   (1 0)
+   (push.car.iloc (0 . 0) "./boot/macro/synrule.scm" . 30777)
+   (push.cadr.iloc (0 . 0) "./boot/macro/synrule.scm" . 30786)
+   (ret.subr.gloc.of |.list| "./boot/macro/synrule.scm" . 30762))
+ (set.gloc.of |.L438|)
+ (close
+   (3 0 . compiled->source)
+   (push.iloc.0 . 0)
+   (const . ...)
+   (if.eq?
+     (push.const . syntax-rules)
+     (push.iloc.0 . 1)
+     (call
+       (push.gloc.of |.L438|)
+       (push.iloc.0 . 2)
+       (apply.gloc.of map "./boot/macro/synrule.scm" . 30757))
+     (push)
+     (ret.subr.gloc.of |.cons*| "./boot/macro/synrule.scm" . 29705))
+   (push.const . syntax-rules)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (call
+     (push.gloc.of |.L440|)
+     (push.iloc.0 . 2)
+     (apply.gloc.of map "./boot/macro/synrule.scm" . 31791))
+   (push)
+   (ret.subr.gloc.of |.cons*| "./boot/macro/synrule.scm" . 29705))
+ (set.gloc.of |compiled->source`1521*|)
+ (close
+   (1 0)
+   (push.car.iloc (0 . 0) "./boot/macro/synrule.scm" . 31811)
+   (push.cadr.iloc (0 . 0) "./boot/macro/synrule.scm" . 31820)
+   (ret.subr.gloc.of |.list| "./boot/macro/synrule.scm" . 31796))
+ (set.gloc.of |.L440|)
+ (close
    (2 0 . transcribe-compiled-templete)
    (push.car.iloc (0 . 0) "./boot/macro/synrule.scm" . 9241)
    (push.cadr.iloc (0 . 0) "./boot/macro/synrule.scm" . 10265)
@@ -10482,41 +10517,6 @@
    (push)
    (ret.subr.gloc.of values "./boot/macro/synrule.scm" . 22541))
  (set.gloc.of |transcribe-compiled-templete`1521*|)
- (close
-   (3 0 . compiled->source)
-   (push.iloc.0 . 0)
-   (const . ...)
-   (if.eq?
-     (push.const . syntax-rules)
-     (push.iloc.0 . 1)
-     (call
-       (push.gloc.of |.L438|)
-       (push.iloc.0 . 2)
-       (apply.gloc.of map "./boot/macro/synrule.scm" . 30757))
-     (push)
-     (ret.subr.gloc.of |.cons*| "./boot/macro/synrule.scm" . 29705))
-   (push.const . syntax-rules)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (call
-     (push.gloc.of |.L439|)
-     (push.iloc.0 . 2)
-     (apply.gloc.of map "./boot/macro/synrule.scm" . 31791))
-   (push)
-   (ret.subr.gloc.of |.cons*| "./boot/macro/synrule.scm" . 29705))
- (set.gloc.of |compiled->source`1521*|)
- (close
-   (1 0)
-   (push.car.iloc (0 . 0) "./boot/macro/synrule.scm" . 31811)
-   (push.cadr.iloc (0 . 0) "./boot/macro/synrule.scm" . 31820)
-   (ret.subr.gloc.of |.list| "./boot/macro/synrule.scm" . 31796))
- (set.gloc.of |.L439|)
- (close
-   (1 0)
-   (push.car.iloc (0 . 0) "./boot/macro/synrule.scm" . 30777)
-   (push.cadr.iloc (0 . 0) "./boot/macro/synrule.scm" . 30786)
-   (ret.subr.gloc.of |.list| "./boot/macro/synrule.scm" . 30762))
- (set.gloc.of |.L438|)
  (close
    (2 0 . transcribe-syntax-rules)
    (call
@@ -10713,14 +10713,6 @@
  (set.gloc.of parse-syntax-rule)
  (ret.const.unspec))
 ((close
-   (4 0)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.iloc.0 . 2)
-   (push.iloc.0 . 3)
-   (ret.subr.gloc.of list "./boot/macro/synrule.scm" . 82963))
- (set.gloc.of |.L455|)
- (close
    (1 0 . make-remark)
    (call
      (touch.gloc.of get-annotation)
@@ -10738,6 +10730,14 @@
    (iloc.0 . 0)
    (ret.cons "./boot/macro/synrule.scm" . 70677))
  (set.gloc.of |make-remark`1581*|)
+ (close
+   (4 0)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (push.iloc.0 . 2)
+   (push.iloc.0 . 3)
+   (ret.subr.gloc.of list "./boot/macro/synrule.scm" . 82963))
+ (set.gloc.of |.L454|)
  (close
    (5 0 . compile-syntax-rules)
    (push.const . #f)
@@ -10795,7 +10795,7 @@
            (push.iloc.1 . 0)
            (push.iloc 5 . 4)
            (apply.gloc.of parse-syntax-rule "./boot/macro/synrule.scm" . 81984))
-         (push.gloc.of |.L455|)
+         (push.gloc.of |.L454|)
          (apply.gloc.of |.call-with-values| "./boot/macro/synrule.scm" . 81984))
        (push.iloc.0 . 1)
        (apply.gloc.of map "./boot/macro/synrule.scm" . 80912))
@@ -11143,21 +11143,11 @@
  (push.gloc.of |.L476|)
  (ret.subr.gloc.of set-top-level-value! "./boot/macro/syncase.scm" . 76801))
 ((close
-   (1 1)
-   (iloc.0 . 1)
-   (if.null?
-     (push.iloc.0 . 0)
-     (apply.gloc.of |.flatten-syntax| "./boot/macro/syncase.scm" . 108572))
-   (push.iloc.0 . 0)
-   (push.car.iloc (0 . 1) "./boot/macro/syncase.scm" . 109608)
-   (ret.subr.gloc.of values "./boot/macro/syncase.scm" . 109596))
- (set.gloc.of |.L478|)
- (close
    (1 0)
    (push.close
      (1 0 . thunk)
      (push.close (0 0) (push.iloc.1 . 0) (apply.iloc (2 . 0) "./boot/macro/syncase.scm" . 105505))
-     (push.gloc.of |.L478|)
+     (push.gloc.of |.L479|)
      (apply.gloc.of call-with-values "./boot/macro/syncase.scm" . 104468))
    (extend . 1)
    (push.iloc.1 . 0)
@@ -11198,20 +11188,21 @@
      (push.iloc.0 . 0)
      (apply.gloc.of make-variable-transformer-token "./boot/macro/syncase.scm" . 115726))
    (ret.iloc 1 . 0))
+ (set.gloc.of |.L478|)
+ (close
+   (1 1)
+   (iloc.0 . 1)
+   (if.null?
+     (push.iloc.0 . 0)
+     (apply.gloc.of |.flatten-syntax| "./boot/macro/syncase.scm" . 108572))
+   (push.iloc.0 . 0)
+   (push.car.iloc (0 . 1) "./boot/macro/syncase.scm" . 109608)
+   (ret.subr.gloc.of values "./boot/macro/syncase.scm" . 109596))
  (set.gloc.of |.L479|)
  (push.const . |.transformer-thunk|)
- (push.gloc.of |.L479|)
- (ret.subr.gloc.of set-top-level-value! "./boot/macro/syncase.scm" . 106518))
+ (push.gloc.of |.L478|)
+ (ret.subr.gloc.of set-top-level-value! "./boot/macro/syncase.scm" . 102403))
 ((close
-   (1 0)
-   (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 122887)
-   (call
-     (touch.gloc.of make-pattern-variable)
-     (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 122887)
-     (apply.gloc.of make-pattern-variable "./boot/macro/syncase.scm" . 122887))
-   (ret.cons "./boot/macro/syncase.scm" . 122887))
- (set.gloc.of |.L488|)
- (close
    (2 0 . rewrite)
    (extend.enclose
      (1 0 . loop)
@@ -11249,6 +11240,15 @@
    (push.iloc.1 . 0)
    (apply.iloc (0 . 0) "./boot/macro/syncase.scm" . 124939))
  (set.gloc.of |rewrite`1680*|)
+ (close
+   (1 0)
+   (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 122887)
+   (call
+     (touch.gloc.of make-pattern-variable)
+     (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 122887)
+     (apply.gloc.of make-pattern-variable "./boot/macro/syncase.scm" . 122887))
+   (ret.cons "./boot/macro/syncase.scm" . 122887))
+ (set.gloc.of |.L486|)
  (close
    (2 0 . expand-syntax-case)
    (call
@@ -11369,7 +11369,7 @@
        (call
          (touch.gloc.of extend-env)
          (call
-           (push.gloc.of |.L488|)
+           (push.gloc.of |.L486|)
            (call
              (touch.gloc.of collect-vars-ranks)
              (push.iloc.0 . 0)
@@ -12404,7 +12404,7 @@
    (push.const)
    (push.const . #f)
    (apply.gloc.of make-syntax-object "./boot/macro/syncase.scm" . 346134))
- (set.gloc.of |.L510|)
+ (set.gloc.of |.L509|)
  (close
    (1 0 . generate-temporaries)
    (push.iloc.0 . 0)
@@ -12415,7 +12415,7 @@
      (push.iloc.0 . 0)
      (push.subr.gloc.of format 2 "./boot/macro/syncase.scm" . 345140)
      (apply.gloc.of assertion-violation "./boot/macro/syncase.scm" . 345097))
-   (push.gloc.of |.L510|)
+   (push.gloc.of |.L509|)
    (push.iloc.0 . 0)
    (apply.gloc.of map "./boot/macro/syncase.scm" . 346117))
  (set.gloc.of generate-temporaries)
@@ -12674,52 +12674,60 @@
  (set.gloc.of unwrap-syntax)
  (ret.const.unspec))
 ((close
-   (1 0 . rewrite-nil)
-   (touch.gloc.of |loop`1881*|)
-   (push.iloc.0 . 0)
-   (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 449547))
- (set.gloc.of |rewrite-nil`1860*|)
- (close
-   (1 0 . loop)
-   (iloc.0 . 0)
-   (if.pair?
-     (call
-       (touch.gloc.of |loop`1881*|)
-       (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 450593)
-       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 450587))
-     (push)
-     (call
-       (touch.gloc.of |loop`1881*|)
-       (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 450614)
-       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 450608))
-     (push)
-     (extend . 2)
-     (call
-       (push.car.iloc (1 . 0) "./boot/macro/syncase.scm" . 451621)
-       (iloc.0 . 0)
-       (if.not.eq?.ret.const . #f)
-       (push.cdr.iloc (1 . 0) "./boot/macro/syncase.scm" . 451639)
-       (iloc.0 . 1)
-       (ret.eq? "./boot/macro/syncase.scm" . 451634))
-     (if.true (ret.iloc 1 . 0))
-     (push.iloc.0 . 0)
-     (iloc.0 . 1)
-     (ret.cons "./boot/macro/syncase.scm" . 452640))
-   (push.iloc.0 . 0)
-   (subr.gloc.of vector? 1 "./boot/macro/syncase.scm" . 453650)
-   (if.true
-     (call
-       (touch.gloc.of |loop`1881*|)
+   (2 0 . wrap-renamed-id)
+   (extend.enclose+
+     (1 0 . loop)
+     (iloc.0 . 0)
+     (if.pair?
+       (call
+         (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 462881)
+         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 462875))
+       (push)
+       (call
+         (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 462902)
+         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 462896))
+       (push)
+       (extend . 2)
+       (call
+         (push.car.iloc (1 . 0) "./boot/macro/syncase.scm" . 463909)
+         (iloc.0 . 0)
+         (if.not.eq?.ret.const . #f)
+         (push.cdr.iloc (1 . 0) "./boot/macro/syncase.scm" . 463927)
+         (iloc.0 . 1)
+         (ret.eq? "./boot/macro/syncase.scm" . 463922))
+       (if.true (ret.iloc 1 . 0))
        (push.iloc.0 . 0)
-       (push.subr.gloc.of vector->list 1 "./boot/macro/syncase.scm" . 454694)
-       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 454688))
-     (push)
-     (ret.subr.gloc.of list->vector "./boot/macro/syncase.scm" . 454674))
-   (push.iloc.0 . 0)
-   (const . |.&NIL|)
-   (if.eq?.ret.const)
-   (ret.iloc 0 . 0))
- (set.gloc.of |loop`1881*|)
+       (iloc.0 . 1)
+       (ret.cons "./boot/macro/syncase.scm" . 464928))
+     (push.iloc.0 . 0)
+     (subr.gloc.of vector? 1 "./boot/macro/syncase.scm" . 465938)
+     (if.true
+       (call
+         (push.iloc.0 . 0)
+         (push.subr.gloc.of vector->list 1 "./boot/macro/syncase.scm" . 466982)
+         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 466976))
+       (push)
+       (ret.subr.gloc.of list->vector "./boot/macro/syncase.scm" . 466962))
+     (call
+       (touch.gloc.of renamed-id?)
+       (push.iloc.0 . 0)
+       (apply.gloc.of renamed-id? "./boot/macro/syncase.scm" . 467986))
+     (if.true
+       (touch.gloc.of make-syntax-object)
+       (push.iloc.0 . 0)
+       (call
+         (push.iloc.0 . 0)
+         (push.iloc 2 . 1)
+         (subr.gloc.of assq 2 "./boot/macro/syncase.scm" . 469038)
+         (if.true.ret)
+         (ret.const))
+       (push)
+       (push.const . #f)
+       (apply.gloc.of make-syntax-object "./boot/macro/syncase.scm" . 469010))
+     (ret.iloc 0 . 0))
+   (push.iloc.1 . 0)
+   (apply.iloc+ (0 . 0) "./boot/macro/syncase.scm" . 461835))
+ (set.gloc.of |wrap-renamed-id`1860*|)
  (close
    (2 0 . partial-wrap-syntax-object)
    (extend.enclose+
@@ -12820,61 +12828,6 @@
    (apply.gloc.of make-syntax-object "./boot/macro/syncase.scm" . 431125))
  (set.gloc.of |emit`1860*|)
  (close
-   (2 0 . wrap-renamed-id)
-   (extend.enclose+
-     (1 0 . loop)
-     (iloc.0 . 0)
-     (if.pair?
-       (call
-         (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 462881)
-         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 462875))
-       (push)
-       (call
-         (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 462902)
-         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 462896))
-       (push)
-       (extend . 2)
-       (call
-         (push.car.iloc (1 . 0) "./boot/macro/syncase.scm" . 463909)
-         (iloc.0 . 0)
-         (if.not.eq?.ret.const . #f)
-         (push.cdr.iloc (1 . 0) "./boot/macro/syncase.scm" . 463927)
-         (iloc.0 . 1)
-         (ret.eq? "./boot/macro/syncase.scm" . 463922))
-       (if.true (ret.iloc 1 . 0))
-       (push.iloc.0 . 0)
-       (iloc.0 . 1)
-       (ret.cons "./boot/macro/syncase.scm" . 464928))
-     (push.iloc.0 . 0)
-     (subr.gloc.of vector? 1 "./boot/macro/syncase.scm" . 465938)
-     (if.true
-       (call
-         (push.iloc.0 . 0)
-         (push.subr.gloc.of vector->list 1 "./boot/macro/syncase.scm" . 466982)
-         (apply.iloc+ (1 . 0) "./boot/macro/syncase.scm" . 466976))
-       (push)
-       (ret.subr.gloc.of list->vector "./boot/macro/syncase.scm" . 466962))
-     (call
-       (touch.gloc.of renamed-id?)
-       (push.iloc.0 . 0)
-       (apply.gloc.of renamed-id? "./boot/macro/syncase.scm" . 467986))
-     (if.true
-       (touch.gloc.of make-syntax-object)
-       (push.iloc.0 . 0)
-       (call
-         (push.iloc.0 . 0)
-         (push.iloc 2 . 1)
-         (subr.gloc.of assq 2 "./boot/macro/syncase.scm" . 469038)
-         (if.true.ret)
-         (ret.const))
-       (push)
-       (push.const . #f)
-       (apply.gloc.of make-syntax-object "./boot/macro/syncase.scm" . 469010))
-     (ret.iloc 0 . 0))
-   (push.iloc.1 . 0)
-   (apply.iloc+ (0 . 0) "./boot/macro/syncase.scm" . 461835))
- (set.gloc.of |wrap-renamed-id`1860*|)
- (close
    (1 0 . contain-wrapped-syntax-object?)
    (touch.gloc.of |loop`1867*|)
    (push.iloc.0 . 0)
@@ -12918,6 +12871,53 @@
    (push.iloc.0 . 0)
    (apply.gloc.of wrapped-syntax-object? "./boot/macro/syncase.scm" . 444434))
  (set.gloc.of |loop`1867*|)
+ (close
+   (1 0 . rewrite-nil)
+   (touch.gloc.of |loop`1881*|)
+   (push.iloc.0 . 0)
+   (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 449547))
+ (set.gloc.of |rewrite-nil`1860*|)
+ (close
+   (1 0 . loop)
+   (iloc.0 . 0)
+   (if.pair?
+     (call
+       (touch.gloc.of |loop`1881*|)
+       (push.car.iloc (0 . 0) "./boot/macro/syncase.scm" . 450593)
+       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 450587))
+     (push)
+     (call
+       (touch.gloc.of |loop`1881*|)
+       (push.cdr.iloc (0 . 0) "./boot/macro/syncase.scm" . 450614)
+       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 450608))
+     (push)
+     (extend . 2)
+     (call
+       (push.car.iloc (1 . 0) "./boot/macro/syncase.scm" . 451621)
+       (iloc.0 . 0)
+       (if.not.eq?.ret.const . #f)
+       (push.cdr.iloc (1 . 0) "./boot/macro/syncase.scm" . 451639)
+       (iloc.0 . 1)
+       (ret.eq? "./boot/macro/syncase.scm" . 451634))
+     (if.true (ret.iloc 1 . 0))
+     (push.iloc.0 . 0)
+     (iloc.0 . 1)
+     (ret.cons "./boot/macro/syncase.scm" . 452640))
+   (push.iloc.0 . 0)
+   (subr.gloc.of vector? 1 "./boot/macro/syncase.scm" . 453650)
+   (if.true
+     (call
+       (touch.gloc.of |loop`1881*|)
+       (push.iloc.0 . 0)
+       (push.subr.gloc.of vector->list 1 "./boot/macro/syncase.scm" . 454694)
+       (apply.gloc.of |loop`1881*| "./boot/macro/syncase.scm" . 454688))
+     (push)
+     (ret.subr.gloc.of list->vector "./boot/macro/syncase.scm" . 454674))
+   (push.iloc.0 . 0)
+   (const . |.&NIL|)
+   (if.eq?.ret.const)
+   (ret.iloc 0 . 0))
+ (set.gloc.of |loop`1881*|)
  (close
    (6 0 . syntax-transcribe)
    (iloc.0 . 1)
@@ -15381,14 +15381,6 @@
  (set.gloc.of expand-library)
  (ret.const.unspec))
 ((close
-   (1 0)
-   (push.const . |.require-scheme-library|)
-   (push.const . quote)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of |.list| 2 (|.list| 'quote |dep`2333*|))
-   (ret.subr.gloc.of |.list| "./boot/macro/library.scm" . 444442))
- (set.gloc.of |.L650|)
- (close
    (4 0 . make-proc-macro)
    (call
      (iloc.0 . 2)
@@ -15521,6 +15513,14 @@
    (push.iloc.0 . 3)
    (ret.subr.gloc.of |.list| "./boot/macro/library.scm" . 415755))
  (set.gloc.of |make-rule-macro`2312*|)
+ (close
+   (1 0)
+   (push.const . |.require-scheme-library|)
+   (push.const . quote)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of |.list| 2 (|.list| 'quote |dep`2333*|))
+   (ret.subr.gloc.of |.list| "./boot/macro/library.scm" . 444442))
+ (set.gloc.of |.L652|)
  (close
    (9 0 . expand-library-body)
    (extend.unbound . 7)
@@ -15675,7 +15675,7 @@
      (push)
      (extend . 1)
      (call
-       (push.gloc.of |.L650|)
+       (push.gloc.of |.L652|)
        (push.iloc 5 . 6)
        (apply.gloc.of map "./boot/macro/library.scm" . 444437))
      (push)
@@ -17911,15 +17911,6 @@
 
 ;
 ((close
-   (1 0 . permute-env)
-   (touch.gloc.of |loop`2645*|)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of core-hashtable->alist 1 "./boot/macro/r7rs.scm" . 9241)
-   (push.const)
-   (push.const)
-   (apply.gloc.of |loop`2645*| "./boot/macro/r7rs.scm" . 10251))
- (set.gloc.of |permute-env`2639*|)
- (close
    (3 0 . loop)
    (iloc.0 . 0)
    (if.null?
@@ -17947,6 +17938,15 @@
    (push.iloc.0 . 2)
    (apply.gloc.of |loop`2645*| "./boot/macro/r7rs.scm" . 10376))
  (set.gloc.of |loop`2645*|)
+ (close
+   (1 0 . permute-env)
+   (touch.gloc.of |loop`2645*|)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of core-hashtable->alist 1 "./boot/macro/r7rs.scm" . 9241)
+   (push.const)
+   (push.const)
+   (apply.gloc.of |loop`2645*| "./boot/macro/r7rs.scm" . 10251))
+ (set.gloc.of |permute-env`2639*|)
  (close
    (2 0 . expand-define-library)
    (call
@@ -17998,23 +17998,23 @@
        (apply.gloc.of current-include-files "./boot/macro/r7rs.scm" . 12293))
      (push.close
        (0 0)
-       (subr.gloc.of make-core-hashtable 0)
-       (push)
-       (subr.gloc.of make-core-hashtable 0)
-       (push)
-       (subr.gloc.of make-core-hashtable 0)
-       (push)
-       (extend . 3)
        (call
          (extend.enclose+
            (5 0 . loop)
            (iloc.0 . 0)
            (if.null?
+             (subr.gloc.of make-core-hashtable 0)
+             (push)
+             (subr.gloc.of make-core-hashtable 0)
+             (push)
+             (subr.gloc.of make-core-hashtable 0)
+             (push)
+             (extend . 3)
              (call
                (push.close
                  (1 0)
                  (call
-                   (push.iloc 3 . 2)
+                   (push.iloc.1 . 2)
                    (push.cdr.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                    (push.const . #f)
                    (subr.gloc.of core-hashtable-ref 3 "./boot/macro/r7rs.scm" . 12293)
@@ -18030,24 +18030,24 @@
                    (push)
                    (push.cdr.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                    (apply.gloc.of syntax-violation "./boot/macro/r7rs.scm" . 12293))
-                 (push.iloc 3 . 2)
+                 (push.iloc.1 . 2)
                  (push.cdr.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.const . #t)
                  (subr.gloc.of core-hashtable-set! 3 "./boot/macro/r7rs.scm" . 12293)
-                 (push.iloc 3 . 0)
+                 (push.iloc.1 . 0)
                  (push.car.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.const . #t)
                  (ret.subr.gloc.of core-hashtable-set! "./boot/macro/r7rs.scm" . 12293))
-               (push.iloc.0 . 1)
+               (push.iloc.1 . 1)
                (apply.gloc.of for-each "./boot/macro/r7rs.scm" . 12293))
              (call
                (push.close
                  (1 0)
-                 (push.iloc 3 . 0)
+                 (push.iloc.1 . 0)
                  (push.car.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.const . #t)
                  (subr.gloc.of core-hashtable-set! 3 "./boot/macro/r7rs.scm" . 12293)
-                 (push.iloc 3 . 1)
+                 (push.iloc.1 . 1)
                  (push.car.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.const . #f)
                  (push.subr.gloc.of core-hashtable-ref 3 "./boot/macro/r7rs.scm" . 12293)
@@ -18068,17 +18068,17 @@
                    (push)
                    (push.car.iloc (1 . 0) "./boot/macro/r7rs.scm" . 12293)
                    (apply.gloc.of syntax-violation "./boot/macro/r7rs.scm" . 12293))
-                 (push.iloc 4 . 1)
+                 (push.iloc 2 . 1)
                  (push.car.iloc (1 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.cdr.iloc (1 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (ret.subr.gloc.of core-hashtable-set! "./boot/macro/r7rs.scm" . 12293))
-               (push.iloc.0 . 2)
+               (push.iloc.1 . 2)
                (apply.gloc.of
                  for-each
                  (for-each (lambda (|a`2674*|)
-                             (core-hashtable-set! |ht-immutables`2665*| (car |a`2674*|) #t)
+                             (core-hashtable-set! |ht-immutables`2670*| (car |a`2674*|) #t)
                              (let ((|.L692`2676*|
-                                     (core-hashtable-ref |ht-imports`2665*| (car |a`2674*|) #f)))
+                                     (core-hashtable-ref |ht-imports`2670*| (car |a`2674*|) #f)))
                                (if |.L692`2676*|
                                    (or (eq? |.L692`2676*| (cdr |a`2674*|))
                                        (syntax-violation
@@ -18087,13 +18087,13 @@
                                          (abbreviated-take-form |form`2638*| 4 8)
                                          (car |a`2674*|)))
                                    (core-hashtable-set!
-                                     |ht-imports`2665*|
+                                     |ht-imports`2670*|
                                      (car |a`2674*|)
                                      (cdr |a`2674*|)))))
-                           |imports`2670*|)))
+                           |imports`2668*|)))
              (call
                (touch.gloc.of make-shield-id-table)
-               (push.iloc.0 . 4)
+               (push.iloc.1 . 4)
                (apply.gloc.of make-shield-id-table "./boot/macro/r7rs.scm" . 12293))
              (push)
              (subr.gloc.of make-core-hashtable 0)
@@ -18110,7 +18110,7 @@
                  (push.car.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (push.cdr.iloc (0 . 0) "./boot/macro/r7rs.scm" . 12293)
                  (ret.subr.gloc.of core-hashtable-set! "./boot/macro/r7rs.scm" . 12293))
-               (push.iloc 3 . 1)
+               (push.iloc.1 . 1)
                (push.subr.gloc.of core-hashtable->alist 1 "./boot/macro/r7rs.scm" . 12293)
                (apply.gloc.of for-each "./boot/macro/r7rs.scm" . 12293))
              (push.const . #f)
@@ -18122,7 +18122,7 @@
                  (apply.gloc.of current-immutable-identifiers "./boot/macro/r7rs.scm" . 12293))
                (set.iloc (1 . 0) "./boot/macro/r7rs.scm" . 12293)
                (touch.gloc.of current-immutable-identifiers)
-               (push.iloc 5 . 0)
+               (push.iloc 3 . 0)
                (apply.gloc.of current-immutable-identifiers "./boot/macro/r7rs.scm" . 12293))
              (push.close
                (0 0)
@@ -18130,10 +18130,10 @@
                (push.iloc 10 . 0)
                (push.iloc 8 . 0)
                (push.iloc 8 . 1)
-               (push.iloc 3 . 4)
-               (push.iloc 3 . 1)
-               (push.iloc 3 . 2)
-               (push.iloc 3 . 3)
+               (push.iloc 4 . 4)
+               (push.iloc 4 . 1)
+               (push.iloc 4 . 2)
+               (push.iloc 4 . 3)
                (call
                  (touch.gloc.of extend-env)
                  (push.gloc.of private-primitives-environment)
@@ -18181,7 +18181,7 @@
              (push.iloc.1 . 1)
              (call
                (touch.gloc.of parse-exports)
-               (push.iloc 8 . 0)
+               (push.iloc 7 . 0)
                (push.iloc.1 . 0)
                (push.subr.gloc.of cdar 1 "./boot/macro/r7rs.scm" . 12293)
                (apply.gloc.of parse-exports "./boot/macro/r7rs.scm" . 12293))
@@ -18207,7 +18207,7 @@
              (push.iloc 2 . 2)
              (call
                (touch.gloc.of parse-imports)
-               (push.iloc 9 . 0)
+               (push.iloc 8 . 0)
                (push.iloc.0 . 0)
                (apply.gloc.of parse-imports "./boot/macro/r7rs.scm" . 12293))
              (push)
@@ -18215,7 +18215,7 @@
              (push.iloc 2 . 3)
              (call
                (touch.gloc.of parse-depends)
-               (push.iloc 9 . 0)
+               (push.iloc 8 . 0)
                (push.iloc.0 . 0)
                (apply.gloc.of parse-depends "./boot/macro/r7rs.scm" . 12293))
              (push)
@@ -18243,14 +18243,14 @@
            (push.const . "malformed library declarations")
            (call
              (touch.gloc.of abbreviated-take-form)
-             (push.iloc 8 . 0)
+             (push.iloc 7 . 0)
              (push.const . 4)
              (push.const . 8)
              (apply.gloc.of abbreviated-take-form "./boot/macro/r7rs.scm" . 12293))
            (push)
            (push.car.iloc (1 . 0) "./boot/macro/r7rs.scm" . 12293)
            (apply.gloc.of syntax-violation "./boot/macro/r7rs.scm" . 12293))
-         (push.iloc 5 . 0)
+         (push.iloc 4 . 0)
          (push.const)
          (push.const)
          (push.const)
@@ -18268,7 +18268,7 @@
          (subr.gloc.of = 2 "./boot/macro/r7rs.scm" . 12293)
          (if.true.ret)
          (push.gloc.of library-include-dependencies)
-         (push.iloc 4 . 0)
+         (push.iloc 3 . 0)
          (call
            (touch.gloc.of current-include-files)
            (apply.gloc.of current-include-files "./boot/macro/r7rs.scm" . 12293))
@@ -18287,154 +18287,151 @@
            (set! |tmp1`2657`2659*| (current-include-files))
            (current-include-files |tmp2`2657`2659*|))
          (lambda ()
-           (let ((|ht-immutables`2665*| (make-core-hashtable))
-                 (|ht-imports`2665*| (make-core-hashtable))
-                 (|ht-publics`2665*| (make-core-hashtable)))
-             (let ((|coreform`2709*|
-                     (letrec* ((|loop`2669*|
-                                 (lambda (|clauses`2670*|
-                                           |exports`2670*|
-                                           |imports`2670*|
-                                           |depends`2670*|
-                                           |commands`2670*|)
-                                   (if (null? |clauses`2670*|)
-                                       (begin
-                                         (for-each (lambda (|a`2672*|)
-                                                     (and (core-hashtable-ref
-                                                            |ht-publics`2665*|
-                                                            (cdr |a`2672*|)
-                                                            #f)
-                                                          (syntax-violation
-                                                            'define-library
-                                                            "duplicate export identifiers"
-                                                            (abbreviated-take-form |form`2638*| 4 8)
-                                                            (cdr |a`2672*|)))
-                                                     (core-hashtable-set!
-                                                       |ht-publics`2665*|
-                                                       (cdr |a`2672*|)
-                                                       #t)
-                                                     (core-hashtable-set!
-                                                       |ht-immutables`2665*|
-                                                       (car |a`2672*|)
-                                                       #t))
-                                                   |exports`2670*|)
-                                         (for-each (lambda (|a`2674*|)
-                                                     (core-hashtable-set!
-                                                       |ht-immutables`2665*|
-                                                       (car |a`2674*|)
-                                                       #t)
-                                                     (let ((|.L692`2676*|
-                                                             (core-hashtable-ref
-                                                               |ht-imports`2665*|
-                                                               (car |a`2674*|)
-                                                               #f)))
-                                                       (if |.L692`2676*|
-                                                           (or (eq? |.L692`2676*| (cdr |a`2674*|))
-                                                               (syntax-violation
-                                                                 'define-library
-                                                                 "duplicate import identifiers"
-                                                                 (abbreviated-take-form
-                                                                   |form`2638*|
-                                                                   4
-                                                                   8)
-                                                                 (car |a`2674*|)))
-                                                           (core-hashtable-set!
-                                                             |ht-imports`2665*|
+           (let ((|coreform`2709*|
+                   (letrec* ((|loop`2667*|
+                               (lambda (|clauses`2668*|
+                                         |exports`2668*|
+                                         |imports`2668*|
+                                         |depends`2668*|
+                                         |commands`2668*|)
+                                 (if (null? |clauses`2668*|)
+                                     (let ((|ht-immutables`2670*| (make-core-hashtable))
+                                           (|ht-imports`2670*| (make-core-hashtable))
+                                           (|ht-publics`2670*| (make-core-hashtable)))
+                                       (for-each (lambda (|a`2672*|)
+                                                   (and (core-hashtable-ref
+                                                          |ht-publics`2670*|
+                                                          (cdr |a`2672*|)
+                                                          #f)
+                                                        (syntax-violation
+                                                          'define-library
+                                                          "duplicate export identifiers"
+                                                          (abbreviated-take-form |form`2638*| 4 8)
+                                                          (cdr |a`2672*|)))
+                                                   (core-hashtable-set!
+                                                     |ht-publics`2670*|
+                                                     (cdr |a`2672*|)
+                                                     #t)
+                                                   (core-hashtable-set!
+                                                     |ht-immutables`2670*|
+                                                     (car |a`2672*|)
+                                                     #t))
+                                                 |exports`2668*|)
+                                       (for-each (lambda (|a`2674*|)
+                                                   (core-hashtable-set!
+                                                     |ht-immutables`2670*|
+                                                     (car |a`2674*|)
+                                                     #t)
+                                                   (let ((|.L692`2676*|
+                                                           (core-hashtable-ref
+                                                             |ht-imports`2670*|
                                                              (car |a`2674*|)
-                                                             (cdr |a`2674*|)))))
-                                                   |imports`2670*|)
-                                         (let ((|ht-env`2680*|
-                                                 (make-shield-id-table |commands`2670*|))
-                                               (|ht-libenv`2680*| (make-core-hashtable)))
-                                           (for-each (lambda (|a`2682*|)
-                                                       (core-hashtable-set!
-                                                         |ht-env`2680*|
-                                                         (car |a`2682*|)
-                                                         (cdr |a`2682*|))
-                                                       (core-hashtable-set!
-                                                         |ht-libenv`2680*|
-                                                         (car |a`2682*|)
-                                                         (cdr |a`2682*|)))
-                                                     (core-hashtable->alist |ht-imports`2665*|))
-                                           (let ((|tmp1`2685`2687*| #f))
-                                             (|.dynamic-wind|
-                                               (lambda ()
-                                                 (set! |tmp1`2685`2687*|
-                                                       (current-immutable-identifiers))
-                                                 (current-immutable-identifiers
-                                                   |ht-immutables`2665*|))
-                                               (lambda ()
-                                                 (expand-library-body
-                                                   |form`2638*|
-                                                   |library-id`2654*|
-                                                   |library-version`2654*|
-                                                   |commands`2670*|
-                                                   |exports`2670*|
-                                                   |imports`2670*|
-                                                   |depends`2670*|
-                                                   (extend-env
-                                                     private-primitives-environment
-                                                     (|permute-env`2639*| |ht-env`2680*|))
-                                                   (|permute-env`2639*| |ht-libenv`2680*|)))
-                                               (lambda ()
-                                                 (current-immutable-identifiers
-                                                   |tmp1`2685`2687*|))))))
-                                       (let ((|.L694`2695`2698*|
-                                               (and (pair? |clauses`2670*|)
-                                                    (pair? (car |clauses`2670*|))
-                                                    (list? (cdar |clauses`2670*|))
-                                                    (list? (cdr |clauses`2670*|)))))
-                                         (if (and |.L694`2695`2698*|
-                                                  (eq? (caar |clauses`2670*|) 'export))
-                                             (|loop`2669*|
-                                               (cdr |clauses`2670*|)
-                                               (append
-                                                 |exports`2670*|
-                                                 (parse-exports
-                                                   |form`2638*|
-                                                   (cdar |clauses`2670*|)))
-                                               |imports`2670*|
-                                               |depends`2670*|
-                                               |commands`2670*|)
-                                             (if (and |.L694`2695`2698*|
-                                                      (eq? (caar |clauses`2670*|) 'import))
-                                                 (let ((|import-spec`2703*| (cdar |clauses`2670*|)))
-                                                   (|loop`2669*|
-                                                     (cdr |clauses`2670*|)
-                                                     |exports`2670*|
+                                                             #f)))
+                                                     (if |.L692`2676*|
+                                                         (or (eq? |.L692`2676*| (cdr |a`2674*|))
+                                                             (syntax-violation
+                                                               'define-library
+                                                               "duplicate import identifiers"
+                                                               (abbreviated-take-form
+                                                                 |form`2638*|
+                                                                 4
+                                                                 8)
+                                                               (car |a`2674*|)))
+                                                         (core-hashtable-set!
+                                                           |ht-imports`2670*|
+                                                           (car |a`2674*|)
+                                                           (cdr |a`2674*|)))))
+                                                 |imports`2668*|)
+                                       (let ((|ht-env`2680*|
+                                               (make-shield-id-table |commands`2668*|))
+                                             (|ht-libenv`2680*| (make-core-hashtable)))
+                                         (for-each (lambda (|a`2682*|)
+                                                     (core-hashtable-set!
+                                                       |ht-env`2680*|
+                                                       (car |a`2682*|)
+                                                       (cdr |a`2682*|))
+                                                     (core-hashtable-set!
+                                                       |ht-libenv`2680*|
+                                                       (car |a`2682*|)
+                                                       (cdr |a`2682*|)))
+                                                   (core-hashtable->alist |ht-imports`2670*|))
+                                         (let ((|tmp1`2685`2687*| #f))
+                                           (|.dynamic-wind|
+                                             (lambda ()
+                                               (set! |tmp1`2685`2687*|
+                                                     (current-immutable-identifiers))
+                                               (current-immutable-identifiers
+                                                 |ht-immutables`2670*|))
+                                             (lambda ()
+                                               (expand-library-body
+                                                 |form`2638*|
+                                                 |library-id`2654*|
+                                                 |library-version`2654*|
+                                                 |commands`2668*|
+                                                 |exports`2668*|
+                                                 |imports`2668*|
+                                                 |depends`2668*|
+                                                 (extend-env
+                                                   private-primitives-environment
+                                                   (|permute-env`2639*| |ht-env`2680*|))
+                                                 (|permute-env`2639*| |ht-libenv`2680*|)))
+                                             (lambda ()
+                                               (current-immutable-identifiers
+                                                 |tmp1`2685`2687*|))))))
+                                     (let ((|.L694`2695`2698*|
+                                             (and (pair? |clauses`2668*|)
+                                                  (pair? (car |clauses`2668*|))
+                                                  (list? (cdar |clauses`2668*|))
+                                                  (list? (cdr |clauses`2668*|)))))
+                                       (if (and |.L694`2695`2698*|
+                                                (eq? (caar |clauses`2668*|) 'export))
+                                           (|loop`2667*|
+                                             (cdr |clauses`2668*|)
+                                             (append
+                                               |exports`2668*|
+                                               (parse-exports |form`2638*| (cdar |clauses`2668*|)))
+                                             |imports`2668*|
+                                             |depends`2668*|
+                                             |commands`2668*|)
+                                           (if (and |.L694`2695`2698*|
+                                                    (eq? (caar |clauses`2668*|) 'import))
+                                               (let ((|import-spec`2703*| (cdar |clauses`2668*|)))
+                                                 (|loop`2667*|
+                                                   (cdr |clauses`2668*|)
+                                                   |exports`2668*|
+                                                   (append
+                                                     |imports`2668*|
+                                                     (parse-imports
+                                                       |form`2638*|
+                                                       |import-spec`2703*|))
+                                                   (append
+                                                     |depends`2668*|
+                                                     (parse-depends
+                                                       |form`2638*|
+                                                       |import-spec`2703*|))
+                                                   |commands`2668*|))
+                                               (if (and |.L694`2695`2698*|
+                                                        (eq? (caar |clauses`2668*|) 'begin))
+                                                   (|loop`2667*|
+                                                     (cdr |clauses`2668*|)
+                                                     |exports`2668*|
+                                                     |imports`2668*|
+                                                     |depends`2668*|
                                                      (append
-                                                       |imports`2670*|
-                                                       (parse-imports
-                                                         |form`2638*|
-                                                         |import-spec`2703*|))
-                                                     (append
-                                                       |depends`2670*|
-                                                       (parse-depends
-                                                         |form`2638*|
-                                                         |import-spec`2703*|))
-                                                     |commands`2670*|))
-                                                 (if (and |.L694`2695`2698*|
-                                                          (eq? (caar |clauses`2670*|) 'begin))
-                                                     (|loop`2669*|
-                                                       (cdr |clauses`2670*|)
-                                                       |exports`2670*|
-                                                       |imports`2670*|
-                                                       |depends`2670*|
-                                                       (append
-                                                         |commands`2670*|
-                                                         (cdar |clauses`2670*|)))
-                                                     (syntax-violation
-                                                       'define-library
-                                                       "malformed library declarations"
-                                                       (abbreviated-take-form |form`2638*| 4 8)
-                                                       (car |clauses`2670*|))))))))))
-                       (|loop`2669*| |clauses`2652*| '() '() '() '()))))
-               (or (= (core-hashtable-size (current-include-files)) 0)
-                   (core-hashtable-set!
-                     library-include-dependencies
-                     |library-id`2654*|
-                     (current-include-files)))
-               |coreform`2709*|)))
+                                                       |commands`2668*|
+                                                       (cdar |clauses`2668*|)))
+                                                   (syntax-violation
+                                                     'define-library
+                                                     "malformed library declarations"
+                                                     (abbreviated-take-form |form`2638*| 4 8)
+                                                     (car |clauses`2668*|))))))))))
+                     (|loop`2667*| |clauses`2652*| '() '() '() '()))))
+             (or (= (core-hashtable-size (current-include-files)) 0)
+                 (core-hashtable-set!
+                   library-include-dependencies
+                   |library-id`2654*|
+                   (current-include-files)))
+             |coreform`2709*|))
          (lambda () (current-include-files |tmp1`2657`2659*|)))))
    (push.const . define-library)
    (push.const . "expected library name and declarations")
@@ -21937,6 +21934,127 @@
  (set.gloc.of compile-expression-letrec*)
  (ret.const.unspec))
 ((close
+   (5 0 . compile-unary-special)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of cadadr 1 "./boot/compile.scm" . 470036)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of caddr 1 "./boot/compile.scm" . 471061)
+   (extend . 2)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.iloc.0 . 0)
+     (push.iloc.1 . 1)
+     (push.const . #f)
+     (push.const . #f)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 472091))
+   (push)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.iloc.0 . 1)
+     (push.iloc.1 . 1)
+     (push.const . #f)
+     (push.const . #t)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 473116))
+   (push)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.iloc.1 . 0)
+     (push.subr.gloc.of cadddr 1 "./boot/compile.scm" . 474161)
+     (push.iloc.1 . 1)
+     (push.const . #f)
+     (push.const . #t)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 474141))
+   (push)
+   (extend . 3)
+   (call
+     (push.iloc 2 . 4)
+     (const . if.null?.ret.const)
+     (if.not.eq?.ret.const . #f)
+     (iloc.1 . 0)
+     (if.not.symbol?.ret.const . #f)
+     (push.iloc.1 . 0)
+     (iloc.1 . 1)
+     (ret.eq? "./boot/compile.scm" . 475216))
+   (if.true
+     (iloc 2 . 2)
+     (if.true
+       (push.iloc.0 . 0)
+       (push.iloc 2 . 4)
+       (push.subr.gloc.of |.list| 1 (|.list| |inst-ret-const`3049*|))
+       (iloc.0 . 2)
+       (push.cons)
+       (ret.subr.gloc.of |.append| "./boot/compile.scm" . 476186))
+     (push.const . call)
+     (push.iloc.0 . 0)
+     (push.iloc 2 . 4)
+     (push.subr.gloc.of |.list| 1 (|.list| |inst-ret-const`3049*|))
+     (iloc.0 . 2)
+     (push.cons)
+     (subr.gloc.of
+       |.append|
+       2
+       (|.append| |arg-code`3053*| (|.cons| (|.list| |inst-ret-const`3049*|) |false-code`3053*|)))
+     (push.cons)
+     (ret.subr.gloc.of |.list| "./boot/compile.scm" . 477210))
+   (call
+     (cdr.iloc (0 . 1) "./boot/compile.scm" . 479268)
+     (if.not.null?.ret.const . #f)
+     (push.iloc.0 . 1)
+     (push.subr.gloc.of caar 1 "./boot/compile.scm" . 479291)
+     (push.const const ret.const)
+     (ret.subr.gloc.of memq "./boot/compile.scm" . 479285))
+   (if.true
+     (iloc 2 . 2)
+     (if.true
+       (push.iloc.0 . 0)
+       (push.iloc 2 . 4)
+       (push.iloc.0 . 1)
+       (subr.gloc.of cdar 1 "./boot/compile.scm" . 480325)
+       (push.cons)
+       (iloc.0 . 2)
+       (push.cons)
+       (ret.subr.gloc.of |.append| "./boot/compile.scm" . 480286))
+     (push.const . call)
+     (push.iloc.0 . 0)
+     (push.iloc 2 . 3)
+     (iloc.0 . 1)
+     (push.cons)
+     (iloc.0 . 2)
+     (push.cons)
+     (subr.gloc.of
+       |.append|
+       2
+       (|.append|
+         |arg-code`3053*|
+         (|.cons| (|.cons| |inst`3049*| |true-code`3053*|) |false-code`3053*|)))
+     (push.cons)
+     (ret.subr.gloc.of |.list| "./boot/compile.scm" . 481310))
+   (iloc 2 . 2)
+   (if.true
+     (push.iloc.0 . 0)
+     (push.iloc 2 . 3)
+     (iloc.0 . 1)
+     (push.cons)
+     (iloc.0 . 2)
+     (push.cons)
+     (ret.subr.gloc.of |.append| "./boot/compile.scm" . 482334))
+   (push.const . call)
+   (push.iloc.0 . 0)
+   (push.iloc 2 . 3)
+   (iloc.0 . 1)
+   (push.cons)
+   (iloc.0 . 2)
+   (push.cons)
+   (subr.gloc.of
+     |.append|
+     2
+     (|.append|
+       |arg-code`3053*|
+       (|.cons| (|.cons| |inst`3049*| |true-code`3053*|) |false-code`3053*|)))
+   (push.cons)
+   (ret.subr.gloc.of |.list| "./boot/compile.scm" . 483358))
+ (set.gloc.of |compile-unary-special`3042*|)
+ (close
    (4 0 . compile-anonymous)
    (call
      (touch.gloc.of compile-expression)
@@ -22063,127 +22181,6 @@
    (push.cons)
    (ret.subr.gloc.of |.list| "./boot/compile.scm" . 464923))
  (set.gloc.of |compile-anonymous`3042*|)
- (close
-   (5 0 . compile-unary-special)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of cadadr 1 "./boot/compile.scm" . 470036)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of caddr 1 "./boot/compile.scm" . 471061)
-   (extend . 2)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.iloc.0 . 0)
-     (push.iloc.1 . 1)
-     (push.const . #f)
-     (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 472091))
-   (push)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.iloc.0 . 1)
-     (push.iloc.1 . 1)
-     (push.const . #f)
-     (push.const . #t)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 473116))
-   (push)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.iloc.1 . 0)
-     (push.subr.gloc.of cadddr 1 "./boot/compile.scm" . 474161)
-     (push.iloc.1 . 1)
-     (push.const . #f)
-     (push.const . #t)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 474141))
-   (push)
-   (extend . 3)
-   (call
-     (push.iloc 2 . 4)
-     (const . if.null?.ret.const)
-     (if.not.eq?.ret.const . #f)
-     (iloc.1 . 0)
-     (if.not.symbol?.ret.const . #f)
-     (push.iloc.1 . 0)
-     (iloc.1 . 1)
-     (ret.eq? "./boot/compile.scm" . 475216))
-   (if.true
-     (iloc 2 . 2)
-     (if.true
-       (push.iloc.0 . 0)
-       (push.iloc 2 . 4)
-       (push.subr.gloc.of |.list| 1 (|.list| |inst-ret-const`3049*|))
-       (iloc.0 . 2)
-       (push.cons)
-       (ret.subr.gloc.of |.append| "./boot/compile.scm" . 476186))
-     (push.const . call)
-     (push.iloc.0 . 0)
-     (push.iloc 2 . 4)
-     (push.subr.gloc.of |.list| 1 (|.list| |inst-ret-const`3049*|))
-     (iloc.0 . 2)
-     (push.cons)
-     (subr.gloc.of
-       |.append|
-       2
-       (|.append| |arg-code`3053*| (|.cons| (|.list| |inst-ret-const`3049*|) |false-code`3053*|)))
-     (push.cons)
-     (ret.subr.gloc.of |.list| "./boot/compile.scm" . 477210))
-   (call
-     (cdr.iloc (0 . 1) "./boot/compile.scm" . 479268)
-     (if.not.null?.ret.const . #f)
-     (push.iloc.0 . 1)
-     (push.subr.gloc.of caar 1 "./boot/compile.scm" . 479291)
-     (push.const const ret.const)
-     (ret.subr.gloc.of memq "./boot/compile.scm" . 479285))
-   (if.true
-     (iloc 2 . 2)
-     (if.true
-       (push.iloc.0 . 0)
-       (push.iloc 2 . 4)
-       (push.iloc.0 . 1)
-       (subr.gloc.of cdar 1 "./boot/compile.scm" . 480325)
-       (push.cons)
-       (iloc.0 . 2)
-       (push.cons)
-       (ret.subr.gloc.of |.append| "./boot/compile.scm" . 480286))
-     (push.const . call)
-     (push.iloc.0 . 0)
-     (push.iloc 2 . 3)
-     (iloc.0 . 1)
-     (push.cons)
-     (iloc.0 . 2)
-     (push.cons)
-     (subr.gloc.of
-       |.append|
-       2
-       (|.append|
-         |arg-code`3053*|
-         (|.cons| (|.cons| |inst`3049*| |true-code`3053*|) |false-code`3053*|)))
-     (push.cons)
-     (ret.subr.gloc.of |.list| "./boot/compile.scm" . 481310))
-   (iloc 2 . 2)
-   (if.true
-     (push.iloc.0 . 0)
-     (push.iloc 2 . 3)
-     (iloc.0 . 1)
-     (push.cons)
-     (iloc.0 . 2)
-     (push.cons)
-     (ret.subr.gloc.of |.append| "./boot/compile.scm" . 482334))
-   (push.const . call)
-   (push.iloc.0 . 0)
-   (push.iloc 2 . 3)
-   (iloc.0 . 1)
-   (push.cons)
-   (iloc.0 . 2)
-   (push.cons)
-   (subr.gloc.of
-     |.append|
-     2
-     (|.append|
-       |arg-code`3053*|
-       (|.cons| (|.cons| |inst`3049*| |true-code`3053*|) |false-code`3053*|)))
-   (push.cons)
-   (ret.subr.gloc.of |.list| "./boot/compile.scm" . 483358))
- (set.gloc.of |compile-unary-special`3042*|)
  (close
    (5 0 . compile-binary-special)
    (push.iloc.0 . 0)
@@ -22429,56 +22426,25 @@
  (set.gloc.of compile-expression-if)
  (ret.const.unspec))
 ((close
-   (2 0 . compile-anonymous-negate)
+   (2 0 . compile-anonymous)
    (call
      (touch.gloc.of compile-expression)
-     (push.car.iloc (0 . 0) "./boot/compile.scm" . 546853)
+     (push.car.iloc (0 . 0) "./boot/compile.scm" . 542757)
      (push.iloc.0 . 1)
      (push.const . #f)
      (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 546833))
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 542737))
    (push)
-   (push.const . if.false.ret.const)
-   (const . #t)
-   (push.cons)
+   (push.const . if.true.ret)
+   (push.subr.gloc.of list 1 "./boot/compile.scm" . 542779)
    (call
      (touch.gloc.of |compile-clause`3070*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 546923)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 542817)
      (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 546907))
+     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 542801))
    (push.cons)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 545803))
- (set.gloc.of |compile-anonymous-negate`3072*|)
- (close
-   (3 0 . compile-binary-special)
-   (call
-     (touch.gloc.of compile-argument)
-     (push.iloc.0 . 0)
-     (push.subr.gloc.of cadar 1 "./boot/compile.scm" . 555043)
-     (push.iloc.0 . 1)
-     (apply.gloc.of compile-argument "./boot/compile.scm" . 555025))
-   (push)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.iloc.0 . 0)
-     (push.subr.gloc.of caddar 1 "./boot/compile.scm" . 555082)
-     (push.iloc.0 . 1)
-     (push.const . #f)
-     (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 555062))
-   (push)
-   (push.iloc.0 . 2)
-   (const . #t)
-   (push.cons)
-   (call
-     (touch.gloc.of |compile-clause`3070*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 555140)
-     (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 555124))
-   (push.cons)
-   (push.subr.gloc.of |.append| 2 "./boot/compile.scm" . 555062)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 553995))
- (set.gloc.of |compile-binary-special`3072*|)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 541707))
+ (set.gloc.of |compile-anonymous`3072*|)
  (close
    (2 0 . compile-clause)
    (cdr.iloc (0 . 0) "./boot/compile.scm" . 557076)
@@ -22697,25 +22663,35 @@
    (apply.gloc.of |compile-anonymous`3072*| "./boot/compile.scm" . 613396))
  (set.gloc.of |compile-clause`3070*|)
  (close
-   (2 0 . compile-anonymous)
+   (3 0 . compile-binary-special)
+   (call
+     (touch.gloc.of compile-argument)
+     (push.iloc.0 . 0)
+     (push.subr.gloc.of cadar 1 "./boot/compile.scm" . 555043)
+     (push.iloc.0 . 1)
+     (apply.gloc.of compile-argument "./boot/compile.scm" . 555025))
+   (push)
    (call
      (touch.gloc.of compile-expression)
-     (push.car.iloc (0 . 0) "./boot/compile.scm" . 542757)
+     (push.iloc.0 . 0)
+     (push.subr.gloc.of caddar 1 "./boot/compile.scm" . 555082)
      (push.iloc.0 . 1)
      (push.const . #f)
      (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 542737))
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 555062))
    (push)
-   (push.const . if.true.ret)
-   (push.subr.gloc.of list 1 "./boot/compile.scm" . 542779)
+   (push.iloc.0 . 2)
+   (const . #t)
+   (push.cons)
    (call
      (touch.gloc.of |compile-clause`3070*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 542817)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 555140)
      (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 542801))
+     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 555124))
    (push.cons)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 541707))
- (set.gloc.of |compile-anonymous`3072*|)
+   (push.subr.gloc.of |.append| 2 "./boot/compile.scm" . 555062)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 553995))
+ (set.gloc.of |compile-binary-special`3072*|)
  (close
    (3 0 . compile-unary-special)
    (call
@@ -22738,6 +22714,27 @@
    (push.cons)
    (ret.subr.gloc.of |.append| "./boot/compile.scm" . 549899))
  (set.gloc.of |compile-unary-special`3072*|)
+ (close
+   (2 0 . compile-anonymous-negate)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.car.iloc (0 . 0) "./boot/compile.scm" . 546853)
+     (push.iloc.0 . 1)
+     (push.const . #f)
+     (push.const . #f)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 546833))
+   (push)
+   (push.const . if.false.ret.const)
+   (const . #t)
+   (push.cons)
+   (call
+     (touch.gloc.of |compile-clause`3070*|)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 546923)
+     (push.iloc.0 . 1)
+     (apply.gloc.of |compile-clause`3070*| "./boot/compile.scm" . 546907))
+   (push.cons)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 545803))
+ (set.gloc.of |compile-anonymous-negate`3072*|)
  (close
    (4 0 . compile-expression-or)
    (cdr.iloc (0 . 0) "./boot/compile.scm" . 615443)
@@ -22845,69 +22842,6 @@
    (push.subr.gloc.of |.append| 2 "./boot/compile.scm" . 651318)
    (ret.subr.gloc.of |.append| "./boot/compile.scm" . 650251))
  (set.gloc.of |compile-binary-special`3104*|)
- (close
-   (2 0 . compile-anonymous-negate)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.car.iloc (0 . 0) "./boot/compile.scm" . 643109)
-     (push.iloc.0 . 1)
-     (push.const . #f)
-     (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 643089))
-   (push)
-   (push.const . if.true.ret.const)
-   (const . #f)
-   (push.cons)
-   (call
-     (touch.gloc.of |compile-clause`3102*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 643178)
-     (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 643162))
-   (push.cons)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 642059))
- (set.gloc.of |compile-anonymous-negate`3104*|)
- (close
-   (3 0 . compile-unary-special)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.iloc.0 . 0)
-     (push.subr.gloc.of cadar 1 "./boot/compile.scm" . 647205)
-     (push.iloc.0 . 1)
-     (push.const . #f)
-     (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 647185))
-   (push)
-   (push.iloc.0 . 2)
-   (const . #f)
-   (push.cons)
-   (call
-     (touch.gloc.of |compile-clause`3102*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 647262)
-     (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 647246))
-   (push.cons)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 646155))
- (set.gloc.of |compile-unary-special`3104*|)
- (close
-   (2 0 . compile-anonymous)
-   (call
-     (touch.gloc.of compile-expression)
-     (push.car.iloc (0 . 0) "./boot/compile.scm" . 639013)
-     (push.iloc.0 . 1)
-     (push.const . #f)
-     (push.const . #f)
-     (apply.gloc.of compile-expression "./boot/compile.scm" . 638993))
-   (push)
-   (push.const . if.false.ret)
-   (push.subr.gloc.of list 1 "./boot/compile.scm" . 639035)
-   (call
-     (touch.gloc.of |compile-clause`3102*|)
-     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 639074)
-     (push.iloc.0 . 1)
-     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 639058))
-   (push.cons)
-   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 637963))
- (set.gloc.of |compile-anonymous`3104*|)
  (close
    (2 0 . compile-clause)
    (cdr.iloc (0 . 0) "./boot/compile.scm" . 653332)
@@ -23125,6 +23059,69 @@
    (push.iloc.1 . 1)
    (apply.gloc.of |compile-anonymous`3104*| "./boot/compile.scm" . 709652))
  (set.gloc.of |compile-clause`3102*|)
+ (close
+   (2 0 . compile-anonymous)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.car.iloc (0 . 0) "./boot/compile.scm" . 639013)
+     (push.iloc.0 . 1)
+     (push.const . #f)
+     (push.const . #f)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 638993))
+   (push)
+   (push.const . if.false.ret)
+   (push.subr.gloc.of list 1 "./boot/compile.scm" . 639035)
+   (call
+     (touch.gloc.of |compile-clause`3102*|)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 639074)
+     (push.iloc.0 . 1)
+     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 639058))
+   (push.cons)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 637963))
+ (set.gloc.of |compile-anonymous`3104*|)
+ (close
+   (2 0 . compile-anonymous-negate)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.car.iloc (0 . 0) "./boot/compile.scm" . 643109)
+     (push.iloc.0 . 1)
+     (push.const . #f)
+     (push.const . #f)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 643089))
+   (push)
+   (push.const . if.true.ret.const)
+   (const . #f)
+   (push.cons)
+   (call
+     (touch.gloc.of |compile-clause`3102*|)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 643178)
+     (push.iloc.0 . 1)
+     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 643162))
+   (push.cons)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 642059))
+ (set.gloc.of |compile-anonymous-negate`3104*|)
+ (close
+   (3 0 . compile-unary-special)
+   (call
+     (touch.gloc.of compile-expression)
+     (push.iloc.0 . 0)
+     (push.subr.gloc.of cadar 1 "./boot/compile.scm" . 647205)
+     (push.iloc.0 . 1)
+     (push.const . #f)
+     (push.const . #f)
+     (apply.gloc.of compile-expression "./boot/compile.scm" . 647185))
+   (push)
+   (push.iloc.0 . 2)
+   (const . #f)
+   (push.cons)
+   (call
+     (touch.gloc.of |compile-clause`3102*|)
+     (push.cdr.iloc (0 . 0) "./boot/compile.scm" . 647262)
+     (push.iloc.0 . 1)
+     (apply.gloc.of |compile-clause`3102*| "./boot/compile.scm" . 647246))
+   (push.cons)
+   (ret.subr.gloc.of |.append| "./boot/compile.scm" . 646155))
+ (set.gloc.of |compile-unary-special`3104*|)
  (close
    (4 0 . compile-expression-and)
    (cdr.iloc (0 . 0) "./boot/compile.scm" . 711699)
@@ -25039,7 +25036,7 @@
      (push.iloc.1 . 0)
      (push.iloc.0 . 0)
      (apply.gloc.of apply "./boot/record.scm" . 164879)))
- (set.gloc.of |.L1033|)
+ (set.gloc.of |.L1034|)
  (close
    (1 0 . default-protocol)
    (call
@@ -25081,7 +25078,7 @@
              (lambda () (split-at |field-values`3398*| |parent-field-count`3394*|))
              (lambda (|parent-field-values`3400*| |this-field-values`3400*|)
                (apply (apply |p`3396*| |parent-field-values`3400*|) |this-field-values`3400*|)))))))
-   (ret.gloc.of |.L1033|))
+   (ret.gloc.of |.L1034|))
  (set.gloc.of default-protocol)
  (ret.const.unspec))
 ((close
@@ -27467,11 +27464,17 @@
  (set.gloc.of pretty-print-unwrap-syntax)
  (ret.const.unspec))
 ((close
-   (1 0 . indent-type2?)
+   (1 0 . symbol->length)
    (push.iloc.0 . 0)
-   (push.const if cond case and or set! import export cons map for-each exists for-all)
-   (ret.subr.gloc.of memq "./boot/pp.scm" . 81931))
- (set.gloc.of |indent-type2?`3662*|)
+   (push.subr.gloc.of symbol->string 1 "./boot/pp.scm" . 133146)
+   (ret.subr.gloc.of string-length "./boot/pp.scm" . 133131))
+ (set.gloc.of |symbol->length`3662*|)
+ (close
+   (1 0 . indent-type3?)
+   (push.iloc.0 . 0)
+   (push.const do let-optionals)
+   (ret.subr.gloc.of memq "./boot/pp.scm" . 86027))
+ (set.gloc.of |indent-type3?`3662*|)
  (close
    (2 0 . fits?)
    (>=n.iloc (0 . 0) 0 "./boot/pp.scm" . 90128)
@@ -27756,17 +27759,11 @@
    (ret.subr.gloc.of list "./boot/pp.scm" . 143378))
  (set.gloc.of |parse-list`3662*|)
  (close
-   (1 0 . indent-type3?)
+   (1 0 . indent-type2?)
    (push.iloc.0 . 0)
-   (push.const do let-optionals)
-   (ret.subr.gloc.of memq "./boot/pp.scm" . 86027))
- (set.gloc.of |indent-type3?`3662*|)
- (close
-   (1 0 . symbol->length)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of symbol->string 1 "./boot/pp.scm" . 133146)
-   (ret.subr.gloc.of string-length "./boot/pp.scm" . 133131))
- (set.gloc.of |symbol->length`3662*|)
+   (push.const if cond case and or set! import export cons map for-each exists for-all)
+   (ret.subr.gloc.of memq "./boot/pp.scm" . 81931))
+ (set.gloc.of |indent-type2?`3662*|)
  (close
    (1 0 . parse)
    (iloc.0 . 0)
@@ -29815,7 +29812,7 @@
    (push.const . 6)
    (push.subr.gloc.of - 2 "./boot/eval.scm" . 240725)
    (ret.subr.gloc.of = "./boot/eval.scm" . 240693))
- (set.gloc.of |.L1185|)
+ (set.gloc.of |.L1184|)
  (close
    (1 0)
    (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 243777))
@@ -29856,7 +29853,7 @@
    (if.true
      (push.gloc.of |.L1186|)
      (call
-       (push.gloc.of |.L1185|)
+       (push.gloc.of |.L1184|)
        (push.iloc.0 . 0)
        (push.subr.gloc.of directory-list 1 "./boot/eval.scm" . 241706)
        (apply.gloc.of filter "./boot/eval.scm" . 238626))
@@ -29867,11 +29864,66 @@
  (ret.const.unspec))
 ((close
    (1 0)
+   (push.iloc.0 . 0)
+   (push.const . ".cache")
+   (subr.gloc.of string-contains 2 "./boot/eval.scm" . 269365)
+   (if.false.ret)
+   (push.iloc.0 . 0)
+   (push.const . ".cache")
+   (push.subr.gloc.of string-contains 2 "./boot/eval.scm" . 270392)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of string-length 1 "./boot/eval.scm" . 270424)
+   (push.const . 6)
+   (push.subr.gloc.of - 2 "./boot/eval.scm" . 270421)
+   (ret.subr.gloc.of = "./boot/eval.scm" . 270389))
+ (set.gloc.of |.L1196|)
+ (close
+   (1 0 . dependencies-exists?)
+   (touch.gloc.of every1)
+   (push.gloc.of |.L1198|)
+   (push.iloc.0 . 0)
+   (apply.gloc.of every1 "./boot/eval.scm" . 312365))
+ (set.gloc.of |dependencies-exists?`4041*|)
+ (close
+   (1 0)
+   (push.car.iloc (0 . 0) "./boot/eval.scm" . 313413)
+   (subr.gloc.of string? 1 "./boot/eval.scm" . 313404)
+   (if.false.ret)
+   (push.cdr.iloc (0 . 0) "./boot/eval.scm" . 314437)
+   (subr.gloc.of number? 1 "./boot/eval.scm" . 314428)
+   (if.false.ret)
+   (push.car.iloc (0 . 0) "./boot/eval.scm" . 315466)
+   (ret.subr.gloc.of file-exists? "./boot/eval.scm" . 315452))
+ (set.gloc.of |.L1198|)
+ (close
+   (1 0 . inconsistent-cache-state)
+   (call
+     (call (apply.gloc.of auto-compile-verbose "./boot/eval.scm" . 256014))
+     (if.false.ret)
+     (subr.gloc.of current-error-port 0)
+     (push)
+     (push.const . "~&;; reset ~s~%")
+     (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 257085))
+     (push)
+     (ret.subr.gloc.of format "./boot/eval.scm" . 257038))
+   (push.gloc.of |.L1191|)
+   (push.iloc.0 . 0)
+   (apply.gloc.of for-each "./boot/eval.scm" . 258067))
+ (set.gloc.of |inconsistent-cache-state`3999*|)
+ (close
+   (1 0)
    (push.car.iloc (0 . 0) "./boot/eval.scm" . 320597)
    (push.subr.gloc.of file-stat-mtime 1 "./boot/eval.scm" . 320580)
    (push.cdr.iloc (0 . 0) "./boot/eval.scm" . 320606)
    (ret.subr.gloc.of = "./boot/eval.scm" . 320577))
- (set.gloc.of |.L1197|)
+ (set.gloc.of |.L1193|)
+ (close
+   (1 0 . dependencies-valid?)
+   (touch.gloc.of every1)
+   (push.gloc.of |.L1193|)
+   (push.iloc.0 . 0)
+   (apply.gloc.of every1 "./boot/eval.scm" . 320557))
+ (set.gloc.of |dependencies-valid?`4041*|)
  (close
    (1 0)
    (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 259127))
@@ -29902,62 +29954,7 @@
    (push.const . "~&;; clean ~s~%")
    (push.iloc.1 . 0)
    (ret.subr.gloc.of format "./boot/eval.scm" . 263219))
- (set.gloc.of |.L1196|)
- (close
-   (1 0)
-   (push.iloc.0 . 0)
-   (push.const . ".cache")
-   (subr.gloc.of string-contains 2 "./boot/eval.scm" . 269365)
-   (if.false.ret)
-   (push.iloc.0 . 0)
-   (push.const . ".cache")
-   (push.subr.gloc.of string-contains 2 "./boot/eval.scm" . 270392)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of string-length 1 "./boot/eval.scm" . 270424)
-   (push.const . 6)
-   (push.subr.gloc.of - 2 "./boot/eval.scm" . 270421)
-   (ret.subr.gloc.of = "./boot/eval.scm" . 270389))
- (set.gloc.of |.L1193|)
- (close
-   (1 0 . dependencies-valid?)
-   (touch.gloc.of every1)
-   (push.gloc.of |.L1197|)
-   (push.iloc.0 . 0)
-   (apply.gloc.of every1 "./boot/eval.scm" . 320557))
- (set.gloc.of |dependencies-valid?`4041*|)
- (close
-   (1 0 . dependencies-exists?)
-   (touch.gloc.of every1)
-   (push.gloc.of |.L1195|)
-   (push.iloc.0 . 0)
-   (apply.gloc.of every1 "./boot/eval.scm" . 312365))
- (set.gloc.of |dependencies-exists?`4041*|)
- (close
-   (1 0)
-   (push.car.iloc (0 . 0) "./boot/eval.scm" . 313413)
-   (subr.gloc.of string? 1 "./boot/eval.scm" . 313404)
-   (if.false.ret)
-   (push.cdr.iloc (0 . 0) "./boot/eval.scm" . 314437)
-   (subr.gloc.of number? 1 "./boot/eval.scm" . 314428)
-   (if.false.ret)
-   (push.car.iloc (0 . 0) "./boot/eval.scm" . 315466)
-   (ret.subr.gloc.of file-exists? "./boot/eval.scm" . 315452))
- (set.gloc.of |.L1195|)
- (close
-   (1 0 . inconsistent-cache-state)
-   (call
-     (call (apply.gloc.of auto-compile-verbose "./boot/eval.scm" . 256014))
-     (if.false.ret)
-     (subr.gloc.of current-error-port 0)
-     (push)
-     (push.const . "~&;; reset ~s~%")
-     (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 257085))
-     (push)
-     (ret.subr.gloc.of format "./boot/eval.scm" . 257038))
-   (push.gloc.of |.L1196|)
-   (push.iloc.0 . 0)
-   (apply.gloc.of for-each "./boot/eval.scm" . 258067))
- (set.gloc.of |inconsistent-cache-state`3999*|)
+ (set.gloc.of |.L1191|)
  (close
    (0 0 . auto-compile-cache-update)
    (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 266252))
@@ -29966,7 +29963,7 @@
    (iloc.0 . 0)
    (if.true
      (call
-       (push.gloc.of |.L1193|)
+       (push.gloc.of |.L1196|)
        (push.iloc.0 . 0)
        (push.subr.gloc.of directory-list 1 "./boot/eval.scm" . 271402)
        (apply.gloc.of filter "./boot/eval.scm" . 268322))
@@ -30256,6 +30253,77 @@
                                  (cons (car |lst`4170*|) (|loop`4169*| (cdr |lst`4170*|))))))))
              (|loop`4169*| (scheme-library-paths))))))
  (set.gloc.of |reorder-scheme-library-paths`4078*|)
+ (close
+   (1 0)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of symbol->string 1 "./boot/eval.scm" . 358444)
+   (push.subr.gloc.of string->utf8 1 "./boot/eval.scm" . 358430)
+   (extend . 1)
+   (subr.gloc.of make-string-output-port 0)
+   (push)
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of bytevector-length 1 "./boot/eval.scm" . 360479)
+   (extend . 2)
+   (extend.enclose+
+     (1 0 . loop)
+     (iloc.0 . 0)
+     (=.iloc (2 . 1) "./boot/eval.scm" . 362524)
+     (if.true
+       (push.iloc 2 . 0)
+       (push.subr.gloc.of extract-accumulated-string 1 "./boot/eval.scm" . 363564)
+       (ret.subr.gloc.of string->symbol "./boot/eval.scm" . 363548))
+     (push.iloc 3 . 0)
+     (push.iloc.0 . 0)
+     (push.subr.gloc.of bytevector-u8-ref 2 "./boot/eval.scm" . 364581)
+     (extend . 1)
+     (call
+       (call
+         (>n.iloc (0 . 0) 96 "./boot/eval.scm" . 365614)
+         (if.false.ret)
+         (push.iloc.0 . 0)
+         (push.const . 123)
+         (ret.subr.gloc.of < "./boot/eval.scm" . 365625))
+       (if.true.ret)
+       (call
+         (>n.iloc (0 . 0) 47 "./boot/eval.scm" . 366638)
+         (if.false.ret)
+         (push.iloc.0 . 0)
+         (push.const . 58)
+         (ret.subr.gloc.of < "./boot/eval.scm" . 366649))
+       (if.true.ret)
+       (call
+         (>n.iloc (0 . 0) 64 "./boot/eval.scm" . 367662)
+         (if.false.ret)
+         (push.iloc.0 . 0)
+         (push.const . 91)
+         (ret.subr.gloc.of < "./boot/eval.scm" . 367673))
+       (if.true.ret)
+       (=n.iloc (0 . 0) 43 "./boot/eval.scm" . 368681)
+       (if.true.ret)
+       (=n.iloc (0 . 0) 45 "./boot/eval.scm" . 368692)
+       (if.true.ret)
+       (push.iloc.0 . 0)
+       (push.const . 95)
+       (ret.subr.gloc.of = "./boot/eval.scm" . 368703))
+     (if.true
+       (push.iloc 3 . 0)
+       (push.iloc.0 . 0)
+       (subr.gloc.of put-byte 2 "./boot/eval.scm" . 369701)
+       (push.n+.iloc (1 . 0) 1 "./boot/eval.scm" . 370731)
+       (apply.iloc+ (2 . 0) "./boot/eval.scm" . 370725))
+     (push.iloc 3 . 0)
+     (push.const . "%~x~x")
+     (push.iloc.0 . 0)
+     (push.const . 16)
+     (push.subr.gloc.of div 2 "./boot/eval.scm" . 372793)
+     (call (push.iloc.0 . 0) (push.const . 16) (apply.gloc.of mod "./boot/eval.scm" . 372804))
+     (push)
+     (subr.gloc.of format 4 "./boot/eval.scm" . 372773)
+     (push.n+.iloc (1 . 0) 1 "./boot/eval.scm" . 373803)
+     (apply.iloc+ (2 . 0) "./boot/eval.scm" . 373797))
+   (push.const . 0)
+   (apply.iloc+ (0 . 0) "./boot/eval.scm" . 362520))
+ (set.gloc.of |.L1215|)
  (close
    (4 0 . make-cache)
    (push.const . #f)
@@ -30788,83 +30856,6 @@
    (ret.iloc 0 . 0))
  (set.gloc.of |make-cache`4078*|)
  (close
-   (1 0)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of symbol->string 1 "./boot/eval.scm" . 358444)
-   (push.subr.gloc.of string->utf8 1 "./boot/eval.scm" . 358430)
-   (extend . 1)
-   (subr.gloc.of make-string-output-port 0)
-   (push)
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of bytevector-length 1 "./boot/eval.scm" . 360479)
-   (extend . 2)
-   (extend.enclose+
-     (1 0 . loop)
-     (iloc.0 . 0)
-     (=.iloc (2 . 1) "./boot/eval.scm" . 362524)
-     (if.true
-       (push.iloc 2 . 0)
-       (push.subr.gloc.of extract-accumulated-string 1 "./boot/eval.scm" . 363564)
-       (ret.subr.gloc.of string->symbol "./boot/eval.scm" . 363548))
-     (push.iloc 3 . 0)
-     (push.iloc.0 . 0)
-     (push.subr.gloc.of bytevector-u8-ref 2 "./boot/eval.scm" . 364581)
-     (extend . 1)
-     (call
-       (call
-         (>n.iloc (0 . 0) 96 "./boot/eval.scm" . 365614)
-         (if.false.ret)
-         (push.iloc.0 . 0)
-         (push.const . 123)
-         (ret.subr.gloc.of < "./boot/eval.scm" . 365625))
-       (if.true.ret)
-       (call
-         (>n.iloc (0 . 0) 47 "./boot/eval.scm" . 366638)
-         (if.false.ret)
-         (push.iloc.0 . 0)
-         (push.const . 58)
-         (ret.subr.gloc.of < "./boot/eval.scm" . 366649))
-       (if.true.ret)
-       (call
-         (>n.iloc (0 . 0) 64 "./boot/eval.scm" . 367662)
-         (if.false.ret)
-         (push.iloc.0 . 0)
-         (push.const . 91)
-         (ret.subr.gloc.of < "./boot/eval.scm" . 367673))
-       (if.true.ret)
-       (=n.iloc (0 . 0) 43 "./boot/eval.scm" . 368681)
-       (if.true.ret)
-       (=n.iloc (0 . 0) 45 "./boot/eval.scm" . 368692)
-       (if.true.ret)
-       (push.iloc.0 . 0)
-       (push.const . 95)
-       (ret.subr.gloc.of = "./boot/eval.scm" . 368703))
-     (if.true
-       (push.iloc 3 . 0)
-       (push.iloc.0 . 0)
-       (subr.gloc.of put-byte 2 "./boot/eval.scm" . 369701)
-       (push.n+.iloc (1 . 0) 1 "./boot/eval.scm" . 370731)
-       (apply.iloc+ (2 . 0) "./boot/eval.scm" . 370725))
-     (push.iloc 3 . 0)
-     (push.const . "%~x~x")
-     (push.iloc.0 . 0)
-     (push.const . 16)
-     (push.subr.gloc.of div 2 "./boot/eval.scm" . 372793)
-     (call (push.iloc.0 . 0) (push.const . 16) (apply.gloc.of mod "./boot/eval.scm" . 372804))
-     (push)
-     (subr.gloc.of format 4 "./boot/eval.scm" . 372773)
-     (push.n+.iloc (1 . 0) 1 "./boot/eval.scm" . 373803)
-     (apply.iloc+ (2 . 0) "./boot/eval.scm" . 373797))
-   (push.const . 0)
-   (apply.iloc+ (0 . 0) "./boot/eval.scm" . 362520))
- (set.gloc.of |.L1213|)
- (close
-   (1 0 . encode-library-ref)
-   (push.gloc.of |.L1213|)
-   (push.iloc.0 . 0)
-   (apply.gloc.of map "./boot/eval.scm" . 357387))
- (set.gloc.of |encode-library-ref`4078*|)
- (close
    (2 0 . locate-cache)
    (call (apply.gloc.of auto-compile-cache "./boot/eval.scm" . 447504))
    (if.false.ret)
@@ -30929,6 +30920,12 @@
    (if.false.ret)
    (ret.iloc 0 . 0))
  (set.gloc.of |locate-cache`4078*|)
+ (close
+   (1 0 . encode-library-ref)
+   (push.gloc.of |.L1215|)
+   (push.iloc.0 . 0)
+   (apply.gloc.of map "./boot/eval.scm" . 357387))
+ (set.gloc.of |encode-library-ref`4078*|)
  (close
    (1 0 . locate)
    (call
@@ -32468,26 +32465,6 @@
  (set.gloc.of read-eval-print-loop)
  (ret.const.unspec))
 ((close
-   (1 0)
-   (push.gloc.of |.L1264|)
-   (push.gloc.of |.L1262|)
-   (apply.gloc.of with-exception-handler "./boot/interaction.scm" . 274443))
- (set.gloc.of |.L1260|)
- (close
-   (1 0)
-   (subr.gloc.of current-output-port 0)
-   (push)
-   (subr.gloc.of flush-output-port 1 "./boot/interaction.scm" . 275469)
-   (call
-     (push.iloc.0 . 0)
-     (call (apply.gloc.of current-exception-printer "./boot/interaction.scm" . 276494))
-     (apply))
-   (call (push.iloc.0 . 0) (apply.gloc.of serious-condition? "./boot/interaction.scm" . 277522))
-   (if.false.ret)
-   (push.const . #f)
-   (ret.subr.gloc.of exit "./boot/interaction.scm" . 277545))
- (set.gloc.of |.L1264|)
- (close
    (0 0)
    (call
      (touch.gloc.of nonblock-skip-whitespace)
@@ -32524,15 +32501,35 @@
    (subr.gloc.of current-output-port 0)
    (push)
    (ret.subr.gloc.of flush-output-port "./boot/interaction.scm" . 288790))
- (set.gloc.of |.L1262|)
+ (set.gloc.of |.L1260|)
  (close
    (0 0 . loop)
    (call
-     (push.gloc.of |.L1260|)
+     (push.gloc.of |.L1264|)
      (apply.gloc.of call-with-current-continuation "./boot/interaction.scm" . 272392))
    (touch.gloc.of |loop`4376*|)
    (apply.gloc.of |loop`4376*| "./boot/interaction.scm" . 289799))
  (set.gloc.of |loop`4376*|)
+ (close
+   (1 0)
+   (subr.gloc.of current-output-port 0)
+   (push)
+   (subr.gloc.of flush-output-port 1 "./boot/interaction.scm" . 275469)
+   (call
+     (push.iloc.0 . 0)
+     (call (apply.gloc.of current-exception-printer "./boot/interaction.scm" . 276494))
+     (apply))
+   (call (push.iloc.0 . 0) (apply.gloc.of serious-condition? "./boot/interaction.scm" . 277522))
+   (if.false.ret)
+   (push.const . #f)
+   (ret.subr.gloc.of exit "./boot/interaction.scm" . 277545))
+ (set.gloc.of |.L1263|)
+ (close
+   (1 0)
+   (push.gloc.of |.L1263|)
+   (push.gloc.of |.L1260|)
+   (apply.gloc.of with-exception-handler "./boot/interaction.scm" . 274443))
+ (set.gloc.of |.L1264|)
  (close
    (0 0 . quiet-read-eval-print-loop)
    (touch.gloc.of |loop`4376*|)
@@ -32768,87 +32765,32 @@
  (set.gloc.of display-warning)
  (ret.const.unspec))
 ((close
-   (0 0 . init-sys-sitelib)
-   (push.const . "~a/sitelib")
-   (subr.gloc.of system-share-path 0)
-   (push)
-   (push.subr.gloc.of format 2 "./boot/interaction.scm" . 366613)
-   (extend . 1)
-   (call
-     (touch.gloc.of |directory-exists?`4421*|)
-     (push.iloc.0 . 0)
-     (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 367632))
-   (if.false.ret)
-   (push.iloc.0 . 0)
-   (apply.gloc.of add-library-path "./boot/interaction.scm" . 367657))
- (set.gloc.of |init-sys-sitelib`4421*|)
- (close
-   (1 0)
-   (subr.gloc.of current-output-port 0)
-   (push)
-   (subr.gloc.of flush-output-port 1 "./boot/interaction.scm" . 521237)
-   (call
-     (push.iloc.0 . 0)
-     (call (apply.gloc.of current-exception-printer "./boot/interaction.scm" . 522262))
-     (apply))
-   (call (push.iloc.0 . 0) (apply.gloc.of serious-condition? "./boot/interaction.scm" . 523290))
-   (if.false.ret)
-   (push.const . #f)
-   (ret.subr.gloc.of exit "./boot/interaction.scm" . 523313))
- (set.gloc.of |.L1291|)
- (close
-   (0 0 . init-sys-acc)
-   (push.const . operating-system)
-   (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 371745)
-   (push.const . "windows")
-   (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 371728)
-   (if.true
-     (push.const . "TEMP")
-     (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 372759)
-     (extend . 1)
-     (iloc.0 . 0)
-     (if.true
-       (call
-         (touch.gloc.of |directory-exists?`4421*|)
-         (push.iloc.0 . 0)
-         (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 374819))
-       (if.true
-         (call
-           (call
-             (touch.gloc.of |directory-exists?`4421*|)
-             (push.const . "~//Digamma")
-             (push.iloc.0 . 0)
-             (push.subr.gloc.of format 2 "./boot/interaction.scm" . 375866)
-             (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 375847))
-           (if.true.ret)
-           (push.const . "~//Digamma")
-           (push.iloc.0 . 0)
-           (push.subr.gloc.of format 2 "./boot/interaction.scm" . 376889)
-           (ret.subr.gloc.of create-directory "./boot/interaction.scm" . 376871))
-         (push.const . "~//Digamma")
-         (push.iloc.0 . 0)
-         (push.subr.gloc.of format 2 "./boot/interaction.scm" . 377911)
-         (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 377891))
-       (ret.const.unspec))
-     (ret.const.unspec))
-   (call (apply.gloc.of home-directory "./boot/interaction.scm" . 378896))
-   (push)
+   (0 0 . init-env-sitelib)
+   (push.const . "DIGAMMA_SITELIB")
+   (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 396304)
    (extend . 1)
    (iloc.0 . 0)
    (if.true
+     (push.gloc.of |.L1285|)
      (call
-       (touch.gloc.of |directory-exists?`4421*|)
-       (push.const . "~//.digamma")
+       (push.const . operating-system)
+       (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 404532)
+       (push.const . "windows")
+       (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 404515)
+       (if.true
+         (touch.gloc.of string-split)
+         (push.iloc.0 . 0)
+         (push.const . #\;)
+         (apply.gloc.of string-split "./boot/interaction.scm" . 405539))
+       (touch.gloc.of string-split)
        (push.iloc.0 . 0)
-       (push.subr.gloc.of format 2 "./boot/interaction.scm" . 380973)
-       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 380954))
-     (if.false.ret)
-     (push.const . "~//.digamma")
-     (push.iloc.0 . 0)
-     (push.subr.gloc.of format 2 "./boot/interaction.scm" . 381998)
-     (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 381978))
+       (push.const . #\:)
+       (apply.gloc.of string-split "./boot/interaction.scm" . 406563))
+     (push)
+     (push.subr.gloc.of reverse 1 "./boot/interaction.scm" . 404502)
+     (apply.gloc.of for-each "./boot/interaction.scm" . 399382))
    (ret.const.unspec))
- (set.gloc.of |init-sys-acc`4421*|)
+ (set.gloc.of |init-env-sitelib`4421*|)
  (close
    (1 0 . set-opt-acc)
    (call
@@ -32876,104 +32818,6 @@
    (ret.subr.gloc.of exit "./boot/interaction.scm" . 453648))
  (set.gloc.of |set-opt-acc`4421*|)
  (close
-   (0 0 . show-usage)
-   (push.const . #t)
-   (push.const . "usage: digamma [options] [--] [file] [arguments]~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 463881)
-   (push.const . #t)
-   (push.const . "options:~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 464905)
-   (push.const . #t)
-   (push.const . "  --r6rs (-6)            conforms r6rs top-level program syntax and semantics~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 465929)
-   (push.const . #t)
-   (push.const . "  --mute (-m)            suppresses greeting~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 466953)
-   (push.const . #t)
-   (push.const . "  --quiet (-q)           suppresses greeting, repl prompt, and repl output~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 467977)
-   (push.const . #t)
-   (push.const . "  --verbose (-v)         prints load and compile activities~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 469001)
-   (push.const . #t)
-   (push.const . "  --warning (-w)         prints warnings~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 470025)
-   (push.const . #t)
-   (push.const . "  --interactive (-i)     enters repl after running the script file~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 471049)
-   (push.const . #t)
-   (push.const . "  --compatible (-c)      extends lexical syntax for compatibility~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 472073)
-   (push.const . #t)
-   (push.const . "  --sitelib=path         adds sitelib path (DIGAMMA_SITELIB)~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 473097)
-   (push.const . #t)
-   (push.const . "  --loadpath=path        adds load search path (DIGAMMA_LOADPATH)~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 474121)
-   (push.const . #t)
-   (push.const . "  --acc=dir              sets a auto-compile-cache directory (DIGAMMA_ACC)~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 475145)
-   (push.const . #t)
-   (push.const . "  --heap-limit=mbytes    sets a total heap limit in MBytes~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 476169)
-   (push.const . #t)
-   (push.const . "  --dump-condition       default exception handler dumps condition~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 477193)
-   (push.const . #t)
-   (push.const . "  --disable-acc          disables auto-compile-cache~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 478217)
-   (push.const . #t)
-   (push.const . "  --clean-acc            cleans auto-compile-cache~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 479241)
-   (push.const . #t)
-   (push.const . "  --version              prints version and exit~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 480265)
-   (push.const . #t)
-   (push.const . "  --help                 prints help and exit~%")
-   (subr.gloc.of format 2 "./boot/interaction.scm" . 481289)
-   (push.const . #t)
-   (push.const . "  --                     indicates no more option to proceed~%")
-   (ret.subr.gloc.of format "./boot/interaction.scm" . 482313))
- (set.gloc.of |show-usage`4421*|)
- (close
-   (1 0 . directory-exists?)
-   (push.const . "~a/.")
-   (push.iloc.0 . 0)
-   (push.subr.gloc.of format 2 "./boot/interaction.scm" . 362519)
-   (ret.subr.gloc.of file-exists? "./boot/interaction.scm" . 362505))
- (set.gloc.of |directory-exists?`4421*|)
- (close
-   (0 0 . init-env-acc)
-   (push.const . "DIGAMMA_ACC")
-   (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 386064)
-   (extend . 1)
-   (iloc.0 . 0)
-   (if.true
-     (call
-       (touch.gloc.of |directory-exists?`4421*|)
-       (call
-         (touch.gloc.of expand-path)
-         (push.iloc.0 . 0)
-         (apply.gloc.of expand-path "./boot/interaction.scm" . 388143))
-       (push)
-       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 388124))
-     (if.true
-       (call
-         (touch.gloc.of expand-path)
-         (push.iloc.0 . 0)
-         (apply.gloc.of expand-path "./boot/interaction.scm" . 389168))
-       (push)
-       (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 389148))
-     (subr.gloc.of current-error-port 0)
-     (push)
-     (push.const . "** ERROR in environment variable 'DIGAMMA_ACC': directory ~s not exist~%")
-     (push.iloc.0 . 0)
-     (subr.gloc.of format 3 "./boot/interaction.scm" . 391196)
-     (push.const . #f)
-     (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 392220))
-   (ret.const.unspec))
- (set.gloc.of |init-env-acc`4421*|)
- (close
    (1 0)
    (call
      (touch.gloc.of |directory-exists?`4421*|)
@@ -32995,98 +32839,7 @@
    (push.const . "** ERROR in environment variable 'DIGAMMA_LOADPATH': directory ~s not exist~%")
    (push.iloc.0 . 0)
    (ret.subr.gloc.of format "./boot/interaction.scm" . 417823))
- (set.gloc.of |.L1288|)
- (close
-   (1 0)
-   (call
-     (touch.gloc.of |directory-exists?`4421*|)
-     (call
-       (touch.gloc.of expand-path)
-       (push.iloc.0 . 0)
-       (apply.gloc.of expand-path "./boot/interaction.scm" . 400434))
-     (push)
-     (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 400415))
-   (if.true
-     (call
-       (touch.gloc.of expand-path)
-       (push.iloc.0 . 0)
-       (apply.gloc.of expand-path "./boot/interaction.scm" . 401457))
-     (push)
-     (apply.gloc.of add-library-path "./boot/interaction.scm" . 401439))
-   (subr.gloc.of current-error-port 0)
-   (push)
-   (push.const . "** ERROR in environment variable 'DIGAMMA_SITELIB': directory ~s not exist~%")
-   (push.iloc.0 . 0)
-   (ret.subr.gloc.of format "./boot/interaction.scm" . 403487))
- (set.gloc.of |.L1294|)
- (close
-   (1 0 . add-opt-loadpath)
-   (push.close
-     (1 0)
-     (call
-       (touch.gloc.of |directory-exists?`4421*|)
-       (call
-         (touch.gloc.of expand-path)
-         (push.iloc.0 . 0)
-         (apply.gloc.of expand-path "./boot/interaction.scm" . 438319))
-       (push)
-       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 438300))
-     (if.true
-       (call
-         (touch.gloc.of expand-path)
-         (push.iloc.0 . 0)
-         (apply.gloc.of expand-path "./boot/interaction.scm" . 439339))
-       (push)
-       (apply.gloc.of add-load-path "./boot/interaction.scm" . 439324))
-     (subr.gloc.of current-error-port 0)
-     (push)
-     (push.const . "** ERROR in option '--loadpath=~a': directory ~s not exist~%")
-     (push.iloc.1 . 0)
-     (push.iloc.0 . 0)
-     (subr.gloc.of format 4 "./boot/interaction.scm" . 441372)
-     (push.const . #f)
-     (ret.subr.gloc.of exit "./boot/interaction.scm" . 442396))
-   (call
-     (push.const . operating-system)
-     (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 443441)
-     (push.const . "windows")
-     (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 443424)
-     (if.true
-       (touch.gloc.of string-split)
-       (push.iloc.0 . 0)
-       (push.const . #\;)
-       (apply.gloc.of string-split "./boot/interaction.scm" . 444448))
-     (touch.gloc.of string-split)
-     (push.iloc.0 . 0)
-     (push.const . #\:)
-     (apply.gloc.of string-split "./boot/interaction.scm" . 445472))
-   (push)
-   (push.subr.gloc.of reverse 1 "./boot/interaction.scm" . 443411)
-   (apply.gloc.of
-     for-each
-     (for-each (lambda (|path`4466*|)
-                 (if (|directory-exists?`4421*| (expand-path |path`4466*|))
-                     (add-load-path (expand-path |path`4466*|))
-                     (begin
-                       (format
-                         (current-error-port)
-                         "** ERROR in option '--loadpath=~a': directory ~s not exist~%"
-                         |paths`4464*|
-                         |path`4466*|)
-                       (exit #f))))
-               (reverse
-                 (if (string-contains (architecture-feature 'operating-system) "windows")
-                     (string-split |paths`4464*| #\;)
-                     (string-split |paths`4464*| #\:))))))
- (set.gloc.of |add-opt-loadpath`4421*|)
- (close
-   (0 0 . show-banner)
-   (push.const . #t)
-   (push.const . "digamma r~a~%")
-   (push.const . program-revision)
-   (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 486435)
-   (ret.subr.gloc.of format "./boot/interaction.scm" . 486408))
- (set.gloc.of |show-banner`4421*|)
+ (set.gloc.of |.L1300|)
  (close
    (0 0 . show-info)
    (call
@@ -33148,45 +32901,172 @@
    (ret.subr.gloc.of format "./boot/interaction.scm" . 502793))
  (set.gloc.of |show-info`4421*|)
  (close
-   (0 0 . init-env-sitelib)
-   (push.const . "DIGAMMA_SITELIB")
-   (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 396304)
+   (1 0)
+   (call
+     (touch.gloc.of |directory-exists?`4421*|)
+     (call
+       (touch.gloc.of expand-path)
+       (push.iloc.0 . 0)
+       (apply.gloc.of expand-path "./boot/interaction.scm" . 400434))
+     (push)
+     (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 400415))
+   (if.true
+     (call
+       (touch.gloc.of expand-path)
+       (push.iloc.0 . 0)
+       (apply.gloc.of expand-path "./boot/interaction.scm" . 401457))
+     (push)
+     (apply.gloc.of add-library-path "./boot/interaction.scm" . 401439))
+   (subr.gloc.of current-error-port 0)
+   (push)
+   (push.const . "** ERROR in environment variable 'DIGAMMA_SITELIB': directory ~s not exist~%")
+   (push.iloc.0 . 0)
+   (ret.subr.gloc.of format "./boot/interaction.scm" . 403487))
+ (set.gloc.of |.L1285|)
+ (close
+   (0 0 . show-usage)
+   (push.const . #t)
+   (push.const . "usage: digamma [options] [--] [file] [arguments]~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 463881)
+   (push.const . #t)
+   (push.const . "options:~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 464905)
+   (push.const . #t)
+   (push.const . "  --r6rs (-6)            conforms r6rs top-level program syntax and semantics~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 465929)
+   (push.const . #t)
+   (push.const . "  --mute (-m)            suppresses greeting~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 466953)
+   (push.const . #t)
+   (push.const . "  --quiet (-q)           suppresses greeting, repl prompt, and repl output~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 467977)
+   (push.const . #t)
+   (push.const . "  --verbose (-v)         prints load and compile activities~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 469001)
+   (push.const . #t)
+   (push.const . "  --warning (-w)         prints warnings~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 470025)
+   (push.const . #t)
+   (push.const . "  --interactive (-i)     enters repl after running the script file~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 471049)
+   (push.const . #t)
+   (push.const . "  --compatible (-c)      extends lexical syntax for compatibility~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 472073)
+   (push.const . #t)
+   (push.const . "  --sitelib=path         adds sitelib path (DIGAMMA_SITELIB)~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 473097)
+   (push.const . #t)
+   (push.const . "  --loadpath=path        adds load search path (DIGAMMA_LOADPATH)~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 474121)
+   (push.const . #t)
+   (push.const . "  --acc=dir              sets a auto-compile-cache directory (DIGAMMA_ACC)~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 475145)
+   (push.const . #t)
+   (push.const . "  --heap-limit=mbytes    sets a total heap limit in MBytes~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 476169)
+   (push.const . #t)
+   (push.const . "  --dump-condition       default exception handler dumps condition~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 477193)
+   (push.const . #t)
+   (push.const . "  --disable-acc          disables auto-compile-cache~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 478217)
+   (push.const . #t)
+   (push.const . "  --clean-acc            cleans auto-compile-cache~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 479241)
+   (push.const . #t)
+   (push.const . "  --version              prints version and exit~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 480265)
+   (push.const . #t)
+   (push.const . "  --help                 prints help and exit~%")
+   (subr.gloc.of format 2 "./boot/interaction.scm" . 481289)
+   (push.const . #t)
+   (push.const . "  --                     indicates no more option to proceed~%")
+   (ret.subr.gloc.of format "./boot/interaction.scm" . 482313))
+ (set.gloc.of |show-usage`4421*|)
+ (close
+   (0 0 . init-env-acc)
+   (push.const . "DIGAMMA_ACC")
+   (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 386064)
    (extend . 1)
    (iloc.0 . 0)
    (if.true
-     (push.gloc.of |.L1294|)
      (call
-       (push.const . operating-system)
-       (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 404532)
-       (push.const . "windows")
-       (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 404515)
-       (if.true
-         (touch.gloc.of string-split)
+       (touch.gloc.of |directory-exists?`4421*|)
+       (call
+         (touch.gloc.of expand-path)
          (push.iloc.0 . 0)
-         (push.const . #\;)
-         (apply.gloc.of string-split "./boot/interaction.scm" . 405539))
-       (touch.gloc.of string-split)
-       (push.iloc.0 . 0)
-       (push.const . #\:)
-       (apply.gloc.of string-split "./boot/interaction.scm" . 406563))
+         (apply.gloc.of expand-path "./boot/interaction.scm" . 388143))
+       (push)
+       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 388124))
+     (if.true
+       (call
+         (touch.gloc.of expand-path)
+         (push.iloc.0 . 0)
+         (apply.gloc.of expand-path "./boot/interaction.scm" . 389168))
+       (push)
+       (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 389148))
+     (subr.gloc.of current-error-port 0)
      (push)
-     (push.subr.gloc.of reverse 1 "./boot/interaction.scm" . 404502)
-     (apply.gloc.of for-each "./boot/interaction.scm" . 399382))
+     (push.const . "** ERROR in environment variable 'DIGAMMA_ACC': directory ~s not exist~%")
+     (push.iloc.0 . 0)
+     (subr.gloc.of format 3 "./boot/interaction.scm" . 391196)
+     (push.const . #f)
+     (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 392220))
    (ret.const.unspec))
- (set.gloc.of |init-env-sitelib`4421*|)
+ (set.gloc.of |init-env-acc`4421*|)
  (close
-   (1 0 . bad-option)
-   (subr.gloc.of current-error-port 0)
+   (0 0 . init-sys-acc)
+   (push.const . operating-system)
+   (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 371745)
+   (push.const . "windows")
+   (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 371728)
+   (if.true
+     (push.const . "TEMP")
+     (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 372759)
+     (extend . 1)
+     (iloc.0 . 0)
+     (if.true
+       (call
+         (touch.gloc.of |directory-exists?`4421*|)
+         (push.iloc.0 . 0)
+         (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 374819))
+       (if.true
+         (call
+           (call
+             (touch.gloc.of |directory-exists?`4421*|)
+             (push.const . "~//Digamma")
+             (push.iloc.0 . 0)
+             (push.subr.gloc.of format 2 "./boot/interaction.scm" . 375866)
+             (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 375847))
+           (if.true.ret)
+           (push.const . "~//Digamma")
+           (push.iloc.0 . 0)
+           (push.subr.gloc.of format 2 "./boot/interaction.scm" . 376889)
+           (ret.subr.gloc.of create-directory "./boot/interaction.scm" . 376871))
+         (push.const . "~//Digamma")
+         (push.iloc.0 . 0)
+         (push.subr.gloc.of format 2 "./boot/interaction.scm" . 377911)
+         (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 377891))
+       (ret.const.unspec))
+     (ret.const.unspec))
+   (call (apply.gloc.of home-directory "./boot/interaction.scm" . 378896))
    (push)
-   (push.const . "** ERROR in option '~a'~%")
-   (push.iloc.0 . 0)
-   (subr.gloc.of format 3 "./boot/interaction.scm" . 457737)
-   (call
-     (touch.gloc.of |show-usage`4421*|)
-     (apply.gloc.of |show-usage`4421*| "./boot/interaction.scm" . 458761))
-   (push.const . #f)
-   (ret.subr.gloc.of exit "./boot/interaction.scm" . 459785))
- (set.gloc.of |bad-option`4421*|)
+   (extend . 1)
+   (iloc.0 . 0)
+   (if.true
+     (call
+       (touch.gloc.of |directory-exists?`4421*|)
+       (push.const . "~//.digamma")
+       (push.iloc.0 . 0)
+       (push.subr.gloc.of format 2 "./boot/interaction.scm" . 380973)
+       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 380954))
+     (if.false.ret)
+     (push.const . "~//.digamma")
+     (push.iloc.0 . 0)
+     (push.subr.gloc.of format 2 "./boot/interaction.scm" . 381998)
+     (apply.gloc.of auto-compile-cache "./boot/interaction.scm" . 381978))
+   (ret.const.unspec))
+ (set.gloc.of |init-sys-acc`4421*|)
  (close
    (1 0 . add-opt-sitelib)
    (push.close
@@ -33248,13 +33128,36 @@
                      (string-split |paths`4460*| #\:))))))
  (set.gloc.of |add-opt-sitelib`4421*|)
  (close
+   (0 0 . show-banner)
+   (push.const . #t)
+   (push.const . "digamma r~a~%")
+   (push.const . program-revision)
+   (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 486435)
+   (ret.subr.gloc.of format "./boot/interaction.scm" . 486408))
+ (set.gloc.of |show-banner`4421*|)
+ (close
+   (0 0 . init-sys-sitelib)
+   (push.const . "~a/sitelib")
+   (subr.gloc.of system-share-path 0)
+   (push)
+   (push.subr.gloc.of format 2 "./boot/interaction.scm" . 366613)
+   (extend . 1)
+   (call
+     (touch.gloc.of |directory-exists?`4421*|)
+     (push.iloc.0 . 0)
+     (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 367632))
+   (if.false.ret)
+   (push.iloc.0 . 0)
+   (apply.gloc.of add-library-path "./boot/interaction.scm" . 367657))
+ (set.gloc.of |init-sys-sitelib`4421*|)
+ (close
    (0 0 . init-env-loadpath)
    (push.const . "DIGAMMA_LOADPATH")
    (push.subr.gloc.of lookup-process-environment 1 "./boot/interaction.scm" . 410640)
    (extend . 1)
    (iloc.0 . 0)
    (if.true
-     (push.gloc.of |.L1288|)
+     (push.gloc.of |.L1300|)
      (call
        (push.const . operating-system)
        (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 418868)
@@ -33274,6 +33177,100 @@
      (apply.gloc.of for-each "./boot/interaction.scm" . 413718))
    (ret.const.unspec))
  (set.gloc.of |init-env-loadpath`4421*|)
+ (close
+   (1 0 . bad-option)
+   (subr.gloc.of current-error-port 0)
+   (push)
+   (push.const . "** ERROR in option '~a'~%")
+   (push.iloc.0 . 0)
+   (subr.gloc.of format 3 "./boot/interaction.scm" . 457737)
+   (call
+     (touch.gloc.of |show-usage`4421*|)
+     (apply.gloc.of |show-usage`4421*| "./boot/interaction.scm" . 458761))
+   (push.const . #f)
+   (ret.subr.gloc.of exit "./boot/interaction.scm" . 459785))
+ (set.gloc.of |bad-option`4421*|)
+ (close
+   (1 0 . directory-exists?)
+   (push.const . "~a/.")
+   (push.iloc.0 . 0)
+   (push.subr.gloc.of format 2 "./boot/interaction.scm" . 362519)
+   (ret.subr.gloc.of file-exists? "./boot/interaction.scm" . 362505))
+ (set.gloc.of |directory-exists?`4421*|)
+ (close
+   (1 0 . add-opt-loadpath)
+   (push.close
+     (1 0)
+     (call
+       (touch.gloc.of |directory-exists?`4421*|)
+       (call
+         (touch.gloc.of expand-path)
+         (push.iloc.0 . 0)
+         (apply.gloc.of expand-path "./boot/interaction.scm" . 438319))
+       (push)
+       (apply.gloc.of |directory-exists?`4421*| "./boot/interaction.scm" . 438300))
+     (if.true
+       (call
+         (touch.gloc.of expand-path)
+         (push.iloc.0 . 0)
+         (apply.gloc.of expand-path "./boot/interaction.scm" . 439339))
+       (push)
+       (apply.gloc.of add-load-path "./boot/interaction.scm" . 439324))
+     (subr.gloc.of current-error-port 0)
+     (push)
+     (push.const . "** ERROR in option '--loadpath=~a': directory ~s not exist~%")
+     (push.iloc.1 . 0)
+     (push.iloc.0 . 0)
+     (subr.gloc.of format 4 "./boot/interaction.scm" . 441372)
+     (push.const . #f)
+     (ret.subr.gloc.of exit "./boot/interaction.scm" . 442396))
+   (call
+     (push.const . operating-system)
+     (push.subr.gloc.of architecture-feature 1 "./boot/interaction.scm" . 443441)
+     (push.const . "windows")
+     (subr.gloc.of string-contains 2 "./boot/interaction.scm" . 443424)
+     (if.true
+       (touch.gloc.of string-split)
+       (push.iloc.0 . 0)
+       (push.const . #\;)
+       (apply.gloc.of string-split "./boot/interaction.scm" . 444448))
+     (touch.gloc.of string-split)
+     (push.iloc.0 . 0)
+     (push.const . #\:)
+     (apply.gloc.of string-split "./boot/interaction.scm" . 445472))
+   (push)
+   (push.subr.gloc.of reverse 1 "./boot/interaction.scm" . 443411)
+   (apply.gloc.of
+     for-each
+     (for-each (lambda (|path`4466*|)
+                 (if (|directory-exists?`4421*| (expand-path |path`4466*|))
+                     (add-load-path (expand-path |path`4466*|))
+                     (begin
+                       (format
+                         (current-error-port)
+                         "** ERROR in option '--loadpath=~a': directory ~s not exist~%"
+                         |paths`4464*|
+                         |path`4466*|)
+                       (exit #f))))
+               (reverse
+                 (if (string-contains (architecture-feature 'operating-system) "windows")
+                     (string-split |paths`4464*| #\;)
+                     (string-split |paths`4464*| #\:))))))
+ (set.gloc.of |add-opt-loadpath`4421*|)
+ (close
+   (1 0)
+   (subr.gloc.of current-output-port 0)
+   (push)
+   (subr.gloc.of flush-output-port 1 "./boot/interaction.scm" . 521237)
+   (call
+     (push.iloc.0 . 0)
+     (call (apply.gloc.of current-exception-printer "./boot/interaction.scm" . 522262))
+     (apply))
+   (call (push.iloc.0 . 0) (apply.gloc.of serious-condition? "./boot/interaction.scm" . 523290))
+   (if.false.ret)
+   (push.const . #f)
+   (ret.subr.gloc.of exit "./boot/interaction.scm" . 523313))
+ (set.gloc.of |.L1290|)
  (close
    (0 0 . start-scheme-session)
    (extend.unbound . 9)
@@ -33312,7 +33309,7 @@
          (push.iloc.1 . 0)
          (apply.gloc.of load "./boot/interaction.scm" . 517141))
        (apply.gloc.of with-exception-handler "./boot/interaction.scm" . 509970))
-     (push.gloc.of |.L1291|)
+     (push.gloc.of |.L1290|)
      (push.close
        (0 0)
        (call
@@ -33797,13 +33794,42 @@
  (set.gloc.of |.L1320|)
  (close
    (2 0)
+   (push.iloc.0 . 0)
    (push.iloc.0 . 1)
+   (push.subr.gloc.of top-level-value 1 "./boot/libraries.scm" . 42029)
+   (subr.gloc.of set-top-level-value! 2 "./boot/libraries.scm" . 42005)
+   (push.gloc.of immutable-primitives)
+   (push.iloc.0 . 0)
+   (push.const . #t)
+   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 43029))
+ (set.gloc.of |.L1326|)
+ (close
+   (2 0 . compound-exports)
+   (call (apply.gloc.of scheme-library-exports "./boot/libraries.scm" . 67601))
+   (push)
    (call
-     (touch.gloc.of make-import)
+     (touch.gloc.of generate-library-id)
      (push.iloc.0 . 0)
-     (apply.gloc.of make-import "./boot/libraries.scm" . 21576))
-   (ret.cons "./boot/libraries.scm" . 21568))
- (set.gloc.of |.L1321|)
+     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 67631))
+   (push)
+   (extend . 2)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (push.const)
+   (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 68652)
+   (push.iloc.0 . 0)
+   (call
+     (touch.gloc.of generate-library-id)
+     (push.iloc.1 . 1)
+     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 67667))
+   (push)
+   (push.const)
+   (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 69676)
+   (push.subr.gloc.of append 2 "./boot/libraries.scm" . 68644)
+   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 68617))
+ (set.gloc.of |compound-exports`4530*|)
  (close
    (2 0 . setup-intrinsic-procs)
    (subr.gloc.of system-environment 0)
@@ -33826,7 +33852,7 @@
    (push)
    (extend . 3)
    (call
-     (push.gloc.of |.L1325|)
+     (push.gloc.of |.L1329|)
      (push.iloc.0 . 2)
      (push.iloc.1 . 1)
      (apply.gloc.of for-each "./boot/libraries.scm" . 15369))
@@ -33841,7 +33867,7 @@
    (call
      (touch.gloc.of unify-import-bindings)
      (call
-       (push.gloc.of |.L1321|)
+       (push.gloc.of |.L1325|)
        (push.iloc.0 . 2)
        (push.iloc.1 . 1)
        (apply.gloc.of map "./boot/libraries.scm" . 21549))
@@ -33855,6 +33881,60 @@
    (push)
    (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 20489))
  (set.gloc.of |setup-intrinsic-procs`4530*|)
+ (close
+   (2 0 . setup-core-primitive-procs)
+   (call (apply.gloc.of scheme-library-exports "./boot/libraries.scm" . 37905))
+   (push)
+   (call
+     (touch.gloc.of generate-library-id)
+     (push.iloc.0 . 0)
+     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 38929))
+   (push)
+   (call
+     (push.gloc.of core-primitive-name)
+     (push.iloc.0 . 1)
+     (apply.gloc.of map "./boot/libraries.scm" . 39958))
+   (push)
+   (extend . 3)
+   (call
+     (push.gloc.of |.L1326|)
+     (push.iloc.0 . 2)
+     (push.iloc.1 . 1)
+     (apply.gloc.of for-each "./boot/libraries.scm" . 40969))
+   (subr.gloc.of system-environment 0)
+   (push)
+   (subr.gloc.of interaction-environment 0)
+   (push)
+   (push.iloc.0 . 2)
+   (subr.gloc.of copy-environment-variables! 3 "./boot/libraries.scm" . 45065)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (call
+     (touch.gloc.of unify-import-bindings)
+     (call
+       (push.gloc.of |.L1327|)
+       (push.iloc.0 . 2)
+       (push.iloc.1 . 1)
+       (apply.gloc.of map "./boot/libraries.scm" . 47149))
+     (push)
+     (push.iloc.0 . 0)
+     (push.iloc.0 . 1)
+     (push.const)
+     (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 48173)
+     (push.subr.gloc.of append 2 "./boot/libraries.scm" . 47141)
+     (apply.gloc.of unify-import-bindings "./boot/libraries.scm" . 46116))
+   (push)
+   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 46089))
+ (set.gloc.of |setup-core-primitive-procs`4530*|)
+ (close
+   (2 0)
+   (push.iloc.0 . 1)
+   (call
+     (touch.gloc.of make-import)
+     (push.iloc.0 . 0)
+     (apply.gloc.of make-import "./boot/libraries.scm" . 62536))
+   (ret.cons "./boot/libraries.scm" . 62528))
+ (set.gloc.of |.L1322|)
  (close
    (2 0 . setup-intrinsic-macros)
    (call (apply.gloc.of scheme-library-exports "./boot/libraries.scm" . 26641))
@@ -33917,7 +33997,7 @@
    (push)
    (extend . 3)
    (call
-     (push.gloc.of |.L1328|)
+     (push.gloc.of |.L1323|)
      (push.iloc.0 . 2)
      (push.iloc.1 . 1)
      (apply.gloc.of for-each "./boot/libraries.scm" . 55305))
@@ -33948,98 +34028,6 @@
  (set.gloc.of |setup-core-primitive-macros`4530*|)
  (close
    (2 0)
-   (push.iloc.0 . 1)
-   (call
-     (touch.gloc.of make-import)
-     (push.iloc.0 . 0)
-     (apply.gloc.of make-import "./boot/libraries.scm" . 62536))
-   (ret.cons "./boot/libraries.scm" . 62528))
- (set.gloc.of |.L1322|)
- (close
-   (2 0 . setup-core-primitive-procs)
-   (call (apply.gloc.of scheme-library-exports "./boot/libraries.scm" . 37905))
-   (push)
-   (call
-     (touch.gloc.of generate-library-id)
-     (push.iloc.0 . 0)
-     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 38929))
-   (push)
-   (call
-     (push.gloc.of core-primitive-name)
-     (push.iloc.0 . 1)
-     (apply.gloc.of map "./boot/libraries.scm" . 39958))
-   (push)
-   (extend . 3)
-   (call
-     (push.gloc.of |.L1327|)
-     (push.iloc.0 . 2)
-     (push.iloc.1 . 1)
-     (apply.gloc.of for-each "./boot/libraries.scm" . 40969))
-   (subr.gloc.of system-environment 0)
-   (push)
-   (subr.gloc.of interaction-environment 0)
-   (push)
-   (push.iloc.0 . 2)
-   (subr.gloc.of copy-environment-variables! 3 "./boot/libraries.scm" . 45065)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (call
-     (touch.gloc.of unify-import-bindings)
-     (call
-       (push.gloc.of |.L1330|)
-       (push.iloc.0 . 2)
-       (push.iloc.1 . 1)
-       (apply.gloc.of map "./boot/libraries.scm" . 47149))
-     (push)
-     (push.iloc.0 . 0)
-     (push.iloc.0 . 1)
-     (push.const)
-     (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 48173)
-     (push.subr.gloc.of append 2 "./boot/libraries.scm" . 47141)
-     (apply.gloc.of unify-import-bindings "./boot/libraries.scm" . 46116))
-   (push)
-   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 46089))
- (set.gloc.of |setup-core-primitive-procs`4530*|)
- (close
-   (2 0 . compound-exports)
-   (call (apply.gloc.of scheme-library-exports "./boot/libraries.scm" . 67601))
-   (push)
-   (call
-     (touch.gloc.of generate-library-id)
-     (push.iloc.0 . 0)
-     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 67631))
-   (push)
-   (extend . 2)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.const)
-   (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 68652)
-   (push.iloc.0 . 0)
-   (call
-     (touch.gloc.of generate-library-id)
-     (push.iloc.1 . 1)
-     (apply.gloc.of generate-library-id "./boot/libraries.scm" . 67667))
-   (push)
-   (push.const)
-   (push.subr.gloc.of core-hashtable-ref 3 "./boot/libraries.scm" . 69676)
-   (push.subr.gloc.of append 2 "./boot/libraries.scm" . 68644)
-   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 68617))
- (set.gloc.of |compound-exports`4530*|)
- (close
-   (2 0)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.subr.gloc.of top-level-value 1 "./boot/libraries.scm" . 42029)
-   (subr.gloc.of set-top-level-value! 2 "./boot/libraries.scm" . 42005)
-   (push.gloc.of immutable-primitives)
-   (push.iloc.0 . 0)
-   (push.const . #t)
-   (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 43029))
- (set.gloc.of |.L1327|)
- (close
-   (2 0)
    (subr.gloc.of current-macro-environment 0)
    (push)
    (push.iloc.0 . 1)
@@ -34054,7 +34042,25 @@
      (push.iloc.0 . 0)
      (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 58401))
    (ret.const.unspec))
- (set.gloc.of |.L1328|)
+ (set.gloc.of |.L1323|)
+ (close
+   (2 0)
+   (push.iloc.0 . 1)
+   (call
+     (touch.gloc.of make-import)
+     (push.iloc.0 . 0)
+     (apply.gloc.of make-import "./boot/libraries.scm" . 21576))
+   (ret.cons "./boot/libraries.scm" . 21568))
+ (set.gloc.of |.L1325|)
+ (close
+   (2 0)
+   (push.iloc.0 . 1)
+   (call
+     (touch.gloc.of make-import)
+     (push.iloc.0 . 0)
+     (apply.gloc.of make-import "./boot/libraries.scm" . 47176))
+   (ret.cons "./boot/libraries.scm" . 47168))
+ (set.gloc.of |.L1327|)
  (close
    (2 0)
    (push.iloc.0 . 0)
@@ -34065,16 +34071,7 @@
    (push.iloc.0 . 0)
    (push.const . #t)
    (ret.subr.gloc.of core-hashtable-set! "./boot/libraries.scm" . 17429))
- (set.gloc.of |.L1325|)
- (close
-   (2 0)
-   (push.iloc.0 . 1)
-   (call
-     (touch.gloc.of make-import)
-     (push.iloc.0 . 0)
-     (apply.gloc.of make-import "./boot/libraries.scm" . 47176))
-   (ret.cons "./boot/libraries.scm" . 47168))
- (set.gloc.of |.L1330|)
+ (set.gloc.of |.L1329|)
  (call
    (touch.gloc.of |setup-intrinsic-macros`4530*|)
    (push.const core intrinsics)

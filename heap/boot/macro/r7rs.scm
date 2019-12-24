@@ -14,21 +14,22 @@
        (let ((library-id (library-name->id form library-name)) (library-version (library-name->version form library-name)))
          (and library-version (core-hashtable-set! (scheme-library-versions) library-id library-version))
          (parameterize ((current-include-files (make-core-hashtable)))
-           (let ((ht-immutables (make-core-hashtable)) (ht-imports (make-core-hashtable)) (ht-publics (make-core-hashtable)))
              (let ((coreform
                      (let loop ((clauses clauses) (exports '()) (imports '()) (depends '()) (commands '()))
                        (if (null? clauses)
-                           (begin
+                           (let ((ht-immutables (make-core-hashtable)) (ht-imports (make-core-hashtable)) (ht-publics (make-core-hashtable)))
                              (for-each (lambda (a)
-                                         (and (core-hashtable-ref ht-publics (cdr a) #f) (syntax-violation 'define-library "duplicate export identifiers" (abbreviated-take-form form 4 8) (cdr a)))
+                                         (and (core-hashtable-ref ht-publics (cdr a) #f)
+                                              (syntax-violation 'define-library "duplicate export identifiers" (abbreviated-take-form form 4 8) (cdr a)))
                                          (core-hashtable-set! ht-publics (cdr a) #t)
                                          (core-hashtable-set! ht-immutables (car a) #t))
                                        exports)
                              (for-each (lambda (a)
                                          (core-hashtable-set! ht-immutables (car a) #t)
                                          (cond ((core-hashtable-ref ht-imports (car a) #f)
-                                                =>
-                                                (lambda (deno) (or (eq? deno (cdr a)) (syntax-violation 'define-library "duplicate import identifiers" (abbreviated-take-form form 4 8) (car a)))))
+                                                => (lambda (deno)
+                                                     (or (eq? deno (cdr a))
+                                                         (syntax-violation 'define-library "duplicate import identifiers" (abbreviated-take-form form 4 8) (car a)))))
                                                (else (core-hashtable-set! ht-imports (car a) (cdr a)))))
                                        imports)
                              (let ((ht-env (make-shield-id-table commands)) (ht-libenv (make-core-hashtable)))
@@ -56,8 +57,9 @@
                               (loop more exports imports depends (append commands body)))
                              (_
                               (syntax-violation 'define-library "malformed library declarations" (abbreviated-take-form form 4 8) (car clauses))))))))
-               (or (= (core-hashtable-size (current-include-files)) 0) (core-hashtable-set! library-include-dependencies library-id (current-include-files)))
-               coreform)))))
+               (or (= (core-hashtable-size (current-include-files)) 0)
+                   (core-hashtable-set! library-include-dependencies library-id (current-include-files)))
+               coreform))))
       (_ (syntax-violation 'define-library "expected library name and declarations" (abbreviated-take-form form 4 8))))))
 
 #|
