@@ -305,6 +305,7 @@
     define
     define-condition-type
     define-enumeration
+    define-library
     define-macro
     define-record-type
     define-struct
