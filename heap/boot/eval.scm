@@ -104,12 +104,12 @@
             (else
              (format "~/" path))))))
 
-(define locate-load-file
-  (lambda (path)
+(define locate-file
+  (lambda (path form)
 
     (define path-not-found
       (lambda (path)
-        (assertion-violation 'load (format "~a~/~a not found" #\" path #\"))))
+        (assertion-violation form (format "~a~/~a not found" #\" path #\"))))
 
     (define confirm-path
       (lambda (path)
@@ -125,6 +125,10 @@
                  (cons "." (scheme-load-paths))))
           (else
            (path-not-found path)))))
+
+(define locate-load-file (lambda (path) (locate-file path 'load)))
+
+(define locate-include-file (lambda (path) (locate-file path 'include)))
 
 (define load-file-has-r6rs-comment?
   (lambda (path)
