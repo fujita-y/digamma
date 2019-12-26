@@ -1,7 +1,7 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define read-file-to-include
+(define read-include-file
   (lambda (path)
     (let ((abs-path (locate-include-file path)))
       (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" abs-path))
@@ -66,9 +66,9 @@
                              ((('import import-spec ...) more ...)
                               (loop more exports (append imports (parse-imports form import-spec)) (append depends (parse-depends form import-spec)) commands))
                              ((('include (? string? path)) more ...)
-                              (loop (cons (cons 'begin (read-file-to-include path)) more) exports imports depends commands))
+                              (loop (cons (cons 'begin (read-include-file path)) more) exports imports depends commands))
                              ((('include-library-declarations (? string? path)) more ...)
-                              (loop (append (read-file-to-include path) more) exports imports depends commands))
+                              (loop (append (read-include-file path) more) exports imports depends commands))
                              ((('cond-expand _ ... ('else body ...)) more ...)
                               (loop (append body more) exports imports depends commands))
                              ((('begin body ...) more ...)
