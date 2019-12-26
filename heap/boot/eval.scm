@@ -9,7 +9,7 @@
 (define current-include-files (make-parameter #f))
 (define library-include-dependencies (make-core-hashtable))
 
-(define track-file-open
+(define track-file-open-operation
   (lambda (path)
     (and (current-include-files)
          (core-hashtable-set! (current-include-files) path #t))))
@@ -344,6 +344,26 @@
           (else
            (unspecified)))))
 
+(define read-include-file
+  (lambda (path)
+    (let ((source-path (locate-include-file path)))
+      (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" source-path))
+      (track-file-open-operation source-path)
+      (let ((port (open-script-input-port source-path)))
+        (with-exception-handler
+        (lambda (c)
+          (cond ((serious-condition? c)
+                  (close-port port)
+                  (raise c))
+                (else
+                  (raise-continuable c))))
+        (lambda ()
+            (let loop ((acc '()))
+              (let ((form (core-read port (current-source-comments) 'include)))
+                (cond ((eof-object? form) (close-port port) (reverse acc))
+                      (else
+                        (loop (cons form acc))))))))))))
+
 (define load-scheme-library
   (lambda (ref . vital)
     (let ((vital (or (not (pair? vital)) (car vital)))) ; vital default #t
@@ -466,6 +486,7 @@
       (cond ((locate-source ref)
              => (lambda (location)
                   (destructuring-bind (source-path base-path) location
+                    (track-file-open-operation source-path)
                     (parameterize ((scheme-library-paths (reorder-scheme-library-paths base-path)))
                       (if (auto-compile-cache)
                           (let ((cache-path (locate-cache ref source-path)))

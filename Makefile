@@ -139,7 +139,7 @@ check: all
 	@rm -f ./test/tmp*
 
 eval: all
-	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./sitelib:./stdlib
+	./$(PROG) --verbose --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./sitelib:./stdlib
 
 bench: all
 	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib -- bench/run-digamma.scm

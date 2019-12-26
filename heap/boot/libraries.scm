@@ -500,8 +500,6 @@
                         shutdown-output-port
                         port-closed?
 
-                        track-file-open
-
                         getenv
                         gethostname
                         system

@@ -1,25 +1,6 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define read-include-file
-  (lambda (path)
-    (let ((abs-path (locate-include-file path)))
-      (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" abs-path))
-      (let ((port (open-script-input-port abs-path)))
-        (with-exception-handler
-        (lambda (c)
-          (cond ((serious-condition? c)
-                  (close-port port)
-                  (raise c))
-                (else
-                  (raise-continuable c))))
-        (lambda ()
-            (let loop ((acc '()))
-              (let ((form (core-read port (current-source-comments) 'include)))
-                (cond ((eof-object? form) (close-port port) (reverse acc))
-                      (else
-                        (loop (cons form acc))))))))))))
-
 (define expand-define-library
   (lambda (form env)
 
