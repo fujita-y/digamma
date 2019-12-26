@@ -1,45 +1,49 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
+(define feature-identifies
+  (make-parameter
+    (cons*
+      (if (= (architecture-feature 'sizeof:void*) 64) 'lp64 'ilp32)
+      (string->symbol (string-append (symbol->string (native-endianness)) "-endian"))
+      '(r7rs exact-closed exact-complex ieee-float full-unicode ratios posix digamma digamma-1))))
+
+(define check-feature-identifies
+  (lambda (form spec)
+    (let loop ((spec spec))
+      (destructuring-match spec
+        ((? symbol? id) (memq id (feature-identifies)))
+        (('and) #t)
+        (('and clause . more)
+         (and (if (symbol? clause)
+                  (memq clause (feature-identifies))
+                  (loop clause))
+              (loop `(and ,@more))))
+        (('or) #f)
+        (('or clause . more)
+         (or (if (symbol? clause)
+                 (memq clause (feature-identifies))
+                 (loop clause))
+             (loop `(or ,@more))))
+        (('not)
+         (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) spec))
+        (('not clause)
+         (not (loop clause)))
+        (_
+         (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) spec))))))
+
 (define parse-cond-expand
   (lambda (form specs)
-
-    (define feature-identifies '(srfi-1 srfi-2))
-
-    (define check-feature-condition
-      (lambda (form spec)
-        (let loop ((spec spec))
-          (destructuring-match spec
-            ((? symbol? id) (memq id feature-identifies))
-            (('and) #t)
-            (('and clause . more)
-             (and (if (symbol? clause)
-                      (memq clause feature-identifies)
-                      (loop clause))
-                  (loop `(and ,@more))))
-            (('or) #f)
-            (('or clause . more)
-             (or (if (symbol? clause)
-                     (memq clause feature-identifies)
-                     (loop clause))
-                 (loop `(or ,@more))))
-            (('not)
-             (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) spec))
-            (('not clause)
-             (not (loop clause)))
-            (_
-             (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) spec))))))
-
     (let loop ((spec specs))
       (destructuring-match spec
         (() '())
         ((('else body ...)) body)
         ((('else body ...) . _)
-         (syntax-violation 'cond-expand "misplaced else" #;(abbreviated-take-form form 4 8) (car spec)))
+         (syntax-violation 'cond-expand "misplaced else" (abbreviated-take-form form 4 8) (car spec)))
         (((condition body ...) . more)
-         (if (check-feature-condition form condition) body (loop more)))
+         (if (check-feature-identifies form condition) body (loop more)))
         (_
-         (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) (car spec)))))))
+         (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) (car spec)))))))
 
 (define expand-define-library
   (lambda (form env)
@@ -90,8 +94,8 @@
                               (loop (cons (cons 'begin (read-include-file path)) more) exports imports depends commands))
                              ((('include-library-declarations (? string? path)) more ...)
                               (loop (append (read-include-file path) more) exports imports depends commands))
-                             ((('cond-expand _ ... ('else body ...)) more ...)
-                              (loop (append body more) exports imports depends commands))
+                             ((('cond-expand spec ...) more ...)
+                              (loop (append (parse-cond-expand form spec) more) exports imports depends commands))
                              ((('begin body ...) more ...)
                               (loop more exports imports depends (append commands body)))
                              (_
@@ -225,10 +229,8 @@
 #|
 (define-library
   (foo)
-  (include-library-declarations "decl.ss")
   (import (rnrs))
   (begin (define a (lambda (x) (car x))) (define b (lambda (x) (cdr x))))
   (import (rename (core) (current-directory cd)))
-  (include "include.ss")
-  (cond-expand (scm) (else (begin (define c (lambda () (cd)))))))
+  (cond-expand (srfi-1 (begin (display "hi"))) (else (begin (define c (lambda () (cd)))))))
 |#
