@@ -1,6 +1,46 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
+(define parse-cond-expand
+  (lambda (form specs)
+
+    (define feature-identifies '(srfi-1 srfi-2))
+
+    (define check-feature-condition
+      (lambda (form spec)
+        (let loop ((spec spec))
+          (destructuring-match spec
+            ((? symbol? id) (memq id feature-identifies))
+            (('and) #t)
+            (('and clause . more)
+             (and (if (symbol? clause)
+                      (memq clause feature-identifies)
+                      (loop clause))
+                  (loop `(and ,@more))))
+            (('or) #f)
+            (('or clause . more)
+             (or (if (symbol? clause)
+                     (memq clause feature-identifies)
+                     (loop clause))
+                 (loop `(or ,@more))))
+            (('not)
+             (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) spec))
+            (('not clause)
+             (not (loop clause)))
+            (_
+             (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) spec))))))
+
+    (let loop ((spec specs))
+      (destructuring-match spec
+        (() '())
+        ((('else body ...)) body)
+        ((('else body ...) . _)
+         (syntax-violation 'cond-expand "misplaced else" #;(abbreviated-take-form form 4 8) (car spec)))
+        (((condition body ...) . more)
+         (if (check-feature-condition form condition) body (loop more)))
+        (_
+         (syntax-violation 'cond-expand "malformed clause" #;(abbreviated-take-form form 4 8) (car spec)))))))
+
 (define expand-define-library
   (lambda (form env)
 
