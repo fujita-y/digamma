@@ -67,6 +67,8 @@
                               (loop more exports (append imports (parse-imports form import-spec)) (append depends (parse-depends form import-spec)) commands))
                              ((('include (? string? path)) more ...)
                               (loop (cons (cons 'begin (read-file-to-include path)) more) exports imports depends commands))
+                             ((('include-library-declarations (? string? path)) more ...)
+                              (loop (append (read-file-to-include path) more) exports imports depends commands))
                              ((('begin body ...) more ...)
                               (loop more exports imports depends (append commands body)))
                              (_
@@ -181,6 +183,16 @@
 (define-library
   (foo)
   (export a b c)
+  (import (rnrs))
+  (begin (define a (lambda (x) (car x))) (define b (lambda (x) (cdr x))))
+  (import (rename (core) (current-directory cd)))
+  (include "include.ss")
+  (begin (define c (lambda () (cd)))))
+|#
+#|
+(define-library
+  (foo)
+  (include-library-declarations "decl.ss")
   (import (rnrs))
   (begin (define a (lambda (x) (car x))) (define b (lambda (x) (cdr x))))
   (import (rename (core) (current-directory cd)))
