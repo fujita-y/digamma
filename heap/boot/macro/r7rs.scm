@@ -91,9 +91,11 @@
                              ((('import import-spec ...) more ...)
                               (loop more exports (append imports (parse-imports form import-spec)) (append depends (parse-depends form import-spec)) commands))
                              ((('include (? string? path)) more ...)
-                              (loop (cons (cons 'begin (read-include-file path)) more) exports imports depends commands))
+                              (loop (cons (cons 'begin (read-include-file path 'include)) more) exports imports depends commands))
+                             ((('include-ci (? string? path)) more ...)
+                              (loop (cons (cons 'begin (read-include-file path 'include-ci)) more) exports imports depends commands))
                              ((('include-library-declarations (? string? path)) more ...)
-                              (loop (append (read-include-file path) more) exports imports depends commands))
+                              (loop (append (read-include-file path 'include-library-declarations) more) exports imports depends commands))
                              ((('cond-expand spec ...) more ...)
                               (loop (append (parse-cond-expand form spec) more) exports imports depends commands))
                              ((('begin body ...) more ...)
@@ -233,4 +235,14 @@
   (begin (define a (lambda (x) (car x))) (define b (lambda (x) (cdr x))))
   (import (rename (core) (current-directory cd)))
   (cond-expand (srfi-1 (begin (display "hi"))) (else (begin (define c (lambda () (cd)))))))
+|#
+#|
+(define-library
+  (foo)
+  (export a b c)
+  (import (rnrs))
+  (begin (define a (lambda (x) (car x))) (define b (lambda (x) (cdr x))))
+  (import (rename (core) (current-directory cd)))
+  (include-ci "include.ss")
+  (begin (define c (lambda () (cd)))))
 |#

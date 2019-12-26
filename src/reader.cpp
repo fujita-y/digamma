@@ -74,7 +74,7 @@ reader_t::delimited(int c)
     return DELIMITER_CHARP(c);
 }
 
-reader_t::reader_t(VM* vm, scm_port_t input)
+reader_t::reader_t(VM* vm, scm_port_t input, bool foldcase)
 {
     m_file = port_regular_file_pred(input);
     m_graph = NULL;
@@ -84,6 +84,7 @@ reader_t::reader_t(VM* vm, scm_port_t input)
     m_ungetbuf = scm_eof;
     m_ungetbuf_valid = false;
     m_graph_ref = false;
+    m_foldcase = foldcase;
 }
 
 void
@@ -439,8 +440,18 @@ reader_t::read_char()
         return MAKECHAR(c);
     }
     if (buf[1] == 0) return MAKECHAR(buf[0]);
+    char foldcase[32];
+    int i = 0;
+    if (m_foldcase) {
+        while (buf[i] != 0) {
+            foldcase[i] = isascii(buf[i]) ? tolower(buf[i]) : buf[i]; // TODO: consider using ICU
+            i++;
+        }
+    }
+    foldcase[i] = 0;
     for (int i = 0; i < array_sizeof(char_name); i++) {
         if (strcmp(buf, char_name[i].name) == 0) return MAKECHAR(char_name[i].code);
+        if (m_foldcase && strcmp(foldcase, char_name[i].name) == 0) return MAKECHAR(char_name[i].code);
     }
     uint32_t ucs4;
     int n = cnvt_utf8_to_ucs4((uint8_t*)buf, &ucs4);
@@ -619,6 +630,7 @@ reader_t::read_symbol()
             }
             lexical_error("invalid character %U while reading identifier", c);
         }
+        if (m_foldcase && isascii(c)) c = tolower(c); // TODO: consider using ICU
         if (m_vm->m_flags.extend_lexical_syntax == scm_true) {
             if (SYMBOL_CHARP(c)) {
                 buf[i++] = c;
@@ -781,6 +793,12 @@ top:
                             get_ucs4(); // read delimiter
                             return fasl_reader_t(m_vm, m_in).get();
                         }
+                        if (strcmp(tag, "fold-case") == 0) {
+                            m_foldcase = true;
+                        }
+                        if (strcmp(tag, "no-fold-case") == 0) {
+                            m_foldcase = false;
+                        }
 #if ENABLE_NOBACKTRACE_COMMENT
                         if (strcmp(tag, "nobacktrace") == 0) {
                             m_vm->m_flags.backtrace = scm_false;
@@ -807,7 +825,7 @@ top:
                             m_vm->m_flags.mutable_literals = scm_false;
                         }
 #endif
-                    }
+                   }
                     goto top;
                 }
                 case 'v':

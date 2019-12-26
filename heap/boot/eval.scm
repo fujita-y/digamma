@@ -345,7 +345,7 @@
            (unspecified)))))
 
 (define read-include-file
-  (lambda (path)
+  (lambda (path who)
     (let ((source-path (locate-include-file path)))
       (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" source-path))
       (track-file-open-operation source-path)
@@ -359,7 +359,7 @@
                   (raise-continuable c))))
         (lambda ()
             (let loop ((acc '()))
-              (let ((form (core-read port (current-source-comments) 'include)))
+              (let ((form (core-read port (current-source-comments) who)))
                 (cond ((eof-object? form) (close-port port) (reverse acc))
                       (else
                         (loop (cons form acc))))))))))))
