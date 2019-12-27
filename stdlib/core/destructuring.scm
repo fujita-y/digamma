@@ -64,7 +64,15 @@
       (cond ((or (symbol? pat) (boolean? pat) (null? pat) (char? pat) (fixnum? pat)) 'eq?)
             ((number? pat) 'eqv?)
             (else 'equal?))))
-
+;;
+  (define drop-last-cdr
+    (lambda (lst)
+      (cond ((null? lst) '())
+            (else
+             (let loop ((lst lst))
+               (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
+                     (else '())))))))
+;;
   (define drop-last-pair
     (lambda (lst)
       (cond ((null? lst) '())
@@ -73,13 +81,6 @@
                (cond ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst))))
                      (else '())))))))
 
-  (define drop-last-cdr
-    (lambda (lst)
-      (cond ((null? lst) '())
-            (else
-             (let loop ((lst lst))
-               (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
-                     (else '())))))))
 ;;
   (define last-pair
     (lambda (lst)

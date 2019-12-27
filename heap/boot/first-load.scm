@@ -38,6 +38,13 @@
 
   ;; procedures used in destruction-match generating code (TODO: move to core primitives)
   (begin
+    (define drop-last-cdr
+      (lambda (lst)
+        (cond ((null? lst) '())
+              (else
+              (let loop ((lst lst))
+                (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
+                      (else '())))))))
     (define drop-last-pair
       (lambda (lst)
         (cond ((null? lst) '())

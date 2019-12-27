@@ -129,18 +129,16 @@
 (define locate-load-file (lambda (path) (locate-file path 'load)))
 
 (define locate-include-file
-  (lambda (library-id path)
-    (pretty-print library-id)(newline)
-    (let ((dir
-          (destructuring-match library-id
-            ((base ... file) (symbol-list->string base "/"))
-            (_ ""))))
-        (or (any1 (lambda (base)
-                    (let ((maybe-include-path (format "~a/~a/~a" base dir path)))
-                      (pretty-print maybe-include-path)(newline)
-                      (and (file-exists? maybe-include-path) maybe-include-path)))
-                  (scheme-library-paths))
-            (locate-file path 'include)))))
+  (lambda (library-name path)
+    (let ((subdir
+            (destructuring-match library-name
+              ((_) "")
+              ((base ... _) (symbol-list->string base "/")))))
+      (or (any1 (lambda (base)
+                  (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
+                    (and (file-exists? maybe-include-path) maybe-include-path)))
+                (scheme-library-paths))
+          (locate-file path 'include)))))
 
 (define load-file-has-r6rs-comment?
   (lambda (path)
