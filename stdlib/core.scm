@@ -279,6 +279,7 @@
     core-read
     coreform-optimize
     cos
+    count-pair
     create-directory
     create-hard-link
     create-symbolic-link
@@ -327,6 +328,9 @@
     div0-and-mod0
     do
     drop
+    drop-last-cdr
+    drop-last-n-pair
+    drop-last-pair
     dynamic-wind
     else
     encode-microsecond
@@ -551,6 +555,9 @@
     iota
     irritants-condition?
     lambda
+    last-cdr
+    last-n-pair
+    last-pair
     latin-1-codec
     lcm
     least-fixnum

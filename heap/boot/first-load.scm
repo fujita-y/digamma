@@ -36,7 +36,7 @@
   (set-top-level-value! '.append append)
   (set-top-level-value! '.apply apply))
 
-  ;; procedures used in destruction-match generating code (TODO: move to core primitives)
+  ;; procedures used in destruction-match generating code
   (begin
     (define drop-last-cdr
       (lambda (lst)

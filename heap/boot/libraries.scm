@@ -553,10 +553,17 @@
                         rename-file
                         change-file-mode
 ;;                      win32-error->string
-
                         make-cmwc-random-state
                         cmwc-random-u32
                         cmwc-random-real
+
+                        drop-last-cdr
+                        drop-last-pair
+                        last-pair
+                        last-cdr
+                        count-pair
+                        last-n-pair
+                        drop-last-n-pair
                         ))
 
   (compound-exports '(core primitives) '(core intrinsics)))
