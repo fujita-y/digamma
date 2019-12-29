@@ -128,18 +128,6 @@
 
 (define locate-load-file (lambda (path) (locate-file path 'load)))
 
-(define locate-include-file
-  (lambda (library-name path)
-    (let ((subdir
-            (destructuring-match library-name
-              ((_) "")
-              ((base ... _) (symbol-list->string base "/")))))
-      (or (any1 (lambda (base)
-                  (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
-                    (and (file-exists? maybe-include-path) maybe-include-path)))
-                (scheme-library-paths))
-          (locate-file path 'include)))))
-
 (define load-file-has-r6rs-comment?
   (lambda (path)
     (parameterize ((extend-lexical-syntax #t) (mutable-literals #f))
@@ -216,6 +204,199 @@
                           (interpret program)))
                        (else
                         (loop (cons form acc)))))))))))))
+
+(define encode-library-ref
+  (lambda (ref)
+    (map (lambda (s)
+            (let ((utf8 (string->utf8 (symbol->string s))))
+              (let ((buf (make-string-output-port))
+                    (end (bytevector-length utf8)))
+                (let loop ((i 0))
+                  (if (= i end)
+                      (string->symbol (extract-accumulated-string buf))
+                      (let ((c (bytevector-u8-ref utf8 i)))
+                        (cond ((or (and (> c #x60) (< c #x7b))       ; a-z
+                                  (and (> c #x2f) (< c #x3a))       ; 0-9
+                                  (and (> c #x40) (< c #x5b))       ; A-Z
+                                  (= c #x2b) (= c #x2d) (= c #x5f)) ; + - _
+                              (put-byte buf c)
+                              (loop (+ i 1)))
+                              (else
+                              (format buf "%~x~x" (div c 16) (mod c 16))
+                              (loop (+ i 1))))))))))
+          ref)))
+
+(define locate-include-file
+  (lambda (library-name path)
+    (let ((subdir
+            (destructuring-match library-name
+              ((_) "")
+              ((base ... _) (symbol-list->string base "/")))))
+      (or (any1 (lambda (base)
+                  (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
+                    (and (file-exists? maybe-include-path) maybe-include-path)))
+                (scheme-library-paths))
+          (locate-file path 'include)))))
+
+(define locate-library-file
+  (lambda (ref)
+    (let ((ref (encode-library-ref ref)))
+      (let ((path (symbol-list->string ref "/")))
+        (any1 (lambda (base)
+                (any1 (lambda (ext)
+                        (let ((maybe-path (format "~a/~a~a" base path ext)))
+                          (and (file-exists? maybe-path) (list maybe-path base))))
+                      (library-extensions)))
+              (scheme-library-paths))))))
+
+(define read-include-file
+  (lambda (library-id path who)
+    (let ((source-path (locate-include-file library-id path)))
+      (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" source-path))
+      (track-file-open-operation source-path)
+      (let ((port (open-script-input-port source-path)))
+        (with-exception-handler
+        (lambda (c)
+          (cond ((serious-condition? c)
+                  (close-port port)
+                  (raise c))
+                (else
+                  (raise-continuable c))))
+        (lambda ()
+            (let loop ((acc '()))
+              (let ((form (core-read port (current-source-comments) who)))
+                (cond ((eof-object? form) (close-port port) (reverse acc))
+                      (else
+                        (loop (cons form acc))))))))))))
+
+(define load-scheme-library
+  (lambda (ref . vital)
+    (let ((vital (or (not (pair? vital)) (car vital)))) ; vital default #t
+
+      (define make-cache
+        (lambda (src dst source-ref source-time)
+          (let ((cyclic-code #f))
+            (call-with-port
+              (make-file-output-port dst)
+              (lambda (output)
+                (call-with-port
+                  (open-script-input-port src)
+                  (lambda (input)
+                    (with-exception-handler
+                     (lambda (c)
+                       (close-port input)
+                       (close-port output)
+                       (and (file-exists? dst) (delete-file dst))
+                       (raise c))
+                     (lambda ()
+                       (parameterize
+                           ((current-source-comments (current-source-comments))
+                            (current-temporaries (current-temporaries))
+                            (current-environment (current-environment))
+                            (extend-lexical-syntax (extend-lexical-syntax))
+                            (mutable-literals (mutable-literals))
+                            (backtrace (backtrace)))
+                         (let loop ()
+                           (current-source-comments (and (backtrace) (make-core-hashtable)))
+                           (current-temporaries (make-core-hashtable 'string=?))
+                           (current-rename-count 0)
+                           (let ((obj (core-read input (current-source-comments) 'load)))
+                             (cond ((eof-object? obj)
+                                    (or cyclic-code (format output "~%")))
+                                   (else
+                                    (let ((code
+                                           (parameterize ((current-closure-comments (make-core-hashtable)))
+                                             (compile-coreform (macro-expand obj)))))
+                                      (or cyclic-code
+                                          (cond ((cyclic-object? code)
+                                                 (close-port output)
+                                                 (and (file-exists? dst) (delete-file dst))
+                                                 (set! cyclic-code #t))
+                                                (else
+                                                 (put-fasl output code)
+                                                 (format output "~%"))))
+                                      (run-vmi (cons '(1 . 0) code))
+                                      (loop)))))))))))))
+            cyclic-code)))
+
+      (define locate-file
+        (lambda (ref)
+          (let ((path (symbol-list->string ref "/")))
+            (any1 (lambda (base)
+                    (any1 (lambda (ext)
+                            (let ((maybe-path (format "~a/~a~a" base path ext)))
+                              (and (file-exists? maybe-path) (list maybe-path base))))
+                          (library-extensions)))
+                  (scheme-library-paths)))))
+
+      (define locate-source
+        (lambda (ref)
+          (let ((safe-ref (encode-library-ref ref)))
+            (or (if (library-contains-implicit-main)
+                    (if (eq? (list-ref safe-ref (- (length safe-ref) 1)) 'main)
+                        (or (locate-file (append safe-ref '(main))) (locate-file safe-ref))
+                        (or (locate-file safe-ref) (locate-file (append safe-ref '(main)))))
+                    (locate-file safe-ref))
+                (and vital (error 'load-scheme-library (format "~s not found in scheme-library-paths: ~s" path (scheme-library-paths))))))))
+
+      (define locate-cache
+        (lambda (ref source-path)
+          (and (auto-compile-cache)
+               (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string (encode-library-ref ref) "."))))
+                 (and (file-exists? cache-path)
+                      (let ((timestamp-path (string-append cache-path ".time")))
+                        (and (file-exists? timestamp-path)
+                             (call-with-port
+                               (make-file-input-port timestamp-path)
+                               (lambda (timestamp-port)
+                                 (get-datum timestamp-port)
+                                 (get-datum timestamp-port)
+                                 (cond ((equal? source-path (get-datum timestamp-port)) cache-path)
+                                       (else (close-port timestamp-port) (auto-compile-cache-clean) #f))))))
+                      cache-path)))))
+
+      (define reorder-scheme-library-paths
+        (lambda (top-path)
+          (cons top-path
+                (let loop ((lst (scheme-library-paths)))
+                  (cond ((null? lst) '())
+                        ((equal? (car lst) top-path) (cdr lst))
+                        (else
+                         (cons (car lst)
+                               (loop (cdr lst)))))))))
+
+      (or (list? ref) (scheme-error "internal error in load-scheme-library: unrecognized argument: ~s" ref))
+      (cond ((locate-source ref)
+             => (lambda (location)
+                  (destructuring-bind (source-path base-path) location
+                    (track-file-open-operation source-path)
+                    (parameterize ((scheme-library-paths (reorder-scheme-library-paths base-path)))
+                      (if (auto-compile-cache)
+                          (let ((cache-path (locate-cache ref source-path)))
+                            (if cache-path
+                                (load-cache cache-path)
+                                (let ((ref (encode-library-ref ref)) (library-id (generate-library-id ref)))
+                                  (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string ref "."))))
+                                    (and (auto-compile-verbose) (format #t "~&;; compile ~s~%~!" source-path))
+                                    (if (make-cache source-path cache-path ref (file-stat-mtime source-path))
+                                        (and (auto-compile-verbose) (format #t "~&;; delete ~s~%~!" cache-path))
+                                        (let ((timestamp-path (string-append cache-path ".time")))
+                                          (call-with-port
+                                            (make-file-output-port timestamp-path)
+                                            (lambda (output)
+                                              (format output
+                                                      "~s ~s ~s ~s~%"
+                                                      (microsecond)
+                                                      (file-stat-mtime source-path)
+                                                      source-path
+                                                      auto-compile-cache-validation-signature)
+                                              (cond ((core-hashtable-ref library-include-dependencies library-id #f)
+                                                     => (lambda (deps)
+                                                          (for-each (lambda (dep)
+                                                                      (format output "~s ~s~%" (car dep) (file-stat-mtime (car dep))))
+                                                                    (core-hashtable->alist deps))
+                                                          (core-hashtable-delete! library-include-dependencies library-id))))))))))))
+                          (load source-path))))))))))
 
 (define load-cache
   (lambda (path)
@@ -353,174 +534,3 @@
                                     (loop (cdr lst) expiration))))))))))
           (else
            (unspecified)))))
-
-(define read-include-file
-  (lambda (library-id path who)
-    (let ((source-path (locate-include-file library-id path)))
-      (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" source-path))
-      (track-file-open-operation source-path)
-      (let ((port (open-script-input-port source-path)))
-        (with-exception-handler
-        (lambda (c)
-          (cond ((serious-condition? c)
-                  (close-port port)
-                  (raise c))
-                (else
-                  (raise-continuable c))))
-        (lambda ()
-            (let loop ((acc '()))
-              (let ((form (core-read port (current-source-comments) who)))
-                (cond ((eof-object? form) (close-port port) (reverse acc))
-                      (else
-                        (loop (cons form acc))))))))))))
-
-(define load-scheme-library
-  (lambda (ref . vital)
-    (let ((vital (or (not (pair? vital)) (car vital)))) ; vital default #t
-
-      (define encode-library-ref
-        (lambda (ref)
-          (map (lambda (s)
-                 (let ((utf8 (string->utf8 (symbol->string s))))
-                   (let ((buf (make-string-output-port))
-                         (end (bytevector-length utf8)))
-                     (let loop ((i 0))
-                       (if (= i end)
-                           (string->symbol (extract-accumulated-string buf))
-                           (let ((c (bytevector-u8-ref utf8 i)))
-                             (cond ((or (and (> c #x60) (< c #x7b))       ; a-z
-                                        (and (> c #x2f) (< c #x3a))       ; 0-9
-                                        (and (> c #x40) (< c #x5b))       ; A-Z
-                                        (= c #x2b) (= c #x2d) (= c #x5f)) ; + - _
-                                    (put-byte buf c)
-                                    (loop (+ i 1)))
-                                   (else
-                                    (format buf "%~x~x" (div c 16) (mod c 16))
-                                    (loop (+ i 1))))))))))
-               ref)))
-
-      (define make-cache
-        (lambda (src dst source-ref source-time)
-          (let ((cyclic-code #f))
-            (call-with-port
-              (make-file-output-port dst)
-              (lambda (output)
-                (call-with-port
-                  (open-script-input-port src)
-                  (lambda (input)
-                    (with-exception-handler
-                     (lambda (c)
-                       (close-port input)
-                       (close-port output)
-                       (and (file-exists? dst) (delete-file dst))
-                       (raise c))
-                     (lambda ()
-                       (parameterize
-                           ((current-source-comments (current-source-comments))
-                            (current-temporaries (current-temporaries))
-                            (current-environment (current-environment))
-                            (extend-lexical-syntax (extend-lexical-syntax))
-                            (mutable-literals (mutable-literals))
-                            (backtrace (backtrace)))
-                         (let loop ()
-                           (current-source-comments (and (backtrace) (make-core-hashtable)))
-                           (current-temporaries (make-core-hashtable 'string=?))
-                           (current-rename-count 0)
-                           (let ((obj (core-read input (current-source-comments) 'load)))
-                             (cond ((eof-object? obj)
-                                    (or cyclic-code (format output "~%")))
-                                   (else
-                                    (let ((code
-                                           (parameterize ((current-closure-comments (make-core-hashtable)))
-                                             (compile-coreform (macro-expand obj)))))
-                                      (or cyclic-code
-                                          (cond ((cyclic-object? code)
-                                                 (close-port output)
-                                                 (and (file-exists? dst) (delete-file dst))
-                                                 (set! cyclic-code #t))
-                                                (else
-                                                 (put-fasl output code)
-                                                 (format output "~%"))))
-                                      (run-vmi (cons '(1 . 0) code))
-                                      (loop)))))))))))))
-            cyclic-code)))
-
-      (define locate-source
-        (lambda (ref)
-
-          (define locate
-            (lambda (ref)
-              (let ((path (symbol-list->string ref "/")))
-                (any1 (lambda (base)
-                        (any1 (lambda (ext)
-                                (let ((maybe-path (format "~a/~a~a" base path ext)))
-                                  (and (file-exists? maybe-path) (list maybe-path base))))
-                              (library-extensions)))
-                      (scheme-library-paths)))))
-
-          (let ((safe-ref (encode-library-ref ref)))
-            (or (if (library-contains-implicit-main)
-                    (if (eq? (list-ref safe-ref (- (length safe-ref) 1)) 'main)
-                        (or (locate (append safe-ref '(main))) (locate safe-ref))
-                        (or (locate safe-ref) (locate (append safe-ref '(main)))))
-                    (locate safe-ref))
-                (and vital (error 'load-scheme-library (format "~s not found in scheme-library-paths: ~s" path (scheme-library-paths))))))))
-
-      (define locate-cache
-        (lambda (ref source-path)
-          (and (auto-compile-cache)
-               (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string (encode-library-ref ref) "."))))
-                 (and (file-exists? cache-path)
-                      (let ((timestamp-path (string-append cache-path ".time")))
-                        (and (file-exists? timestamp-path)
-                             (call-with-port
-                               (make-file-input-port timestamp-path)
-                               (lambda (timestamp-port)
-                                 (get-datum timestamp-port)
-                                 (get-datum timestamp-port)
-                                 (cond ((equal? source-path (get-datum timestamp-port)) cache-path)
-                                       (else (close-port timestamp-port) (auto-compile-cache-clean) #f))))))
-                      cache-path)))))
-
-      (define reorder-scheme-library-paths
-        (lambda (top-path)
-          (cons top-path
-                (let loop ((lst (scheme-library-paths)))
-                  (cond ((null? lst) '())
-                        ((equal? (car lst) top-path) (cdr lst))
-                        (else
-                         (cons (car lst)
-                               (loop (cdr lst)))))))))
-
-      (or (list? ref) (scheme-error "internal error in load-scheme-library: unrecognized argument: ~s" ref))
-      (cond ((locate-source ref)
-             => (lambda (location)
-                  (destructuring-bind (source-path base-path) location
-                    (track-file-open-operation source-path)
-                    (parameterize ((scheme-library-paths (reorder-scheme-library-paths base-path)))
-                      (if (auto-compile-cache)
-                          (let ((cache-path (locate-cache ref source-path)))
-                            (if cache-path
-                                (load-cache cache-path)
-                                (let ((ref (encode-library-ref ref)) (library-id (generate-library-id ref)))
-                                  (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string ref "."))))
-                                    (and (auto-compile-verbose) (format #t "~&;; compile ~s~%~!" source-path))
-                                    (if (make-cache source-path cache-path ref (file-stat-mtime source-path))
-                                        (and (auto-compile-verbose) (format #t "~&;; delete ~s~%~!" cache-path))
-                                        (let ((timestamp-path (string-append cache-path ".time")))
-                                          (call-with-port
-                                            (make-file-output-port timestamp-path)
-                                            (lambda (output)
-                                              (format output
-                                                      "~s ~s ~s ~s~%"
-                                                      (microsecond)
-                                                      (file-stat-mtime source-path)
-                                                      source-path
-                                                      auto-compile-cache-validation-signature)
-                                              (cond ((core-hashtable-ref library-include-dependencies library-id #f)
-                                                     => (lambda (deps)
-                                                          (for-each (lambda (dep)
-                                                                      (format output "~s ~s~%" (car dep) (file-stat-mtime (car dep))))
-                                                                    (core-hashtable->alist deps))
-                                                          (core-hashtable-delete! library-include-dependencies library-id))))))))))))
-                          (load source-path))))))))))

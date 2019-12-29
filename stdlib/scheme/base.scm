@@ -298,13 +298,25 @@
         (let-optionals options ((port (current-input-port)))
           (not (eof-object? (lookahead-char port))))))
 
-    (define cond-expand #f)
+    (define-syntax cond-expand
+      (lambda (x)
+        (syntax-case x (else)
+          ((_)
+           #'(begin))
+          ((_ (else body ...))
+           #'(begin body ...))
+          ((_ (else body ...) more ...)
+           (syntax-violation 'cond-expand "misplaced else" x))
+          ((_ (conditions body ...) more ...)
+           (if (fulfill-feature-requirements? x (syntax->datum #'conditions))
+               #'(begin body ...)
+               #'(cond-expand more ...))))))
 
     (define-syntax define-values
       (lambda (x)
         (syntax-case x ()
-          ((stx (formals ...) expression)
-           (with-syntax (((n ...) (datum->syntax #'k (iota (length #'(formals ...))))))
+          ((_ (formals ...) expression)
+           (with-syntax (((n ...) (iota (length #'(formals ...)))))
             #'(begin
                 (define temp (call-with-values (lambda () expression) vector))
                 (define formals (vector-ref temp n)) ...))))))

@@ -126,8 +126,8 @@
 
   (setup-core-primitive-macros
    '(core primitives) '( do
-                           syntax-case
-                         syntax))
+                         syntax
+                         syntax-case))
 
   (setup-core-primitive-procs
    '(core primitives) '(; eval
@@ -564,6 +564,8 @@
                         count-pair
                         last-n-pair
                         drop-last-n-pair
+
+                        fulfill-feature-requirements?
                         ))
 
   (compound-exports '(core primitives) '(core intrinsics)))
