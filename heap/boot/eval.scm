@@ -140,6 +140,16 @@
                 (scheme-library-paths))
           (locate-file path 'include)))))
 
+(define locate-library-file
+  (lambda (ref)
+    (let ((path (symbol-list->string ref "/")))
+      (any1 (lambda (base)
+              (any1 (lambda (ext)
+                      (let ((maybe-path (format "~a/~a~a" base path ext)))
+                        (and (file-exists? maybe-path) (list maybe-path base))))
+                    (library-extensions)))
+            (scheme-library-paths)))))
+
 (define load-file-has-r6rs-comment?
   (lambda (path)
     (parameterize ((extend-lexical-syntax #t) (mutable-literals #f))
@@ -447,23 +457,12 @@
 
       (define locate-source
         (lambda (ref)
-
-          (define locate
-            (lambda (ref)
-              (let ((path (symbol-list->string ref "/")))
-                (any1 (lambda (base)
-                        (any1 (lambda (ext)
-                                (let ((maybe-path (format "~a/~a~a" base path ext)))
-                                  (and (file-exists? maybe-path) (list maybe-path base))))
-                              (library-extensions)))
-                      (scheme-library-paths)))))
-
           (let ((safe-ref (encode-library-ref ref)))
             (or (if (library-contains-implicit-main)
                     (if (eq? (list-ref safe-ref (- (length safe-ref) 1)) 'main)
-                        (or (locate (append safe-ref '(main))) (locate safe-ref))
-                        (or (locate safe-ref) (locate (append safe-ref '(main)))))
-                    (locate safe-ref))
+                        (or (locate-library-file (append safe-ref '(main))) (locate-library-file safe-ref))
+                        (or (locate-library-file safe-ref) (locate-library-file (append safe-ref '(main)))))
+                    (locate-library-file safe-ref))
                 (and vital (error 'load-scheme-library (format "~s not found in scheme-library-paths: ~s" path (scheme-library-paths))))))))
 
       (define locate-cache

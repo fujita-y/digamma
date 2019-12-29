@@ -444,6 +444,7 @@
     force
     format
     free-identifier=?
+    fulfill-feature-requirements?
     fx*
     fx*/carry
     fx+

@@ -8,11 +8,12 @@
       (string->symbol (string-append (symbol->string (native-endianness)) "-endian"))
       '(r7rs exact-closed exact-complex ieee-float full-unicode ratios posix digamma digamma-1))))
 
-(define check-feature-identifies
+(define fulfill-feature-requirements?
   (lambda (form spec)
     (let loop ((spec spec))
       (destructuring-match spec
-        ((? symbol? id) (memq id (feature-identifies)))
+        ((? symbol? id)
+         (memq id (feature-identifies)))
         (('and) #t)
         (('and clause . more)
          (and (if (symbol? clause)
@@ -29,6 +30,9 @@
          (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) spec))
         (('not clause)
          (not (loop clause)))
+        (('library name)
+         (or (member name '((core primitives) '(core intrinsics)))
+             (locate-library-file name)))
         (_
          (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) spec))))))
 
@@ -41,7 +45,7 @@
         ((('else body ...) . _)
          (syntax-violation 'cond-expand "misplaced else" (abbreviated-take-form form 4 8) (car spec)))
         (((condition body ...) . more)
-         (if (check-feature-identifies form condition) body (loop more)))
+         (if (fulfill-feature-requirements? form condition) body (loop more)))
         (_
          (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) (car spec)))))))
 
