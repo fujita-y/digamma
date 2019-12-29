@@ -1,6 +1,7 @@
 (define-library
   (scheme base)
-  (import (core) (rnrs))
+  (import (except (core) for-each map)
+          (except (rnrs) for-each map))
   (export *
           +
           -
@@ -240,61 +241,115 @@
           write-u8
           zero?)
   (begin
-      (define bytevector-append
-        (lambda args
-          (let ((ans (make-bytevector (apply + (map bytevector-length args)))))
-            (let loop ((args args) (p 0))
-                (or (null? args)
-                    (let ((n (bytevector-length (car args))))
-                      (bytevector-copy! (car args) 0 ans p n)
-                      (loop (cdr args) (+ p n)))))
-            ans)))
+    (define for-each-1
+      (lambda (proc lst)
+        (cond ((null? lst) (unspecified))
+              (else
+                (proc (car lst))
+                (for-each-1 proc (cdr lst))))))
 
-      (define bytevector #f)
-      (define char-ready? #f)
-      (define cond-expand #f)
-      (define define-values #f)
-      (define error-object? #f)
-      (define error-object-irritants #f)
-      (define error-object-message #f)
-      (define exact-integer? #f)
-      (define features #f)
-      (define file-error? #f)
-      (define floor/ #f)
-      (define floor-quotient #f)
-      (define floor-remainder #f)
-      (define get-output-bytevector #f)
-      (define get-output-string #f)
-      (define include-ci #f)
-      (define include #f)
-      (define input-port-open? #f)
-      (define list-set! #f)
-      (define open-input-bytevector #f)
-      (define open-input-string #f)
-      (define open-output-bytevector #f)
-      (define open-output-string #f)
-      (define output-port-open? #f)
-      (define peek-u8 #f)
-      (define read-bytevector #f)
-      (define read-bytevector! #f)
-      (define read-error? #f)
-      (define read-line #f)
-      (define read-string #f)
-      (define read-u8 #f)
-      (define square #f)
-      (define string-copy! #f)
-      (define string-map #f)
-      (define string->vector #f)
-      (define syntax-error #f)
-      (define truncate/ #f)
-      (define truncate-quotient #f)
-      (define truncate-remainder #f)
-      (define u8-ready? #f)
-      (define vector-append #f)
-      (define vector-copy! #f)
-      (define vector->string #f)
-      (define write-bytevector #f)
-      (define write-string #f)
-      (define write-u8 #f)
+    (define for-each-n
+      (lambda (proc lst)
+        (cond ((null? lst) (unspecified))
+              (else
+                (apply proc (car lst))
+                (for-each-n proc (cdr lst))))))
+
+    (define for-each
+      (lambda (proc lst1 . lst2)
+        (if (null? lst2)
+            (for-each-1 proc lst1)
+            (for-each-n proc (apply list-transpose* lst1 lst2)))))
+
+    (define map-1
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (proc (car lst))
+                          (map-1 proc (cdr lst)))))))
+
+    (define map-n
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (apply proc (car lst))
+                          (map-n proc (cdr lst)))))))
+
+    (define map
+      (lambda (proc lst1 . lst2)
+        (if (null? lst2)
+            (map-1 proc lst1)
+            (map-n proc (apply list-transpose* lst1 lst2)))))
+
+    (define bytevector
+      (lambda args
+        (u8-list->bytevector args)))
+
+    (define bytevector-append
+      (lambda args
+        (let ((ans (make-bytevector (apply + (map bytevector-length args)))))
+          (let loop ((args args) (p 0))
+              (or (null? args)
+                  (let ((n (bytevector-length (car args))))
+                    (bytevector-copy! (car args) 0 ans p n)
+                    (loop (cdr args) (+ p n)))))
+          ans)))
+
+    (define char-ready?
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (not (eof-object? (lookahead-char port))))))
+
+    (define cond-expand #f)
+
+    (define-syntax define-values
+      (lambda (x)
+        (syntax-case x ()
+          ((stx (formals ...) expression)
+           (with-syntax (((n ...) (datum->syntax #'k (iota (length #'(formals ...))))))
+            #'(begin
+                (define temp (call-with-values (lambda () expression) vector))
+                (define formals (vector-ref temp n)) ...))))))
+
+    (define error-object? #f)
+    (define error-object-irritants #f)
+    (define error-object-message #f)
+    (define exact-integer? #f)
+    (define features #f)
+    (define file-error? #f)
+    (define floor/ #f)
+    (define floor-quotient #f)
+    (define floor-remainder #f)
+    (define get-output-bytevector #f)
+    (define get-output-string #f)
+    (define include-ci #f)
+    (define include #f)
+    (define input-port-open? #f)
+    (define list-set! #f)
+    (define open-input-bytevector #f)
+    (define open-input-string #f)
+    (define open-output-bytevector #f)
+    (define open-output-string #f)
+    (define output-port-open? #f)
+    (define peek-u8 #f)
+    (define read-bytevector #f)
+    (define read-bytevector! #f)
+    (define read-error? #f)
+    (define read-line #f)
+    (define read-string #f)
+    (define read-u8 #f)
+    (define square #f)
+    (define string-copy! #f)
+    (define string-map #f)
+    (define string->vector #f)
+    (define syntax-error #f)
+    (define truncate/ #f)
+    (define truncate-quotient #f)
+    (define truncate-remainder #f)
+    (define u8-ready? #f)
+    (define vector-append #f)
+    (define vector-copy! #f)
+    (define vector->string #f)
+    (define write-bytevector #f)
+    (define write-string #f)
+    (define write-u8 #f)
   )
 ) ;[end]
