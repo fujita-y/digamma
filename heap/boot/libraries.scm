@@ -565,6 +565,7 @@
                         last-n-pair
                         drop-last-n-pair
 
+                        feature-identifies
                         fulfill-feature-requirements?
                         ))
 

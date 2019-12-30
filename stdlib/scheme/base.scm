@@ -324,25 +324,61 @@
                 (define temp (call-with-values (lambda () expression) vector))
                 (define formals (vector-ref temp n)) ...))))))
 
-    (define error-object? #f)
-    (define error-object-irritants #f)
-    (define error-object-message #f)
-    (define exact-integer? #f)
-    (define features #f)
-    (define file-error? #f)
-    (define floor/ #f)
-    (define floor-quotient #f)
-    (define floor-remainder #f)
+    (define error-object?
+      (lambda (obj)
+        (or (error? obj) (violation? obj))))
+
+    (define error-object-irritants
+      (lambda (obj)
+        (and (irritants-condition? obj) (condition-irritants obj))))
+
+    (define error-object-message
+      (lambda (obj)
+        (and (message-condition? obj) (condition-message obj))))
+
+    (define exact-integer?
+      (lambda (obj)
+        (and (integer? obj) (exact? obj))))
+
+    (define features
+      (lambda ()
+        (feature-identifies)))
+
+    (define file-error?
+      (lambda (obj)
+        (i/o-filename-error? obj)))
+
+    (define floor/
+      (lambda (n m)
+        (values (floor-quotient n m) (floor-remainder n m))))
+
+    (define floor-quotient
+      (lambda (n m)
+        (floor (/ n m))))
+
+    (define floor-remainder modulo)
+
     (define get-output-bytevector #f)
-    (define get-output-string #f)
+    (define get-output-string #f) ;; get-accumulated-string
     (define include-ci #f)
     (define include #f)
     (define input-port-open? #f)
-    (define list-set! #f)
+
+    (define list-set!
+      (lambda (lst k obj)
+        (let loop ((lst lst) (k k))
+          (cond ((null? lst)
+                 (assertion-violation
+                   'list-set!
+                   (format "index out of range, ~s as argument 2" k)
+                   (list lst k obj)))
+                ((> k 0) (loop (cdr lst) (- k 1)))
+                (else (set-car! lst obj))))))
+
     (define open-input-bytevector #f)
-    (define open-input-string #f)
+    (define open-input-string #f) ;; make-string-input-port
     (define open-output-bytevector #f)
-    (define open-output-string #f)
+    (define open-output-string #f) ;; make-string-output-port
     (define output-port-open? #f)
     (define peek-u8 #f)
     (define read-bytevector #f)
@@ -351,14 +387,41 @@
     (define read-line #f)
     (define read-string #f)
     (define read-u8 #f)
-    (define square #f)
-    (define string-copy! #f)
-    (define string-map #f)
+
+    (define square (lambda (z) (* z z)))
+
+    (define string-copy!
+      (lambda (to at from . options)
+        (let-optionals options ((start 0) (end (string-length from)))
+          (if (> start at)
+              (let loop ((at at) (start start))
+                (if (< start end)
+                    (begin
+                      (string-set! to at (string-ref from start))
+                      (loop (+ at 1) (+ start 1)))))
+              (let loop ((at (- (+ at end) start 1)) (end (- end 1)))
+                (if (<= start end)
+                    (begin
+                      (string-set! to at (string-ref from end))
+                      (loop (- at 1) (- end 1)))))))))
+
+    (define string-map
+      (lambda (proc str1 . str2)
+        (if (null? str2)
+            (list->string (map proc (string->list str1)))
+            (list->string (apply map proc (string->list str1) (map string->list str2))))))
+
     (define string->vector #f)
     (define syntax-error #f)
-    (define truncate/ #f)
-    (define truncate-quotient #f)
-    (define truncate-remainder #f)
+
+    (define truncate/
+      (lambda (n m)
+        (values (truncate-quotient n m) (truncate-remainder n m))))
+
+    (define truncate-quotient quotient)
+
+    (define truncate-remainder remainder)
+
     (define u8-ready? #f)
     (define vector-append #f)
     (define vector-copy! #f)
