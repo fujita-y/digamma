@@ -7,15 +7,15 @@ R7RS Scheme Implementation (under development)
 
 ## How to rebuild heap on changing identifiers
 
-* Open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
+* open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
 * $ make
 * $ cd heap
-* Open 'boot/libraries.scm' and edit
+* open 'boot/libraries.scm' and edit
 * $ make
 * $ cd ..
 * $ make
 * $ cd heap
 * $ make
 * $ cd ..
-* Open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '0'
+* open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '0'
 * $ make
