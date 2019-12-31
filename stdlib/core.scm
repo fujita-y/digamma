@@ -546,6 +546,8 @@
     imag-part
     immutable
     implementation-restriction-violation?
+    include
+    include-ci
     inexact
     inexact->exact
     inexact?

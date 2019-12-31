@@ -206,7 +206,7 @@
                         (loop (cons form acc)))))))))))))
 
 (define encode-library-ref
-  (lambda (ref)
+  (lambda (library-name)
     (map (lambda (s)
             (let ((utf8 (string->utf8 (symbol->string s))))
               (let ((buf (make-string-output-port))
@@ -224,50 +224,51 @@
                               (else
                               (format buf "%~x~x" (div c 16) (mod c 16))
                               (loop (+ i 1))))))))))
-          ref)))
+          library-name)))
 
 (define locate-include-file
-  (lambda (library-name path)
-    (let ((subdir
-            (destructuring-match library-name
-              ((_) "")
-              ((base ... _) (symbol-list->string base "/")))))
-      (or (any1 (lambda (base)
-                  (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
-                    (and (file-exists? maybe-include-path) maybe-include-path)))
-                (scheme-library-paths))
-          (locate-file path 'include)))))
+  (lambda (library-name path who)
+    (if library-name
+        (let ((subdir
+                (destructuring-match library-name
+                  ((_) "")
+                  ((base ... _) (symbol-list->string base "/")))))
+          (or (any1 (lambda (base)
+                      (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
+                        (and (file-exists? maybe-include-path) maybe-include-path)))
+                    (scheme-library-paths))
+              (locate-file path who)))
+        (locate-file path who))))
 
 (define locate-library-file
-  (lambda (ref)
-    (let ((ref (encode-library-ref ref)))
-      (let ((path (symbol-list->string ref "/")))
-        (any1 (lambda (base)
-                (any1 (lambda (ext)
-                        (let ((maybe-path (format "~a/~a~a" base path ext)))
-                          (and (file-exists? maybe-path) (list maybe-path base))))
-                      (library-extensions)))
-              (scheme-library-paths))))))
+  (lambda (library-name)
+    (let ((path (symbol-list->string (encode-library-ref library-name) "/")))
+      (any1 (lambda (base)
+              (any1 (lambda (ext)
+                      (let ((maybe-path (format "~a/~a~a" base path ext)))
+                        (and (file-exists? maybe-path) (list maybe-path base))))
+                    (library-extensions)))
+            (scheme-library-paths)))))
 
 (define read-include-file
-  (lambda (library-id path who)
-    (let ((source-path (locate-include-file library-id path)))
+  (lambda (library-name path who)
+    (let ((source-path (locate-include-file library-name path who)))
       (and (scheme-load-verbose) (format #t "~&;; including ~s~%~!" source-path))
       (track-file-open-operation source-path)
       (let ((port (open-script-input-port source-path)))
         (with-exception-handler
-        (lambda (c)
-          (cond ((serious-condition? c)
-                  (close-port port)
-                  (raise c))
-                (else
-                  (raise-continuable c))))
-        (lambda ()
-            (let loop ((acc '()))
-              (let ((form (core-read port (current-source-comments) who)))
-                (cond ((eof-object? form) (close-port port) (reverse acc))
-                      (else
-                        (loop (cons form acc))))))))))))
+          (lambda (c)
+            (cond ((serious-condition? c)
+                    (close-port port)
+                    (raise c))
+                  (else
+                    (raise-continuable c))))
+          (lambda ()
+              (let loop ((acc '()))
+                (let ((form (core-read port (current-source-comments) who)))
+                  (cond ((eof-object? form) (close-port port) (reverse acc))
+                        (else
+                          (loop (cons form acc))))))))))))
 
 (define load-scheme-library
   (lambda (ref . vital)

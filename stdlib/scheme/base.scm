@@ -366,9 +366,6 @@
       (lambda (port)
         (get-accumulated-string port)))
 
-    (define include-ci #f)
-    (define include #f)
-
     (define input-port-open?
       (lambda (port)
         (and (not (port-closed? port)) (input-port? port))))
@@ -420,7 +417,10 @@
 
     (define read-error? i/o-read-error?)
 
-    (define read-line #f)
+    (define read-line
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (get-line port))))
 
     (define read-string
       (lambda (k . options)
@@ -476,7 +476,7 @@
         (let-optionals options ((port (current-input-port)))
           (not (eof-object? (lookahead-u8 port))))))
 
-    (define vector-append ;; todo: use vector copy!
+    (define vector-append ;; TODO: use vector copy!
       (lambda vec
         (apply vector (apply append (map vector->list vec)))))
 

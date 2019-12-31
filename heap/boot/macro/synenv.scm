@@ -222,7 +222,9 @@
   (init-core-macro '=>                (make-special unexpected-auxiliary-syntax))
   (init-core-macro '...               (make-special unexpected-auxiliary-syntax))
   (init-core-macro '_                 (make-special unexpected-auxiliary-syntax))
-  (init-core-macro 'import            (make-special expand-import)))
+  (init-core-macro 'import            (make-special expand-import))
+  (init-core-macro 'include           (make-special expand-include))
+  (init-core-macro 'include-ci        (make-special expand-include-ci)))
 
 (define denote-lambda           (core-hashtable-ref core-env 'lambda #f))
 (define denote-begin            (core-hashtable-ref core-env 'begin #f))
@@ -257,6 +259,8 @@
 (define denote-=>               (core-hashtable-ref core-env '=> #f))
 (define denote-_                (core-hashtable-ref core-env '_ #f))
 (define denote-import           (core-hashtable-ref core-env 'import #f))
+(define denote-include          (core-hashtable-ref core-env 'include #f))
+(define denote-include-ci       (core-hashtable-ref core-env 'include-ci #f))
 
 (define denote-macro?
   (lambda (env obj)

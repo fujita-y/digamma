@@ -2,7 +2,7 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define dump-condition (make-parameter #f))
-(define self-evaluating-vector-constants (make-parameter #t))
+(define self-evaluating-vector-constants (make-parameter #f))
 
 (define default-exception-printer
   (lambda (c . out)
