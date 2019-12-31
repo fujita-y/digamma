@@ -2,6 +2,7 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define dump-condition (make-parameter #f))
+(define self-evaluating-vector-constants (make-parameter #t))
 
 (define default-exception-printer
   (lambda (c . out)
@@ -452,6 +453,7 @@
       (lambda ()
         (format #t "usage: digamma [options] [--] [file] [arguments]~%")
         (format #t "options:~%")
+        (format #t "  --r7rs (-7)            conforms r7rs syntax and semantics~%")
         (format #t "  --r6rs (-6)            conforms r6rs top-level program syntax and semantics~%")
         (format #t "  --mute (-m)            suppresses greeting~%")
         (format #t "  --quiet (-q)           suppresses greeting, repl prompt, and repl output~%")
@@ -579,15 +581,21 @@
                             ((opt? "--help" #f)
                              (show-usage)
                              (exit))
+                            ((or (opt? "--r7rs" #f) (opt? "-7" #f))
+                             (self-evaluating-vector-constants #t)
+                             (extend-lexical-syntax #f)
+                             (mutable-literals #f)
+                             (loop (cdr lst)))
                             ((or (opt? "--r6rs" #f) (opt? "-6" #f))
+                             (self-evaluating-vector-constants #f)
                              (extend-lexical-syntax #f)
                              (mutable-literals #f)
                              (set! r6rs-program #t)
                              (loop (cdr lst)))
                             ((or (opt? "--compatible" #f) (opt? "-c" #f))
+                             (self-evaluating-vector-constants #t)
                              (extend-lexical-syntax #t)
                              (mutable-literals #t)
-                             #;(set! r6rs-program #f)
                              (loop (cdr lst)))
                             ((or (opt? "--verbose" #f) (opt? "-v" #f))
                              (scheme-load-verbose #t)

@@ -526,6 +526,7 @@
                       (expand-each form env)
                       (parameterize ((unexpect-top-level-form #t))
                         (expand-each form env))))))
+          ((and (vector? form) (self-evaluating-vector-constants)) form)
           ((or (boolean? form) (number? form) (char? form) (string? form) (bytevector? form)) form)
           (else
            (syntax-violation #f "invalid expression" form)))))
