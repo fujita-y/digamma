@@ -297,7 +297,7 @@ reader_t::read_bytevector()
         int n = list_length(lst);
         READ_BVECTOR("u8",  uint8_t,  FIXNUMP,            CAST_FIXNUM_TO_U8);
 #if USE_EXTENDED_BVECTOR_SYNTAX
-        if (m_vm->m_flags.extend_lexical_syntax == scm_true) {
+        if (FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
             READ_BVECTOR("s8",  int8_t,   FIXNUMP,            CAST_FIXNUM_TO_S8);
             READ_BVECTOR("s16", int16_t,  FIXNUMP,            exact_integer_to_int16);
             READ_BVECTOR("s32", int32_t,  exact_integer_pred, exact_integer_to_int32);
@@ -326,7 +326,7 @@ reader_t::read_number()
     scm_obj_t obj = parse_number(m_vm->m_heap, buf, 0, 0);
     if (obj != scm_false) return obj;
     if (buf[1] == 0 && buf[0] == '.') return S_DOT;
-    if (m_vm->m_flags.extend_lexical_syntax != scm_true) {
+    if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
         if (buf[1] == 0 && (buf[0] == '+' || buf[0] == '-')) return make_symbol(m_vm->m_heap, buf);
         if (strcmp(buf, "...") == 0) return make_symbol(m_vm->m_heap, buf);
         if (buf[0] == '-' && buf[1] == '>') {
@@ -567,7 +567,7 @@ reader_t::read_string()
 scm_obj_t
 reader_t::read_quoted_symbol()
 {
-    if (m_vm->m_flags.extend_lexical_syntax != scm_true) {
+    if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
         lexical_error("invalid lexical syntax, misplaced vertical bar(|)");
     }
     char buf[MAX_READ_SYMBOL_LENGTH];
@@ -631,7 +631,7 @@ reader_t::read_symbol()
             lexical_error("invalid character %U while reading identifier", c);
         }
         if (m_foldcase && isascii(c)) c = tolower(c); // TODO: consider using ICU
-        if (m_vm->m_flags.extend_lexical_syntax == scm_true) {
+        if (FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
             if (SYMBOL_CHARP(c)) {
                 buf[i++] = c;
                 continue;
@@ -699,7 +699,7 @@ reader_t::read_list(bool bracketed, bool vector)
         }
         if (token == S_DOT) {
             if (vector) {
-                if (m_vm->m_flags.extend_lexical_syntax != scm_true) {
+                if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
                     lexical_error("misplaced dot('.') while reading vector");
                 }
             }
@@ -806,20 +806,20 @@ top:
 #endif
 #if ENABLE_CORE_COMMENT
                         if (strcmp(tag, "core") == 0) {
-                            m_vm->m_flags.extend_lexical_syntax = scm_true;
-                        }
-#endif
-#if ENABLE_R7RS_COMMENT
-                        if (strcmp(tag, "r7rs") == 0) {
-                            m_vm->m_flags.extend_lexical_syntax = scm_true;
-                            if (m_graph == NULL) {
-                                m_graph = make_hashtable(m_vm->m_heap, SCM_HASHTABLE_TYPE_EQ, lookup_mutable_hashtable_size(0));
-                            }
+                            m_vm->m_flags.lexical_syntax_version = MAKEFIXNUM(7);
                         }
 #endif
 #if ENABLE_R6RS_COMMENT
                         if (strcmp(tag, "r6rs") == 0) {
-                            m_vm->m_flags.extend_lexical_syntax = scm_false;
+                            m_vm->m_flags.lexical_syntax_version = MAKEFIXNUM(6);
+                        }
+#endif
+#if ENABLE_R7RS_COMMENT
+                        if (strcmp(tag, "r7rs") == 0) {
+                            m_vm->m_flags.lexical_syntax_version = MAKEFIXNUM(7);
+                            if (m_graph == NULL) {
+                                m_graph = make_hashtable(m_vm->m_heap, SCM_HASHTABLE_TYPE_EQ, lookup_mutable_hashtable_size(0));
+                            }
                         }
 #endif
                    }
@@ -1006,7 +1006,7 @@ reader_t::read(scm_hashtable_t note)
     m_note = note;
     if (m_note) put_note(".&SOURCE-PATH", m_in->name);
     m_first_line = m_in->line;
-    if (m_vm->m_flags.extend_lexical_syntax == scm_true) {
+    if (FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
         if (m_graph == NULL) {
             m_graph = make_hashtable(m_vm->m_heap, SCM_HASHTABLE_TYPE_EQ, lookup_mutable_hashtable_size(0));
         }

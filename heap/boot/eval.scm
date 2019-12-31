@@ -128,13 +128,14 @@
 
 (define locate-load-file (lambda (path) (locate-file path 'load)))
 
-(define load-file-has-r6rs-comment?
+#;(define load-file-has-r6rs-comment?
   (lambda (path)
     (parameterize ((extend-lexical-syntax #t) (mutable-literals #f))
       (let ((port (open-script-input-port (locate-load-file path))))
         (core-read port #f 'load)
         (close-port port)
         (not (extend-lexical-syntax))))))
+(define load-file-has-r6rs-comment? (lambda (path) #f))
 
 (define load
   (lambda (path)
@@ -158,7 +159,7 @@
                       ((current-source-comments (current-source-comments))
                        (current-temporaries (current-temporaries))
                        (current-environment (current-environment))
-                       (extend-lexical-syntax (extend-lexical-syntax))
+                       (lexical-syntax-version (lexical-syntax-version))
                        (mutable-literals (mutable-literals))
                        (backtrace (backtrace)))
                     (current-temporaries (make-core-hashtable 'string=?))
@@ -189,7 +190,7 @@
                ((current-source-comments (current-source-comments))
                 (current-temporaries (current-temporaries))
                 (current-environment (current-environment))
-                (extend-lexical-syntax (extend-lexical-syntax))
+                (lexical-syntax-version (lexical-syntax-version))
                 (mutable-literals (mutable-literals))
                 (backtrace (backtrace)))
              (current-source-comments (and (backtrace) (make-core-hashtable)))
@@ -294,7 +295,7 @@
                            ((current-source-comments (current-source-comments))
                             (current-temporaries (current-temporaries))
                             (current-environment (current-environment))
-                            (extend-lexical-syntax (extend-lexical-syntax))
+                            (lexical-syntax-version (lexical-syntax-version))
                             (mutable-literals (mutable-literals))
                             (backtrace (backtrace)))
                          (let loop ()
