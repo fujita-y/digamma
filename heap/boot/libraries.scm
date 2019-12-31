@@ -128,7 +128,8 @@
    '(core primitives) '( do
                          syntax
                          syntax-case
-                         include include-ci))
+                         include
+                         include-ci))
 
   (setup-core-primitive-procs
    '(core primitives) '(; eval

@@ -232,8 +232,6 @@
 (define denote-define-syntax    (core-hashtable-ref core-env 'define-syntax #f))
 (define denote-let-syntax       (core-hashtable-ref core-env 'let-syntax #f))
 (define denote-letrec-syntax    (core-hashtable-ref core-env 'letrec-syntax #f))
-(define denote-library          (core-hashtable-ref core-env 'library #f))
-(define denote-define-library   (core-hashtable-ref core-env 'define-library #f))
 (define denote-quasiquote       (core-hashtable-ref core-env 'quasiquote #f))
 (define denote-quote            (core-hashtable-ref core-env 'quote #f))
 (define denote-if               (core-hashtable-ref core-env 'if #f))
@@ -241,16 +239,10 @@
 (define denote-unquote          (core-hashtable-ref core-env 'unquote #f))
 (define denote-unquote-splicing (core-hashtable-ref core-env 'unquote-splicing #f))
 (define denote-let              (core-hashtable-ref core-env 'let #f))
-(define denote-letrec           (core-hashtable-ref core-env 'letrec #f))
 (define denote-let*             (core-hashtable-ref core-env 'let* #f))
 (define denote-cond             (core-hashtable-ref core-env 'cond #f))
-(define denote-case             (core-hashtable-ref core-env 'case #f))
-(define denote-do               (core-hashtable-ref core-env 'do #f))
-(define denote-and              (core-hashtable-ref core-env 'and #f))
 (define denote-or               (core-hashtable-ref core-env 'or #f))
 (define denote-letrec*          (core-hashtable-ref core-env 'letrec* #f))
-(define denote-let*-values      (core-hashtable-ref core-env 'let*-values #f))
-(define denote-let-values       (core-hashtable-ref core-env 'let-values #f))
 (define denote-syntax-quote     (core-hashtable-ref core-env 'syntax-quote #f))
 (define denote-syntax           (core-hashtable-ref core-env 'syntax #f))
 (define denote-syntax-case      (core-hashtable-ref core-env 'syntax-case #f))
@@ -259,18 +251,6 @@
 (define denote-=>               (core-hashtable-ref core-env '=> #f))
 (define denote-_                (core-hashtable-ref core-env '_ #f))
 (define denote-import           (core-hashtable-ref core-env 'import #f))
-(define denote-include          (core-hashtable-ref core-env 'include #f))
-(define denote-include-ci       (core-hashtable-ref core-env 'include-ci #f))
-
-(define denote-macro?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (macro? (env-lookup env obj)))))
-
-(define denote-special?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (special? (env-lookup env obj)))))
 
 (define denote-lambda?
   (lambda (env obj)
@@ -286,26 +266,6 @@
   (lambda (env obj)
     (and (symbol? obj)
          (eq? (env-lookup env obj) denote-let))))
-
-(define denote-define-syntax?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (eq? (env-lookup env obj) denote-define-syntax))))
-
-(define denote-let-syntax?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (eq? (env-lookup env obj) denote-let-syntax))))
-
-(define denote-letrec-syntax?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (eq? (env-lookup env obj) denote-letrec-syntax))))
-
-(define denote-define?
-  (lambda (env obj)
-    (and (symbol? obj)
-         (eq? (env-lookup env obj) denote-define))))
 
 (define denote-quote?
   (lambda (env obj)

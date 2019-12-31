@@ -28,7 +28,7 @@
   #define DEFAULT_HEAP_LIMIT        32  // 32MB
 #endif
 
-#define UNBOUND_GLOC_RETURN_UNSPEC  1
+#define UNBOUND_GLOC_RETURN_UNSPEC  0
 
 #ifdef NDEBUG
     #define MTDEBUG                 0
