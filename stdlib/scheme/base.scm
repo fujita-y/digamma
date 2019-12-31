@@ -498,7 +498,6 @@
                        (vector-set! to at (vector-ref from end))
                        (loop (- at 1) (- end 1)))))))))
 
-
     (define vector->string
       (lambda (vec . options)
         (let-optionals options ((start 0) (end (vector-length vec)))

@@ -146,7 +146,6 @@ reader_t::lookahead_ucs4()
     }
 }
 
-
 scm_obj_t
 reader_t::cons(scm_obj_t e1, scm_obj_t e2)
 {
@@ -822,7 +821,7 @@ top:
                             }
                         }
 #endif
-                   }
+                    }
                     goto top;
                 }
                 case 'v':
