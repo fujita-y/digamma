@@ -130,10 +130,10 @@ check: all
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/syntax-rule-stress-test.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs-lib.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-lib.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-lib.scm
 	@echo '----------------------------------------'
 	@echo 'Passed all tests'
 	@rm -f ./test/tmp*
