@@ -54,7 +54,6 @@ public:
     struct {
         // note: no gc protect
         scm_obj_t   lexical_syntax_version;       // fixnum
-        scm_obj_t   extend_lexical_syntax;        // #t or #f
         scm_obj_t   mutable_literals;             // #t ot #f
         scm_obj_t   collect_notify;               // #t or #f
         scm_obj_t   collect_stack_notify;         // #t or #f

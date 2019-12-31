@@ -137,10 +137,8 @@ VM::init(object_heap_t* heap)
         m_shared_object_win32_lasterror = 0;
 #if BOOT_R6RS_COMPLIANT_SYNTAX
         m_flags.lexical_syntax_version = MAKEFIXNUM(6);
-        m_flags.extend_lexical_syntax = scm_false;
 #else
         m_flags.lexical_syntax_version = MAKEFIXNUM(7);
-        m_flags.extend_lexical_syntax = scm_true;
 #endif
         m_flags.mutable_literals = scm_false;
         m_flags.collect_notify = scm_false;

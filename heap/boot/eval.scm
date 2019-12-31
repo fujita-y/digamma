@@ -128,14 +128,13 @@
 
 (define locate-load-file (lambda (path) (locate-file path 'load)))
 
-#;(define load-file-has-r6rs-comment?
+(define load-file-has-r6rs-comment?
   (lambda (path)
-    (parameterize ((extend-lexical-syntax #t) (mutable-literals #f))
+    (parameterize ((lexical-syntax-version 7) (mutable-literals #f))
       (let ((port (open-script-input-port (locate-load-file path))))
         (core-read port #f 'load)
         (close-port port)
-        (not (extend-lexical-syntax))))))
-(define load-file-has-r6rs-comment? (lambda (path) #f))
+        (= (lexical-syntax-version) 6)))))
 
 (define load
   (lambda (path)
