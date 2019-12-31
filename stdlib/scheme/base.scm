@@ -476,9 +476,14 @@
         (let-optionals options ((port (current-input-port)))
           (not (eof-object? (lookahead-u8 port))))))
 
-    (define vector-append ;; TODO: use vector copy!
-      (lambda vec
-        (apply vector (apply append (map vector->list vec)))))
+    (define vector-append
+      (lambda args
+        (let ((ans (make-vector (apply + (map vector-length args)))))
+          (let loop ((at 0) (args args))
+            (cond ((null? args) ans)
+                  (else
+                    (vector-copy! ans at (car args))
+                    (loop (+ at (vector-length (car args))) (cdr args))))))))
 
     (define vector-copy!
       (lambda (to at from . options)
@@ -492,6 +497,7 @@
                 (cond ((<= start end)
                        (vector-set! to at (vector-ref from end))
                        (loop (- at 1) (- end 1)))))))))
+
 
     (define vector->string
       (lambda (vec . options)
