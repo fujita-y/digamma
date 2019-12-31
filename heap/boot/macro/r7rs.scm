@@ -36,6 +36,14 @@
         (_
          (syntax-violation 'cond-expand "malformed clause" (abbreviated-take-form form 4 8) spec))))))
 
+(define expand-include
+  (lambda (form env)
+    `(begin ,@(apply append (map (lambda (e) (read-include-file #f e 'include)) (cdr form))))))
+
+(define expand-include-ci
+  (lambda (form env)
+    `(begin ,@(apply append (map (lambda (e) (read-include-file #f e 'include-ci)) (cdr form))))))
+
 (define parse-cond-expand
   (lambda (form specs)
     (let loop ((spec specs))

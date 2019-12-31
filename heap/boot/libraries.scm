@@ -127,7 +127,8 @@
   (setup-core-primitive-macros
    '(core primitives) '( do
                          syntax
-                         syntax-case))
+                         syntax-case
+                         include include-ci))
 
   (setup-core-primitive-procs
    '(core primitives) '(; eval
@@ -309,6 +310,7 @@
                         native-transcoder-descriptor
                         port-transcoder-descriptor
                         extract-accumulated-bytevector
+                        get-accumulated-bytevector
                         extract-accumulated-string
                         get-accumulated-string
                         open-port
@@ -565,6 +567,7 @@
                         last-n-pair
                         drop-last-n-pair
 
+                        feature-identifies
                         fulfill-feature-requirements?
                         ))
 

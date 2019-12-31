@@ -372,6 +372,7 @@
     expt
     extract-accumulated-bytevector
     extract-accumulated-string
+    feature-identifies
     fields
     file-directory?
     file-executable?
@@ -490,6 +491,7 @@
     generate-temporaries
     generate-temporary-symbol
     gensym
+    get-accumulated-bytevector
     get-accumulated-string
     get-bytevector-all
     get-bytevector-n
@@ -544,6 +546,8 @@
     imag-part
     immutable
     implementation-restriction-violation?
+    include
+    include-ci
     inexact
     inexact->exact
     inexact?

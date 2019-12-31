@@ -324,47 +324,197 @@
                 (define temp (call-with-values (lambda () expression) vector))
                 (define formals (vector-ref temp n)) ...))))))
 
-    (define error-object? #f)
-    (define error-object-irritants #f)
-    (define error-object-message #f)
-    (define exact-integer? #f)
-    (define features #f)
-    (define file-error? #f)
-    (define floor/ #f)
-    (define floor-quotient #f)
-    (define floor-remainder #f)
-    (define get-output-bytevector #f)
-    (define get-output-string #f)
-    (define include-ci #f)
-    (define include #f)
-    (define input-port-open? #f)
-    (define list-set! #f)
-    (define open-input-bytevector #f)
-    (define open-input-string #f)
-    (define open-output-bytevector #f)
-    (define open-output-string #f)
-    (define output-port-open? #f)
-    (define peek-u8 #f)
-    (define read-bytevector #f)
-    (define read-bytevector! #f)
-    (define read-error? #f)
-    (define read-line #f)
-    (define read-string #f)
-    (define read-u8 #f)
-    (define square #f)
-    (define string-copy! #f)
-    (define string-map #f)
-    (define string->vector #f)
-    (define syntax-error #f)
-    (define truncate/ #f)
-    (define truncate-quotient #f)
-    (define truncate-remainder #f)
-    (define u8-ready? #f)
-    (define vector-append #f)
-    (define vector-copy! #f)
-    (define vector->string #f)
-    (define write-bytevector #f)
-    (define write-string #f)
-    (define write-u8 #f)
+    (define error-object?
+      (lambda (obj)
+        (or (error? obj) (violation? obj))))
+
+    (define error-object-irritants
+      (lambda (obj)
+        (and (irritants-condition? obj) (condition-irritants obj))))
+
+    (define error-object-message
+      (lambda (obj)
+        (and (message-condition? obj) (condition-message obj))))
+
+    (define exact-integer?
+      (lambda (obj)
+        (and (integer? obj) (exact? obj))))
+
+    (define features
+      (lambda ()
+        (feature-identifies)))
+
+    (define file-error?
+      (lambda (obj)
+        (i/o-filename-error? obj)))
+
+    (define floor/
+      (lambda (n m)
+        (values (floor-quotient n m) (floor-remainder n m))))
+
+    (define floor-quotient
+      (lambda (n m)
+        (floor (/ n m))))
+
+    (define floor-remainder modulo)
+
+    (define get-output-bytevector
+      (lambda (port)
+        (get-accumulated-bytevector port)))
+
+    (define get-output-string
+      (lambda (port)
+        (get-accumulated-string port)))
+
+    (define input-port-open?
+      (lambda (port)
+        (and (not (port-closed? port)) (input-port? port))))
+
+    (define list-set!
+      (lambda (lst k obj)
+        (let loop ((lst lst) (k k))
+          (cond ((null? lst)
+                 (assertion-violation 'list-set! (format "index out of range, ~s as argument 2" k) (list lst k obj)))
+                ((> k 0)
+                 (loop (cdr lst) (- k 1)))
+                (else
+                 (set-car! lst obj))))))
+
+    (define open-input-bytevector
+      (lambda (bv)
+        (open-bytevector-input-port bv)))
+
+    (define open-input-string
+      (lambda (str)
+        (open-string-input-port str)))
+
+    (define open-output-bytevector
+      (lambda ()
+        (open-bytevector-output-port)))
+
+    (define open-output-string
+      (lambda ()
+        (open-string-output-port)))
+
+    (define output-port-open?
+      (lambda (port)
+        (and (not (port-closed? port) (output-port? port)))))
+
+    (define peek-u8
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (lookahead-u8 port))))
+
+    (define read-bytevector
+      (lambda (k . options)
+        (let-optionals options ((port (current-input-port)))
+          (get-bytevector-n port k))))
+
+    (define read-bytevector!
+      (lambda (bv . options)
+        (let-optionals options ((port (current-input-port)) (start 0) (end (bytevector-length bv)))
+          (get-bytevector-n! port bv start (- end start)))))
+
+    (define read-error? i/o-read-error?)
+
+    (define read-line
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (get-line port))))
+
+    (define read-string
+      (lambda (k . options)
+        (let-optionals options ((port (current-input-port)))
+          (get-string-n port k))))
+
+    (define read-u8
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (get-u8 port))))
+
+    (define square (lambda (z) (* z z)))
+
+    (define string-copy!
+      (lambda (to at from . options)
+        (let-optionals options ((start 0) (end (string-length from)))
+          (if (> start at)
+              (let loop ((at at) (start start))
+                (cond ((< start end)
+                       (string-set! to at (string-ref from start))
+                       (loop (+ at 1) (+ start 1)))))
+              (let loop ((at (- (+ at end) start 1)) (end (- end 1)))
+                (cond ((<= start end)
+                       (string-set! to at (string-ref from end))
+                       (loop (- at 1) (- end 1)))))))))
+
+    (define string-map
+      (lambda (proc str1 . str2)
+        (if (null? str2)
+            (list->string (map proc (string->list str1)))
+            (list->string (apply map proc (string->list str1) (map string->list str2))))))
+
+    (define string->vector
+      (lambda (str . options)
+        (let-optionals options ((start 0) (end (string-length str)))
+          (apply vector (string->list (substring str start end))))))
+
+    (define-syntax syntax-error
+      (syntax-rules ()
+        ((_ msg args ...)
+         (syntax-violation #f msg '(args ...)))))
+
+    (define truncate/
+      (lambda (n m)
+        (values (truncate-quotient n m) (truncate-remainder n m))))
+
+    (define truncate-quotient quotient)
+
+    (define truncate-remainder remainder)
+
+    (define u8-ready?
+      (lambda options
+        (let-optionals options ((port (current-input-port)))
+          (not (eof-object? (lookahead-u8 port))))))
+
+    (define vector-append ;; TODO: use vector copy!
+      (lambda vec
+        (apply vector (apply append (map vector->list vec)))))
+
+    (define vector-copy!
+      (lambda (to at from . options)
+        (let-optionals options ((start 0) (end (vector-length from)))
+          (if (> start at)
+              (let loop ((at at) (start start))
+                (cond ((< start end)
+                       (vector-set! to at (vector-ref from start))
+                       (loop (+ at 1) (+ start 1)))))
+              (let loop ((at (- (+ at end) start 1)) (end (- end 1)))
+                (cond ((<= start end)
+                       (vector-set! to at (vector-ref from end))
+                       (loop (- at 1) (- end 1)))))))))
+
+    (define vector->string
+      (lambda (vec . options)
+        (let-optionals options ((start 0) (end (vector-length vec)))
+          (let loop ((start start) (acc '()))
+            (if (< start end)
+                (loop (+ start 1) (cons (vector-ref vec start) acc))
+                (list->string (reverse acc)))))))
+
+    (define write-bytevector
+      (lambda (bv . options)
+        (let-optionals options ((port (current-output-port)) (start 0) (end (bytevector-length bv)))
+          (put-bytevector port bv start (- end start)))))
+
+    (define write-string
+      (lambda (str . options)
+        (let-optionals options ((port (current-output-port)) (start 0) (end (string-length str)))
+          (put-string port str start (- end start)))))
+
+    (define write-u8
+      (lambda (b . options)
+        (let-optionals options ((port (current-output-port)))
+          (put-u8 port b))))
+
   )
 ) ;[end]
