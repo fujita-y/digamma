@@ -480,10 +480,41 @@
       (lambda vec
         (apply vector (apply append (map vector->list vec)))))
 
-    (define vector-copy! #f)
-    (define vector->string #f)
-    (define write-bytevector #f)
-    (define write-string #f)
-    (define write-u8 #f)
+    (define vector-copy!
+      (lambda (to at from . options)
+        (let-optionals options ((start 0) (end (vector-length from)))
+          (if (> start at)
+              (let loop ((at at) (start start))
+                (cond ((< start end)
+                       (vector-set! to at (vector-ref from start))
+                       (loop (+ at 1) (+ start 1)))))
+              (let loop ((at (- (+ at end) start 1)) (end (- end 1)))
+                (cond ((<= start end)
+                       (vector-set! to at (vector-ref from end))
+                       (loop (- at 1) (- end 1)))))))))
+
+    (define vector->string
+      (lambda (vec . options)
+        (let-optionals options ((start 0) (end (vector-length vec)))
+          (let loop ((start start) (acc '()))
+            (if (< start end)
+                (loop (+ start 1) (cons (vector-ref vec start) acc))
+                (list->string (reverse acc)))))))
+
+    (define write-bytevector
+      (lambda (bv . options)
+        (let-optionals options ((port (current-output-port)) (start 0) (end (bytevector-length bv)))
+          (put-bytevector port bv start (- end start)))))
+
+    (define write-string
+      (lambda (str . options)
+        (let-optionals options ((port (current-output-port)) (start 0) (end (string-length str)))
+          (put-string port str start (- end start)))))
+
+    (define write-u8
+      (lambda (b . options)
+        (let-optionals options ((port (current-output-port)))
+          (put-u8 port b))))
+
   )
 ) ;[end]
