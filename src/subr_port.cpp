@@ -473,6 +473,26 @@ subr_extract_accumulated_bytevector(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+// get-accumulated-bytevector
+scm_obj_t
+subr_get_accumulated_bytevector(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 1) {
+        if (PORTP(argv[0])) {
+            scm_port_t port = (scm_port_t)argv[0];
+            scoped_lock lock(port->lock);
+            CHECK_OPENED_PORT(0, "get-accumulated-bytevector");
+            if (port_bytevector_pred(port) && port_output_pred(port)) return port_get_bytevector(vm->m_heap, port);
+            wrong_type_argument_violation(vm, "get-accumulated-bytevector", 0, "bytevector or string output port", argv[0], argc, argv);
+            return scm_undef;
+        }
+        wrong_type_argument_violation(vm, "get-accumulated-bytevector", 0, "bytevector or string output port", argv[0], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "get-accumulated-bytevector", 0, 0, argc, argv);
+    return scm_undef;
+}
+
 // extract-accumulated-string
 scm_obj_t
 subr_extract_accumulated_string(VM* vm, int argc, scm_obj_t argv[])
@@ -2440,6 +2460,7 @@ void init_subr_port(object_heap_t* heap)
     DEFSUBR("native-transcoder-descriptor", subr_native_transcoder_descriptor);
     DEFSUBR("port-transcoder-descriptor", subr_port_transcoder_descriptor);
     DEFSUBR("extract-accumulated-bytevector", subr_extract_accumulated_bytevector);
+    DEFSUBR("get-accumulated-bytevector", subr_get_accumulated_bytevector);
     DEFSUBR("extract-accumulated-string", subr_extract_accumulated_string);
     DEFSUBR("get-accumulated-string", subr_get_accumulated_string);
     DEFSUBR("make-string-output-port", subr_make_string_output_port);

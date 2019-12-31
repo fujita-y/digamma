@@ -491,6 +491,7 @@
     generate-temporaries
     generate-temporary-symbol
     gensym
+    get-accumulated-bytevector
     get-accumulated-string
     get-bytevector-all
     get-bytevector-n

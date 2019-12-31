@@ -309,6 +309,7 @@
                         native-transcoder-descriptor
                         port-transcoder-descriptor
                         extract-accumulated-bytevector
+                        get-accumulated-bytevector
                         extract-accumulated-string
                         get-accumulated-string
                         open-port

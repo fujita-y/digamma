@@ -2209,7 +2209,7 @@ port_regular_file_pred(scm_port_t port)
 }
 
 scm_bvector_t
-port_extract_bytevector(object_heap_t* heap, scm_port_t port)
+port_get_bytevector(object_heap_t* heap, scm_port_t port)
 {
     assert(PORTP(port));
     port->lock.verify_locked();
@@ -2224,6 +2224,13 @@ port_extract_bytevector(object_heap_t* heap, scm_port_t port)
         bvector = make_bvector(heap, n);
         memcpy(bvector->elts, port->buf_head, n);
     }
+    return bvector;
+}
+
+scm_bvector_t
+port_extract_bytevector(object_heap_t* heap, scm_port_t port)
+{
+    scm_bvector_t bvector = port_get_bytevector(heap, port);
     free(port->buf);
     port->buf = NULL;
     port->buf_head = NULL;
@@ -2231,26 +2238,6 @@ port_extract_bytevector(object_heap_t* heap, scm_port_t port)
     port->buf_size = 0;
     port->mark = 0;
     return bvector;
-}
-
-scm_string_t
-port_extract_string(object_heap_t* heap, scm_port_t port)
-{
-    assert(PORTP(port));
-    port->lock.verify_locked();
-    assert(port->direction & SCM_PORT_DIRECTION_OUT);
-    assert(port->type == SCM_PORT_TYPE_BYTEVECTOR);
-    assert(port->buf_state == SCM_PORT_BUF_STATE_ACCUMULATE);
-    scm_string_t string;
-    if (port->buf == NULL) string = make_string(heap, "");
-    else string = make_string(heap, (const char*)port->buf_head, port->buf_tail - port->buf_head);
-    free(port->buf);
-    port->buf = NULL;
-    port->buf_head = NULL;
-    port->buf_tail = NULL;
-    port->buf_size = 0;
-    port->mark = 0;
-    return string;
 }
 
 scm_string_t
@@ -2264,6 +2251,19 @@ port_get_string(object_heap_t* heap, scm_port_t port)
     scm_string_t string;
     if (port->buf == NULL) string = make_string(heap, "");
     else string = make_string(heap, (const char*)port->buf_head, port->buf_tail - port->buf_head);
+    return string;
+}
+
+scm_string_t
+port_extract_string(object_heap_t* heap, scm_port_t port)
+{
+    scm_string_t string = port_get_string(heap, port);
+    free(port->buf);
+    port->buf = NULL;
+    port->buf_head = NULL;
+    port->buf_tail = NULL;
+    port->buf_size = 0;
+    port->mark = 0;
     return string;
 }
 
