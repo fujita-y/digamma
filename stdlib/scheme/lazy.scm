@@ -10,10 +10,10 @@
           delay-force
           make-promise)
   (begin
-   (define delay)
-   (define force)
-   (define promise?)
-   (define delay-force)
-   (define make-promise)
+   (define delay #f)
+   (define force #f)
+   (define promise? #f)
+   (define delay-force #f)
+   (define make-promise #f)
   )
 ) ;[end]
