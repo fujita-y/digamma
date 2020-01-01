@@ -20,7 +20,8 @@
           recursive-decomposition
           decompose
           sort-combining-marks!
-          compose)
+          compose
+          digit-value)
 
   (import (core primitives)
           (core io)
@@ -155,7 +156,11 @@
 
   (define numeric-property?
     (lambda (c)
-      (and (core-hashtable-ref (numeric-property-table) (char->integer c) #f) #t)))
+      (and (digit-value c) #t)))
+
+  (define digit-value
+    (lambda (c)
+      (core-hashtable-ref (numeric-property-table) (char->integer c) #f)))
 
   (define simple-uppercase
     (lambda (c)

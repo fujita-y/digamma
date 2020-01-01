@@ -244,6 +244,7 @@
           write-u8
           zero?)
   (begin
+
     (define for-each-1
       (lambda (proc lst)
         (cond ((null? lst) (unspecified))
