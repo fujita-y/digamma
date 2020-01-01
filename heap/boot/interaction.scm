@@ -3,6 +3,7 @@
 
 (define dump-condition (make-parameter #f))
 (define self-evaluating-vector-constants (make-parameter #t))
+(define continuation-to-exit (make-parameter #f))
 
 (define default-exception-printer
   (lambda (c . out)
@@ -348,6 +349,11 @@
               (format (current-error-port) "~%~a~!" (extract-accumulated-string port))))))))
 
 (define start-scheme-session
+  (lambda ()
+    (let ((status (call/cc (lambda (cont) (continuation-to-exit cont) (run-scheme-session) 0))))
+      (exit status))))
+
+(define run-scheme-session
   (lambda ()
 
     (define directory-exists?

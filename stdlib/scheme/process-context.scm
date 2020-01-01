@@ -14,6 +14,9 @@
     (define get-environment-variable lookup-process-environment)
     (define get-environment-variables process-environment->alist)
     (define emergency-exit core:exit)
-    (define exit #f)
+    (define exit
+      (lambda options
+        (let-optionals options ((status 0))
+          ((continuation-to-exit) status))))
   )
 ) ;[end]

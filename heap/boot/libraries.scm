@@ -570,6 +570,7 @@
 
                         feature-identifies
                         fulfill-feature-requirements?
+                        continuation-to-exit
                         ))
 
   (compound-exports '(core primitives) '(core intrinsics)))

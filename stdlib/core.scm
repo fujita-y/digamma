@@ -261,6 +261,7 @@
     condition?
     cons
     cons*
+    continuation-to-exit
     copy-environment-macros!
     copy-environment-variables!
     core-eval
