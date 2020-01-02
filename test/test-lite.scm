@@ -2,7 +2,7 @@
   (export test-begin test-end test-section-begin test-comment test-report
           test-lexical-exception test-syntax-violation test-assertion-violation test-violation test-i/o-error
           test-eval! test-eq test-eqv test-equal test-equal-evaluated
-          test test-values test-error)
+          test test-values test-error test-assert)
   (import (core))
 
   (define-record-type section
@@ -20,11 +20,13 @@
   (define-syntax test
     (syntax-rules ()
       ((_ expected expr)
+       (test expected expr 'expr))
+      ((_ expected expr arg)
         (let ((res expr))
           (cond
            ((not (equal? expr expected))
             (display "FAIL: ")
-            (write 'expr)
+            (write arg)
             (newline)
             (display "expected: ")
             (write expected)
@@ -32,6 +34,10 @@
             (display "but got: ")
             (write res)
             (newline)))))))
+
+  (define-syntax test-assert
+    (syntax-rules ()
+      ((_ str expr) (test #t expr str))))
 
   (define-syntax test-values
     (syntax-rules ()

@@ -408,6 +408,7 @@ reader_t::read_char()
         int code;
     } char_name[] = {
         { "nul",        0x0000 },
+        { "null",       0x0000 },
         { "alarm",      0x0007 },
         { "backspace",  0x0008 },
         { "tab",        0x0009 },
@@ -417,6 +418,7 @@ reader_t::read_char()
         { "page",       0x000C },
         { "return",     0x000D },
         { "esc",        0x001B },
+        { "escape",     0x001B },
         { "space",      0x0020 },
         { "delete",     0x007F }
     };
@@ -453,6 +455,10 @@ reader_t::read_char()
     }
     foldcase[i] = 0;
     for (int i = 0; i < array_sizeof(char_name); i++) {
+        if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
+            if (strcmp(foldcase, "null") == 0) continue;
+            if (strcmp(foldcase, "escape") == 0) continue;
+        }
         if (strcmp(buf, char_name[i].name) == 0) return MAKECHAR(char_name[i].code);
         if (m_foldcase && strcmp(foldcase, char_name[i].name) == 0) return MAKECHAR(char_name[i].code);
     }
@@ -483,6 +489,11 @@ reader_t::read_escape_sequence()
         case 'r':  return 0x000D;
         case '"':  return 0x0022;
         case '\\': return 0x005C;
+        case '|':
+            if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
+              lexical_error("invalid escape sequence, \\~a", MAKECHAR(c));
+            }
+            return 0x007C;
         case EOF: lexical_error("unexpected end-of-file while reading escape sequence");
     }
     lexical_error("invalid escape sequence, \\~a", MAKECHAR(c));
@@ -831,18 +842,38 @@ top:
                 case 'v':
                     return read_bytevector();
                 case 'f': case 'F': {
+                    if (c == 'F' && FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
+                        lexical_error("invalid lexical syntax #~a", MAKECHAR(c));
+                    }
                     int c2 = get_ucs4();
                     if (c2 == EOF || delimited(c2)) {
                         unget_ucs4();
                         return scm_false;
                     }
+                    unget_ucs4();
+                    scm_obj_t obj = read_symbol();
+                    if (SYMBOLP(obj)) {
+                        const char* tag = ((scm_symbol_t)obj)->name;
+                        if (strcmp(tag, "alse") == 0) return scm_false;
+                        lexical_error("invalid lexical syntax #f~a", obj);
+                    }
                     lexical_error("invalid lexical syntax #~a~a", MAKECHAR(c), MAKECHAR(c2));
                 }
                 case 't': case 'T':{
+                    if (c == 'T' && FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
+                        lexical_error("invalid lexical syntax #~a", MAKECHAR(c));
+                    }
                     int c2 = get_ucs4();
                     if (c2 == EOF || delimited(c2)) {
                         unget_ucs4();
                         return scm_true;
+                    }
+                    unget_ucs4();
+                    scm_obj_t obj = read_symbol();
+                    if (SYMBOLP(obj)) {
+                        const char* tag = ((scm_symbol_t)obj)->name;
+                        if (strcmp(tag, "rue") == 0) return scm_true;
+                        lexical_error("invalid lexical syntax #t~a", obj);
                     }
                     lexical_error("invalid lexical syntax #~a~a", MAKECHAR(c), MAKECHAR(c2));
                 }
