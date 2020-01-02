@@ -278,6 +278,7 @@
                             (lambda (lst)
                               (destructuring-match lst
                                 ((((? else? _) (? =>? _) expr) more ...)
+                                 (right-arrow-in-case)
                                  (if (null? more)
                                      `(.ELSE (,expr ,temp))
                                      (syntax-violation (car form) "misplaced else" form (car lst))))
@@ -286,6 +287,7 @@
                                      `(.ELSE ,@expr)
                                      (syntax-violation (car form) "misplaced else" form (car lst))))
                                 ((((datum) (? =>? _) expr) _ ...)
+                                 (right-arrow-in-case)
                                  (if (or (symbol? datum) (fixnum? datum) (char? datum) (boolean? datum) (null? datum))
                                      `((.EQ? ,temp ',datum) (,expr ,temp))
                                      `((.EQV? ,temp ',datum) (,expr ,temp))))
@@ -294,6 +296,7 @@
                                      `((.EQ? ,temp ',datum) ,@expr)
                                      `((.EQV? ,temp ',datum) ,@expr)))
                                 ((((? list? datum) (? =>? _) expr) _ ...)
+                                 (right-arrow-in-case)
                                  (cond ((null? datum) '(#f))
                                        ((every1 (lambda (e) (or (symbol? e) (fixnum? e) (char? e) (boolean? e) (null? datum))) datum)
                                         `((.MEMQ ,temp ',datum) (,expr ,temp)))

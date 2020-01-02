@@ -1,9 +1,12 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
+(define continuation-to-exit (make-parameter #f))
+
 (define dump-condition (make-parameter #f))
 (define self-evaluating-vector-constants (make-parameter #t))
-(define continuation-to-exit (make-parameter #f))
+(define ellipsis/underscore-in-literal (make-parameter #t))
+(define right-arrow-in-case (make-parameter #t))
 
 (define default-exception-printer
   (lambda (c . out)
@@ -588,17 +591,23 @@
                              (show-usage)
                              (exit))
                             ((or (opt? "--r7rs" #f) (opt? "-7" #f))
+                             (right-arrow-in-case #t)
+                             (ellipsis/underscore-in-literal #t)
                              (self-evaluating-vector-constants #t)
                              (lexical-syntax-version 7)
                              (mutable-literals #f)
                              (loop (cdr lst)))
                             ((or (opt? "--r6rs" #f) (opt? "-6" #f))
+                             (right-arrow-in-case #f)
                              (self-evaluating-vector-constants #f)
+                             (ellipsis/underscore-in-literal #f)
                              (lexical-syntax-version 6)
                              (mutable-literals #f)
                              (loop (cdr lst)))
                             ((opt? "--r6rs-program" #f)
+                             (right-arrow-in-case #f)
                              (self-evaluating-vector-constants #f)
+                             (ellipsis/underscore-in-literal #f)
                              (lexical-syntax-version 6)
                              (mutable-literals #f)
                              (set! r6rs-program #t)

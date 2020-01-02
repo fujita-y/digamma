@@ -51,11 +51,12 @@
       (lambda (promise)
         (if (promise-done? promise)
             (promise-value promise)
-            (let ((ans ((promise-value promise))))
+            (let ((promise* ((promise-value promise))))
               (cond ((promise-done? promise)
                      (promise-value promise))
                     (else
-                     (promise-datum-set! promise (promise-datum ans))
+                     (promise-datum-set! promise (promise-datum promise*))
                      (force promise)))))))
+
   )
 ) ;[end]

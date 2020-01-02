@@ -48,7 +48,10 @@
                  (let* ((rule (car rules))
                         (pattern (car rule))
                         (vars
-                          (and (match-pattern? form pattern lites) (bind-pattern form pattern lites '()))))
+                          (and (if (and (pair? pattern) (eq? (car pattern) '_))
+                                   (match-pattern? (cdr form) (cdr pattern) lites)
+                                   (match-pattern? form pattern lites))
+                               (bind-pattern form pattern lites '()))))
                    (if vars (transcribe-compiled-templete (cdr rule) vars) (loop (cdr rules)))))))))))
 
 (define parse-syntax-rule

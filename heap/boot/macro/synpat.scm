@@ -28,6 +28,10 @@
          (pair? (cdr form))
          (null? (cddr form)))))
 
+(define underscore?
+  (lambda (form lites)
+    (and (eq? form '_) (not (memq '_ lites)))))
+
 (define collect-unique-ids ; exclude ellipsis-id
   (lambda (expr)
     (let loop ((lst expr) (ans '()))
@@ -43,7 +47,7 @@
 
 (define collect-vars-ranks
   (lambda (pat lites depth ranks)
-    (cond ((eq? pat '_) ranks)
+    (cond ((underscore? pat lites) ranks)
           ((symbol? pat)
            (if (memq pat lites)
                ranks
@@ -70,7 +74,7 @@
                  (loop (cdr lst)
                        (loop (car lst) pool)))
                 ((ellipsis-id? lst) pool)
-                ((eq? lst '_) pool)
+                ((underscore? lst lites) pool)
                 ((symbol? lst)
                  (if (memq lst lites)
                      pool
@@ -120,7 +124,7 @@
 
 (define match-pattern?
   (lambda (expr pat lites)
-    (cond ((eq? pat '_) #t)
+    (cond ((underscore? pat lites) #t)
           ((symbol? pat)
            (cond ((memq pat lites)
                   (and (or (symbol? expr)
@@ -147,15 +151,16 @@
           (else (equal? pat expr)))))
 
 (define union-vars
-  (lambda (vars evars)
+  (lambda (lites vars evars)
     (if (null? evars)
         vars
-        (union-vars (bind-var! (caar evars) (reverse (cdar evars)) vars)
+        (union-vars lites
+                    (bind-var! (caar evars) lites (reverse (cdar evars)) vars)
                     (cdr evars)))))
 
 (define bind-var!
-  (lambda (pat expr vars)
-    (cond ((eq? pat '_) vars)
+  (lambda (pat lites expr vars)
+    (cond ((underscore? pat lites) vars)
           (else
            (let ((slot (assq pat vars)))
              (if slot
@@ -170,14 +175,14 @@
           (loop (cdr lst)
                 (if (memq (car lst) lites)
                     vars
-                    (bind-var! (car lst) '() vars)))))))
+                    (bind-var! (car lst) lites '() vars)))))))
 
 (define bind-ellipsis
   (lambda (expr pat lites vars evars)
     (if (null? expr)
         (if (null? evars)
             (bind-null-ellipsis pat lites vars)
-            (union-vars vars evars))
+            (union-vars lites vars evars))
         (bind-ellipsis (cdr expr) pat lites vars
                        (bind-pattern (car expr) (car pat) lites evars)))))
 
@@ -186,7 +191,7 @@
     (if (= n 0)
         (if (null? evars)
             (bind-null-ellipsis pat lites vars)
-            (union-vars vars evars))
+            (union-vars lites vars evars))
         (bind-ellipsis-n (cdr expr) pat lites (- n 1) vars
                          (bind-pattern (car expr) (car pat) lites evars)))))
 
@@ -195,16 +200,16 @@
     (cond ((symbol? pat)
            (if (memq pat lites)
                vars
-               (bind-var! pat expr vars)))
+               (bind-var! pat lites expr vars)))
           ((ellipsis-pair? pat)
            (if (and (null? (cddr pat)) (list? expr))
                (if (symbol? (car pat))
-                   (bind-var! (car pat) expr vars)
+                   (bind-var! (car pat) lites expr vars)
                    (bind-ellipsis expr pat lites vars '()))
                (let ((n (- (count-pair expr) (count-pair (cddr pat)))))
                  (bind-pattern (list-tail expr n) (cddr pat) lites
                                (if (and (= n 0) (symbol? (car pat)))
-                                   (bind-var! (car pat) '() vars)
+                                   (bind-var! (car pat) lites '() vars)
                                    (bind-ellipsis-n expr pat lites n vars '()))))))
           ((pair? pat)
            (bind-pattern (cdr expr) (cdr pat) lites

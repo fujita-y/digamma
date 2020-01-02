@@ -210,10 +210,13 @@
               (syntax-violation 'syntax-rules "invalid literals" transformer lites))
           (or (unique-id-list? lites)
               (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
-          (and (memq '_ lites) (syntax-violation 'syntax-rules "_ in literals" transformer lites))
-          (if ellipsis
-              (and (memq ellipsis lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))
-              (and (memq '... lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites)))
+          (or (ellipsis/underscore-in-literal)
+              (and (memq '_ lites)
+                   (syntax-violation 'syntax-rules "_ in literals" transformer lites)))
+          (or (ellipsis/underscore-in-literal)
+              (if ellipsis
+                  (and (memq ellipsis lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))
+                  (and (memq '... lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))))
           (for-each (lambda (rule)
                       (destructuring-match rule
                         ((((? symbol? _) . _) _) #t)
