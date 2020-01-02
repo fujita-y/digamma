@@ -3,8 +3,7 @@
 
 (define-library
   (scheme base)
-  (import (except (core) for-each map)
-          (except (rnrs) for-each map))
+  (import (except (core) for-each map))
   (export *
           +
           -

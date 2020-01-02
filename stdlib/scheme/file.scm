@@ -3,7 +3,7 @@
 
 (define-library
   (scheme file)
-  (import (rnrs))
+  (import (core))
   (export call-with-input-file
           delete-file
           open-binary-input-file

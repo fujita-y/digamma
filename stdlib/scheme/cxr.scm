@@ -3,7 +3,7 @@
 
 (define-library
   (scheme cxr)
-  (import (rnrs))
+  (import (core))
   (export caaaar
           caaar
           caaddr

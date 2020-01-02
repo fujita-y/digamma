@@ -3,7 +3,7 @@
 
 (define-library
   (scheme lazy)
-  (import (rnrs) (only (core) tuple tuple? tuple-ref tuple-set!))
+  (import (except (core) delay force))
   (export delay
           force
           promise?
@@ -23,7 +23,9 @@
 
     (define make-promise
       (lambda (obj)
-        (tuple 'type:promise (cons #t obj))))
+        (if (promise? obj)
+            obj
+            (tuple 'type:promise (cons #t obj)))))
 
     (define promise?
       (lambda (obj)

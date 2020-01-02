@@ -3,7 +3,7 @@
 
 (define-library
   (scheme char)
-  (import (rnrs) (core unicode-assistants))
+  (import (core) (core unicode-assistants))
   (export char-alphabetic?
           char-ci<?
           char-ci>=?

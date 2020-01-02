@@ -3,6 +3,6 @@
 
 (define-library
   (scheme case-lambda)
-  (import (only (rnrs control) case-lambda))
+  (import (only (core control) case-lambda))
   (export case-lambda)
 ) ;[end]

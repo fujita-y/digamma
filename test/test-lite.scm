@@ -1,7 +1,7 @@
 (library (test-lite)
   (export test-begin test-end test-section-begin test-comment test-report
           test-lexical-exception test-syntax-violation test-assertion-violation test-violation test-i/o-error
-          test-eval! test-eq test-eqv test-equal test-equal-evaluated)
+          test-eval! test-eq test-eqv test-equal test-equal-evaluated test)
   (import (core))
 
   (define-record-type section
@@ -134,6 +134,22 @@
        (parameterize ((scheme-library-exports (section-lib (section-current))))
          (eval 'expr (section-env (section-current)))))))
 
+  (define-syntax test
+    (syntax-rules ()
+      ((_ expected expr)
+        (let ((res expr))
+          (cond
+           ((not (equal? expr expected))
+            (display "FAIL: ")
+            (write 'expr)
+            (newline)
+            (display "expected: ")
+            (write expected)
+            (newline)
+            (display "but got: ")
+            (write res)
+            (newline)))))))
+
   (define-syntax test-eq
     (syntax-rules (=>)
       ((_ name expr => value)
@@ -201,14 +217,14 @@
        (test-error-condition name 'expr assertion-violation? '&assertion))
       ((_ expr)
        (test-error-condition "" 'expr assertion-violation? '&assertion))))
-  
+
   (define-syntax test-i/o-error
     (syntax-rules ()
       ((_ name expr)
        (test-error-condition name 'expr i/o-error? '&i/o))
       ((_ expr)
        (test-error-condition "" 'expr i/o-error? '&i/o))))
-  
+
   (define-syntax test-section-begin
     (syntax-rules ()
       ((_ name testcases ...)

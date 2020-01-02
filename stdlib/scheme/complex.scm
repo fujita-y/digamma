@@ -3,6 +3,6 @@
 
 (define-library
   (scheme complex)
-  (import (rnrs))
+  (import (core))
   (export angle magnitude make-rectangular imag-part make-polar real-part)
 ) ;[end]

@@ -3,6 +3,6 @@
 
 (define-library
   (scheme eval)
-  (import (rnrs) (core))
+  (import (core))
   (export environment eval)
 ) ;[end]
