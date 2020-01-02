@@ -2,7 +2,7 @@
   (export test-begin test-end test-section-begin test-comment test-report
           test-lexical-exception test-syntax-violation test-assertion-violation test-violation test-i/o-error
           test-eval! test-eq test-eqv test-equal test-equal-evaluated
-          test test-values)
+          test test-values test-error)
   (import (core))
 
   (define-record-type section
@@ -49,6 +49,13 @@
             (display "but got: ")
             (write expr)
             (newline)))))))
+
+  (define-syntax test-error
+    (syntax-rules ()
+      ((_ name expr)
+       (test-violation name expr))
+      ((_ expr)
+       (test-violation expr))))
 
   ;;
   ;; private test utility

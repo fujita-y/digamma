@@ -296,7 +296,7 @@ reader_t::read_bytevector()
         int n = list_length(lst);
         READ_BVECTOR("u8",  uint8_t,  FIXNUMP,            CAST_FIXNUM_TO_U8);
 #if USE_EXTENDED_BVECTOR_SYNTAX
-        if (FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
+        if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
             READ_BVECTOR("s8",  int8_t,   FIXNUMP,            CAST_FIXNUM_TO_S8);
             READ_BVECTOR("s16", int16_t,  FIXNUMP,            exact_integer_to_int16);
             READ_BVECTOR("s32", int32_t,  exact_integer_pred, exact_integer_to_int32);
@@ -309,7 +309,11 @@ reader_t::read_bytevector()
         }
 #endif
     }
-    lexical_error("invalid lexical syntax #v%s~a ...", buf, MAKECHAR(c));
+    if (FIXNUM(m_vm->m_flags.lexical_syntax_version) == 6) {
+        lexical_error("invalid lexical syntax #v%s~a ...", buf, MAKECHAR(c));
+    } else {
+        lexical_error("invalid lexical syntax #%s~a ...", buf, MAKECHAR(c));
+    }
 
     #undef CAST_REAL_TO_DOUBLE
     #undef CAST_FIXNUM_TO_U8
@@ -863,6 +867,10 @@ top:
                     unget_ucs4();
                     return list2(S_UNSYNTAX, read_expr());
                 default:
+                    if (c == 'u' && FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
+                        unget_ucs4();
+                        return read_bytevector();
+                    }
                     if (m_graph == NULL) break;
                     if (c >= '0' && c <= '9') {
                         intptr_t mark = c - '0';

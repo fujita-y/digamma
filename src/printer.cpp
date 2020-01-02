@@ -844,7 +844,11 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
             if (HDR_BVECTOR_MAPPING(bvector->hdr)) {
                 format("#<bytevector-mapping 0x%x %d>", bvector->elts, bvector->count);
             } else {
-                port_puts(m_port, "#vu8(");
+                if (FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
+                    port_puts(m_port, "#u8(");
+                } else {
+                    port_puts(m_port, "#vu8(");
+                }
                 uint8_t* u8 = (uint8_t*)bvector->elts;
                 for (int i = 0; i < bvector->count; i++) {
                     if (i != 0) port_put_byte(m_port, ' ');

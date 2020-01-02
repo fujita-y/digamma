@@ -3,7 +3,11 @@
 
 (define-library
   (scheme base)
-  (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill!)
+  (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill! bytevector-copy vector-map)
+                  (error r6rs:error)
+                  (string->utf8 r6rs:string->utf8)
+                  (utf8->string r6rs:utf8->string)
+                  (bytevector-copy! r6rs:bytevector-copy!)
                   (let-syntax r6rs:let-syntax)
                   (letrec-syntax r6rs:letrec-syntax)))
 
@@ -247,6 +251,34 @@
           zero?)
   (begin
 
+    (define vector-map
+      (lambda (proc vec1 . vec2)
+        (list->vector
+          (apply map proc (vector->list vec1)
+                 (map vector->list vec2)))))
+
+    (define string->utf8
+      (lambda (str . options)
+        (let-optionals options ((start 0) (end (string-length str)))
+          (r6rs:string->utf8 (substring str start end)))))
+
+    (define utf8->string
+      (lambda (bv . options)
+        (let-optionals options ((start 0) (end (bytevector-length bv)))
+          (r6rs:utf8->string (bytevector-copy bv start end)))))
+
+    (define bytevector-copy!
+      (lambda (to at from . options)
+        (let-optionals options ((start 0) (end (bytevector-length from)))
+          (r6rs:bytevector-copy! from start to at (- end start)))))
+
+    (define bytevector-copy
+      (lambda (bv . options)
+        (let-optionals options ((start 0) (end (bytevector-length bv)))
+          (let ((ans (make-bytevector (- end start))))
+            (r6rs:bytevector-copy! bv start ans 0 (- end start))
+            ans))))
+
     (define string-fill!
       (lambda (str char . options)
         (let-optionals options ((start 0) (end (string-length str)))
@@ -363,7 +395,7 @@
           (let loop ((args args) (p 0))
               (or (null? args)
                   (let ((n (bytevector-length (car args))))
-                    (bytevector-copy! (car args) 0 ans p n)
+                    (r6rs:bytevector-copy! (car args) 0 ans p n)
                     (loop (cdr args) (+ p n)))))
           ans)))
 
@@ -405,6 +437,10 @@
                  (define temp (call-with-values (lambda () expr) list))
                  (define var (list-ref temp i)) ...
                  (define var2 (list-tail temp n)))))))))
+
+    (define error
+      (lambda (message . irritants)
+        (apply r6rs:error #f message irritants)))
 
     (define error-object?
       (lambda (obj)
@@ -472,15 +508,19 @@
 
     (define open-output-bytevector
       (lambda ()
-        (open-bytevector-output-port)))
+        (call-with-values
+          open-bytevector-output-port
+          (lambda (port proc) port))))
 
     (define open-output-string
       (lambda ()
-        (open-string-output-port)))
+        (call-with-values
+          open-string-output-port
+          (lambda (port proc) port))))
 
     (define output-port-open?
       (lambda (port)
-        (and (not (port-closed? port) (output-port? port)))))
+        (and (not (port-closed? port)) (output-port? port))))
 
     (define peek-u8
       (lambda options
