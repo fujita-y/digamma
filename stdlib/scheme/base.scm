@@ -3,7 +3,7 @@
 
 (define-library
   (scheme base)
-  (import (rename (except (core) for-each map)
+  (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill!)
                   (let-syntax r6rs:let-syntax)
                   (letrec-syntax r6rs:letrec-syntax)))
 
@@ -247,17 +247,73 @@
           zero?)
   (begin
 
-  (define-syntax let-syntax
-    (syntax-rules ()
-      ((_ e1 e2 ...)
-       (r6rs:let-syntax e1
-         (let () e2 ...)))))
+    (define string-fill!
+      (lambda (str char . options)
+        (let-optionals options ((start 0) (end (string-length str)))
+          (let loop ((i (- end 1)))
+            (if (< i start)
+                (begin
+                  (string-set! str i char)
+                  (loop (- i 1))))))))
 
-  (define-syntax letrec-syntax
-    (syntax-rules ()
-      ((_ e1 e2 ...)
-       (r6rs:letrec-syntax e1
-         (let () e2 ...)))))
+    (define string-copy
+      (lambda (str . options)
+        (let-optionals options ((start 0) (end (string-length str)))
+          (substring str start end))))
+
+    (define string->list
+      (lambda (str . options)
+        (let-optionals options ((start 0) (end (string-length str)))
+          (let loop ((i (- end 1)) (ans '()))
+            (if (< i start)
+                ans
+                (loop (- i 1) (cons (string-ref str i) ans)))))))
+
+    (define vector-fill!
+      (lambda (vec obj . options)
+        (let-optionals options ((start 0) (end (vector-length vec)))
+          (let loop ((i (- end 1)))
+            (if (< i start)
+                (begin
+                  (vector-set! vec i obj)
+                  (loop (- i 1))))))))
+
+    (define vector->list
+      (lambda (vec . options)
+        (let-optionals options ((start 0) (end (vector-length vec)))
+          (let loop ((i (- end 1)) (ans '()))
+            (if (< i start)
+                ans
+                (loop (- i 1) (cons (vector-ref vec i) ans)))))))
+
+    (define assoc
+      (lambda (key lst . options)
+        (let-optionals options ((proc equal?))
+          (find (lambda (e) (proc key (car e))) lst))))
+
+    (define find-tail
+      (lambda (proc lst)
+        (let loop ((lst lst))
+          (cond ((null? lst) #f)
+                ((proc (car lst)) lst)
+                (else (loop (cdr lst)))))))
+
+    (define member
+      (lambda (x lst . options)
+        (let-optionals options ((proc equal?))
+          (find-tail (lambda (e) (proc x e)) lst))))
+
+    (define-syntax let-syntax
+      (syntax-rules ()
+        ((_ e1 e2 ...)
+        (r6rs:let-syntax e1
+          (let () e2 ...)))))
+
+    (define-syntax letrec-syntax
+      (syntax-rules ()
+        ((_ e1 e2 ...)
+        (r6rs:letrec-syntax e1
+          (let () e2 ...)))))
 
     (define for-each-1
       (lambda (proc lst)

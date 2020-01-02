@@ -1,7 +1,8 @@
 (library (test-lite)
   (export test-begin test-end test-section-begin test-comment test-report
           test-lexical-exception test-syntax-violation test-assertion-violation test-violation test-i/o-error
-          test-eval! test-eq test-eqv test-equal test-equal-evaluated test)
+          test-eval! test-eq test-eqv test-equal test-equal-evaluated
+          test test-values)
   (import (core))
 
   (define-record-type section
@@ -16,8 +17,41 @@
      (mutable env)
      (mutable lib)))
 
+  (define-syntax test
+    (syntax-rules ()
+      ((_ expected expr)
+        (let ((res expr))
+          (cond
+           ((not (equal? expr expected))
+            (display "FAIL: ")
+            (write 'expr)
+            (newline)
+            (display "expected: ")
+            (write expected)
+            (newline)
+            (display "but got: ")
+            (write res)
+            (newline)))))))
+
+  (define-syntax test-values
+    (syntax-rules ()
+      ((_ expected expr)
+       (let ((res-expr (call-with-values (lambda () expr) list))
+             (res-expected (call-with-values (lambda () expected) list)))
+          (cond
+           ((not (equal? res-expr res-expected))
+            (display "FAIL: ")
+            (write 'expr)
+            (newline)
+            (display "expected: ")
+            (write expected)
+            (newline)
+            (display "but got: ")
+            (write expr)
+            (newline)))))))
+
   ;;
-  ;; test utility
+  ;; private test utility
   ;;
 
   (define test-result (string))
@@ -133,22 +167,6 @@
       ((_ expr)
        (parameterize ((scheme-library-exports (section-lib (section-current))))
          (eval 'expr (section-env (section-current)))))))
-
-  (define-syntax test
-    (syntax-rules ()
-      ((_ expected expr)
-        (let ((res expr))
-          (cond
-           ((not (equal? expr expected))
-            (display "FAIL: ")
-            (write 'expr)
-            (newline)
-            (display "expected: ")
-            (write expected)
-            (newline)
-            (display "but got: ")
-            (write res)
-            (newline)))))))
 
   (define-syntax test-eq
     (syntax-rules (=>)
