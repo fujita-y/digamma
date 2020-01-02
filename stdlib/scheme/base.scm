@@ -3,7 +3,10 @@
 
 (define-library
   (scheme base)
-  (import (except (core) for-each map))
+  (import (rename (except (core) for-each map)
+                  (let-syntax r6rs:let-syntax)
+                  (letrec-syntax r6rs:letrec-syntax)))
+
   (export *
           +
           -
@@ -244,6 +247,18 @@
           zero?)
   (begin
 
+  (define-syntax let-syntax
+    (syntax-rules ()
+      ((_ e1 e2 ...)
+       (r6rs:let-syntax e1
+         (let () e2 ...)))))
+
+  (define-syntax letrec-syntax
+    (syntax-rules ()
+      ((_ e1 e2 ...)
+       (r6rs:letrec-syntax e1
+         (let () e2 ...)))))
+
     (define for-each-1
       (lambda (proc lst)
         (cond ((null? lst) (unspecified))
@@ -318,11 +333,22 @@
     (define-syntax define-values
       (lambda (x)
         (syntax-case x ()
-          ((_ (formals ...) expression)
-           (with-syntax (((n ...) (iota (length #'(formals ...)))))
-            #'(begin
-                (define temp (call-with-values (lambda () expression) vector))
-                (define formals (vector-ref temp n)) ...))))))
+          ((_ var expr)
+           (identifier? (syntax var))
+           (syntax (define var (call-with-values (lambda () expr) list))))
+          ((_ (var ...) expr)
+           (with-syntax (((i ...) (iota (length (syntax (var ...))))))
+             (syntax
+               (begin
+                 (define temp (call-with-values (lambda () expr) vector))
+                 (define var (vector-ref temp i)) ...))))
+          ((_ (var ... . var2) expr)
+           (with-syntax (((i ...) (iota (length (syntax (var ...))))) (n (length (syntax (var ...)))))
+             (syntax
+               (begin
+                 (define temp (call-with-values (lambda () expr) list))
+                 (define var (list-ref temp i)) ...
+                 (define var2 (list-tail temp n)))))))))
 
     (define error-object?
       (lambda (obj)
