@@ -261,6 +261,7 @@
   (lambda (form env)
 
     (define else? (lambda (id) (denote-else? env id)))
+    (define =>? (lambda (id) (denote-=>? env id)))
 
     (define maplist
       (lambda (func lst)
@@ -276,6 +277,10 @@
                   (.COND ,@(maplist
                             (lambda (lst)
                               (destructuring-match lst
+                                ((((? else? _) (? =>? _) expr) more ...)
+                                 (if (null? more)
+                                     `(.ELSE (,expr ,temp))
+                                     (syntax-violation (car form) "misplaced else" form (car lst))))
                                 ((((? else? _) . (? pair? expr)) more ...)
                                  (if (null? more)
                                      `(.ELSE ,@expr)

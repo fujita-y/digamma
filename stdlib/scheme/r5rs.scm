@@ -7,8 +7,15 @@
           (scheme load)
           (scheme eval)
           (scheme repl)
-          (except (rnrs) for-each map)
-          (rnrs r5rs))
+          (scheme lazy)
+          (scheme inexact)
+          (scheme complex)
+          (scheme cxr)
+          (scheme file)
+          (scheme read)
+          (scheme char)
+          (scheme write)
+          (only (rnrs r5rs) scheme-report-environment null-environment exact->inexact inexact->exact))
   (export *
           +
           -
