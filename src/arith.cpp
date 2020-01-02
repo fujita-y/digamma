@@ -4989,7 +4989,6 @@ parse_done:
 static const char*
 parse_mantissa(object_heap_t* heap, const char* s, int radix, scm_obj_t* ans, int* digit_count, int *fraction_count)
 {
-    bool first_digit = true;
     bool fraction = false;
     const char* p = s;
     int workpad_count = BN_QUANTUM;
@@ -5011,7 +5010,6 @@ parse_mantissa(object_heap_t* heap, const char* s, int radix, scm_obj_t* ans, in
             else if (c >= 'a') digit = c - 'a' + 10;
             else if (c >= 'A') digit = c - 'A' + 10;
             else break;
-            first_digit = false;
             if (digit < radix) {
                 if (fraction) *fraction_count = *fraction_count + 1;
                 *digit_count = *digit_count + 1;
@@ -5048,12 +5046,16 @@ parse_exact_udecimal(object_heap_t* heap, const char* s, int radix, scm_obj_t* a
     const char* p = s;
     int digit_count = 0;
     int fraction_count = 0;
+    int leading_zero_count = 0;
     bool exponent_negative = false;
     scm_bignum_t mantissa;
     scm_obj_t exponent = MAKEFIXNUM(0);
     char c;
     while ((c = *p++) != 0) {
-        if (c == '0') continue;
+        if (c == '0') {
+            leading_zero_count++;
+            continue;
+        }
         p--;
         goto parse_digits;
     }
@@ -5081,7 +5083,7 @@ parse_digits:
             return p; // string end with `e`, `e+`, `e-` like `100.4e`, `100.4e-`
         }
     }
-    if (digit_count == 0) return p; // string looks like `.`, `e`, `+.`, `.e+10`
+    if (leading_zero_count + digit_count == 0) return p; // string looks like `.`, `e`, `+.`, `.e+10`
     if (!FIXNUMP(exponent)) return p;
     int exp10 = (exponent_negative ? -FIXNUM(exponent) : FIXNUM(exponent)) - fraction_count;
     // #e1.00e100

@@ -124,7 +124,7 @@ check: all
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/arith.scm
 	@echo '----------------------------------------'
 	@echo 'r5rs_pitfall.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r5rs_pitfall.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r5rs_pitfall.scm
 	@echo '----------------------------------------'
 	@echo 'syntax-rule-stress-test.scm:'
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/syntax-rule-stress-test.scm
