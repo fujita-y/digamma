@@ -483,7 +483,7 @@
 
     (define show-banner
       (lambda ()
-       (format #t "digamma r~a~%" (architecture-feature 'program-revision))))
+       (format #t "digamma 0.1.~a~%" (architecture-feature 'program-revision))))
 
     (define show-info
       (lambda ()
@@ -525,7 +525,7 @@
                     (cond ((or top-level-program (load-file-has-r6rs-comment? path))
                            (load-top-level-program path))
                           (else
-                           (interpret '(import (core) (rnrs)))
+                           (interpret '(import (core)))
                            (load path)))
                     (flush-output-port (current-error-port))
                     (flush-output-port (current-output-port))
@@ -536,7 +536,7 @@
         (cond (mute)
               (verbose (show-info))
               (else (show-banner)))
-        (or script (interpret '(import (core) (rnrs))))
+        (or script (interpret '(import (core))))
         (if quiet
             (quiet-read-eval-print-loop)
             (read-eval-print-loop))))

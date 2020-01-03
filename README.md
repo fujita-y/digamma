@@ -1,16 +1,27 @@
 # Digamma
 
-R7RS/R6RS Scheme Implementation derived from Ypsilon(fujita-y/ypsilon) core
+R7RS/R6RS Scheme Implementation derived from Ypsilon(fujita-y/ypsilon) core.
 
 * Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 * See LICENSE file for terms and conditions of use.
 
-### Memo: How to rebuild heap on changing identifiers
+### Run
+
+* To run R7RS script file from project root, try following:
+```
+./digamma --r7rs --top-level-program --disable-acc --sitelib=./sitelib:./stdlib -- test/r7rs-sample.scm
+```
+
+### Limitations
+
+* REPL start with '(import (core))' regardless what command line option is given.
+
+### Rebuild heap files
 
 * open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
 * $ make
 * $ cd heap
-* open 'boot/libraries.scm' and edit
+* open 'boot/libraries.scm' and edit for example
 * $ make
 * $ cd ..
 * $ make
