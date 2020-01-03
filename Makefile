@@ -138,25 +138,6 @@ check: all
 	@echo 'r6rs-more.scm:'
 	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-more.scm
 	@echo '----------------------------------------'
-	@echo 'Passed all tests'
-	@rm -f ./test/tmp*
-
-check-r6rs: all
-	@echo '----------------------------------------'
-	@echo 'r6rs.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs.scm
-	@echo '----------------------------------------'
-	@echo 'r6rs-lib.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-lib.scm
-	@echo '----------------------------------------'
-	@echo 'r6rs-more.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-more.scm
-	@echo '----------------------------------------'
-	@echo 'Passed all tests'
-	@rm -f ./test/tmp*
-
-check-r7rs: all
-	@echo '----------------------------------------'
 	@echo 'r7rs-test.scm:'
 	@./$(PROG) --r7rs --top-level-program --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
 	@echo '----------------------------------------'

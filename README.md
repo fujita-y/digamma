@@ -1,6 +1,6 @@
 # Digamma
 
-R7RS Scheme Implementation (under development)
+R7RS/R6RS Scheme Implementation
 
 * Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 * See LICENSE file for terms and conditions of use.
