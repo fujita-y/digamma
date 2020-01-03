@@ -464,7 +464,7 @@
         (format #t "options:~%")
         (format #t "  --r7rs (-7)            conforms r7rs syntax and semantics~%")
         (format #t "  --r6rs (-6)            conforms r6rs syntax and semantics~%")
-        (format #t "  --top-level-program    run top-level program~%")
+        (format #t "  --top-level-program    runs the top-level program~%")
         (format #t "  --mute (-m)            suppresses greeting~%")
         (format #t "  --quiet (-q)           suppresses greeting, repl prompt, and repl output~%")
         (format #t "  --verbose (-v)         prints load and compile activities~%")
