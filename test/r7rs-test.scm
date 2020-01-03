@@ -544,8 +544,6 @@
  (foo bar x)
  (test 'x (bar 1)))
 
-;[TODO]
-#|
 (begin
   (define-syntax ffoo
     (syntax-rules ()
@@ -557,7 +555,6 @@
            (* x x))))))
   (ffoo ff)
   (test 100 (ff 10)))
-|#
 
 (let-syntax ((vector-lit
                (syntax-rules ()

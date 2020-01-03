@@ -172,7 +172,7 @@
                                (interpret form)
                                (loop))))))))))))))
 
-(define load-r6rs
+(define load-top-level-program
   (lambda (path)
     (let ((abs-path (locate-load-file path)))
       (and (scheme-load-verbose) (format #t "~&;; loading ~s~%~!" abs-path))

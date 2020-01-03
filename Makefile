@@ -158,7 +158,7 @@ check-r6rs: all
 check-r7rs: all
 	@echo '----------------------------------------'
 	@echo 'r7rs-test.scm:'
-	@./$(PROG) --r7rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
+	@./$(PROG) --r7rs --top-level-program --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
 	@echo '----------------------------------------'
 	@echo 'Passed all tests'
 	@rm -f ./test/tmp*

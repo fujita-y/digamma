@@ -14,7 +14,7 @@
                 (else
                  (loop (cdr lst) (cons (car lst) bounds) unbounds))))))
 
-    (define library-name '(.R6RS-TOP))
+    (define library-name '(.TOP-LEVEL-PROGRAM))
 
     (destructuring-match form
       ((('import import-spec ...) body ...)
