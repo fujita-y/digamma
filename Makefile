@@ -1,10 +1,10 @@
-#   Makefile for Linux, FreeBSD, OpenBSD, and Darwin
-#   Requirements: GNU Make, GCC 4.0 or later
+#   Makefile for Linux, Darwin
+#   Requirements: GNU Make, clang++
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
-PROG 	 = digamma
+PROG = digamma
 
-PREFIX 	 = /usr/local
+PREFIX = /usr/local
 
 CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -DSYSTEM_EXTENSION_PATH='"$(DESTDIR)$(PREFIX)/lib/$(PROG)"'
 
