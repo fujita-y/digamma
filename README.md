@@ -1,6 +1,6 @@
 # Digamma
 
-R7RS/R6RS Scheme Implementation derived from Ypsilon(fujita-y/ypsilon) core.
+R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https://github.com/fujita-y/ypsilon)).
 
 * Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 * See LICENSE file for terms and conditions of use.
