@@ -664,8 +664,7 @@
   (list x y)))
 
 ;; Records
-;[TODO]
-#|
+
 (define-record-type <pare>
   (kons x y)
   pare?
@@ -679,7 +678,7 @@
 (test 3 (let ((k (kons 1 2)))
           (set-kar! k 3)
           (kar k)))
-|#
+
 (test-end)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

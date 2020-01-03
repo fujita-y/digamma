@@ -4,6 +4,7 @@
 (define-library
   (scheme base)
   (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill! bytevector-copy vector-map)
+                  (define-record-type r6rs:define-record-type)
                   (expt r6rs:expt)
                   (error r6rs:error)
                   (string->utf8 r6rs:string->utf8)
@@ -343,18 +344,6 @@
         (let-optionals options ((proc equal?))
           (find-tail (lambda (e) (proc x e)) lst))))
 
-    (define-syntax let-syntax
-      (syntax-rules ()
-        ((_ e1 e2 ...)
-        (r6rs:let-syntax e1
-          (let () e2 ...)))))
-
-    (define-syntax letrec-syntax
-      (syntax-rules ()
-        ((_ e1 e2 ...)
-        (r6rs:letrec-syntax e1
-          (let () e2 ...)))))
-
     (define for-each-1
       (lambda (proc lst)
         (cond ((null? lst) (unspecified))
@@ -411,40 +400,6 @@
       (lambda options
         (let-optionals options ((port (current-input-port)))
           (not (eof-object? (lookahead-char port))))))
-
-    (define-syntax cond-expand
-      (lambda (x)
-        (syntax-case x (else)
-          ((_)
-           #'(begin))
-          ((_ (else body ...))
-           #'(begin body ...))
-          ((_ (else body ...) more ...)
-           (syntax-violation 'cond-expand "misplaced else" x))
-          ((_ (conditions body ...) more ...)
-           (if (fulfill-feature-requirements? x (syntax->datum #'conditions))
-               #'(begin body ...)
-               #'(cond-expand more ...))))))
-
-    (define-syntax define-values
-      (lambda (x)
-        (syntax-case x ()
-          ((_ var expr)
-           (identifier? (syntax var))
-           (syntax (define var (call-with-values (lambda () expr) list))))
-          ((_ (var ...) expr)
-           (with-syntax (((i ...) (iota (length (syntax (var ...))))))
-             (syntax
-               (begin
-                 (define temp (call-with-values (lambda () expr) vector))
-                 (define var (vector-ref temp i)) ...))))
-          ((_ (var ... . var2) expr)
-           (with-syntax (((i ...) (iota (length (syntax (var ...))))) (n (length (syntax (var ...)))))
-             (syntax
-               (begin
-                 (define temp (call-with-values (lambda () expr) list))
-                 (define var (list-ref temp i)) ...
-                 (define var2 (list-tail temp n)))))))))
 
     (define error
       (lambda (message . irritants)
@@ -590,11 +545,6 @@
         (let-optionals options ((start 0) (end (string-length str)))
           (apply vector (string->list (substring str start end))))))
 
-    (define-syntax syntax-error
-      (syntax-rules ()
-        ((_ msg args ...)
-         (syntax-violation #f msg '(args ...)))))
-
     (define truncate/
       (lambda (n m)
         (values (truncate-quotient n m) (truncate-remainder n m))))
@@ -652,6 +602,72 @@
       (lambda (b . options)
         (let-optionals options ((port (current-output-port)))
           (put-u8 port b))))
+
+    (define-syntax syntax-error
+      (syntax-rules ()
+        ((_ msg args ...)
+         (syntax-violation #f msg '(args ...)))))
+
+    (define-syntax cond-expand
+      (lambda (x)
+        (syntax-case x (else)
+          ((_)
+           #'(begin))
+          ((_ (else body ...))
+           #'(begin body ...))
+          ((_ (else body ...) more ...)
+           (syntax-violation 'cond-expand "misplaced else" x))
+          ((_ (conditions body ...) more ...)
+           (if (fulfill-feature-requirements? x (syntax->datum #'conditions))
+               #'(begin body ...)
+               #'(cond-expand more ...))))))
+
+    (define-syntax define-values
+      (lambda (x)
+        (syntax-case x ()
+          ((_ var expr)
+           (identifier? (syntax var))
+           (syntax (define var (call-with-values (lambda () expr) list))))
+          ((_ (var ...) expr)
+           (with-syntax (((i ...) (iota (length (syntax (var ...))))))
+             (syntax
+               (begin
+                 (define temp (call-with-values (lambda () expr) vector))
+                 (define var (vector-ref temp i)) ...))))
+          ((_ (var ... . var2) expr)
+           (with-syntax (((i ...) (iota (length (syntax (var ...))))) (n (length (syntax (var ...)))))
+             (syntax
+               (begin
+                 (define temp (call-with-values (lambda () expr) list))
+                 (define var (list-ref temp i)) ...
+                 (define var2 (list-tail temp n)))))))))
+
+    (define-syntax let-syntax
+      (syntax-rules ()
+        ((_ e1 e2 ...)
+        (r6rs:let-syntax e1
+          (let () e2 ...)))))
+
+    (define-syntax letrec-syntax
+      (syntax-rules ()
+        ((_ e1 e2 ...)
+        (r6rs:letrec-syntax e1
+          (let () e2 ...)))))
+
+    (define-syntax define-record-type
+      (lambda (x)
+        (define parse
+          (lambda (stx)
+            (syntax-case stx ()
+              ((e1 e2) #'(immutable e1 e2))
+              ((e1 e2 e3) #'(mutable e1 e2 e3)))))
+        (syntax-case x ()
+          ((_ type (ctor _ ...)
+              pred
+              spec ...)
+          (with-syntax (((spec ...) (map parse #'(spec ...))))
+            #'(r6rs:define-record-type (type ctor pred)
+                (fields spec ...)))))))
 
   )
 ) ;[end]
