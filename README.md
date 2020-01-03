@@ -12,12 +12,12 @@ R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https:/
 ./digamma --r7rs --top-level-program --disable-acc --sitelib=./stdlib -- test/r7rs-sample.scm
 ```
 
-### Limitations
+### Limitations and Notes
 
 * REPL start with '(import (core))' regardless what command line option is given.
 * Without '-top-level-program', the contents of the specified script file will be interpreted as if they had been entered into the REPL.
 
-### Rebuild heap files
+### Rebuild Heap Files
 
 * open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
 * $ make
