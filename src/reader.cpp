@@ -87,6 +87,17 @@ reader_t::reader_t(VM* vm, scm_port_t input, bool foldcase)
     m_foldcase = foldcase;
 }
 
+reader_t::~reader_t()
+{
+    if (m_ungetbuf_valid && m_ungetbuf != scm_eof) {
+        if (port_has_port_position_pred(m_in) && port_has_set_port_position_pred(m_in)) {
+            int n = utf8_sizeof_ucs4(CHAR(m_ungetbuf));
+            off64_t position = port_position(m_in);
+            if (position >= 0) port_set_port_position(m_in, position - n);
+        }
+    }
+}
+
 void
 reader_t::lexical_error(const char* fmt, ...)
 {

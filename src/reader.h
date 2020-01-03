@@ -13,6 +13,7 @@
 class reader_t {
 public:
     reader_t(VM* vm, scm_port_t input, bool foldcase = false);
+    ~reader_t();
     scm_obj_t read(scm_hashtable_t note);
     scm_obj_t read_graph(scm_hashtable_t note);
 private:
