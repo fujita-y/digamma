@@ -9,7 +9,7 @@ R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https:/
 
 * To run R7RS script from project root, try following:
 ```
-./digamma --r7rs --top-level-program --disable-acc --sitelib=./sitelib:./stdlib -- test/r7rs-sample.scm
+./digamma --r7rs --top-level-program --disable-acc --sitelib=./stdlib -- test/r7rs-sample.scm
 ```
 
 ### Limitations
