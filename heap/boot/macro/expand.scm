@@ -213,21 +213,22 @@
           (or (ellipsis/underscore-in-literal)
               (and (memq '_ lites)
                    (syntax-violation 'syntax-rules "_ in literals" transformer lites)))
-          (or (ellipsis/underscore-in-literal)
-              (if ellipsis
-                  (and (memq ellipsis lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))
-                  (and (memq '... lites) (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites))))
-          (for-each (lambda (rule)
-                      (destructuring-match rule
-                        ((((? symbol? _) . _) _) #t)
-                        (((_ . _) _)
-                          (syntax-violation 'syntax-rules "expected identifer for first subform of pattern" transformer rule))
-                        ((_ _)
-                          (syntax-violation 'syntax-rules "expected list for pattern" transformer rule))
-                        (_
-                          (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer rule))))
-                    rules)
-          (compile-syntax-rules transformer ellipsis lites rules env))))
+          (let ((ellipsis (or ellipsis '...)))
+            (and (memq ellipsis lites)
+                 (if (ellipsis/underscore-in-literal)
+                     (set! ellipsis #f)
+                     (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites)))
+            (for-each (lambda (rule)
+                        (destructuring-match rule
+                          ((((? symbol? _) . _) _) #t)
+                          (((_ . _) _)
+                            (syntax-violation 'syntax-rules "expected identifer for first subform of pattern" transformer rule))
+                          ((_ _)
+                            (syntax-violation 'syntax-rules "expected list for pattern" transformer rule))
+                          (_
+                            (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer rule))))
+                      rules)
+            (compile-syntax-rules transformer ellipsis lites rules env)))))
       (_ (compile-transformer transformer env)))))
 
 (define expand-let-syntax-bindings

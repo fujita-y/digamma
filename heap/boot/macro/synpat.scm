@@ -5,7 +5,7 @@
 
 (define ellipsis-id?
   (lambda (form)
-    (eq? form (ellipsis-id))))
+    (and (symbol? form) (eq? form (ellipsis-id)))))
 
 (define ellipsis-pair?
   (lambda (form)
