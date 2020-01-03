@@ -15,6 +15,7 @@ R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https:/
 ### Limitations
 
 * REPL start with '(import (core))' regardless what command line option is given.
+* Without '-top-level-program', the contents of the specified script file will be interpreted as if they had been entered into the REPL.
 
 ### Rebuild heap files
 
