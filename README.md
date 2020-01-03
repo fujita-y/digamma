@@ -21,7 +21,7 @@ R7RS/R6RS Scheme Implementation derived from Ypsilon(fujita-y/ypsilon) core.
 * open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
 * $ make
 * $ cd heap
-* open 'boot/libraries.scm' and edit for example
+* open and edit 'boot/libraries.scm' for example
 * $ make
 * $ cd ..
 * $ make
