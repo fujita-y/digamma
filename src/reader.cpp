@@ -595,7 +595,14 @@ reader_t::read_quoted_symbol()
             buf[i] = 0;
             return make_symbol(m_vm->m_heap, buf, i);
         }
-        if (c == '\\') c = read_escape_sequence();
+        if (c == '\\') {
+            if (lookahead_ucs4() != '\\') {
+                c = read_escape_sequence();
+            } else {
+                buf[i++] = c;
+                c = get_ucs4();
+            }
+        }
         if (c < 128) buf[i++] = c;
         else i += cnvt_ucs4_to_utf8(ensure_ucs4(c), (uint8_t*)buf + i);
     }
@@ -859,7 +866,7 @@ top:
                     }
                     lexical_error("invalid lexical syntax #~a~a", MAKECHAR(c), MAKECHAR(c2));
                 }
-                case 't': case 'T':{
+                case 't': case 'T': {
                     if (c == 'T' && FIXNUM(m_vm->m_flags.lexical_syntax_version) > 6) {
                         lexical_error("invalid lexical syntax #~a", MAKECHAR(c));
                     }
@@ -880,7 +887,10 @@ top:
                 case '(': return make_vector(m_vm->m_heap, read_list(false, true));
                 case '|': return skip_srfi30();
                 case '\\': return read_char();
-                case ';': read_expr(); goto top;
+                case ';': {
+                    if (read_expr() == S_DOT) lexical_error("misplaced dot('.') immediately after '#;'");
+                    goto top;
+                }
                 case 'b': case 'B': return read_prefixed_number(read_exactness(c), c, true);
                 case 'o': case 'O': return read_prefixed_number(read_exactness(c), c, true);
                 case 'd': case 'D': return read_prefixed_number(read_exactness(c), c, true);
