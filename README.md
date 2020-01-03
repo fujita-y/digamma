@@ -1,11 +1,11 @@
 # Digamma
 
-R7RS/R6RS Scheme Implementation
+R7RS/R6RS Scheme Implementation derived from Ypsilon(fujita-y/ypsilon) core
 
 * Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 * See LICENSE file for terms and conditions of use.
 
-## How to rebuild heap on changing identifiers
+### Memo: How to rebuild heap on changing identifiers
 
 * open 'src/core.h' and set 'UNBOUND_GLOC_RETURN_UNSPEC' to '1'
 * $ make
