@@ -4,6 +4,7 @@
 (define-library
   (scheme base)
   (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill! bytevector-copy vector-map)
+                  (expt r6rs:expt)
                   (error r6rs:error)
                   (string->utf8 r6rs:string->utf8)
                   (utf8->string r6rs:utf8->string)
@@ -251,6 +252,13 @@
           zero?)
   (begin
 
+    (define expt
+      (lambda (z1 z2)
+        (let ((z (r6rs:expt z1 z2)))
+          (if (or (inexact? z1) (inexact? z2))
+              (inexact z)
+              z))))
+
     (define vector-map
       (lambda (proc vec1 . vec2)
         (list->vector
@@ -283,7 +291,7 @@
       (lambda (str char . options)
         (let-optionals options ((start 0) (end (string-length str)))
           (let loop ((i (- end 1)))
-            (if (< i start)
+            (if (>= i start)
                 (begin
                   (string-set! str i char)
                   (loop (- i 1))))))))
@@ -305,7 +313,7 @@
       (lambda (vec obj . options)
         (let-optionals options ((start 0) (end (vector-length vec)))
           (let loop ((i (- end 1)))
-            (if (< i start)
+            (if (>= i start)
                 (begin
                   (vector-set! vec i obj)
                   (loop (- i 1))))))))
@@ -537,7 +545,9 @@
         (let-optionals options ((port (current-input-port)) (start 0) (end (bytevector-length bv)))
           (get-bytevector-n! port bv start (- end start)))))
 
-    (define read-error? i/o-read-error?)
+    (define read-error?
+      (lambda (obj)
+        (or (i/o-read-error? obj) (lexical-violation? obj))))
 
     (define read-line
       (lambda options

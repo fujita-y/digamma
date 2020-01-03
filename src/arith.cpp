@@ -4879,11 +4879,11 @@ parse_uinteger(object_heap_t* heap, const char* s, int radix, scm_obj_t* ans)
 static const char*
 parse_udecimal(object_heap_t* heap, const char* s, int radix, scm_obj_t* ans)
 {
-    if (s[0] == 'n' && strncmp(s + 1, "an.0", 4) == 0) {
+    if (tolower(s[0]) == 'n' && strncasecmp(s + 1, "an.0", 4) == 0) {
         *ans = make_flonum(heap, VALUE_NAN);
         return s + 5;
     }
-    if (s[0] == 'i' && strncmp(s + 1, "nf.0", 4) == 0) {
+    if (tolower(s[0]) == 'i' && strncasecmp(s + 1, "nf.0", 4) == 0) {
         *ans = make_flonum(heap, VALUE_INF);
         return s + 5;
     }
