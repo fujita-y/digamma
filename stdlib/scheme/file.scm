@@ -1,9 +1,8 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-library
-  (scheme file)
-  (import (core))
+(define-library (scheme file)
+  (import (core primitives) (core io))
   (export call-with-input-file
           delete-file
           open-binary-input-file
@@ -17,5 +16,4 @@
   (begin
     (define open-binary-input-file open-file-input-port)
     (define open-binary-output-file open-file-output-port)
-  )
-) ;[end]
+  ))

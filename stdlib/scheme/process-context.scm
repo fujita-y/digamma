@@ -2,9 +2,9 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-library
-  (scheme process-context)
-  (import (rename (core) (exit core:exit)))
+(define-library (scheme process-context)
+  (import (rename (core primitives) (exit core:exit))
+          (core optargs))
   (export command-line
           exit
           get-environment-variable
@@ -18,5 +18,4 @@
       (lambda options
         (let-optionals options ((status 0))
           ((continuation-to-exit) status))))
-  )
-) ;[end]
+  ))

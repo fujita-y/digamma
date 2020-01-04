@@ -1,16 +1,14 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-library
-  (scheme lazy)
-  (import (except (core) delay force))
+(define-library (scheme lazy)
+  (import (core primitives))
   (export delay
           force
           promise?
           delay-force
           make-promise)
   (begin
-
     (define-syntax delay
       (syntax-rules ()
         ((_ expr)
@@ -57,6 +55,4 @@
                     (else
                      (promise-datum-set! promise (promise-datum promise*))
                      (force promise)))))))
-
-  )
-) ;[end]
+  ))

@@ -1,9 +1,10 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-library
-  (scheme base)
-  (import (rename (except (core) for-each map member assoc string->list string-copy string-fill! vector->list vector-fill! bytevector-copy vector-map)
+(define-library (scheme base)
+  (import (rename (except (core)
+                          for-each map member assoc string->list string-copy string-fill!
+                          vector->list vector-fill! bytevector-copy vector-map)
                   (define-record-type r6rs:define-record-type)
                   (expt r6rs:expt)
                   (error r6rs:error)
@@ -252,13 +253,12 @@
           write-u8
           zero?)
   (begin
-
     (define expt
       (lambda (z1 z2)
         (let ((z (r6rs:expt z1 z2)))
-          (if (or (inexact? z1) (inexact? z2))
-              (inexact z)
-              z))))
+          (cond ((or (inexact? z1) (inexact? z2))
+                 (inexact z))
+                (else z)))))
 
     (define vector-map
       (lambda (proc vec1 . vec2)
@@ -519,7 +519,8 @@
         (let-optionals options ((port (current-input-port)))
           (get-u8 port))))
 
-    (define square (lambda (z) (* z z)))
+    (define square
+      (lambda (z) (* z z)))
 
     (define string-copy!
       (lambda (to at from . options)
@@ -668,6 +669,4 @@
           (with-syntax (((spec ...) (map parse #'(spec ...))))
             #'(r6rs:define-record-type (type ctor pred)
                 (fields spec ...)))))))
-
-  )
-) ;[end]
+  ))

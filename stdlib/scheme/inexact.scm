@@ -1,9 +1,8 @@
 ;;; Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-library
-  (scheme inexact)
-  (import (rename (rnrs)
+(define-library (scheme inexact)
+  (import (rename (core primitives)
                   (infinite? r6rs:infinite?)
                   (finite? r6rs:finite?)
                   (nan? r6rs:nan?)))
@@ -27,5 +26,4 @@
             (r6rs:nan? z)
             (or (r6rs:nan? (real-part z))
                 (r6rs:nan? (imag-part z))))))
-  )
-) ;[end]
+  ))
