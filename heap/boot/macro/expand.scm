@@ -268,7 +268,7 @@
                       vars macros))
           env)))))
 
-(define expand-macro-use
+#;(define expand-macro-use
   (lambda (form env deno)
     (fresh-rename-count)
     (current-macro-expression form)
@@ -276,6 +276,63 @@
       (if (procedure? (cadr deno))
           ((cadr deno) (wrap-transformer-input form))
           (transcribe-syntax-rules form (cadr deno))))))
+
+#;(define prune-lhs-renames
+  (lambda (expr renames env)
+    (let loop ((expr (flatten-begin expr env)) (defs '()))
+      (cond ((null? expr)
+             (display 'defs:)(pretty-print defs)(newline)
+             renames)
+            ((and (pair? expr) (pair? (car expr)) (symbol? (caar expr)))
+             (let ((deno (env-lookup env (caar expr))))
+               (cond ((eq? denote-begin deno)
+                      (loop (flatten-begin expr env) defs renames))
+                     ((eq? denote-define deno)
+                      (let ((def (cadr (desugar-define (car expr)))))
+                          (loop (cdr expr) (cons def defs))))
+                     (else
+                        (loop (cdr expr) defs)))))
+            (else
+              (loop (cdr expr) defs))))))
+#;(define expand-macro-use
+  (lambda (form env deno)
+    (fresh-rename-count)
+    (current-macro-expression form)
+    (parameterize ((current-expansion-environment env) (current-transformer-environment (cddr deno)))
+      (if (procedure? (cadr deno))
+          ((cadr deno) (wrap-transformer-input form))
+          (let-values (((expr renames) (transcribe-syntax-rules form (cadr deno))))
+            (values expr (prune-lhs-renames expr renames env)))))))
+
+(define prune-obsolete-renames
+  (lambda (expr renames env)
+    (cond ((pair? expr)
+           (let loop ((expr (flatten-begin expr env)) (defs '()))
+             (cond ((null? expr)
+                    (filter (lambda (a) (not (memq (car a) defs))) renames))
+                   ((and (pair? expr) (pair? (car expr)) (symbol? (caar expr)))
+                    (cond ((assq (caar expr) renames)
+                           => (lambda (a)
+                                (if (eq? denote-define (cdr a))
+                                    (let ((def (cadr (desugar-define (car expr)))))
+                                      (loop (cdr expr) (cons def defs)))
+                                    (loop (cdr expr) defs))))
+                          (else (loop (cdr expr) defs))))
+                   (else
+                    (loop (cdr expr) defs)))))
+          (else renames))))
+
+
+(define expand-macro-use
+  (lambda (form env deno)
+    (fresh-rename-count)
+    (current-macro-expression form)
+    (parameterize ((current-expansion-environment env) (current-transformer-environment (cddr deno)))
+      (let-values (((expr renames)
+          (if (procedure? (cadr deno))
+              ((cadr deno) (wrap-transformer-input form))
+              (transcribe-syntax-rules form (cadr deno)))))
+        (values expr (prune-obsolete-renames expr renames env))))))
 
 (define expand-initial-forms
   (lambda (form env)

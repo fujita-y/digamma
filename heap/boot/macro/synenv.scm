@@ -257,6 +257,11 @@
     (and (symbol? obj)
          (eq? (env-lookup env obj) denote-lambda))))
 
+(define denote-define?
+  (lambda (env obj)
+    (and (symbol? obj)
+         (eq? (env-lookup env obj) denote-define))))
+
 (define denote-begin?
   (lambda (env obj)
     (and (symbol? obj)
