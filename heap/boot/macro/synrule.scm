@@ -19,6 +19,7 @@
                        (let ((id (car lst)))
                          (loop (cdr lst) (acons id (rename-id id suffix) ans)))))))
 
+            (display "alias:") (pretty-print alias) (newline)
             (values (transcribe-template template ranks vars aliases #f)
                     (map (lambda (lst)
                            (cons (cdr lst) (env-lookup env (car lst))))

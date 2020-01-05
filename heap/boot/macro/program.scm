@@ -51,18 +51,6 @@
 
     (define initial-libenv #f)
 
-    (define internal-definition?
-      (lambda (lst)
-        (and (pair? lst)
-             (pair? (car lst))
-             (symbol? (caar lst))
-             (let ((deno (env-lookup env (caar lst))))
-               (or (macro? deno)
-                   (eq? denote-define deno)
-                   (eq? denote-define-syntax deno)
-                   (eq? denote-let-syntax deno)
-                   (eq? denote-letrec-syntax deno))))))
-
     (define macro-defs '())
 
     (define extend-env!

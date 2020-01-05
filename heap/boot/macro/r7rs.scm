@@ -130,18 +130,6 @@
 
     (define initial-libenv #f)
 
-    (define internal-definition?
-      (lambda (lst)
-        (and (pair? lst)
-             (pair? (car lst))
-             (symbol? (caar lst))
-             (let ((deno (env-lookup env (caar lst))))
-               (or (macro? deno)
-                   (eq? denote-define deno)
-                   (eq? denote-define-syntax deno)
-                   (eq? denote-let-syntax deno)
-                   (eq? denote-letrec-syntax deno))))))
-
     (define macro-defs '())
 
     (define extend-env!
@@ -176,10 +164,7 @@
                         (((_ (? symbol? org) clause) more ...)
                          (begin
                            (and (core-hashtable-contains? ht-imported-immutables org)
-                                (syntax-violation
-                                  'define-syntax
-                                  "attempt to modify immutable binding"
-                                  (car body)))
+                                (syntax-violation 'define-syntax "attempt to modify immutable binding" (car body)))
                            (let-values (((code . expr)
                                          (parameterize ((current-template-environment initial-libenv))
                                            (compile-macro (car body) clause env))))
@@ -195,10 +180,7 @@
                                        (extend-env! org (make-macro code env))
                                        (loop more defs (cons (list org 'template code) macros) (acons org new renames))))))))
                         (_
-                          (syntax-violation
-                            'define-syntax
-                            "expected symbol and single expression"
-                            (car body)))))
+                          (syntax-violation 'define-syntax "expected symbol and single expression" (car body)))))
                      ((eq? denote-define deno)
                       (let ((def (annotate (cdr (desugar-define (car body))) (car body))))
                         (and (core-hashtable-contains? ht-imported-immutables (car def))
