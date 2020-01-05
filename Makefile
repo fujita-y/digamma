@@ -126,9 +126,6 @@ check: all
 	@echo 'r5rs_pitfall.scm:'
 	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r5rs_pitfall.scm
 	@echo '----------------------------------------'
-	@echo 'syntax-rule-stress-test.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/syntax-rule-stress-test.scm
-	@echo '----------------------------------------'
 	@echo 'r6rs.scm:'
 	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs.scm
 	@echo '----------------------------------------'
@@ -139,7 +136,10 @@ check: all
 	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-more.scm
 	@echo '----------------------------------------'
 	@echo 'r7rs-test.scm:'
-	@./$(PROG) --r7rs --top-level-program --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
+	@./$(PROG) --r7rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
+	@echo '----------------------------------------'
+	@echo 'syntax-rule-stress-test.scm:'
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/syntax-rule-stress-test.scm
 	@echo '----------------------------------------'
 	@echo 'Passed all tests'
 	@rm -f ./test/tmp*

@@ -40,7 +40,7 @@
 ;; however (chibi test) provides nicer output, timings, and
 ;; approximate equivalence for floating point numbers.
 
-(test-begin "R7RS")
+#;(test-begin "R7RS")
 
 (test-begin "4.1 Primitive expression types")
 
@@ -2439,7 +2439,7 @@
 
 (test-end)
 
-(test-end)
+#;(test-end)
 
 (test-begin "6.14 System interface")
 
@@ -2478,4 +2478,4 @@
 
 (test-end)
 
-(test-end)
+#;(test-end)

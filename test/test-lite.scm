@@ -33,7 +33,11 @@
             (newline)
             (display "but got: ")
             (write res)
-            (newline)))))))
+            (newline))
+           (else
+             (section-pass-count-inc! (section-current))
+             (put-byte (current-output-port) #x0d)
+             (format #t "Passed ~a~!" (section-pass-count (section-current)))))))))
 
   (define-syntax test-assert
     (syntax-rules ()
@@ -54,7 +58,11 @@
             (newline)
             (display "but got: ")
             (write expr)
-            (newline)))))))
+            (newline))
+           (else
+             (section-pass-count-inc! (section-current))
+             (put-byte (current-output-port) #x0d)
+             (format #t "Passed ~a~!" (section-pass-count (section-current)))))))))
 
   (define-syntax test-error
     (syntax-rules ()
