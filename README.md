@@ -5,6 +5,10 @@ R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https:/
 * Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
 * See LICENSE file for terms and conditions of use.
 
+### Special note for MacOS users
+
+You may want try "export MACOSX_DEPLOYMENT_TARGET=10.14" while build if you got "Segmentation fault: 11 (stack_not_16_byte_aligned_error)" on execution. https://forums.developer.apple.com/thread/121887
+
 ### Run
 
 * To run R7RS script from project root, try following:
