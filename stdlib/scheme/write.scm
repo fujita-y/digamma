@@ -6,5 +6,4 @@
   (export display write-shared write write-simple)
   (begin
     (define write-shared write-with-shared-structure)
-    (define write-simple write)
-  ))
+    (define write-simple write)))

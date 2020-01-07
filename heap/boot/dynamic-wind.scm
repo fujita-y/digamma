@@ -10,11 +10,11 @@
     (in)
     (current-dynamic-wind-record (cons (cons in out) (current-dynamic-wind-record)))
     (call-with-values
-        body
-        (lambda ans
-          (current-dynamic-wind-record (cdr (current-dynamic-wind-record)))
-          (out)
-          (apply values ans)))))
+     body
+     (lambda ans
+       (current-dynamic-wind-record (cdr (current-dynamic-wind-record)))
+       (out)
+       (apply values ans)))))
 
 (define perform-dynamic-wind
   (lambda (new cont args)
@@ -24,7 +24,7 @@
         (let ((nx (length x)) (ny (length y)))
           (do ((x (if (> nx ny) (list-tail x (- nx ny)) x) (cdr x))
                (y (if (> ny nx) (list-tail y (- ny nx)) y) (cdr y)))
-              ((eq? x y) x)))))
+            ((eq? x y) x)))))
 
     (let ((tail (common-tail new (current-dynamic-wind-record))))
       (let loop ((rec (current-dynamic-wind-record)))

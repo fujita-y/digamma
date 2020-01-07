@@ -32,7 +32,7 @@
   (lambda (form lites)
     (and (eq? form '_) (not (memq '_ lites)))))
 
-(define collect-unique-ids ; exclude ellipsis-id
+(define collect-unique-macro-ids ; exclude ellipsis-id
   (lambda (expr)
     (let loop ((lst expr) (ans '()))
       (cond ((pair? lst)
@@ -169,7 +169,7 @@
 
 (define bind-null-ellipsis
   (lambda (pat lites vars)
-    (let loop ((lst (collect-unique-ids (car pat))) (vars vars))
+    (let loop ((lst (collect-unique-macro-ids (car pat))) (vars vars))
       (if (null? lst)
           vars
           (loop (cdr lst)

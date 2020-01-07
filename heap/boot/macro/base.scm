@@ -114,12 +114,12 @@
       (lambda (id)
         (or (core-hashtable-contains? immutable-primitives id)
             (memq id '(library define define-syntax
-                        quote lambda if set!
-                        cond case and or let let* letrec letrec*
-                        let-values let*-values
-                        begin quasiquote unquote unquote-splicing
-                        let-syntax letrec-syntax syntax-rules identifier-syntax
-                        assert else => ... _)))))
+                       quote lambda if set!
+                       cond case and or let let* letrec letrec*
+                       let-values let*-values
+                       begin quasiquote unquote unquote-splicing
+                       let-syntax letrec-syntax syntax-rules identifier-syntax
+                       assert else => ... _)))))
 
     (define let?
       (lambda (id)

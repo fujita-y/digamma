@@ -263,8 +263,8 @@
     (define vector-map
       (lambda (proc vec1 . vec2)
         (list->vector
-          (apply map proc (vector->list vec1)
-                 (map vector->list vec2)))))
+         (apply map proc (vector->list vec1)
+                (map vector->list vec2)))))
 
     (define string->utf8
       (lambda (str . options)
@@ -348,15 +348,15 @@
       (lambda (proc lst)
         (cond ((null? lst) (unspecified))
               (else
-                (proc (car lst))
-                (for-each-1 proc (cdr lst))))))
+               (proc (car lst))
+               (for-each-1 proc (cdr lst))))))
 
     (define for-each-n
       (lambda (proc lst)
         (cond ((null? lst) (unspecified))
               (else
-                (apply proc (car lst))
-                (for-each-n proc (cdr lst))))))
+               (apply proc (car lst))
+               (for-each-n proc (cdr lst))))))
 
     (define for-each
       (lambda (proc lst1 . lst2)
@@ -390,10 +390,10 @@
       (lambda args
         (let ((ans (make-bytevector (apply + (map bytevector-length args)))))
           (let loop ((args args) (p 0))
-              (or (null? args)
-                  (let ((n (bytevector-length (car args))))
-                    (r6rs:bytevector-copy! (car args) 0 ans p n)
-                    (loop (cdr args) (+ p n)))))
+            (or (null? args)
+                (let ((n (bytevector-length (car args))))
+                  (r6rs:bytevector-copy! (car args) 0 ans p n)
+                  (loop (cdr args) (+ p n)))))
           ans)))
 
     (define char-ready?
@@ -472,14 +472,14 @@
     (define open-output-bytevector
       (lambda ()
         (call-with-values
-          open-bytevector-output-port
-          (lambda (port proc) port))))
+         open-bytevector-output-port
+         (lambda (port proc) port))))
 
     (define open-output-string
       (lambda ()
         (call-with-values
-          open-string-output-port
-          (lambda (port proc) port))))
+         open-string-output-port
+         (lambda (port proc) port))))
 
     (define output-port-open?
       (lambda (port)
@@ -565,8 +565,8 @@
           (let loop ((at 0) (args args))
             (cond ((null? args) ans)
                   (else
-                    (vector-copy! ans at (car args))
-                    (loop (+ at (vector-length (car args))) (cdr args))))))))
+                   (vector-copy! ans at (car args))
+                   (loop (+ at (vector-length (car args))) (cdr args))))))))
 
     (define vector-copy!
       (lambda (to at from . options)
@@ -632,28 +632,28 @@
           ((_ (var ...) expr)
            (with-syntax (((i ...) (iota (length (syntax (var ...))))))
              (syntax
-               (begin
-                 (define temp (call-with-values (lambda () expr) vector))
-                 (define var (vector-ref temp i)) ...))))
+              (begin
+                (define temp (call-with-values (lambda () expr) vector))
+                (define var (vector-ref temp i)) ...))))
           ((_ (var ... . var2) expr)
            (with-syntax (((i ...) (iota (length (syntax (var ...))))) (n (length (syntax (var ...)))))
              (syntax
-               (begin
-                 (define temp (call-with-values (lambda () expr) list))
-                 (define var (list-ref temp i)) ...
-                 (define var2 (list-tail temp n)))))))))
+              (begin
+                (define temp (call-with-values (lambda () expr) list))
+                (define var (list-ref temp i)) ...
+                (define var2 (list-tail temp n)))))))))
 
     (define-syntax let-syntax
       (syntax-rules ()
         ((_ e1 e2 ...)
-        (r6rs:let-syntax e1
-          (let () e2 ...)))))
+         (r6rs:let-syntax e1
+                          (let () e2 ...)))))
 
     (define-syntax letrec-syntax
       (syntax-rules ()
         ((_ e1 e2 ...)
-        (r6rs:letrec-syntax e1
-          (let () e2 ...)))))
+         (r6rs:letrec-syntax e1
+                             (let () e2 ...)))))
 
     (define-syntax define-record-type
       (lambda (x)
@@ -666,7 +666,7 @@
           ((_ type (ctor _ ...)
               pred
               spec ...)
-          (with-syntax (((spec ...) (map parse #'(spec ...))))
-            #'(r6rs:define-record-type (type ctor pred)
-                (fields spec ...)))))))
-  ))
+           (with-syntax (((spec ...) (map parse #'(spec ...))))
+             #'(r6rs:define-record-type (type ctor pred)
+                                        (fields spec ...)))))))
+    ))

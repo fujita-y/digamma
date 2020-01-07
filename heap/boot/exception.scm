@@ -132,17 +132,17 @@
                           (make-message-condition message)))))))
 
 #;(define scheme-error
-  (lambda args
-    (format #t "~!")
-    (let ((port (current-error-port)) (proc (current-exception-handler)))
-      (cond (proc (raise (apply format args)))
-            (else
-             (format port "~&~%")
-             (apply format port args)
-             (format port "~%")
-             (display-backtrace)
-             (format port "~%[exit]~%")
-             (exit #f))))))
+    (lambda args
+      (format #t "~!")
+      (let ((port (current-error-port)) (proc (current-exception-handler)))
+        (cond (proc (raise (apply format args)))
+              (else
+               (format port "~&~%")
+               (apply format port args)
+               (format port "~%")
+               (display-backtrace)
+               (format port "~%[exit]~%")
+               (exit #f))))))
 
 (define scheme-error
   (lambda args

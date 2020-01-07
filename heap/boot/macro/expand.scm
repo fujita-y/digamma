@@ -55,23 +55,23 @@
               bindings))
         (syntax-violation (car form) "duplicate bindings" form))))
 
+(define collect-unique-ids
+  (lambda (lst)
+    (let loop ((obj lst) (acc '()))
+      (cond ((pair? obj)
+             (loop (cdr obj)
+                   (loop (car obj) acc)))
+            ((symbol? obj)
+             (cond ((memq obj acc) acc)
+                   (else (cons obj acc))))
+            (else acc)))))
+
 (define check-internal-def-contract-violation
   (lambda (bindings lst)
 
-    (define filter-unique-ids
-      (lambda (lst)
-        (let loop ((obj lst) (acc '()))
-          (cond ((pair? obj)
-                 (loop (cdr obj)
-                       (loop (car obj) acc)))
-                ((symbol? obj)
-                 (cond ((memq obj acc) acc)
-                       (else (cons obj acc))))
-                (else acc)))))
-
     (define collect-ids
       (lambda (lst)
-        (filter-unique-ids
+        (collect-unique-ids
          (let loop ((obj lst))
            (cond ((symbol? obj) obj)
                  ((and (pair? obj)
@@ -85,20 +85,9 @@
 (define check-rec-contract-violation
   (lambda (vars lst)
 
-    (define filter-unique-ids
-      (lambda (lst)
-        (let loop ((obj lst) (acc '()))
-          (cond ((pair? obj)
-                 (loop (cdr obj)
-                       (loop (car obj) acc)))
-                ((symbol? obj)
-                 (cond ((memq obj acc) acc)
-                       (else (cons obj acc))))
-                (else acc)))))
-
     (define collect-ids
       (lambda (lst)
-        (filter-unique-ids
+        (collect-unique-ids
          (let loop ((obj lst))
            (cond ((symbol? obj) obj)
                  ((and (pair? obj)
@@ -203,32 +192,32 @@
       (((? syntax-rules? _)) (syntax-violation 'syntax-rules "expected literals and rules" transformer))
       (((? syntax-rules? _) clauses ...)
        (begin
-        (let* ((ellipsis (and (pair? clauses) (symbol? (car clauses)) (car clauses)))
-               (lites (if ellipsis (cadr clauses) (car clauses)))
-               (rules (if ellipsis (cddr clauses) (cdr clauses))))
-          (or (and (list? lites) (every1 symbol? lites))
-              (syntax-violation 'syntax-rules "invalid literals" transformer lites))
-          (or (unique-id-list? lites)
-              (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
-          (or (ellipsis/underscore-in-literal)
-              (and (memq '_ lites)
-                   (syntax-violation 'syntax-rules "_ in literals" transformer lites)))
-          (let ((ellipsis (or ellipsis '...)))
-            (and (memq ellipsis lites)
-                 (if (ellipsis/underscore-in-literal)
-                     (set! ellipsis #f)
-                     (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites)))
-            (for-each (lambda (rule)
-                        (destructuring-match rule
-                          ((((? symbol? _) . _) _) #t)
-                          (((_ . _) _)
+         (let* ((ellipsis (and (pair? clauses) (symbol? (car clauses)) (car clauses)))
+                (lites (if ellipsis (cadr clauses) (car clauses)))
+                (rules (if ellipsis (cddr clauses) (cdr clauses))))
+           (or (and (list? lites) (every1 symbol? lites))
+               (syntax-violation 'syntax-rules "invalid literals" transformer lites))
+           (or (unique-id-list? lites)
+               (syntax-violation 'syntax-rules "duplicate literals" transformer lites))
+           (or (ellipsis/underscore-in-literal)
+               (and (memq '_ lites)
+                    (syntax-violation 'syntax-rules "_ in literals" transformer lites)))
+           (let ((ellipsis (or ellipsis '...)))
+             (and (memq ellipsis lites)
+                  (if (ellipsis/underscore-in-literal)
+                      (set! ellipsis #f)
+                      (syntax-violation 'syntax-rules "ellipsis in literals" transformer lites)))
+             (for-each (lambda (rule)
+                         (destructuring-match rule
+                           ((((? symbol? _) . _) _) #t)
+                           (((_ . _) _)
                             (syntax-violation 'syntax-rules "expected identifer for first subform of pattern" transformer rule))
-                          ((_ _)
+                           ((_ _)
                             (syntax-violation 'syntax-rules "expected list for pattern" transformer rule))
-                          (_
+                           (_
                             (syntax-violation 'syntax-rules "expected (pattern template) for each rule" transformer rule))))
-                      rules)
-            (compile-syntax-rules transformer ellipsis lites rules env)))))
+                       rules)
+             (compile-syntax-rules transformer ellipsis lites rules env)))))
       (_ (compile-transformer transformer env)))))
 
 (define expand-let-syntax-bindings
@@ -294,9 +283,9 @@
     (current-macro-expression form)
     (parameterize ((current-expansion-environment env) (current-transformer-environment (cddr deno)))
       (let-values (((expr renames)
-          (if (procedure? (cadr deno))
-              ((cadr deno) (wrap-transformer-input form))
-              (transcribe-syntax-rules form (cadr deno)))))
+                    (if (procedure? (cadr deno))
+                        ((cadr deno) (wrap-transformer-input form))
+                        (transcribe-syntax-rules form (cadr deno)))))
         (values expr (prune-renames expr renames))))))
 
 (define expand-initial-forms

@@ -70,10 +70,10 @@
       (define indent-type1?
         (lambda (id)
           (memq id '(library define define-syntax define-macro define-inline define-constant
-                      syntax-rules syntax-case
-                      with-syntax lambda let-syntax letrec-syntax
-                      let letrec let* letrec letrec* let-values let*-values
-                      destructuring-match parameterize))))
+                     syntax-rules syntax-case
+                     with-syntax lambda let-syntax letrec-syntax
+                     let letrec let* letrec letrec* let-values let*-values
+                     destructuring-match parameterize))))
 
       (define indent-type2?
         (lambda (id)

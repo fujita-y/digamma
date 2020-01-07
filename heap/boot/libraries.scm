@@ -126,10 +126,10 @@
 
   (setup-core-primitive-macros
    '(core primitives) '( do
-                         syntax
-                         syntax-case
-                         include
-                         include-ci))
+                            syntax
+                          syntax-case
+                          include
+                          include-ci))
 
   (setup-core-primitive-procs
    '(core primitives) '(; eval
@@ -433,12 +433,12 @@
                         usleep
                         scheme-error
                         architecture-feature
-;;                      load-shared-object
-;;                      lookup-shared-object
-;;                      call-shared-object
-;;                      make-callback-trampoline
-;;                      shared-object-errno
-;;                      shared-object-win32-lasterror
+                        ;; load-shared-object
+                        ;; lookup-shared-object
+                        ;; call-shared-object
+                        ;; make-callback-trampoline
+                        ;; shared-object-errno
+                        ;; shared-object-win32-lasterror
                         bytevector-c-short-ref bytevector-c-unsigned-short-ref bytevector-c-short-set!
                         bytevector-c-int-ref bytevector-c-unsigned-int-ref bytevector-c-int-set!
                         bytevector-c-long-ref bytevector-c-unsigned-long-ref bytevector-c-long-set!
@@ -555,7 +555,7 @@
                         create-hard-link
                         rename-file
                         change-file-mode
-;;                      win32-error->string
+                        ;; win32-error->string
                         make-cmwc-random-state
                         cmwc-random-u32
                         cmwc-random-real

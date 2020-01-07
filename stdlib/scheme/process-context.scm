@@ -17,5 +17,4 @@
     (define exit
       (lambda options
         (let-optionals options ((status 0))
-          ((continuation-to-exit) status))))
-  ))
+          ((continuation-to-exit) status))))))
