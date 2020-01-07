@@ -3,7 +3,7 @@
 
 (define collect-rename-ids
   (lambda (template ranks)
-    (let ((ids (collect-unique-ids template)))
+    (let ((ids (collect-unique-macro-ids template)))
       (let loop ((lst ids))
         (if (null? lst)
             lst
@@ -28,7 +28,7 @@
           (cond ((symbol? lst)
                  (>= (rank-of lst ranks) depth))
                 ((ellipsis-quote? lst)
-                 (any1 (lambda (id) (>= (rank-of id ranks) depth)) (collect-unique-ids lst)))
+                 (any1 (lambda (id) (>= (rank-of id ranks) depth)) (collect-unique-macro-ids lst)))
                 ((ellipsis-splicing-pair? lst)
                  (let-values (((body tail len) (parse-ellipsis-splicing lst)))
                    (or (loop body (+ depth 1))
@@ -110,7 +110,7 @@
 
 (define collect-ellipsis-vars
   (lambda (tmpl ranks depth vars)
-    (let ((ids (collect-unique-ids tmpl)))
+    (let ((ids (collect-unique-macro-ids tmpl)))
       (filter values
               (map (lambda (slot)
                      (and (memq (car slot) ids)

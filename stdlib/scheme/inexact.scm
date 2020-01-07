@@ -19,11 +19,11 @@
         (if (real? z)
             (r6rs:finite? z)
             (and (r6rs:finite? (real-part z))
-                (r6rs:finite? (imag-part z))))))
+                 (r6rs:finite? (imag-part z))))))
     (define nan?
       (lambda (z)
         (if (real? z)
             (r6rs:nan? z)
             (or (r6rs:nan? (real-part z))
                 (r6rs:nan? (imag-part z))))))
-  ))
+    ))

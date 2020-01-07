@@ -36,51 +36,51 @@
   (set-top-level-value! '.append append)
   (set-top-level-value! '.apply apply))
 
-  ;; procedures used in destruction-match generating code
-  (begin
-    (define drop-last-cdr
-      (lambda (lst)
-        (cond ((null? lst) '())
-              (else
-              (let loop ((lst lst))
-                (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
-                      (else '())))))))
-    (define drop-last-pair
-      (lambda (lst)
-        (cond ((null? lst) '())
-              (else
-              (let loop ((lst lst))
-                (cond ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst))))
-                      (else '())))))))
-    (define last-pair
-      (lambda (lst)
-        (cond ((null? lst) '())
-              (else
-               (let loop ((lst lst))
-                 (cond ((pair? (cdr lst)) (loop (cdr lst)))
-                       (else lst)))))))
-    (define last-cdr
-      (lambda (lst)
-        (cond ((pair? lst)
-               (let loop ((lst lst))
-                 (cond ((pair? (cdr lst)) (loop (cdr lst)))
-                       (else (cdr lst)))))
-              (else lst))))
-    (define count-pair
-      (lambda (lst)
-        (let loop ((lst lst) (n 0))
-          (cond ((pair? lst) (loop (cdr lst) (+ n 1)))
-                 (else n)))))
-    (define last-n-pair
-      (lambda (n lst)
-        (let ((m (count-pair lst)))
-          (cond ((< m n) '())
-                 (else (list-tail lst (- m n)))))))
-    (define drop-last-n-pair
-      (lambda (n lst)
-        (cond ((null? lst) '())
-              (else
-               (let loop ((lst lst) (m (- (count-pair lst) n)))
-                 (cond ((<= m 0) '())
-                        ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst) (- m 1))))
-                       (else '()))))))))
+;; procedures used in destruction-match generating code
+(begin
+  (define drop-last-cdr
+    (lambda (lst)
+      (cond ((null? lst) '())
+            (else
+             (let loop ((lst lst))
+               (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
+                     (else '())))))))
+  (define drop-last-pair
+    (lambda (lst)
+      (cond ((null? lst) '())
+            (else
+             (let loop ((lst lst))
+               (cond ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst))))
+                     (else '())))))))
+  (define last-pair
+    (lambda (lst)
+      (cond ((null? lst) '())
+            (else
+             (let loop ((lst lst))
+               (cond ((pair? (cdr lst)) (loop (cdr lst)))
+                     (else lst)))))))
+  (define last-cdr
+    (lambda (lst)
+      (cond ((pair? lst)
+             (let loop ((lst lst))
+               (cond ((pair? (cdr lst)) (loop (cdr lst)))
+                     (else (cdr lst)))))
+            (else lst))))
+  (define count-pair
+    (lambda (lst)
+      (let loop ((lst lst) (n 0))
+        (cond ((pair? lst) (loop (cdr lst) (+ n 1)))
+              (else n)))))
+  (define last-n-pair
+    (lambda (n lst)
+      (let ((m (count-pair lst)))
+        (cond ((< m n) '())
+              (else (list-tail lst (- m n)))))))
+  (define drop-last-n-pair
+    (lambda (n lst)
+      (cond ((null? lst) '())
+            (else
+             (let loop ((lst lst) (m (- (count-pair lst) n)))
+               (cond ((<= m 0) '())
+                     ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst) (- m 1))))
+                     (else '()))))))))

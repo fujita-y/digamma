@@ -15,5 +15,4 @@
           with-output-to-file)
   (begin
     (define open-binary-input-file open-file-input-port)
-    (define open-binary-output-file open-file-output-port)
-  ))
+    (define open-binary-output-file open-file-output-port)))

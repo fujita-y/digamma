@@ -117,7 +117,7 @@
     (let ((vars (formals->list formals)))
       (let ((cte (cte-extend-iloc vars cte)))
         `(,(append (make-formals-operand vars formals) comment)
-           ,@(compile-expression-seq body cte #f #t))))))
+          ,@(compile-expression-seq body cte #f #t))))))
 
 (define ht-special-subr-expression
   (let ((ht (make-core-hashtable)))
@@ -384,8 +384,8 @@
            (collect-local-closure (cadr form))
            (let ((vars (map car (cadr form))))
              (let ((code `(,@(compile-argument-each (map cadr (cadr form)) cte)
-                             (extend . ,(length vars))
-                             ,@(compile-expression-seq (cddr form) (cte-extend-iloc vars cte) #f #t))))
+                           (extend . ,(length vars))
+                           ,@(compile-expression-seq (cddr form) (cte-extend-iloc vars cte) #f #t))))
                (if tail code (list (cons 'call code)))))))))
 
 (define compile-expression-letrec*
@@ -405,9 +405,9 @@
                             (if tail code (list (cons 'call code)))))))
                      (else
                       (let ((code `(,(cons 'extend.unbound 1)
-                                     ,@(compile-argument (cadr binding) cte)
-                                     ,(cons 'enclose 1)
-                                     ,@(compile-expression-seq (cddr form) cte #f #t))))
+                                    ,@(compile-argument (cadr binding) cte)
+                                    ,(cons 'enclose 1)
+                                    ,@(compile-expression-seq (cddr form) cte #f #t))))
                         (if tail code (list (cons 'call code)))))))))
           (else
            (let ((bindings (cadr form)))

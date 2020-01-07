@@ -100,11 +100,11 @@
   (lambda (code)
     (let ((thunk (lambda (x)
                    (call-with-values
-                     (lambda () (code x))
-                     (lambda (obj . env)
-                       (if (null? env)
-                           (.flatten-syntax obj)
-                           (values obj (car env))))))))
+                    (lambda () (code x))
+                    (lambda (obj . env)
+                      (if (null? env)
+                          (.flatten-syntax obj)
+                          (values obj (car env))))))))
       (cond ((procedure? code)
              (let-values (((nargs opt) (closure-arity code)))
                (and nargs opt (= nargs 1) (= opt 0) thunk)))
@@ -179,7 +179,7 @@
     (destructuring-match form
       ((_ tmpl)
        (let ((template (unrename-syntax tmpl env)) (patvar (expand-form '.vars env)))
-         (let ((ids (collect-unique-ids template)))
+         (let ((ids (collect-unique-macro-ids template)))
            (let ((ranks
                   (filter values
                           (map (lambda (id)

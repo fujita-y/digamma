@@ -7,5 +7,4 @@
   (begin
     (define current-jiffy microsecond)
     (define jiffies-per-second (lambda () 1000000))
-    (define current-second (lambda () (/ (microsecond) 1000000.0)))
-  ))
+    (define current-second (lambda () (/ (microsecond) 1000000.0)))))
