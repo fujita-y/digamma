@@ -126,10 +126,10 @@
 
   (setup-core-primitive-macros
    '(core primitives) '( do
-                            syntax
-                          syntax-case
-                          include
-                          include-ci))
+                         syntax
+                         syntax-case
+                         include
+                         include-ci))
 
   (setup-core-primitive-procs
    '(core primitives) '(; eval
