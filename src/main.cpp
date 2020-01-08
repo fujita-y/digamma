@@ -1,8 +1,5 @@
-/*
-    Ypsilon Scheme System
-    Copyright (c) 2004-2009 Y.FUJITA / LittleWing Company Limited.
-    See license.txt for terms and conditions of use
-*/
+// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
 
 #include "core.h"
 #include "vm.h"
@@ -16,9 +13,6 @@ char* const* main_command_line_argv;
 #else
   __thread VM* s_current_vm;
 #endif
-
-// --heap-limit=32   -> 32MB (default)
-// --heap-limit=1024 -> 1GB
 
 static int opt_heap_limit(int argc, char* const argv[])
 {

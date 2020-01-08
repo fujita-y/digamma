@@ -1,8 +1,5 @@
-/*
-    Ypsilon Scheme System
-    Copyright (c) 2004-2009 Y.FUJITA / LittleWing Company Limited.
-    See license.txt for terms and conditions of use
-*/
+// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
 
 #ifndef BAG_H_INCLUDED
 #define BAG_H_INCLUDED

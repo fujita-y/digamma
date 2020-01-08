@@ -1,8 +1,6 @@
-/*
-    Ypsilon Scheme System
-    Copyright (c) 2004-2016 Y.FUJITA / LittleWing Company Limited.
-    See license.txt for terms and conditions of use
-*/
+// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
+
 /*
 
  * Typical implementation using 'ungetc' may return part of replacement character to subsequent get-u8 operation.

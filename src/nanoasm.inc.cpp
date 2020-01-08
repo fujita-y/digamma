@@ -1,8 +1,5 @@
-/*
-    Ypsilon Scheme System
-    Copyright (c) 2004-2009 Y.FUJITA / LittleWing Company Limited.
-    See license.txt for terms and conditions of use
-*/
+// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
 
 void nanoasm_t::add(const reg8_t& dst, const reg8_t& src) {
     DB(0x00); MOD(src, dst);
@@ -3685,7 +3682,7 @@ void nanoasm_t::mov(const reg32_t& dst, const mem32_t& src) {
         DB(0xA1); DD(src.m_disp);
     } else {
         DB(0x8B); MOD(dst, src);
-    }    
+    }
 #endif
 }
 void nanoasm_t::mov(const reg32_t& dst, const mem32si_t& src) {
@@ -3697,7 +3694,7 @@ void nanoasm_t::mov(const reg32_t& dst, const mem32si_t& src) {
         DB(0xA1); DD(src.m_disp);
     } else {
         DB(0x8B); MOD(dst, src);
-    }    
+    }
 #endif
 }
 void nanoasm_t::mov(const reg64_t& dst, const mem64_t& src) {

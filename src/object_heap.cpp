@@ -1,14 +1,11 @@
-/*
-    Ypsilon Scheme System
-    Copyright (c) 2004-2009 Y.FUJITA / LittleWing Company Limited.
-    See license.txt for terms and conditions of use
-*/
+// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
 
 /*
-    Reference:
-    Malloc(3) revisited: Paul-Henning Kamp
-    The Slab Allocator: An Object-Caching Kernel Memory Allocator - Jeff Bonwick - 1994 USENIX
-    Magazines and Vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources - Jeff Bonwick, Jonathan Adams - 2001 USENIX
+  Reference:
+  Malloc(3) revisited: Paul-Henning Kamp
+  The Slab Allocator: An Object-Caching Kernel Memory Allocator - Jeff Bonwick - 1994 USENIX
+  Magazines and Vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources - Jeff Bonwick, Jonathan Adams - 2001 USENIX
 */
 
 #include "core.h"

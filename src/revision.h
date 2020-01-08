@@ -1,1 +1,1 @@
-#define PROGRAM_REVISION 1
+#define PROGRAM_REVISION 2
