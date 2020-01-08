@@ -257,12 +257,13 @@
           (define #,(constructor-name stx struct-name)
             (lambda ()
               (make-bytevector #,struct-size))))))
-
-  #;(define make-constructor
+  #|
+  (define make-constructor
     (lambda (stx struct-name struct-size)
       #`(define-syntax #,(constructor-name stx struct-name)
           (syntax-rules ()
             ((_) (make-bytevector #,struct-size))))))
+  |#
 
   (define make-accessor/mutator
     (lambda (stx struct-name field-name index accessor mutator)
@@ -518,7 +519,7 @@
     (syntax-rules ()
       ((_ var type)
        (make-bytevector-mapping var (c-sizeof type)))))
-  
+
   (define-syntax define-c-enum
     (lambda (x)
       (syntax-case x ()

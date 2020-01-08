@@ -76,7 +76,7 @@
            (or (eq? (tuple-ref env 0) 'type:eval-environment)
                (assertion-violation 'eval (format "expected environment, but got ~r, as argument 2" env)))
            (interpret `(begin
-                         (library (.R6RS-EVAL)
+                         (library (.EVAL)
                                   (export)
                                   (import (rename (only (core primitives)
                                                         set-top-level-value!
@@ -84,10 +84,10 @@
                                                   (set-top-level-value! .SET-TOP-LEVEL-VALUE!)
                                                   (string->symbol .STRING->SYMBOL))
                                           ,@(tuple-ref env 1))
-                                  (.SET-TOP-LEVEL-VALUE! (.STRING->SYMBOL ".R6RS-EVAL-RESULT") ,expr))
-                         (let ((result .R6RS-EVAL-RESULT))
-                           (.set-top-level-value! '.R6RS-EVAL-RESULT .&UNDEF)
-                           (.unintern-scheme-library ',(generate-library-id '(.R6RS-EVAL)))
+                                  (.SET-TOP-LEVEL-VALUE! (.STRING->SYMBOL ".EVAL-RESULT") ,expr))
+                         (let ((result .EVAL-RESULT))
+                           (.set-top-level-value! '.EVAL-RESULT .&UNDEF)
+                           (.unintern-scheme-library ',(generate-library-id '(.EVAL)))
                            result)))))))
 
 (define expand-path
@@ -422,6 +422,16 @@
                        (run-vmi (cons '(1 . 0) form))
                        (loop)))))))))))
 
+(define auto-compile-cache-delete-files
+  (lambda (cache-lst)
+    (for-each (lambda (cache-name)
+                (let* ((cache-path (string-append (auto-compile-cache) "/" cache-name))
+                      (timestamp-path (string-append cache-path ".time")))
+                  (and (file-exists? cache-path) (delete-file cache-path))
+                  (and (file-exists? timestamp-path) (delete-file timestamp-path))
+                  (and (auto-compile-verbose) (format #t "~&;; clean ~s~%" cache-path))))
+              cache-lst)))
+
 (define auto-compile-cache-clean
   (lambda ()
     (cond ((auto-compile-cache)
@@ -430,13 +440,7 @@
                                            (let ((p (string-contains s ".cache")))
                                              (and p (= (string-contains s ".cache") (- (string-length s) 6)))))
                                          (directory-list path))))
-                  (for-each (lambda (cache-name)
-                              (let* ((cache-path (string-append (auto-compile-cache) "/" cache-name))
-                                     (timestamp-path (string-append cache-path ".time")))
-                                (and (file-exists? cache-path) (delete-file cache-path))
-                                (and (file-exists? timestamp-path) (delete-file timestamp-path))
-                                (and (auto-compile-verbose) (format #t "~&;; clean ~s~%" cache-path))))
-                            cache-lst)))))))
+                  (auto-compile-cache-delete-files cache-lst)))))))
 
 (define auto-compile-cache-update
   (lambda ()
@@ -445,13 +449,7 @@
       (lambda (cache-lst)
         (and (auto-compile-verbose)
              (format (current-error-port) "~&;; reset ~s~%" (auto-compile-cache)))
-        (for-each (lambda (cache-name)
-                    (let* ((cache-path (string-append (auto-compile-cache) "/" cache-name))
-                           (timestamp-path (string-append cache-path ".time")))
-                      (and (file-exists? cache-path) (delete-file cache-path))
-                      (and (file-exists? timestamp-path) (delete-file timestamp-path))
-                      (and (auto-compile-verbose) (format #t "~&;; clean ~s~%" cache-path))))
-                  cache-lst)))
+        (auto-compile-cache-delete-files cache-lst)))
 
     (cond ((auto-compile-cache)
            => (lambda (path)
