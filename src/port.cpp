@@ -50,308 +50,85 @@ static void throw_io_error(int operation, const char* message)
     throw io_exception_t(operation, message);
 }
 
-#if _MSC_VER
-
-    #define S_IRUSR         _S_IREAD
-    #define S_IWUSR         _S_IWRITE
-
-    static fd_t io_open(const char* path, int oflag, int pmode)
-    {
-        wchar_t ucs2[MAX_PATH];
-        if (win32path(path, ucs2, array_sizeof(ucs2))) {
-            int access = GENERIC_READ;
-            switch (oflag & (O_RDWR | O_RDONLY | O_WRONLY)) {
-                case O_RDONLY:
-                    access = GENERIC_READ;
-                    break;
-                case O_WRONLY:
-                    access = GENERIC_WRITE;
-                    break;
-                case O_RDWR:
-                    access = GENERIC_READ | GENERIC_WRITE;
-                    break;
-            }
-            int create = OPEN_EXISTING;
-            switch (oflag & (O_CREAT | O_TRUNC | O_EXCL)) {
-                case O_CREAT:
-                    create = OPEN_ALWAYS;
-                    break;
-                case O_CREAT | O_TRUNC:
-                    create = CREATE_ALWAYS;
-                    break;
-                case O_EXCL:
-                    create = OPEN_EXISTING;
-                    break;
-                case O_CREAT | O_EXCL:
-                case O_CREAT | O_EXCL | O_TRUNC:
-                    create = CREATE_NEW;
-                    break;
-                case O_TRUNC:
-                case O_TRUNC | O_EXCL:
-                    create = TRUNCATE_EXISTING;
-                    break;
-            }
-            HANDLE fd = CreateFileW(ucs2,
-                                   access,
-                                   FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                   NULL,
-                                   create,
-                                   FILE_ATTRIBUTE_NORMAL,
-                                   NULL);
-            if (fd == INVALID_HANDLE_VALUE) {
-                _dosmaperr(GetLastError());
-                return INVALID_FD;
-            }
-            return fd;
-        }
-        errno = ENOENT;
-        return INVALID_FD;
-    }
-
-    static int io_close(fd_t fd)
-    {
-        if (CloseHandle(fd)) return 0;
-        _dosmaperr(GetLastError());
-        return -1;
-    }
-
-    static int io_pread(fd_t fd, void* buf, size_t nbytes, off64_t offset)
-    {
-        DWORD count = 0;
-        OVERLAPPED ov;
-        ov.Offset = offset & 0xffffffff;
-        ov.OffsetHigh = offset >> 32;
-        ov.hEvent = NULL;
-        if (ReadFile(fd, buf, nbytes, &count, &ov) == 0) {
-            DWORD err = GetLastError();
-            if (err == ERROR_HANDLE_EOF) return 0;
-            if (err == ERROR_BROKEN_PIPE) return 0;
-            if (err == ERROR_ACCESS_DENIED) errno = EBADF;
-            else _dosmaperr(err);
-            return -1;
-        }
-        return count;
-    }
-
-    static int io_pwrite(fd_t fd, void* buf, size_t nbytes, off64_t offset)
-    {
-        DWORD count = 0;
-        OVERLAPPED ov;
-        ov.Offset = offset & 0xffffffff;
-        ov.OffsetHigh = offset >> 32;
-        ov.hEvent = NULL;
-        if (WriteFile(fd, buf, nbytes, &count, &ov) == 0) {
-            DWORD err = GetLastError();
-            if (err == ERROR_ACCESS_DENIED) errno = EBADF;
-            else _dosmaperr(err);
-            return -1;
-        }
-        if (count == 0) {
-            errno = ENOSPC;
-            return -1;
-        }
-        return count;
-    }
-
-    static int io_read(fd_t fd, void* buf, size_t nbytes)
-    {
-        DWORD count = 0;
-        if (ReadFile(fd, buf, nbytes, &count, NULL) == 0) {
-            DWORD err = GetLastError();
-            if (err == ERROR_HANDLE_EOF) return 0;
-            if (err == ERROR_BROKEN_PIPE) return 0;
-            if (err == ERROR_ACCESS_DENIED) errno = EBADF;
-            else _dosmaperr(err);
-            return -1;
-        }
-        return count;
-    }
-
-    static int io_write(fd_t fd, void* buf, size_t nbytes)
-    {
-        if (nbytes == 0) return 0;
-        DWORD count = 0;
-        if (WriteFile(fd, buf, nbytes, &count, NULL) == 0) {
-            DWORD err = GetLastError();
-            if (err == ERROR_ACCESS_DENIED) errno = EBADF;
-            else _dosmaperr(err);
-            return -1;
-        }
-        if (count == 0) {
-            errno = ENOSPC;
-            return -1;
-        }
-        return count;
-    }
-
-    static off64_t io_lseek64(fd_t fd, off64_t offset, int origin)
-    {
-        LARGE_INTEGER in;
-        in.QuadPart = offset;
-        LARGE_INTEGER out;
-        int method;
-        switch (origin) {
-        case SEEK_SET: method = FILE_BEGIN; break;
-        case SEEK_CUR: method = FILE_CURRENT; break;
-        case SEEK_END: method = FILE_END; break;
-        default:
-            fatal("%s:%u wrong origin", __FILE__, __LINE__);
-        }
-        if (SetFilePointerEx(fd, in, &out, method)) return out.QuadPart;
-        _dosmaperr(GetLastError());
-        return -1;
-    }
-
-    static fd_t io_mkstemp(char *tmpl)
-    {
-        char pathBuf[MAX_PATH];
-        int retval;
-        retval = GetTempPathA(sizeof(pathBuf), pathBuf);
-        if (retval == 0) {
-            _dosmaperr(GetLastError());
-            return INVALID_FD;
-        }
-        char nameBuf[MAX_PATH + 64];
-        retval = GetTempFileNameA(pathBuf, "tmp", 0, nameBuf);
-        if (retval == 0) {
-            _dosmaperr(GetLastError());
-            return INVALID_FD;
-        }
-        HANDLE fd = CreateFileA(nameBuf,
-                            GENERIC_READ | GENERIC_WRITE,
-                            FILE_SHARE_READ | FILE_SHARE_WRITE,
-                            NULL,
-                            CREATE_ALWAYS,
-                            FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
-                            NULL);
-        if (fd == INVALID_HANDLE_VALUE) {
-            _dosmaperr(GetLastError());
-            return INVALID_FD;
-        }
-        return fd;
-    }
-
-    static int io_stat_mode(const char* path)
-    {
-        wchar_t ucs2[MAX_PATH];
-        if (win32path(path, ucs2, array_sizeof(ucs2))) {
-            HANDLE fd = CreateFileW(ucs2, 0, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (fd != INVALID_HANDLE_VALUE) {
-                DWORD type = GetFileType(fd);
-                CloseHandle(fd);
-                switch (type) {
-                    case FILE_TYPE_CHAR: return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
-                    case FILE_TYPE_PIPE: return SCM_PORT_SUBTYPE_FIFO;
-                }
-            }
-            return SCM_PORT_SUBTYPE_NONE;
-        }
-        return SCM_PORT_SUBTYPE_NONE;
-    }
-
-    static int io_fstat_mode(fd_t fd)
-    {
-        switch (GetFileType(fd)) {
-            case FILE_TYPE_CHAR: return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
-            case FILE_TYPE_PIPE: return SCM_PORT_SUBTYPE_FIFO;
-        }
-        return SCM_PORT_SUBTYPE_NONE;
-    }
-
-    static int io_fstat_size(fd_t fd, off64_t* size)
-    {
-        LARGE_INTEGER fileSize;
-        if (GetFileSizeEx(fd, &fileSize)) {
-            *size = fileSize.QuadPart;
-            return 0;
-        }
-        _dosmaperr(GetLastError());
-        return -1;
-    }
-
-#else
-
-    static inline int io_open(const char* path, int oflag, int pmode)
-    {
-  #if USE_CLOEXEC
-    #if defined(O_CLOEXEC)
-        return open(path, oflag | O_CLOEXEC, pmode);
-    #else
-        int fd = open(path, oflag, pmode);
-        if (fd >= 0) fcntl(fd, F_SETFD, FD_CLOEXEC);
-        return fd;
-    #endif
+static inline int io_open(const char* path, int oflag, int pmode)
+{
+#if USE_CLOEXEC
+  #if defined(O_CLOEXEC)
+    return open(path, oflag | O_CLOEXEC, pmode);
   #else
-        return open(path, oflag, pmode);
+    int fd = open(path, oflag, pmode);
+    if (fd >= 0) fcntl(fd, F_SETFD, FD_CLOEXEC);
+    return fd;
   #endif
-    }
-
-    static inline int io_close(fd_t fd)
-    {
-        return close(fd);
-    }
-
-    static inline int io_read(fd_t fd, void* buf, size_t nbytes)
-    {
-        return read(fd, buf, nbytes);
-    }
-
-    static inline int io_write(fd_t fd, void* buf, size_t nbytes)
-    {
-        return write(fd, buf, nbytes);
-    }
-
-    static inline int io_pread(fd_t fd, void* buf, size_t nbytes, off64_t offset)
-    {
-        return pread(fd, buf, nbytes, offset);
-    }
-
-    static inline int io_pwrite(fd_t fd, void* buf, size_t nbytes, off64_t offset)
-    {
-        return pwrite(fd, buf, nbytes, offset);
-    }
-
-    static inline off64_t io_lseek64(fd_t fd, off64_t offset, int origin)
-    {
-        return lseek(fd, offset, origin);
-    }
-
-    static inline fd_t io_mkstemp(char *tmpl)
-    {
-        return mkstemp(tmpl);
-    }
-
-    static int io_stat_mode(const char* path)
-    {
-        struct stat st;
-        if (stat(path, &st) == 0) {
-            if (S_ISCHR(st.st_mode)) return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
-            if (S_ISFIFO(st.st_mode)) return SCM_PORT_SUBTYPE_FIFO;
-        }
-        return SCM_PORT_SUBTYPE_NONE;
-    }
-
-    static int io_fstat_mode(fd_t fd)
-    {
-        struct stat st;
-        if (fstat(fd, &st) == 0) {
-            if (S_ISCHR(st.st_mode)) return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
-            if (S_ISFIFO(st.st_mode)) return SCM_PORT_SUBTYPE_FIFO;
-        }
-        return SCM_PORT_SUBTYPE_NONE;
-    }
-
-    static int io_fstat_size(fd_t fd, off64_t* size)
-    {
-        struct stat st;
-        if (fstat(fd, &st) == 0) {
-            *size = st.st_size;
-            return 0;
-        }
-        return -1;
-    }
-
+#else
+    return open(path, oflag, pmode);
 #endif
+}
+
+static inline int io_close(fd_t fd)
+{
+    return close(fd);
+}
+
+static inline int io_read(fd_t fd, void* buf, size_t nbytes)
+{
+    return read(fd, buf, nbytes);
+}
+
+static inline int io_write(fd_t fd, void* buf, size_t nbytes)
+{
+    return write(fd, buf, nbytes);
+}
+
+static inline int io_pread(fd_t fd, void* buf, size_t nbytes, off64_t offset)
+{
+    return pread(fd, buf, nbytes, offset);
+}
+
+static inline int io_pwrite(fd_t fd, void* buf, size_t nbytes, off64_t offset)
+{
+    return pwrite(fd, buf, nbytes, offset);
+}
+
+static inline off64_t io_lseek64(fd_t fd, off64_t offset, int origin)
+{
+    return lseek(fd, offset, origin);
+}
+
+static inline fd_t io_mkstemp(char *tmpl)
+{
+    return mkstemp(tmpl);
+}
+
+static int io_stat_mode(const char* path)
+{
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISCHR(st.st_mode)) return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
+        if (S_ISFIFO(st.st_mode)) return SCM_PORT_SUBTYPE_FIFO;
+    }
+    return SCM_PORT_SUBTYPE_NONE;
+}
+
+static int io_fstat_mode(fd_t fd)
+{
+    struct stat st;
+    if (fstat(fd, &st) == 0) {
+        if (S_ISCHR(st.st_mode)) return SCM_PORT_SUBTYPE_CHAR_SPECIAL;
+        if (S_ISFIFO(st.st_mode)) return SCM_PORT_SUBTYPE_FIFO;
+    }
+    return SCM_PORT_SUBTYPE_NONE;
+}
+
+static int io_fstat_size(fd_t fd, off64_t* size)
+{
+    struct stat st;
+    if (fstat(fd, &st) == 0) {
+        *size = st.st_size;
+        return 0;
+    }
+    return -1;
+}
 
 static bool
 no_input_buffered(scm_port_t port)
@@ -909,73 +686,6 @@ port_close(scm_port_t port)
 bool
 port_nonblock_byte_ready(scm_port_t port)
 {
-#if _MSC_VER
-
-    assert(PORTP(port));
-    port->lock.verify_locked();
-    assert(port->opened);
-    assert(port->direction & SCM_PORT_DIRECTION_IN);
-    if (port->opened) {
-        switch (port->type) {
-            case SCM_PORT_TYPE_SOCKET: {
-                if (no_input_buffered(port)) {
-                    scm_obj_t socket = port_socket(port);
-                    assert(SOCKETP(socket));
-                    int fd = ((scm_socket_t)socket)->fd;
-                    struct timeval tm = { 0, 0 };
-                    fd_set fds;
-                    FD_ZERO(&fds);
-                    FD_SET(fd, &fds);
-                    int state = select(fd + 1, &fds, NULL, NULL, &tm);
-                    if (state < 0) {
-                        if (errno == EINTR) return false;
-                        throw_io_error(SCM_PORT_OPERATION_SELECT, errno);
-                    }
-                    return (state != 0);
-                }
-            } break;
-
-            case SCM_PORT_TYPE_NAMED_FILE: {
-                switch (port->subtype) {
-                    case SCM_PORT_SUBTYPE_FIFO: {
-                        if (no_input_buffered(port)) {
-                            DWORD bytes;
-                            if (PeekNamedPipe(port->fd, NULL, 0, NULL, &bytes, NULL)) return (bytes != 0);
-                            return false;
-                        }
-                    } break;
-
-                    case SCM_PORT_SUBTYPE_CHAR_SPECIAL: {
-                        if (no_input_buffered(port)) {
-                            INPUT_RECORD inRec[32];
-                            DWORD numRec;
-                            if (PeekConsoleInput(port->fd, inRec, array_sizeof(inRec), &numRec)) {
-                                for (int i = 0; i < numRec; i++) {
-                                    if (inRec[i].EventType == KEY_EVENT) return true;
-                                }
-                            }
-                            return false;
-                        }
-                    } break;
-
-                    case SCM_PORT_SUBTYPE_NONE: return false;
-
-                    default: fatal("%s:%u wrong port subtype", __FILE__, __LINE__);
-
-                }
-
-            } break;
-
-            case SCM_PORT_TYPE_CUSTOM:
-            case SCM_PORT_TYPE_BYTEVECTOR:
-                break;
-
-            default:
-                fatal("%s:%u wrong port type", __FILE__, __LINE__);
-        }
-    }
-    return true;
-#else
     assert(PORTP(port));
     port->lock.verify_locked();
     assert(port->opened);
@@ -1040,9 +750,6 @@ port_nonblock_byte_ready(scm_port_t port)
         }
     }
     return true;
-
-#endif
-
 }
 
 int
@@ -1759,174 +1466,6 @@ hit_eof:
     }
 }
 
-#if _MSC_VER
-
-    scm_obj_t
-    port_lookahead_cp932(scm_port_t port)
-    {
-        assert(PORTP(port));
-        port->lock.verify_locked();
-        assert(port->direction & SCM_PORT_DIRECTION_IN);
-        uint8_t cp932[2];
-        if (port->opened) {
-        top:
-            int b = port_lookahead_byte(port);
-            if (b == EOF) return scm_eof;
-            if (b > 127) {
-                int code_length = 1;
-                cp932[0] = b;
-                if (((b >= 0x81) && (b <= 0x9f)) || ((b >= 0xe0) && (b <= 0xfc))) code_length = 2;
-                if (code_length > 1) {
-                    switch (port->type) {
-
-                        case SCM_PORT_TYPE_BYTEVECTOR: {
-                            assert(port->buf == NULL);
-                            scm_bvector_t bvec = ((scm_bvector_t)port->bytes);
-                            if (bvec->count - port->mark < code_length) goto hit_eof;
-                            memcpy(cp932, bvec->elts + port->mark, code_length);
-                        } break;
-
-                        case SCM_PORT_TYPE_NAMED_FILE: {
-                            if (port->buf) {
-                                assert(port->lookahead_size == 0);
-                                assert(port->buf_state == SCM_PORT_BUF_STATE_READ);
-                                assert(port->buf_size >= PORT_LOOKAHEAD_SIZE);
-                                int n1 = port->buf_tail - port->buf_head;
-                                while (n1 < code_length) {
-                                    if (port->buf != port->buf_head) {
-                                        memmove(port->buf, port->buf_head, n1);
-                                        port->buf_head = port->buf;
-                                    }
-                                    int n2 = device_read(port, port->buf + n1, port->buf_size - n1, port->mark + n1);
-                                    n1 = n1 + n2;
-                                    port->buf_tail = port->buf_head + n1;
-                                    if (n2 == 0) goto hit_eof;
-                                }
-                                memcpy(cp932, port->buf_head, code_length);
-                            } else {
-                                assert(port->buf == NULL);
-                                while (port->lookahead_size < code_length) {
-                                    int n = device_read(port,
-                                                        port->lookahead + port->lookahead_size,
-                                                        code_length - port->lookahead_size,
-                                                        port->mark + port->lookahead_size);
-                                    port->lookahead_size += n;
-                                    if (n == 0) goto hit_eof;
-                                }
-                                memcpy(cp932, port->lookahead, code_length);
-                            }
-                        } break;
-
-                        default: fatal("%s:%u wrong port type", __FILE__, __LINE__);
-
-                    }
-                }
-                wchar_t ucs2[2];
-                if (!MultiByteToWideChar(932, MB_ERR_INVALID_CHARS, (LPCSTR)cp932, code_length, ucs2, array_sizeof(ucs2))) {
-                    switch (port->error_handling_mode) {
-                        case SCM_PORT_ERROR_HANDLING_MODE_IGNORE:
-                            for (int i = 0; i < code_length; i++) port_get_byte(port);
-                            goto top;
-                        case SCM_PORT_ERROR_HANDLING_MODE_REPLACE:
-                            return MAKECHAR(SCM_PORT_UCS4_REPLACEMENT_CHAR);
-                            break;
-                        case SCM_PORT_ERROR_HANDLING_MODE_RAISE:
-                            throw_codec_error(SCM_PORT_OPERATION_DECODE, "encountered invalid cp932 sequence", scm_false);
-                        default:
-                            fatal("%s:%u wrong error handling mode", __FILE__, __LINE__);
-                    }
-                }
-                return MAKECHAR(ucs2[0]);
-            }
-            return MAKECHAR(b);
-        }
-        return scm_eof;
-
-    hit_eof:
-        switch (port->error_handling_mode) {
-            case SCM_PORT_ERROR_HANDLING_MODE_IGNORE:
-                return scm_eof;
-            case SCM_PORT_ERROR_HANDLING_MODE_REPLACE:
-                if (port->lookahead_size) {
-                    assert(port->buf == NULL);
-                    port->lookahead[0] = cp932[0];
-                    port->lookahead[1] = cp932[1];
-                    port->lookahead_size = 2;
-                }
-                return MAKECHAR(SCM_PORT_UCS4_REPLACEMENT_CHAR);
-            case SCM_PORT_ERROR_HANDLING_MODE_RAISE:
-                throw_codec_error(SCM_PORT_OPERATION_DECODE, "encountered invalid cp932 sequence", scm_false);
-            default:
-                fatal("%s:%u wrong error handling mode", __FILE__, __LINE__);
-        }
-    }
-
-    scm_obj_t
-    port_get_cp932(scm_port_t port)
-    {
-        assert(PORTP(port));
-        port->lock.verify_locked();
-        assert(port->direction & SCM_PORT_DIRECTION_IN);
-        uint8_t cp932[2];
-        if (port->opened) {
-
-        top:
-            int b = port_get_byte(port);
-            if (b == EOF) return scm_eof;
-            if (b > 127) {
-                int code_length = 1;
-                cp932[0] = b;
-                if (((b >= 0x81) && (b <= 0x9f)) || ((b >= 0xe0) && (b <= 0xfc))) code_length = 2;
-                for (int i = 1; i < code_length; i++) {
-                    int b = port_get_byte(port);
-                    if (b == EOF) {
-                        switch (port->error_handling_mode) {
-                            case SCM_PORT_ERROR_HANDLING_MODE_IGNORE:
-                                return scm_eof;
-                            case SCM_PORT_ERROR_HANDLING_MODE_REPLACE:
-                                return MAKECHAR(SCM_PORT_UCS4_REPLACEMENT_CHAR);
-                            case SCM_PORT_ERROR_HANDLING_MODE_RAISE:
-                                throw_codec_error(SCM_PORT_OPERATION_DECODE, "encountered invalid cp932 sequence", scm_false);
-                            default:
-                                fatal("%s:%u wrong error handling mode", __FILE__, __LINE__);
-                        }
-                    }
-                    cp932[i] = b;
-                }
-                wchar_t ucs2[2];
-                if (!MultiByteToWideChar(932, MB_ERR_INVALID_CHARS, (LPCSTR)cp932, code_length, ucs2, array_sizeof(ucs2))) {
-                    switch (port->error_handling_mode) {
-                        case SCM_PORT_ERROR_HANDLING_MODE_IGNORE:
-                            goto top;
-                        case SCM_PORT_ERROR_HANDLING_MODE_REPLACE:
-                            return MAKECHAR(SCM_PORT_UCS4_REPLACEMENT_CHAR);
-                            break;
-                        case SCM_PORT_ERROR_HANDLING_MODE_RAISE:
-                            throw_codec_error(SCM_PORT_OPERATION_DECODE, "encountered invalid cp932 sequence", scm_false);
-                        default:
-                            fatal("%s:%u wrong error handling mode", __FILE__, __LINE__);
-                    }
-                }
-                return MAKECHAR(ucs2[0]);
-            }
-            return MAKECHAR(b);
-        }
-        return scm_eof;
-    }
-
-    static void
-    port_put_cp932(scm_port_t port, int32_t ucs4)
-    {
-        assert(PORTP(port));
-        wchar_t ucs2[1];
-        ucs2[0] = ucs4; // TODO: sarrogates
-        uint8_t buf[4];
-        int n = WideCharToMultiByte(932, 0, ucs2, 1, (LPSTR)buf, 4, NULL, NULL);
-        for (int i = 0; i < n; i++) port_put_byte(port, buf[i]);
-    }
-
-#endif // _MSC_VER
-
 void
 port_set_mark(scm_port_t port, off64_t offset)
 {
@@ -2275,10 +1814,6 @@ port_lookahead_ch(scm_port_t port)
             return port_lookahead_utf8(port);
         case SCM_PORT_CODEC_UTF16:
             return port_lookahead_utf16(port);
-#if _MSC_VER
-        case SCM_PORT_CODEC_CP932:
-            return port_lookahead_cp932(port);
-#endif
         case SCM_PORT_CODEC_LATIN1:
             int c = port_lookahead_byte(port);
             if (c == EOF) return scm_eof;
@@ -2311,10 +1846,6 @@ port_get_ch(scm_port_t port)
             return port_get_utf8(port);
         case SCM_PORT_CODEC_UTF16:
             return port_get_utf16(port);
-#if _MSC_VER
-        case SCM_PORT_CODEC_CP932:
-            return port_get_cp932(port);
-#endif
         case SCM_PORT_CODEC_LATIN1:
             int c = port_get_byte(port);
             if (c == EOF) return scm_eof;
@@ -2503,37 +2034,6 @@ port_putc(scm_port_t port, int32_t ucs4)
             port_put_utf16(port, ucs4);
             return;
         }
-#if _MSC_VER
-        case SCM_PORT_CODEC_CP932: {
-            if (ucs4 == SCM_PORT_UCS4_LF) {
-                if (port->transcoder != scm_false) {
-                    switch (port->eol_style) {
-                        case SCM_PORT_EOL_STYLE_CR:
-                            port_put_cp932(port, SCM_PORT_UCS4_CR);
-                            return;
-                        case SCM_PORT_EOL_STYLE_CRLF:
-                            port_put_cp932(port, SCM_PORT_UCS4_CR);
-                            port_put_cp932(port, SCM_PORT_UCS4_LF);
-                            return;
-                        case SCM_PORT_EOL_STYLE_NEL:
-                            port_put_cp932(port, SCM_PORT_UCS4_NEL);
-                            return;
-                        case SCM_PORT_EOL_STYLE_CRNEL:
-                            port_put_cp932(port, SCM_PORT_UCS4_CR);
-                            port_put_cp932(port, SCM_PORT_UCS4_NEL);
-                            return;
-                        case SCM_PORT_EOL_STYLE_LS:
-                            port_put_cp932(port, SCM_PORT_UCS4_LS);
-                            return;
-                        default:
-                            break;
-                    }
-                }
-            }
-            port_put_cp932(port, ucs4);
-            return;
-        }
-#endif
         case SCM_PORT_CODEC_LATIN1: {
             if (ucs4 <= 0xff) {
                 if (ucs4 == SCM_PORT_UCS4_LF) {

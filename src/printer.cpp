@@ -1073,9 +1073,6 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
                     case SCM_PORT_CODEC_LATIN1: port_puts(m_port, " latin-1"); break;
                     case SCM_PORT_CODEC_UTF8:   port_puts(m_port, " utf-8"); break;
                     case SCM_PORT_CODEC_UTF16:  port_puts(m_port, " utf-16"); break;
-#if _MSC_VER
-                    case SCM_PORT_CODEC_CP932:  port_puts(m_port, " cp932"); break;
-#endif
                 }
             }
             if (!port_open_pred(port)) port_puts(m_port, " closed");

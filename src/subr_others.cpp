@@ -2015,27 +2015,6 @@ scm_obj_t
 subr_time_usage(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 0) {
-#if _MSC_VER
-        FILETIME real_time;
-        FILETIME creation_time;
-        FILETIME exit_time;
-        FILETIME kernel_time;
-        FILETIME user_time;
-        GetSystemTimeAsFileTime(&real_time);
-        if (GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time, &kernel_time, &user_time)) {
-            return make_list(vm->m_heap, 3,
-                             make_flonum(vm->m_heap, ((double)real_time.dwLowDateTime
-                                                       + (double)real_time.dwHighDateTime
-                                                       * ((double)UINT32_MAX + 1.0)) / 10000000.0),
-                             make_flonum(vm->m_heap, ((double)user_time.dwLowDateTime
-                                                       + (double)user_time.dwHighDateTime
-                                                       * ((double)UINT32_MAX + 1.0)) / 10000000.0),
-                             make_flonum(vm->m_heap, ((double)kernel_time.dwLowDateTime
-                                                       + (double)kernel_time.dwHighDateTime
-                                                       * ((double)UINT32_MAX + 1.0)) / 10000000.0));
-        }
-        return scm_false;
-#else
         struct timeval tv;
         struct rusage ru;
         gettimeofday(&tv, NULL);
@@ -2044,7 +2023,6 @@ subr_time_usage(VM* vm, int argc, scm_obj_t argv[])
                          make_flonum(vm->m_heap, (double)tv.tv_sec + tv.tv_usec / 1000000.0),
                          make_flonum(vm->m_heap, (double)ru.ru_utime.tv_sec + ru.ru_utime.tv_usec / 1000000.0),
                          make_flonum(vm->m_heap, (double)ru.ru_stime.tv_sec + ru.ru_stime.tv_usec / 1000000.0));
-#endif
     }
     wrong_number_of_arguments_violation(vm, "times", 0, 0, argc, argv);
     return scm_undef;

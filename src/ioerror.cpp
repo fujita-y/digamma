@@ -11,10 +11,6 @@
 #include "ioerror.h"
 #include "arith.h"
 
-#if _MSC_VER
-  #define   ETXTBSY     26
-#endif
-
 void
 raise_io_codec_error(VM* vm, const char* who, int operation, const char* message, scm_obj_t io, scm_obj_t ch)
 {

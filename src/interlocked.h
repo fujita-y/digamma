@@ -12,13 +12,10 @@
 inline int32_t
 interlocked_exchange_int32(volatile int32_t* target, int32_t value)
 {
-#if _MSC_VER
-#else
     __asm__ __volatile__ ("xchgl %0, %1"
                             : "+r" (value), "+m" (*target)
                             :
                             : "memory");
-#endif
     return value;
 }
 

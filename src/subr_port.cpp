@@ -271,21 +271,6 @@ subr_standard_input_port(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 0) {
         try {
             scm_port_t port;
-#if _MSC_VER
-            HANDLE hdl;
-            if (!DuplicateHandle(GetCurrentProcess(), PORT_STDIN_FD, GetCurrentProcess(), &hdl, 0L, FALSE, DUPLICATE_SAME_ACCESS)) {
-                _dosmaperr(GetLastError());
-                raise_io_error(vm, "standard-input-port", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, scm_false);
-                return scm_undef;
-            }
-            port = make_std_port(vm->m_heap,
-                                 hdl,
-                                 make_string_literal(vm->m_heap, "/dev/stdin"),
-                                 SCM_PORT_DIRECTION_IN,
-                                 0,
-                                 SCM_PORT_BUFFER_MODE_BLOCK,
-                                 scm_false);
-#else
             int fd = dup(PORT_STDIN_FD);
   #if USE_CLOEXEC
             if (fd >= 0) fcntl(fd, F_SETFD, FD_CLOEXEC);
@@ -297,7 +282,6 @@ subr_standard_input_port(VM* vm, int argc, scm_obj_t argv[])
                                  0,
                                  SCM_PORT_BUFFER_MODE_BLOCK,
                                  scm_false);
-#endif
             port->mark = std_port_position(PORT_STDIN_FD);
             return port;
         } catch (io_exception_t& e) {
@@ -316,21 +300,6 @@ subr_standard_output_port(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 0) {
         try {
             scm_port_t port;
-#if _MSC_VER
-            HANDLE hdl;
-            if (!DuplicateHandle(GetCurrentProcess(), PORT_STDOUT_FD, GetCurrentProcess(), &hdl, 0L, FALSE, DUPLICATE_SAME_ACCESS)) {
-                _dosmaperr(GetLastError());
-                raise_io_error(vm, "standard-output-port", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, scm_false);
-                return scm_undef;
-            }
-            port = make_std_port(vm->m_heap,
-                                 hdl,
-                                 make_string_literal(vm->m_heap, "/dev/stdout"),
-                                 SCM_PORT_DIRECTION_OUT,
-                                 0,
-                                 SCM_PORT_BUFFER_MODE_BLOCK,
-                                 scm_false);
-#else
             int fd = dup(PORT_STDOUT_FD);
   #if USE_CLOEXEC
             if (fd >= 0) fcntl(fd, F_SETFD, FD_CLOEXEC);
@@ -342,7 +311,6 @@ subr_standard_output_port(VM* vm, int argc, scm_obj_t argv[])
                                  0,
                                  SCM_PORT_BUFFER_MODE_BLOCK,
                                  scm_false);
-#endif
             port->mark = std_port_position(PORT_STDOUT_FD);
             return port;
         } catch (io_exception_t& e) {
@@ -361,21 +329,6 @@ subr_standard_error_port(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 0) {
         try {
             scm_port_t port;
-#if _MSC_VER
-            HANDLE hdl;
-            if (!DuplicateHandle(GetCurrentProcess(), PORT_STDERR_FD, GetCurrentProcess(), &hdl, 0L, FALSE, DUPLICATE_SAME_ACCESS)) {
-                _dosmaperr(GetLastError());
-                raise_io_error(vm, "standard-error-port", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, scm_false);
-                return scm_undef;
-            }
-            port = make_std_port(vm->m_heap,
-                                 hdl,
-                                 make_string_literal(vm->m_heap, "/dev/stderr"),
-                                 SCM_PORT_DIRECTION_OUT,
-                                 0,
-                                 SCM_PORT_BUFFER_MODE_NONE,
-                                 scm_false);
-#else
             int fd = dup(PORT_STDERR_FD);
   #if USE_CLOEXEC
             if (fd >= 0) fcntl(fd, F_SETFD, FD_CLOEXEC);
@@ -387,7 +340,6 @@ subr_standard_error_port(VM* vm, int argc, scm_obj_t argv[])
                                  0,
                                  SCM_PORT_BUFFER_MODE_NONE,
                                  scm_false);
-#endif
             port->mark = std_port_position(PORT_STDERR_FD);
             return port;
         } catch (io_exception_t& e) {

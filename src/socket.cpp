@@ -9,11 +9,7 @@
 #include "port.h"
 #include "socket.h"
 
-#if _MSC_VER
-  #define CLOSE_SOCKET closesocket
-#else
-  #define CLOSE_SOCKET close
-#endif
+#define CLOSE_SOCKET close
 
 static void
 throw_socket_error(int operation, int code)
@@ -44,20 +40,10 @@ socket_open(scm_socket_t s, const char* node, const char* service, int family, i
     do {
         retval = getaddrinfo(node, service, &hints, &list);
     } while (retval == EAI_AGAIN);
-#if _MSC_VER
-    if (retval) {
-        char utf8[256];
-        if (!WideCharToMultiByte(CP_UTF8, 0, gai_strerrorW(retval), -1, utf8, sizeof(utf8), NULL, NULL)) {
-            snprintf(utf8, sizeof(utf8), "socket operation failed(%d)", retval);
-        }
-        throw_socket_error(SCM_SOCKET_OPERATION_OPEN, utf8);
-    }
-#else
     if (retval) {
         if (retval == EAI_SYSTEM) throw_socket_error(SCM_SOCKET_OPERATION_OPEN, errno);
         throw_socket_error(SCM_SOCKET_OPERATION_OPEN, gai_strerror(retval));
     }
-#endif
     int first_error = 0;
     if (flags & AI_PASSIVE) {
         for (struct addrinfo* p = list; p != NULL; p = p->ai_next) {

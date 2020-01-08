@@ -1746,10 +1746,6 @@ object_heap_t::init_architecture_feature()
 #undef ARCH_ALIGNOF
 
 #define ARCH_STRING(name, value) put_hashtable(m_architecture_feature, make_symbol(this, #name), make_string_literal(this, value))
-  #if _MSC_VER
-    ARCH_STRING(operating-system, "windows");
-    ARCH_STRING(machine-hardware, "ia32");
-  #else
     {
         struct utsname buf;
         uname(&buf);
@@ -1765,7 +1761,6 @@ object_heap_t::init_architecture_feature()
         }
         ARCH_STRING(machine-hardware, buf.machine);
     }
-  #endif
 #undef ARCH_STRING
 
 #define ARCH_CCONST(name) put_hashtable(m_architecture_feature, make_symbol(this, #name), MAKEFIXNUM(name))

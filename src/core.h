@@ -25,7 +25,7 @@
 #include <signal.h>
 
 #ifndef DEFAULT_HEAP_LIMIT
-  #define DEFAULT_HEAP_LIMIT        32  // 32MB
+  #define DEFAULT_HEAP_LIMIT        32 // MB
 #endif
 
 #define UNBOUND_GLOC_RETURN_UNSPEC  0
@@ -72,33 +72,21 @@
 #define USE_CONST_LITERAL           1
 #define USE_MULTIBYTE_READ          1
 #define USE_MULTIBYTE_WRITE         1
+#define USE_CRITICAL_SECTION        0
+#define USE_SPINLOCK                0
+
 #if defined(FD_CLOEXEC)
   #define USE_CLOEXEC               1
 #else
   #define USE_CLOEXEC               0
 #endif
-#if _MSC_VER
-  #define USE_CRITICAL_SECTION      1
-  #define USE_SPINLOCK              0
-#else
-  #define USE_CRITICAL_SECTION      0
-  #define USE_SPINLOCK              0
-#endif
 
 #ifndef SYSTEM_SHARE_PATH
-  #if _MSC_VER
-    #define SYSTEM_SHARE_PATH       "C:/Program Files/Digamma"
-  #else
-    #define SYSTEM_SHARE_PATH       "/usr/local/share/digamma"
-  #endif
+  #define SYSTEM_SHARE_PATH       "/usr/local/share/digamma"
 #endif
 
 #ifndef SYSTEM_EXTENSION_PATH
-  #if _MSC_VER
-    #define SYSTEM_EXTENSION_PATH   "C:/Program Files/Digamma"
-  #else
-    #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/digamma"
-  #endif
+  #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/digamma"
 #endif
 
 #define MAX_VIRTUAL_MACHINE         32

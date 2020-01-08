@@ -11,14 +11,10 @@
 int main_command_line_argc;
 char* const* main_command_line_argv;
 
-#if _MSC_VER
-  __declspec(thread) VM* s_current_vm;
+#if defined(NO_TLS)
+  pthread_key_t s_current_vm;
 #else
-  #if defined(NO_TLS)
-    pthread_key_t s_current_vm;
-  #else
-    __thread VM* s_current_vm;
-  #endif
+  __thread VM* s_current_vm;
 #endif
 
 // --heap-limit=32   -> 32MB (default)
@@ -56,174 +52,139 @@ static int opt_heap_limit(int argc, char* const argv[])
     return value;
 }
 
-#if _MSC_VER
-    int main(int argc, char* argv[])
-    {
-        srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
-        assert(isnan(VALUE_NAN));
-        assert(isinf(VALUE_INF));
-        {
-            WSADATA wsd;
-            if(WSAStartup(MAKEWORD(2,0),&wsd) != 0) {
-                fatal("WSAStartup failed");
-            }
-        }
-        main_command_line_argc = argc;
-        main_command_line_argv = argv;
-        object_heap_t* heap = new object_heap_t;
-        int heap_limit = opt_heap_limit(argc, argv) * 1024 * 1024;
-        int heap_init = 4 * 1024 * 1024;
-        heap->init_primordial(heap_limit, heap_init);
-        VM rootVM;
-        rootVM.init(heap);
-        s_current_vm = &rootVM;
-  #if USE_PARALLEL_VM
-        Interpreter interp;
-        interp.init(&rootVM, 128);
-        rootVM.boot();
-        rootVM.standalone();
-  #else
-        rootVM.boot();
-        rootVM.standalone();
-  #endif
-        WSACleanup();
-        return 0;
-    }
-#else
-    static void*
-    signal_waiter(void* param)
-    {
-        sigset_t set = *(sigset_t*)param;
-        while (true) {
-            int sig;
-            int err = sigwait(&set, &sig);
-            if (err == 0) {
-                if (sig == SIGHUP) {
-                    fprintf(stderr, ": SIGHUP\n");
-                    exit(0);
-                }
-                if (sig == SIGTERM) {
-                    fprintf(stderr, ": SIGTERM\n");
-                    exit(0);
-                }
-                if (sig == SIGQUIT) {
-                    fprintf(stderr, ": SIGQUIT\n");
-                    exit(0);
-                }
-                if (sig == SIGKILL) {
-                    fprintf(stderr, ": SIGKILL\n");
-                    exit(0);
-                }
-                if (sig == SIGABRT) {
-                    fprintf(stderr, ": SIGABRT\n");
-                    exit(0);
-                }
-                if (sig == SIGINT) {
-                    fprintf(stderr, ": SIGINT\n");
-                    continue;
-                }
-                if (sig == SIGTSTP) {
-                    fprintf(stderr, ": SIGTSTP\n");
-                    continue;
-                }
-                if (sig == SIGCONT) {
-                    fprintf(stderr, ": SIGCONT\n");
-                    continue;
-                }
-                fprintf(stderr, ";; ### UNHANDLED SIGNAL %d ###\n", sig);
+static void*
+signal_waiter(void* param)
+{
+    sigset_t set = *(sigset_t*)param;
+    while (true) {
+        int sig;
+        int err = sigwait(&set, &sig);
+        if (err == 0) {
+            if (sig == SIGHUP) {
+                fprintf(stderr, ": SIGHUP\n");
                 exit(0);
-            } else {
-                if (err != EINTR) {
-                    fprintf(stderr, "error: sigwait() %s (%d)\n", strerror(err), err);
-                }
+            }
+            if (sig == SIGTERM) {
+                fprintf(stderr, ": SIGTERM\n");
+                exit(0);
+            }
+            if (sig == SIGQUIT) {
+                fprintf(stderr, ": SIGQUIT\n");
+                exit(0);
+            }
+            if (sig == SIGKILL) {
+                fprintf(stderr, ": SIGKILL\n");
+                exit(0);
+            }
+            if (sig == SIGABRT) {
+                fprintf(stderr, ": SIGABRT\n");
+                exit(0);
+            }
+            if (sig == SIGINT) {
+                fprintf(stderr, ": SIGINT\n");
+                continue;
+            }
+            if (sig == SIGTSTP) {
+                fprintf(stderr, ": SIGTSTP\n");
+                continue;
+            }
+            if (sig == SIGCONT) {
+                fprintf(stderr, ": SIGCONT\n");
+                continue;
+            }
+            fprintf(stderr, ";; ### UNHANDLED SIGNAL %d ###\n", sig);
+            exit(0);
+        } else {
+            if (err != EINTR) {
+                fprintf(stderr, "error: sigwait() %s (%d)\n", strerror(err), err);
             }
         }
-        return NULL;
     }
+    return NULL;
+}
 
-    int main(int argc, char* const argv[])
-    {
-        srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
-        main_command_line_argc = argc;
-        main_command_line_argv = argv;
-  #ifndef NDEBUG
-        struct foo { char i; };
-        struct bar { int i; struct foo o; };
-        struct hoge { struct bar m; char k; };
-        struct nudge { char c; double x; };
-        printf("sizeof(int) %d\n", (int)sizeof(int));
-        printf("sizeof(long) %d\n", (int)sizeof(long));
-        printf("sizeof(long long) %d\n", (int)sizeof(long long));
-        printf("sizeof(void*) %d\n", (int)sizeof(void*));
-        printf("sizeof(foo) %d\n", (int)sizeof(foo)); // 1
-        printf("sizeof(bar) %d\n", (int)sizeof(bar)); // 8
-        printf("sizeof(hoge) %d\n", (int)sizeof(hoge));
-        printf("sizeof(bool) %d\n", (int)sizeof(bool));
-        printf("sizeof(size_t) %d\n", (int)sizeof(size_t));
-        printf("__alignof__(double) %d\n", (int)__alignof__(double)); // 8
-        printf("FIXNUM_MAX %ld %lx\n", (long)FIXNUM_MAX, (long)FIXNUM_MAX);
-        printf("FIXNUM_MIN %ld %lx\n", (long)FIXNUM_MIN, (long)FIXNUM_MIN);
-        printf("sizeof(pthread_mutex_t) %d\n", (int)sizeof(pthread_mutex_t));
-        printf("sizeof(pthread_cond_t) %d\n", (int)sizeof(pthread_cond_t));
-//      printf("sizeof(queue_t<scm_obj_t>) %d\n", (int)sizeof(queue_t<scm_obj_t>));
-//      printf("sizeof(object_slab_cache_t) %d\n", (int)sizeof(object_slab_cache_t));
-        printf("offsetof(nudge, x) %d\n", (int)offsetof(nudge, x));
-  #endif
-  #if MTDEBUG
-        puts(";; MTDEBUG ON");
-  #endif
-  #if GCDEBUG
-        puts(";; GCDEBUG ON");
-  #endif
-  #if SCDEBUG
-        puts(";; SCDEBUG ON");
-  #endif
-  #if STDEBUG
-        puts(";; STDEBUG ON");
-  #endif
-  #if HPDEBUG
-        puts(";; HPDEBUG ON");
-  #endif
-  #if ASDEBUG
-        puts(";; ASDEBUG ON");
-  #endif
-        sigset_t set;
-        sigemptyset(&set);
-        sigaddset(&set, SIGINT);
-        sigaddset(&set, SIGPIPE);
-        MTVERIFY(pthread_sigmask(SIG_BLOCK, &set, NULL));
-        sigemptyset(&set);
-        sigaddset(&set, SIGINT);
-        pthread_t tid;
-        MTVERIFY(pthread_create(&tid, NULL, signal_waiter, &set));
-        MTVERIFY(pthread_detach(tid));
-        object_heap_t* heap = new object_heap_t;
-        int heap_limit = opt_heap_limit(argc, argv) * 1024 * 1024;
-        int heap_init = 4 * 1024 * 1024;
-  #ifndef NDEBUG
-        printf("heap_limit %d heap_init %d\n", heap_limit, heap_init);
-  #endif
-        heap->init_primordial(heap_limit, heap_init);
-        VM rootVM;
-        rootVM.init(heap);
-  #if defined(NO_TLS)
-        MTVERIFY(pthread_key_create(&s_current_vm, NULL));
-        MTVERIFY(pthread_setspecific(s_current_vm, &rootVM));
-  #else
-        s_current_vm = &rootVM;
-  #endif
-  #if USE_PARALLEL_VM
-        Interpreter interp;
-        interp.init(&rootVM, 128);
-        rootVM.boot();
-        rootVM.standalone();
-  #else
-        rootVM.boot();
-        rootVM.standalone();
-  #endif
-        return 0;
-    }
+int main(int argc, char* const argv[])
+{
+    srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
+    main_command_line_argc = argc;
+    main_command_line_argv = argv;
+#ifndef NDEBUG
+    struct foo { char i; };
+    struct bar { int i; struct foo o; };
+    struct hoge { struct bar m; char k; };
+    struct nudge { char c; double x; };
+    printf("sizeof(int) %d\n", (int)sizeof(int));
+    printf("sizeof(long) %d\n", (int)sizeof(long));
+    printf("sizeof(long long) %d\n", (int)sizeof(long long));
+    printf("sizeof(void*) %d\n", (int)sizeof(void*));
+    printf("sizeof(foo) %d\n", (int)sizeof(foo)); // 1
+    printf("sizeof(bar) %d\n", (int)sizeof(bar)); // 8
+    printf("sizeof(hoge) %d\n", (int)sizeof(hoge));
+    printf("sizeof(bool) %d\n", (int)sizeof(bool));
+    printf("sizeof(size_t) %d\n", (int)sizeof(size_t));
+    printf("__alignof__(double) %d\n", (int)__alignof__(double)); // 8
+    printf("FIXNUM_MAX %ld %lx\n", (long)FIXNUM_MAX, (long)FIXNUM_MAX);
+    printf("FIXNUM_MIN %ld %lx\n", (long)FIXNUM_MIN, (long)FIXNUM_MIN);
+    printf("sizeof(pthread_mutex_t) %d\n", (int)sizeof(pthread_mutex_t));
+    printf("sizeof(pthread_cond_t) %d\n", (int)sizeof(pthread_cond_t));
+//  printf("sizeof(queue_t<scm_obj_t>) %d\n", (int)sizeof(queue_t<scm_obj_t>));
+//  printf("sizeof(object_slab_cache_t) %d\n", (int)sizeof(object_slab_cache_t));
+    printf("offsetof(nudge, x) %d\n", (int)offsetof(nudge, x));
 #endif
+#if MTDEBUG
+    puts(";; MTDEBUG ON");
+#endif
+#if GCDEBUG
+    puts(";; GCDEBUG ON");
+#endif
+#if SCDEBUG
+    puts(";; SCDEBUG ON");
+#endif
+#if STDEBUG
+    puts(";; STDEBUG ON");
+#endif
+#if HPDEBUG
+    puts(";; HPDEBUG ON");
+#endif
+#if ASDEBUG
+    puts(";; ASDEBUG ON");
+#endif
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGPIPE);
+    MTVERIFY(pthread_sigmask(SIG_BLOCK, &set, NULL));
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    pthread_t tid;
+    MTVERIFY(pthread_create(&tid, NULL, signal_waiter, &set));
+    MTVERIFY(pthread_detach(tid));
+    object_heap_t* heap = new object_heap_t;
+    int heap_limit = opt_heap_limit(argc, argv) * 1024 * 1024;
+    int heap_init = 4 * 1024 * 1024;
+#ifndef NDEBUG
+    printf("heap_limit %d heap_init %d\n", heap_limit, heap_init);
+#endif
+    heap->init_primordial(heap_limit, heap_init);
+    VM rootVM;
+    rootVM.init(heap);
+#if defined(NO_TLS)
+    MTVERIFY(pthread_key_create(&s_current_vm, NULL));
+    MTVERIFY(pthread_setspecific(s_current_vm, &rootVM));
+#else
+    s_current_vm = &rootVM;
+#endif
+#if USE_PARALLEL_VM
+    Interpreter interp;
+    interp.init(&rootVM, 128);
+    rootVM.boot();
+    rootVM.standalone();
+#else
+    rootVM.boot();
+    rootVM.standalone();
+#endif
+    return 0;
+}
 
 void fatal(const char* fmt, ...)
 {

@@ -73,61 +73,27 @@ VM::init(object_heap_t* heap)
         m_to_stack_limit = (scm_obj_t*)((intptr_t)m_to_stack_top + m_stack_size);
         memset(m_to_stack_top, 0, m_stack_size);
         m_current_environment = m_heap->m_system_environment;
-
-        #if _MSC_VER
-            scm_bvector_t cp932 = make_bvector(m_heap, 3);
-            scm_bvector_t utf8 = make_bvector(m_heap, 3);
-            cp932->elts[0] = SCM_PORT_CODEC_CP932;
-            cp932->elts[1] = SCM_PORT_EOL_STYLE_CRLF;
-            cp932->elts[2] = SCM_PORT_ERROR_HANDLING_MODE_IGNORE;
-            utf8->elts[0] = SCM_PORT_CODEC_UTF8;
-            utf8->elts[1] = SCM_PORT_EOL_STYLE_CRLF;
-            utf8->elts[2] = SCM_PORT_ERROR_HANDLING_MODE_IGNORE;
-            m_current_input  = make_std_port(m_heap,
-                                             PORT_STDIN_FD,
-                                             make_string_literal(m_heap, "/dev/stdin"),
-                                             SCM_PORT_DIRECTION_IN,
-                                             SCM_PORT_FILE_OPTION_NONE,
-                                             SCM_PORT_BUFFER_MODE_BLOCK,
-                                             (GetFileType(PORT_STDIN_FD) == FILE_TYPE_CHAR && GetConsoleCP() == 932) ? cp932 : utf8);
-            m_current_output = make_std_port(m_heap,
-                                             PORT_STDOUT_FD,
-                                             make_string_literal(m_heap, "/dev/stdout"),
-                                             SCM_PORT_DIRECTION_OUT,
-                                             SCM_PORT_FILE_OPTION_NO_FAIL,
-                                             SCM_PORT_BUFFER_MODE_LINE,
-                                             (GetFileType(PORT_STDOUT_FD) == FILE_TYPE_CHAR && GetConsoleCP() == 932) ? cp932 : utf8);
-            m_current_error  = make_std_port(m_heap,
-                                             PORT_STDERR_FD,
-                                             make_string_literal(m_heap, "/dev/stderr"),
-                                             SCM_PORT_DIRECTION_OUT,
-                                             SCM_PORT_FILE_OPTION_NO_FAIL,
-                                             SCM_PORT_BUFFER_MODE_LINE,
-                                             (GetFileType(PORT_STDERR_FD) == FILE_TYPE_CHAR && GetConsoleCP() == 932) ? cp932 : utf8);
-        #else
-            m_current_input  = make_std_port(m_heap,
-                                             PORT_STDIN_FD,
-                                             make_string_literal(m_heap, "/dev/stdin"),
-                                             SCM_PORT_DIRECTION_IN,
-                                             SCM_PORT_FILE_OPTION_NONE,
-                                             SCM_PORT_BUFFER_MODE_BLOCK,
-                                             scm_true);
-            m_current_output = make_std_port(m_heap,
-                                             PORT_STDOUT_FD,
-                                             make_string_literal(m_heap, "/dev/stdout"),
-                                             SCM_PORT_DIRECTION_OUT,
-                                             SCM_PORT_FILE_OPTION_NO_FAIL,
-                                             SCM_PORT_BUFFER_MODE_LINE,
-                                             scm_true);
-            m_current_error  = make_std_port(m_heap,
-                                             PORT_STDERR_FD,
-                                             make_string_literal(m_heap, "/dev/stderr"),
-                                             SCM_PORT_DIRECTION_OUT,
-                                             SCM_PORT_FILE_OPTION_NO_FAIL,
-                                             SCM_PORT_BUFFER_MODE_LINE,
-                                             scm_true);
-        #endif
-
+        m_current_input  = make_std_port(m_heap,
+                                          PORT_STDIN_FD,
+                                          make_string_literal(m_heap, "/dev/stdin"),
+                                          SCM_PORT_DIRECTION_IN,
+                                          SCM_PORT_FILE_OPTION_NONE,
+                                          SCM_PORT_BUFFER_MODE_BLOCK,
+                                          scm_true);
+        m_current_output = make_std_port(m_heap,
+                                          PORT_STDOUT_FD,
+                                          make_string_literal(m_heap, "/dev/stdout"),
+                                          SCM_PORT_DIRECTION_OUT,
+                                          SCM_PORT_FILE_OPTION_NO_FAIL,
+                                          SCM_PORT_BUFFER_MODE_LINE,
+                                          scm_true);
+        m_current_error  = make_std_port(m_heap,
+                                          PORT_STDERR_FD,
+                                          make_string_literal(m_heap, "/dev/stderr"),
+                                          SCM_PORT_DIRECTION_OUT,
+                                          SCM_PORT_FILE_OPTION_NO_FAIL,
+                                          SCM_PORT_BUFFER_MODE_LINE,
+                                          scm_true);
         m_current_source_comments = scm_false;
         m_current_exception_handler = scm_false;
         m_current_dynamic_environment = make_weakhashtable(m_heap, lookup_mutable_hashtable_size(0));

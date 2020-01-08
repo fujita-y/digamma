@@ -36,11 +36,4 @@ void* load_shared_object(scm_string_t path);
 void* lookup_shared_object(void* hdl, scm_obj_t proc);
 const char* last_shared_object_error();
 
-#if _MSC_VER
-scm_string_t win32_error_message(VM* vm, uint32_t code);
-bool win32path(scm_string_t path, wchar_t* buf, int count);
-bool win32path(const char* path, wchar_t* buf, int count);
-bool posixpath(const wchar_t* ucs2, char* utf8, int count);
-#endif
-
 #endif

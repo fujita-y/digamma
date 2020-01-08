@@ -15,9 +15,6 @@ class spinlock_t {
 #if MTDEBUG
     int lock_count;
 #endif
-#if _MSC_VER
-    volatile LONG spinlock;
-#else
     volatile int32_t spinlock;
 
     int32_t
@@ -30,7 +27,6 @@ class spinlock_t {
                                 : "memory");
         return prev;
     }
-#endif
 
 public:
     spinlock_t() { /* should be null */ }
@@ -46,39 +42,10 @@ public:
 
     void destroy() { }
 
-/*
     void lock()
     {
-      #define SPINLOCK_LOOP_BEFORE_YIELD   30000
-
-      #if _MSC_VER
-        while (_InterlockedCompareExchange(&spinlock, 1, 0) != 0) {
-            int n = SPINLOCK_LOOP_BEFORE_YIELD;
-            do { __asm__ ("pause"); } while ((--n) & spinlock);
-            if (spinlock) Sleep(0);
-        }
-      #else
-        while (interlocked_compare_exchange(&spinlock, 1, 0) != 0) {
-            int n = SPINLOCK_LOOP_BEFORE_YIELD;
-            do { __asm__ ("pause"); } while ((--n) & spinlock);
-            if (spinlock) sched_yield();
-        }
-      #endif
-      #if MTDEBUG
-        lock_count++;
-      #endif
-    }
-*/
-
-    void lock()
-    {
-#if _MSC_VER
-        if (spinlock) Sleep(0);
-        while (InterlockedCompareExchange(&spinlock, 1, 0) != 0) Sleep(0);
-#else
         if (spinlock) sched_yield();
         while (interlocked_compare_exchange(&spinlock, 1, 0) != 0) sched_yield();
-#endif
 #if MTDEBUG
         lock_count++;
 #endif
