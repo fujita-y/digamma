@@ -11,7 +11,7 @@ See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for 
 
 ### Special note for MacOS users
 
-You may want try "export MACOSX_DEPLOYMENT_TARGET=10.14" while build if you got "Segmentation fault: 11 (stack_not_16_byte_aligned_error)" on execution. https://forums.developer.apple.com/thread/121887
+You may want try "export MACOSX_DEPLOYMENT_TARGET=10.14" if you get "Segmentation fault: 11 (stack_not_16_byte_aligned_error)" on program execution. https://forums.developer.apple.com/thread/121887
 
 ### Run
 
