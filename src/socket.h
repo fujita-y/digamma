@@ -1,4 +1,4 @@
-// Copyright (c) 2004-2019 Yoshikatsu Fujita / LittleWing Company Limited.
+// Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
 #ifndef SOCKET_H_INCLUDED
