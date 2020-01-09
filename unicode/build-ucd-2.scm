@@ -4,7 +4,7 @@
 
 #|
 
-    produce followings from unicode data 5.0.0:
+    produce followings from unicode data 12.1.0:
 
     "canonical-class.datum"
     "decompose.datum"
@@ -32,7 +32,7 @@
 
   (define ucd-file
     (lambda (filename)
-      (string-append (current-directory) "/unicode-5.0.0/" filename)))
+      (string-append (current-directory) "/unicode-12.1.0/" filename)))
 
   (define datum-file
     (lambda (filename)
@@ -68,7 +68,7 @@
                  (proc line)
                  (loop)))))))
 
-  ; (code-point) name (general-category) canonical-combining bidi decomposition numeric bidi-mirrored 
+  ; (code-point) name (general-category) canonical-combining bidi decomposition numeric bidi-mirrored
   ; unicode-1-name comment (simple-uppercase) (simple-lowercase) (simple-titlecase)
 
   (define ht-composit-exclusion (make-eqv-hashtable))
@@ -123,7 +123,7 @@
                            (cons (string->number (pregexp-substring s m2 1) 16) lst)))
                     (else
                      (assertion-violation 'parse-unicode-data "bad decomp in unicode data" s)))))))))
-  
+
   (define parse-unicodedata
     (lambda ()
       (let ((re (pregexp "^([A-F0-9]{4,6});[^;]*;[a-zA-Z]{2};([0-9]{0,3});[^;]*;([^;]*);.*$")))

@@ -4,7 +4,7 @@
 
 #|
 
-    produce followings from unicode data 5.0.0:
+    produce followings from unicode data 12.1.0:
 
         case-folding.datum
         general-category-1.datum
@@ -41,7 +41,7 @@
 
   (define ucd-file
     (lambda (filename)
-      (string-append (current-directory) "/unicode-5.0.0/" filename)))
+      (string-append (current-directory) "/unicode-12.1.0/" filename)))
 
   (define datum-file
     (lambda (filename)
@@ -102,12 +102,12 @@
                    (loop (cdr lst) (cons (cons e1 e2) ans)))))))))
 
   ; (shrink-range-list '((1 . 2)(3 . 4)(6 . 7)(8 . 15)(16 . 18)))
-  ; (code-point) name (general-category) canonical-combining bidi decomposition numeric bidi-mirrored 
+  ; (code-point) name (general-category) canonical-combining bidi decomposition numeric bidi-mirrored
   ; unicode-1-name comment (simple-uppercase) (simple-lowercase) (simple-titlecase)
 
   #;(define add-special-range-area
     (lambda (ht)
-      
+
       (define put-range
         (lambda (cn first last)
           (let loop ((cp first))
@@ -115,11 +115,11 @@
                   (else
                    (hashtable-set! ht cp cn)
                    (loop (+ cp 1)))))))
-      
+
       ; 3400;<CJK Ideograph Extension A, First>;Lo;0;L;;;;;N;;;;;
       ; 4DB5;<CJK Ideograph Extension A, Last>;Lo;0;L;;;;;N;;;;;
       (put-range 'Lo #x3400 #x4DB5)
-      
+
       ; 4E00;<CJK Ideograph, First>;Lo;0;L;;;;;N;;;;;
       ; 9FBB;<CJK Ideograph, Last>;Lo;0;L;;;;;N;;;;;
       (put-range 'Lo #x4E00 #x9FBB)
@@ -155,21 +155,21 @@
       ; 100000;<Plane 16 Private Use, First>;Co;0;L;;;;;N;;;;;
       ; 10FFFD;<Plane 16 Private Use, Last>;Co;0;L;;;;;N;;;;;
       (put-range 'Co #x100000 #x10FFFD)))
-  
+
   (define parse-unicodedata
     (lambda ()
       ;(let ((re (pregexp "^([A-F0-9]{4,6});.*;([a-zA-Z]{2});.*;.*;.*;.*;.*;(.*);.*;.*;.*;([A-F0-9]{0,6});([A-F0-9]{0,6});([A-F0-9]{0,6})$")))
       (let ((re (pregexp "^([A-F0-9]{4,6});[^;]*;([a-zA-Z]{2});[^;]*;[^;]*;[^;]*;[^;]*;[^;]*;(.*);[^;]*;[^;]*;[^;]*;([A-F0-9]{0,6});([A-F0-9]{0,6});([A-F0-9]{0,6})$")))
 
         (define ht-general-category-1 (make-eqv-hashtable)) ; code-point < 0x400
-        (define ht-general-category-2 (make-eqv-hashtable)) ; 
+        (define ht-general-category-2 (make-eqv-hashtable)) ;
         (define ht-numeric-property (make-eqv-hashtable))
         (define ht-simple-uppercase (make-eqv-hashtable))
         (define ht-simple-lowercase (make-eqv-hashtable))
         (define ht-simple-titlecase (make-eqv-hashtable))
 
         #;(add-special-range-area ht-general-category-2)
-        
+
         (call-with-port
             (open-file-input-port (ucd-file "UnicodeData.txt") (file-options) (buffer-mode block) (native-transcoder))
             (lambda (input)
@@ -533,4 +533,3 @@
   (format #t " done~%~!")
 
   ) ;[end]
-

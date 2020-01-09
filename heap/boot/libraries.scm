@@ -339,6 +339,7 @@
                         put-char
                         put-string
                         put-datum
+                        put-fasl
                         &i/o make-i/o-error i/o-error?
                         &i/o-read make-i/o-read-error i/o-read-error?
                         &i/o-write make-i/o-write-error i/o-write-error?

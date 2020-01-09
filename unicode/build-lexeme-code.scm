@@ -4,7 +4,7 @@
 
 #|
 
-    produce followings from unicode data 5.0.0:
+    produce followings from unicode data 12.1.0:
 
         lexeme.inc
 
@@ -29,7 +29,7 @@
 
   (define ucd-file
     (lambda (filename)
-      (string-append (current-directory) "/unicode-5.0.0/" filename)))
+      (string-append (current-directory) "/unicode-12.1.0/" filename)))
 
   (define datum-file
     (lambda (filename)
@@ -91,7 +91,7 @@
       ; 3400;<CJK Ideograph Extension A, First>;Lo;0;L;;;;;N;;;;;
       ; 4DB5;<CJK Ideograph Extension A, Last>;Lo;0;L;;;;;N;;;;;
       (put-range 'Lo #x3400 #x4DB5)
-      
+
       ; 4E00;<CJK Ideograph, First>;Lo;0;L;;;;;N;;;;;
       ; 9FBB;<CJK Ideograph, Last>;Lo;0;L;;;;;N;;;;;
       (put-range 'Lo #x4E00 #x9FBB)
@@ -127,7 +127,7 @@
       ; 100000;<Plane 16 Private Use, First>;Co;0;L;;;;;N;;;;;
       ; 10FFFD;<Plane 16 Private Use, Last>;Co;0;L;;;;;N;;;;;
       (put-range 'Co #x100000 #x10FFFD)))
-  
+
   (define parse-unicodedata
     (lambda ()
       (let ((re (pregexp "^([A-F0-9]{4,6});[^;]*;([a-zA-Z]{2});[^;]*;[^;]*;[^;]*;[^;]*;[^;]*;(.*);[^;]*;[^;]*;[^;]*;([A-F0-9]{0,6});([A-F0-9]{0,6});([A-F0-9]{0,6})$")))
@@ -157,7 +157,7 @@
 
                     (define ascii-c (ascii-area-list "!?*/:<=>$%&^_~" #f))
                     (define ascii-s (ascii-area-list "!?*/:<=>$%&^_~.@+-" #t))
-                    
+
                     (define advance
                       (lambda (cp offset bit)
                         (let ((bit (+ bit bit)))
@@ -213,4 +213,3 @@
   (parse-unicodedata)
 
   ) ;[end]
-

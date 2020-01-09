@@ -751,6 +751,7 @@
     put-bytevector
     put-char
     put-datum
+    put-fasl
     put-string
     put-u8
     quasiquote

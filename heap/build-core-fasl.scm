@@ -110,6 +110,7 @@
       "./core/hashtables.scm"
       "./core/struct.scm"
       "./core/optimize.scm"
+      "./core.scm"
 
 ;      "./rnrs/base.scm"
 ;      "./rnrs/unicode.scm"
@@ -137,8 +138,6 @@
 ;      "./rnrs/mutable-pairs.scm"
 ;      "./rnrs/eval.scm"
 ;      "./rnrs.scm"
-
-      "./core.scm"
       ))
 
   (define compile-to
