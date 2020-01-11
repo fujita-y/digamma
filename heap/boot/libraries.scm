@@ -339,7 +339,6 @@
                         put-char
                         put-string
                         put-datum
-                        put-fasl
                         &i/o make-i/o-error i/o-error?
                         &i/o-read make-i/o-read-error i/o-read-error?
                         &i/o-write make-i/o-write-error i/o-write-error?
@@ -391,6 +390,7 @@
                         utf8->string
                         ; extensions
                         put-byte
+                        put-fasl
                         make-string-output-port
                         make-string-input-port
                         make-transcoded-port
