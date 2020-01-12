@@ -4,7 +4,9 @@
 #ifndef CORE_H_INCLUDED
 #define CORE_H_INCLUDED
 
-#define __STDC_LIMIT_MACROS
+#ifndef __STDC_LIMIT_MACROS
+  #define __STDC_LIMIT_MACROS
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>

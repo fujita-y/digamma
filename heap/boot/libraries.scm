@@ -434,24 +434,6 @@
                         usleep
                         scheme-error
                         architecture-feature
-                        ;; load-shared-object
-                        ;; lookup-shared-object
-                        ;; call-shared-object
-                        ;; make-callback-trampoline
-                        ;; shared-object-errno
-                        ;; shared-object-win32-lasterror
-                        bytevector-c-short-ref bytevector-c-unsigned-short-ref bytevector-c-short-set!
-                        bytevector-c-int-ref bytevector-c-unsigned-int-ref bytevector-c-int-set!
-                        bytevector-c-long-ref bytevector-c-unsigned-long-ref bytevector-c-long-set!
-                        bytevector-c-long-long-ref bytevector-c-unsigned-long-long-ref bytevector-c-long-long-set!
-                        bytevector-c-void*-ref bytevector-c-void*-set!
-                        bytevector-c-int8-ref bytevector-c-int16-ref bytevector-c-int32-ref bytevector-c-int64-ref
-                        bytevector-c-uint8-ref bytevector-c-uint16-ref bytevector-c-uint32-ref bytevector-c-uint64-ref
-                        bytevector-c-float-ref bytevector-c-double-ref
-                        bytevector-c-int8-set! bytevector-c-int16-set! bytevector-c-int32-set! bytevector-c-int64-set!
-                        bytevector-c-float-set! bytevector-c-double-set!
-                        string->utf8/nul
-                        bytevector-c-strlen
                         collect collect-notify collect-stack-notify collect-trip-bytes display-heap-statistics display-object-statistics
                         backtrace expansion-backtrace backtrace-line-length display-backtrace
                         warning-level
@@ -498,11 +480,29 @@
                         uninterned-symbol-prefix
                         uninterned-symbol-suffix
 
+                        ; socket
                         socket?
                         make-socket socket-shutdown socket-close socket->port socket-port
                         socket-send socket-recv socket-accept
                         shutdown-output-port
                         port-closed?
+
+                        ; ffi
+                        load-shared-object
+                        lookup-shared-object
+                        call-shared-object
+                        bytevector-c-short-ref bytevector-c-unsigned-short-ref bytevector-c-short-set!
+                        bytevector-c-int-ref bytevector-c-unsigned-int-ref bytevector-c-int-set!
+                        bytevector-c-long-ref bytevector-c-unsigned-long-ref bytevector-c-long-set!
+                        bytevector-c-long-long-ref bytevector-c-unsigned-long-long-ref bytevector-c-long-long-set!
+                        bytevector-c-void*-ref bytevector-c-void*-set!
+                        bytevector-c-int8-ref bytevector-c-int16-ref bytevector-c-int32-ref bytevector-c-int64-ref
+                        bytevector-c-uint8-ref bytevector-c-uint16-ref bytevector-c-uint32-ref bytevector-c-uint64-ref
+                        bytevector-c-float-ref bytevector-c-double-ref
+                        bytevector-c-int8-set! bytevector-c-int16-set! bytevector-c-int32-set! bytevector-c-int64-set!
+                        bytevector-c-float-set! bytevector-c-double-set!
+                        string->utf8/nul
+                        bytevector-c-strlen
 
                         getenv
                         gethostname
