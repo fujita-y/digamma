@@ -10,19 +10,6 @@
 #include "arith.h"
 #include "violation.h"
 
-#include <iostream>
-#include <cstdint>
-#include <string>
-
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/IR/Verifier.h"
-
-using namespace llvm;
-
 #define FFI_C_TYPE_VOID            0x0000
 #define FFI_C_TYPE_BOOL            0x0001
 #define FFI_C_TYPE_SHORT           0x0002
@@ -101,74 +88,8 @@ subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
 {
-    llvm::InitializeNativeTarget();
-
-    /* LLVM Global Context */
-    llvm::LLVMContext ctx;
-    /* Module */
-    Module * module = new Module("MyModule", ctx);
-
-    /* IRBuilder */
-    IRBuilder<> builder(ctx);
-
-    /* Create execution engine */
-    std::string err_str;
-    ExecutionEngine * engine = EngineBuilder(module).setErrorStr(&err_str).create();
-    if (!engine) {
-        std::cerr << "Could not create ExecutionEngine:"
-                  << err_str << std::endl;
-        return scm_undef;
-    }
-
-    /* Type of value I want to return - 64-bit integer */
-    IntegerType * int64_ty = Type::getInt64Ty(ctx);
-
-    /* Actual value to return */
-    int64_t value = 765;
-
-    /* LLVM Value */
-    Value * v = ConstantInt::get(int64_ty, value);
-
-    /* Create prototype of result function - int64_t() */
-    std::vector<Type *> arguments;
-    FunctionType * proto = FunctionType::get(int64_ty, arguments, false);
-
-    /* Create function body */
-    Function * fce = Function::Create(proto, Function::ExternalLinkage, "MyFunction", module);
-    BasicBlock * bb = BasicBlock::Create(ctx, "entry", fce);
-
-    /* Point builder to add instructions to function body */
-    builder.SetInsertPoint(bb);
-
-    /* Return value */
-    builder.CreateRet(v);
-
-    /* Function pass manager */
-    FunctionPassManager pass_manager(module);
-
-    /* Add data layout */
-    pass_manager.add(new DataLayout(*engine->getDataLayout()));
-    pass_manager.doInitialization();
-
-    /* Do optimizations */
-    pass_manager.run(*fce);
-
-    /* JIT it */
-    void * fce_ptr = engine->getPointerToFunction(fce);
-    int64_t (*fce_typed_ptr)() = (int64_t(*)())fce_ptr;
-
-    /* Excute JITed function */
-    std::cout << "Result: " << (*fce_typed_ptr)()
-              << std::endl << std::endl;
-
-    /* Dump LLVM IR */
-    std::cout << "LLVM IR dump: " << std::endl;
-    module->dump();
-
-
-
-//raise_error(vm,"call-shared-object","implementationdoesnotsupportthisfeature",0,argc,argv);
-return scm_undef;
+  raise_error(vm,"call-shared-object","implementation does not support this feature", 0, argc, argv);
+  return scm_undef;
 }
 
 void init_subr_ffi(object_heap_t* heap)

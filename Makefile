@@ -10,9 +10,7 @@ CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -D
 
 CXX = clang++
 
-CXXFLAGS = -pipe -O3 -fstrict-aliasing $(shell llvm-config --cxxflags) -fcxx-exceptions
-
-LDFLAGS = `llvm-config --cxxflags --ldflags --system-libs --libs core`
+CXXFLAGS = -pipe -O3 -fstrict-aliasing
 
 SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp object_set.cpp \
 	     subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp interpreter.cpp serialize.cpp \
@@ -37,7 +35,6 @@ ifndef DATAMODEL
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
-  CPPFLAGS += $$(pkg-config --cflags libffi)
   CXXFLAGS += -pthread -fomit-frame-pointer
   ifneq (,$(findstring arm, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
@@ -54,7 +51,7 @@ ifneq (,$(findstring Linux, $(UNAME)))
       CXXFLAGS += -march=x86-64
     endif
   endif
-  LDLIBS = -pthread -Wl,--no-as-needed -ldl $$(pkg-config --libs libffi)
+  LDLIBS = -pthread -Wl,--no-as-needed -ldl -lffi
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
