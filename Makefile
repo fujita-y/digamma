@@ -35,6 +35,7 @@ ifndef DATAMODEL
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
+  CPPFLAGS += $$(pkg-config --cflags libffi)
   CXXFLAGS += -pthread -fomit-frame-pointer
   ifneq (,$(findstring arm, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
@@ -51,7 +52,7 @@ ifneq (,$(findstring Linux, $(UNAME)))
       CXXFLAGS += -march=x86-64
     endif
   endif
-  LDLIBS = -pthread -Wl,--no-as-needed -ldl
+  LDLIBS = -pthread -Wl,--no-as-needed -ldl $$(pkg-config --libs libffi)
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
