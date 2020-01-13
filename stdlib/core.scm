@@ -184,6 +184,7 @@
     cadddr
     caddr
     cadr
+    call-shared-object
     call-with-bytevector-output-port
     call-with-current-continuation
     call-with-input-file
@@ -594,11 +595,13 @@
     list-transpose+
     list?
     load
+    load-shared-object
     local-heap-object?
     log
     lookahead-char
     lookahead-u8
     lookup-process-environment
+    lookup-shared-object
     macro-expand
     magnitude
     make-assertion-violation
