@@ -75,7 +75,7 @@ public:
     void** argv() { return (void**)m_argv; }
     ffi_type** types() { return m_type; }
     const char* add(VM* vm, scm_obj_t obj, int signature) {
-        if (m_argc >= FFI_MAX_ARGC) fatal("fatal: c function stack frame overflow");
+        if (m_argc >= FFI_MAX_ARGC) fatal("fatal: c function argument count overflow");
         if (FIXNUMP(obj) || BIGNUMP(obj)) {
             if (signature == 'x') {
                 m_type[m_argc] = &ffi_type_sint64;
@@ -217,7 +217,7 @@ call_c_double(VM* vm, void* func, c_arguments_t& args)
 scm_obj_t
 subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
 {
-    if (argc >= 1) {
+    if (argc >= 4) {
         if (!FIXNUMP(argv[0])) {
             wrong_type_argument_violation(vm, "call-shared-object", 0, "fixnum", argv[0], argc, argv);
             return scm_undef;
@@ -338,7 +338,7 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
         invalid_argument_violation(vm, "call-shared-object", "too many arguments,", MAKEFIXNUM(argc), -1, argc, argv);
         return scm_undef;
     }
-    wrong_number_of_arguments_violation(vm, "call-shared-object", 2, -1, argc, argv);
+    wrong_number_of_arguments_violation(vm, "call-shared-object", 4, -1, argc, argv);
     return scm_undef;
 }
 
