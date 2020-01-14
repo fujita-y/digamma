@@ -491,6 +491,8 @@
                         load-shared-object
                         lookup-shared-object
                         call-shared-object
+                        make-callback-trampoline
+                        shared-object-errno
                         bytevector-c-short-ref bytevector-c-unsigned-short-ref bytevector-c-short-set!
                         bytevector-c-int-ref bytevector-c-unsigned-int-ref bytevector-c-int-set!
                         bytevector-c-long-ref bytevector-c-unsigned-long-ref bytevector-c-long-set!

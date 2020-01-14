@@ -410,11 +410,63 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 */
+
+// make-callback-trampoline
+scm_obj_t
+subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 3) {
+        if (exact_non_negative_integer_pred(argv[0])) {
+            if (STRINGP(argv[1])) {
+                const char* signature = ((scm_string_t)argv[1])->name;
+                if (CLOSUREP(argv[2])) {
+                    // return make_callback(vm, FIXNUM(argv[0]), signature, (scm_closure_t)argv[2]);
+                    // see callback_scheme in ffi.cpp
+                    fatal("%s:%u make-callback-trampoline not supported on this build", __FILE__, __LINE__);
+                }
+                wrong_type_argument_violation(vm, "make-callback-trampoline", 2, "closure", argv[2], argc, argv);
+                return scm_undef;
+            }
+            wrong_type_argument_violation(vm, "make-callback-trampoline", 1, "string", argv[1], argc, argv);
+            return scm_undef;
+        }
+        wrong_type_argument_violation(vm, "make-callback-trampoline", 0, "exact non-negative integer", argv[0], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "make-callback-trampoline", 3, 3, argc, argv);
+    return scm_undef;
+}
+
+// shared-object-errno
+scm_obj_t
+subr_shared_object_errno(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 0) return int_to_integer(vm->m_heap, vm->m_shared_object_errno);
+    if (argc == 1) {
+        if (exact_integer_pred(argv[0])) {
+            int val;
+            if (exact_integer_to_int(argv[0], &val)) {
+                errno = val;
+                vm->m_shared_object_errno = val;
+                return scm_unspecified;
+            }
+            invalid_argument_violation(vm, "shared-object-errno", "value out of range,", argv[0], 0, argc, argv);
+            return scm_undef;
+        }
+        wrong_type_argument_violation(vm, "shared-object-errno", 0, "exact integer", argv[0], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "shared-object-errno", 0, 1, argc, argv);
+    return scm_undef;
+}
+
 void init_subr_ffi(object_heap_t* heap)
 {
     #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
 
     DEFSUBR("call-shared-object", subr_call_shared_object);
+    DEFSUBR("make-callback-trampoline", subr_make_callback_trampoline);
+    DEFSUBR("shared-object-errno", subr_shared_object_errno);
 }
 
 /*

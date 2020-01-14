@@ -607,6 +607,7 @@
     make-assertion-violation
     make-bytevector
     make-bytevector-mapping
+    make-callback-trampoline
     make-cmwc-random-state
     make-core-hashtable
     make-custom-binary-input-port
@@ -823,6 +824,7 @@
     shared-bag-get!
     shared-bag-put!
     shared-bag?
+    shared-object-errno
     shared-queue-pop!
     shared-queue-push!
     shared-queue-shutdown
