@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "vm.h"
+#include "arith.h"
 #include "file.h"
 #include "violation.h"
 
@@ -343,6 +344,58 @@ subr_system_extension_path(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+// load-shared-object
+scm_obj_t
+subr_load_shared_object(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 0) {
+        void* hdl = load_shared_object(NULL);
+        if (hdl) return uintptr_to_integer(vm->m_heap, (uintptr_t)hdl);
+        invalid_argument_violation(vm, "load-shared-object", last_shared_object_error(), NULL, -1, argc, argv);
+        return scm_undef;
+    }
+    if (argc == 1) {
+        if (STRINGP(argv[0])) {
+            scm_string_t string = (scm_string_t)argv[0];
+            void* hdl = load_shared_object(string);
+            if (hdl) return uintptr_to_integer(vm->m_heap, (uintptr_t)hdl);
+            invalid_argument_violation(vm, "load-shared-object", last_shared_object_error(), NULL, -1, argc, argv);
+            return scm_undef;
+        }
+        wrong_type_argument_violation(vm, "load-shared-object", 0, "string", argv[0], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "load-shared-object", 0, 1, argc, argv);
+    return scm_undef;
+}
+
+// lookup-shared-object
+scm_obj_t
+subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 2) {
+        void* hdl;
+        if (exact_positive_integer_pred(argv[0])) {
+            if (exact_integer_to_uintptr(argv[0], (uintptr_t*)&hdl) == false) {
+                invalid_argument_violation(vm, "lookup-shared-object", "value out of bound,", argv[0], 0, argc, argv);
+                return scm_undef;
+            }
+        } else {
+            wrong_type_argument_violation(vm, "lookup-shared-object", 0, "shared object handle", argv[0], argc, argv);
+            return scm_undef;
+        }
+        if (STRINGP(argv[1]) || SYMBOLP(argv[1])) {
+            uintptr_t adrs = (uintptr_t)lookup_shared_object(hdl, argv[1]);
+            if (adrs == 0) return scm_false;
+            return uintptr_to_integer(vm->m_heap, adrs);
+        }
+        wrong_type_argument_violation(vm, "lookup-shared-object", 1, "string or symbol", argv[1], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "lookup-shared-object", 2, 2, argc, argv);
+    return scm_undef;
+}
+
 void
 init_subr_file(object_heap_t* heap)
 {
@@ -369,4 +422,6 @@ init_subr_file(object_heap_t* heap)
     DEFSUBR("rename-file", subr_rename_file);
     DEFSUBR("system-share-path", subr_system_share_path);
     DEFSUBR("system-extension-path", subr_system_extension_path);
+    DEFSUBR("load-shared-object", subr_load_shared_object);
+    DEFSUBR("lookup-shared-object", subr_lookup_shared_object);
 }

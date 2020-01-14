@@ -45,57 +45,17 @@
 
 #define FFI_MAX_ARGC 32
 
-// load-shared-object
-scm_obj_t
-subr_load_shared_object(VM* vm, int argc, scm_obj_t argv[])
-{
-    if (argc == 0) {
-        void* hdl = load_shared_object(NULL);
-        if (hdl) return uintptr_to_integer(vm->m_heap, (uintptr_t)hdl);
-        invalid_argument_violation(vm, "load-shared-object", last_shared_object_error(), NULL, -1, argc, argv);
-        return scm_undef;
+class capture_errno {
+    VM* m_vm;
+public:
+    capture_errno(VM* vm) {
+        m_vm = vm;
+        errno = m_vm->m_shared_object_errno;
     }
-    if (argc == 1) {
-        if (STRINGP(argv[0])) {
-            scm_string_t string = (scm_string_t)argv[0];
-            void* hdl = load_shared_object(string);
-            if (hdl) return uintptr_to_integer(vm->m_heap, (uintptr_t)hdl);
-            invalid_argument_violation(vm, "load-shared-object", last_shared_object_error(), NULL, -1, argc, argv);
-            return scm_undef;
-        }
-        wrong_type_argument_violation(vm, "load-shared-object", 0, "string", argv[0], argc, argv);
-        return scm_undef;
+    ~capture_errno() {
+        m_vm->m_shared_object_errno = errno;
     }
-    wrong_number_of_arguments_violation(vm, "load-shared-object", 0, 1, argc, argv);
-    return scm_undef;
-}
-
-// lookup-shared-object
-scm_obj_t
-subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
-{
-    if (argc == 2) {
-        void* hdl;
-        if (exact_positive_integer_pred(argv[0])) {
-            if (exact_integer_to_uintptr(argv[0], (uintptr_t*)&hdl) == false) {
-                invalid_argument_violation(vm, "lookup-shared-object", "value out of bound,", argv[0], 0, argc, argv);
-                return scm_undef;
-            }
-        } else {
-            wrong_type_argument_violation(vm, "lookup-shared-object", 0, "shared object handle", argv[0], argc, argv);
-            return scm_undef;
-        }
-        if (STRINGP(argv[1]) || SYMBOLP(argv[1])) {
-            uintptr_t adrs = (uintptr_t)lookup_shared_object(hdl, argv[1]);
-            if (adrs == 0) return scm_false;
-            return uintptr_to_integer(vm->m_heap, adrs);
-        }
-        wrong_type_argument_violation(vm, "lookup-shared-object", 1, "string or symbol", argv[1], argc, argv);
-        return scm_undef;
-    }
-    wrong_number_of_arguments_violation(vm, "lookup-shared-object", 2, 2, argc, argv);
-    return scm_undef;
-}
+};
 
 class c_arguments_t {
     union value_t {
@@ -119,39 +79,36 @@ public:
         if (FIXNUMP(obj) || BIGNUMP(obj)) {
             if (signature == 'x') {
                 m_type[m_argc] = &ffi_type_sint64;
-                m_value[m_argc++].s64 = coerce_exact_integer_to_int64(obj);
+                m_value[m_argc].s64 = coerce_exact_integer_to_int64(obj);
             } else if (signature == 'i' || signature == 'p' || signature == '*') {
                 m_type[m_argc] = &ffi_type_pointer;
-                m_value[m_argc++].ip = coerce_exact_integer_to_intptr(obj);
+                m_value[m_argc].ip = coerce_exact_integer_to_intptr(obj);
             } else if (signature == 'f') {
                 m_type[m_argc] = &ffi_type_float;
-                m_value[m_argc++].f32 = real_to_double(obj);
+                m_value[m_argc].f32 = real_to_double(obj);
             } else if (signature == 'd') {
                 m_type[m_argc] = &ffi_type_double;
-                m_value[m_argc++].f64 = real_to_double(obj);
+                m_value[m_argc].f64 = real_to_double(obj);
             } else {
                 goto bad_signature;
             }
-            return NULL;
         } else if (FLONUMP(obj)) {
             if (signature == 'f') {
                 scm_flonum_t flonum = (scm_flonum_t)obj;
                 m_type[m_argc] = &ffi_type_float;
-                m_value[m_argc++].f32 = flonum->value;
+                m_value[m_argc].f32 = flonum->value;
             } else if (signature == 'd' || signature == '*') {
                 scm_flonum_t flonum = (scm_flonum_t)obj;
                 m_type[m_argc] = &ffi_type_double;
-                m_value[m_argc++].f64 = flonum->value;
+                m_value[m_argc].f64 = flonum->value;
             } else {
                 goto bad_signature;
             }
-            return NULL;
         } else if (BVECTORP(obj)) {
             if (signature != 'p' && signature != '*') goto bad_signature;
             scm_bvector_t bvector = (scm_bvector_t)obj;
             m_type[m_argc] = &ffi_type_pointer;
-            m_value[m_argc++].ip = (intptr_t)bvector->elts;
-            return NULL;
+            m_value[m_argc].ip = (intptr_t)bvector->elts;
         } else if (VECTORP(obj)) {
             if (signature != 'c') goto bad_signature;
             scm_vector_t vector = (scm_vector_t)obj;
@@ -175,9 +132,13 @@ public:
                 ref--;
             }
             m_type[m_argc] = &ffi_type_pointer;
-            m_value[m_argc++].ip = (intptr_t)bvector->elts;
-            return NULL;
+            m_value[m_argc].ip = (intptr_t)bvector->elts;
+        } else {
+            goto bad_signature;
         }
+        m_argc++;
+        return NULL;
+
     bad_signature:
         switch (signature) {
             case 'i': case 'x': return "exact integer";
@@ -190,23 +151,194 @@ public:
     }
 };
 
+static intptr_t
+call_c_intptr(VM* vm, void* func, c_arguments_t& args)
+{
+    capture_errno sync(vm);
+    ffi_cif cif;
+    intptr_t rc;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_pointer, args.types()) == FFI_OK) {
+        ffi_call(&cif, FFI_FN(func), &rc, args.argv());
+    } else {
+        fatal("%s:%u internal error: cannot prepare c function call",__FILE__ , __LINE__);
+    }
+    return rc;
+}
+
+static int64_t
+call_c_int64(VM* vm, void* func, c_arguments_t& args)
+{
+    capture_errno sync(vm);
+    ffi_cif cif;
+    int64_t rc;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_sint64, args.types()) == FFI_OK) {
+        ffi_call(&cif, FFI_FN(func), &rc, args.argv());
+    } else {
+        fatal("%s:%u internal error: cannot prepare c function call",__FILE__ , __LINE__);
+    }
+    return rc;
+}
+
+static float
+call_c_float(VM* vm, void* func, c_arguments_t& args)
+{
+    capture_errno sync(vm);
+    ffi_cif cif;
+    float rc;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_float, args.types()) == FFI_OK) {
+        ffi_call(&cif, FFI_FN(func), &rc, args.argv());
+    } else {
+        fatal("%s:%u internal error: cannot prepare c function call",__FILE__ , __LINE__);
+    }
+    return rc;
+}
+
+static double
+call_c_double(VM* vm, void* func, c_arguments_t& args)
+{
+    capture_errno sync(vm);
+    ffi_cif cif;
+    double rc;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_double, args.types()) == FFI_OK) {
+        ffi_call(&cif, FFI_FN(func), &rc, args.argv());
+    }
+    return rc;
+}
+
+/*
+(define libc (load-shared-object "libc.so.6"))
+(define c-puts (lookup-shared-object libc "puts"))
+(call-shared-object 0 c-puts #f "p" (string->utf8/nul "hello world!")) ;=> hello world!
+(define c-strcat (lookup-shared-object libc "strcat"))
+(call-shared-object 10 c-strcat #f "pp" (string->utf8/nul "foo!") (string->utf8/nul "bar!")) ;=> "foo!bar!""
+*/
+
 // call-shared-object
 scm_obj_t
 subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
 {
-    c_arguments_t args;
-
-    scm_bvector_t bvector = make_bvector(vm->m_heap, 10);
-    strncpy((char*)bvector->elts, "hello", 6);
-    args.add(vm, bvector, 'p');
-
-    ffi_cif cif;
-    int rc;
-    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_void, args.types()) == FFI_OK) {
-        ffi_call(&cif, FFI_FN(puts), &rc, args.argv());
+    if (argc >= 1) {
+        if (!FIXNUMP(argv[0])) {
+            wrong_type_argument_violation(vm, "call-shared-object", 0, "fixnum", argv[0], argc, argv);
+            return scm_undef;
+        }
+        int type = FIXNUM(argv[0]);
+        void *func = NULL;
+        if (exact_positive_integer_pred(argv[1])) {
+            if (exact_integer_to_uintptr(argv[1], (uintptr_t*)&func) == false) {
+                invalid_argument_violation(vm, "call-shared-object", "value out of bound,", argv[1], 1, argc, argv);
+                return scm_undef;
+            }
+        } else {
+            wrong_type_argument_violation(vm, "call-shared-object", 1, "c function address", argv[1], argc, argv);
+            return scm_undef;
+        }
+        const char* who;
+        if (SYMBOLP(argv[2])) {
+            who = ((scm_symbol_t)argv[2])->name;
+        } else if (argv[2] == scm_false) {
+            who = "call-shared-object";
+        } else {
+            wrong_type_argument_violation(vm, "call-shared-object", 2, "symbol or #f", argv[2], argc, argv);
+            return scm_undef;
+        }
+        const char* signature;
+        if (STRINGP(argv[3])) {
+            signature = ((scm_string_t)argv[3])->name;
+        } else {
+            wrong_type_argument_violation(vm, "call-shared-object", 3, "string", argv[3], argc, argv);
+            return scm_undef;
+        }
+        if (argc - 4 <= FFI_MAX_ARGC) {
+            c_arguments_t args;
+            for (int i = 4; i < argc; i++) {
+                const char* err = args.add(vm, argv[i], signature[0]);
+                if (err) {
+                    wrong_type_argument_violation(vm, who, i, err, argv[i], argc, argv);
+                    return scm_undef;
+                }
+                if (signature[0] != '*') signature++;
+            }
+            switch (type & FFI_RETURN_TYPE_MASK) {
+                case FFI_RETURN_TYPE_VOID: {
+                    call_c_intptr(vm, func, args);
+                    return scm_unspecified;
+                }
+                case FFI_RETURN_TYPE_STRING: {
+                    char* p;
+                    p = (char*)call_c_intptr(vm, func, args);
+                    if (p == NULL) return MAKEFIXNUM(0);
+                    return make_string(vm->m_heap, p);
+                }
+                case FFI_RETURN_TYPE_SIZE_T: {
+                    if (sizeof(size_t) == sizeof(int)) {
+                        unsigned int retval;
+                        retval = (unsigned int)call_c_intptr(vm, func, args);
+                        return uint_to_integer(vm->m_heap, retval);
+                    }
+                    uintptr_t retval;
+                    retval = (uintptr_t)call_c_intptr(vm, func, args);
+                    return uintptr_to_integer(vm->m_heap, retval);
+                }
+                case FFI_RETURN_TYPE_BOOL: {
+                    return (call_c_intptr(vm, func, args) & 0xff) ? MAKEFIXNUM(1) : MAKEFIXNUM(0);
+                }
+                case FFI_RETURN_TYPE_SHORT: {
+                    return int_to_integer(vm->m_heap, (short)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INT: {
+                    return int_to_integer(vm->m_heap, (int)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INTPTR: {
+                    return intptr_to_integer(vm->m_heap, call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_USHORT: {
+                    return uint_to_integer(vm->m_heap, (unsigned short)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINT: {
+                    return uint_to_integer(vm->m_heap, (unsigned int)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINTPTR: {
+                    return uintptr_to_integer(vm->m_heap, (uintptr_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_FLOAT: {
+                    return make_flonum(vm->m_heap, call_c_float(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_DOUBLE: {
+                    return make_flonum(vm->m_heap, call_c_double(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INT8_T: {
+                    return int_to_integer(vm->m_heap, (int8_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINT8_T: {
+                    return uint_to_integer(vm->m_heap, (uint8_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INT16_T: {
+                    return int_to_integer(vm->m_heap, (int16_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINT16_T: {
+                    return uint_to_integer(vm->m_heap, (uint16_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INT32_T: {
+                    return int_to_integer(vm->m_heap, (int32_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINT32_T: {
+                    return uint_to_integer(vm->m_heap, (uint32_t)call_c_intptr(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_INT64_T: {
+                    return int64_to_integer(vm->m_heap, (int64_t)call_c_int64(vm, func, args));
+                }
+                case FFI_RETURN_TYPE_UINT64_T: {
+                    return uint64_to_integer(vm->m_heap, (uint64_t)call_c_int64(vm, func, args));
+                }
+            }
+            invalid_argument_violation(vm, "call-shared-object", "invalid c function return type", argv[0], 0, argc, argv);
+            return scm_undef;
+        }
+        invalid_argument_violation(vm, "call-shared-object", "too many arguments,", MAKEFIXNUM(argc), -1, argc, argv);
+        return scm_undef;
     }
-
-    raise_error(vm, "call-shared-object", "implementation does not support this feature", 0, argc, argv);
+    wrong_number_of_arguments_violation(vm, "call-shared-object", 2, -1, argc, argv);
     return scm_undef;
 }
 
@@ -282,8 +414,6 @@ void init_subr_ffi(object_heap_t* heap)
 {
     #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
 
-    DEFSUBR("load-shared-object", subr_load_shared_object);
-    DEFSUBR("lookup-shared-object", subr_lookup_shared_object);
     DEFSUBR("call-shared-object", subr_call_shared_object);
 }
 
