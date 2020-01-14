@@ -10,27 +10,40 @@
 #include "arith.h"
 #include "violation.h"
 
-#define FFI_C_TYPE_VOID            0x0000
-#define FFI_C_TYPE_BOOL            0x0001
-#define FFI_C_TYPE_SHORT           0x0002
-#define FFI_C_TYPE_INT             0x0003
-#define FFI_C_TYPE_INTPTR          0x0004
-#define FFI_C_TYPE_USHORT          0x0005
-#define FFI_C_TYPE_UINT            0x0006
-#define FFI_C_TYPE_UINTPTR         0x0007
-#define FFI_C_TYPE_FLOAT           0x0008
-#define FFI_C_TYPE_DOUBLE          0x0009
-#define FFI_C_TYPE_STRING          0x000a
-#define FFI_C_TYPE_SIZE_T          0x000b
-#define FFI_C_TYPE_INT8_T          0x000c
-#define FFI_C_TYPE_UINT8_T         0x000d
-#define FFI_C_TYPE_INT16_T         0x000e
-#define FFI_C_TYPE_UINT16_T        0x000f
-#define FFI_C_TYPE_INT32_T         0x0010
-#define FFI_C_TYPE_UINT32_T        0x0011
-#define FFI_C_TYPE_INT64_T         0x0012
-#define FFI_C_TYPE_UINT64_T        0x0013
-#define FFI_C_TYPE_MASK            0x00ff
+#define FFI_RETURN_TYPE_VOID        0x0000
+#define FFI_RETURN_TYPE_BOOL        0x0001
+#define FFI_RETURN_TYPE_SHORT       0x0002
+#define FFI_RETURN_TYPE_INT         0x0003
+#define FFI_RETURN_TYPE_INTPTR      0x0004
+#define FFI_RETURN_TYPE_USHORT      0x0005
+#define FFI_RETURN_TYPE_UINT        0x0006
+#define FFI_RETURN_TYPE_UINTPTR     0x0007
+#define FFI_RETURN_TYPE_FLOAT       0x0008
+#define FFI_RETURN_TYPE_DOUBLE      0x0009
+#define FFI_RETURN_TYPE_STRING      0x000a
+#define FFI_RETURN_TYPE_SIZE_T      0x000b
+#define FFI_RETURN_TYPE_INT8_T      0x000c
+#define FFI_RETURN_TYPE_UINT8_T     0x000d
+#define FFI_RETURN_TYPE_INT16_T     0x000e
+#define FFI_RETURN_TYPE_UINT16_T    0x000f
+#define FFI_RETURN_TYPE_INT32_T     0x0010
+#define FFI_RETURN_TYPE_UINT32_T    0x0011
+#define FFI_RETURN_TYPE_INT64_T     0x0012
+#define FFI_RETURN_TYPE_UINT64_T    0x0013
+#define FFI_RETURN_TYPE_MASK        0x00ff
+
+#define FFI_CALL_TYPE_STDCALL       0x0100
+#define FFI_CALL_TYPE_MASK          0xff00
+
+#define CALLBACK_RETURN_TYPE_INTPTR     0x0000
+#define CALLBACK_RETURN_TYPE_INT64_T    0x0001
+#define CALLBACK_RETURN_TYPE_FLOAT      0x0002
+#define CALLBACK_RETURN_TYPE_DOUBLE     0x0003
+#define CALLBACK_RETURN_TYPE_MASK       0x00ff
+#define CALLBACK_CALL_TYPE_STDCALL      0x0100
+#define CALLBACK_CALL_TYPE_MASK         0xff00
+
+#define FFI_MAX_ARGC 32
 
 // load-shared-object
 scm_obj_t
@@ -84,6 +97,120 @@ subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+class c_arguments_t {
+    union value_t {
+        int8_t s8; int16_t s16; int32_t s32; int64_t s64;
+        uint8_t u8; uint16_t u16; uint32_t u32; uint64_t u64;
+        intptr_t ip; float f32; double f64;
+    };
+    int         m_argc;
+    ffi_type*   m_type[FFI_MAX_ARGC];
+    value_t     m_value[FFI_MAX_ARGC];
+    value_t*    m_argv[FFI_MAX_ARGC];
+public:
+    c_arguments_t() : m_argc(0) {
+        for (int i = 0; i < FFI_MAX_ARGC; i++) m_argv[i] = &m_value[i];
+    }
+    int argc() { return m_argc; }
+    void** argv() { return (void**)m_argv; }
+    ffi_type** types() { return m_type; }
+    const char* add(VM* vm, scm_obj_t obj, int signature) {
+        if (m_argc >= FFI_MAX_ARGC) fatal("fatal: c function stack frame overflow");
+        if (FIXNUMP(obj) || BIGNUMP(obj)) {
+            if (signature == 'x') {
+                m_type[m_argc] = &ffi_type_sint64;
+                m_value[m_argc++].s64 = coerce_exact_integer_to_int64(obj);
+            } else if (signature == 'i' || signature == 'p' || signature == '*') {
+                m_type[m_argc] = &ffi_type_pointer;
+                m_value[m_argc++].ip = coerce_exact_integer_to_intptr(obj);
+            } else if (signature == 'f') {
+                m_type[m_argc] = &ffi_type_float;
+                m_value[m_argc++].f32 = real_to_double(obj);
+            } else if (signature == 'd') {
+                m_type[m_argc] = &ffi_type_double;
+                m_value[m_argc++].f64 = real_to_double(obj);
+            } else {
+                goto bad_signature;
+            }
+            return NULL;
+        } else if (FLONUMP(obj)) {
+            if (signature == 'f') {
+                scm_flonum_t flonum = (scm_flonum_t)obj;
+                m_type[m_argc] = &ffi_type_float;
+                m_value[m_argc++].f32 = flonum->value;
+            } else if (signature == 'd' || signature == '*') {
+                scm_flonum_t flonum = (scm_flonum_t)obj;
+                m_type[m_argc] = &ffi_type_double;
+                m_value[m_argc++].f64 = flonum->value;
+            } else {
+                goto bad_signature;
+            }
+            return NULL;
+        } else if (BVECTORP(obj)) {
+            if (signature != 'p' && signature != '*') goto bad_signature;
+            scm_bvector_t bvector = (scm_bvector_t)obj;
+            m_type[m_argc] = &ffi_type_pointer;
+            m_value[m_argc++].ip = (intptr_t)bvector->elts;
+            return NULL;
+        } else if (VECTORP(obj)) {
+            if (signature != 'c') goto bad_signature;
+            scm_vector_t vector = (scm_vector_t)obj;
+            int n = vector->count;
+            if (n == 0) return "nonempty vector";
+            assert(n);
+            if (!FIXNUMP(vector->elts[0])) return "vector contains fixnum in first element";
+            int ref = FIXNUM(vector->elts[0]);
+            scm_bvector_t bvector = make_bvector(vm->m_heap, sizeof(intptr_t) * (n - 1));
+            for (int i = 0; i < n - 1; i++) {
+                if (BVECTORP(vector->elts[i + 1])) {
+                    *(uint8_t**)(bvector->elts + sizeof(intptr_t) * i) = ((scm_bvector_t)vector->elts[i + 1])->elts;
+                } else {
+                    return "vector of bytevector";
+                }
+            }
+            while (ref) {
+                intptr_t datum = (intptr_t)bvector->elts;
+                bvector = make_bvector(vm->m_heap, sizeof(intptr_t));
+                *(intptr_t*)(bvector->elts) = datum;
+                ref--;
+            }
+            m_type[m_argc] = &ffi_type_pointer;
+            m_value[m_argc++].ip = (intptr_t)bvector->elts;
+            return NULL;
+        }
+    bad_signature:
+        switch (signature) {
+            case 'i': case 'x': return "exact integer";
+            case 'p': return "exact integer or bytevector";
+            case 'c': return "vector";
+            case 'f': case 'd': return "real";
+            case '*': return "exact integer, real, or bytevector";
+            default: return "invalid c function argument type";
+        }
+    }
+};
+
+// call-shared-object
+scm_obj_t
+subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
+{
+    c_arguments_t args;
+
+    scm_bvector_t bvector = make_bvector(vm->m_heap, 10);
+    strncpy((char*)bvector->elts, "hello", 6);
+    args.add(vm, bvector, 'p');
+
+    ffi_cif cif;
+    int rc;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.argc(), &ffi_type_void, args.types()) == FFI_OK) {
+        ffi_call(&cif, FFI_FN(puts), &rc, args.argv());
+    }
+
+    raise_error(vm, "call-shared-object", "implementation does not support this feature", 0, argc, argv);
+    return scm_undef;
+}
+
+/*
 void callback(ffi_cif* cif, void* ret, void* args[], void* context)
 {
   puts("callback");
@@ -146,28 +273,11 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
     for (int i = 0; i < 5; i++) printf("%d ", base[i]);
     puts("");
 
-/*
 
-  ffi_cif cif;
-  ffi_type* args[4];
-  void* values[4];
-  const char* s;
-  int rc;
-
-  args[0] = &ffi_type_pointer;
-  values[0] = &s;
-
-  if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, &ffi_type_uint, args) == FFI_OK) {
-    s = "Hello World!";
-    ffi_call(&cif, (void(*)(void))puts, &rc, values);
-    s = "This is cool!";
-    ffi_call(&cif, (void(*)(void))puts, &rc, values);
-  }
-*/
     raise_error(vm, "call-shared-object", "implementation does not support this feature", 0, argc, argv);
     return scm_undef;
 }
-
+*/
 void init_subr_ffi(object_heap_t* heap)
 {
     #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
