@@ -64,9 +64,9 @@ class c_arguments_t {
         intptr_t ip; float f32; double f64;
     };
     int         m_argc;
+    value_t*    m_argv[FFI_MAX_ARGC];
     ffi_type*   m_type[FFI_MAX_ARGC];
     value_t     m_value[FFI_MAX_ARGC];
-    value_t*    m_argv[FFI_MAX_ARGC];
 public:
     c_arguments_t() : m_argc(0) {
         for (int i = 0; i < FFI_MAX_ARGC; i++) m_argv[i] = &m_value[i];
@@ -148,6 +148,121 @@ public:
             case '*': return "exact integer, real, or bytevector";
             default: return "invalid c function argument type";
         }
+    }
+};
+
+/*
+(import (rnrs) (digamma ffi))
+(define libc (load-shared-object "libc.so.6")) ; Ubuntu 8.10
+(define qsort
+    (c-function libc "libc"
+      void qsort (void* int int [c-callback int (void* void*)])))
+(define comp
+    (lambda (a1 a2)
+      (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
+            (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
+        (cond ((= n1 n2) 0)
+              ((> n1 n2) 1)
+              (else -1)))))
+(define nums (uint-list->bytevector '(10000 1000 10 100000 100) (native-endianness) 4))
+(bytevector->uint-list nums (native-endianness) 4) ; => (10000 1000 10 100000 100)
+(qsort nums 5 4 comp)
+(bytevector->uint-list nums (native-endianness) 4) ; => (10 100 1000 10000 100000)
+*/
+
+class c_trampoline_t {
+    int             m_argc;
+    char*           m_signature;
+    ffi_type*       m_type[FFI_MAX_ARGC];
+    scm_closure_t   m_scm_closure;
+    void*           m_address;
+    int             m_ret_type;
+    ffi_closure*    m_ffi_closure;
+    ffi_cif         m_cif;
+    VM*             m_vm;
+
+    static void c_callback(ffi_cif* cif, void* ret, void* args[], void* context) {
+        c_trampoline_t* trampoline = (c_trampoline_t*)context;
+        puts("callback");
+        puts(trampoline->m_signature);
+        void* arg0 = args[0]; // arg0 point box that parameter is stored
+        void* arg1 = args[1];
+        printf("n0 %d\n", **(int**)arg0);
+        printf("n1 %d\n", **(int**)arg1);
+        *(int*)ret = **(int**)arg0 < **(int**)arg1;
+    }
+
+public:
+    c_trampoline_t(VM* vm, int ret_type, const char* signature, scm_closure_t closure)
+        : m_vm(vm), m_ret_type(ret_type), m_scm_closure(closure), m_address(NULL), m_ffi_closure(NULL) {
+        m_argc = strlen(signature);
+        m_signature = new char[m_argc + 1];
+        strncpy(m_signature, signature, m_argc + 1);
+        for (int i = 0; i < m_argc; i++) {
+            char c = m_signature[i];
+            switch (c) {
+                case 'L': {
+                    m_type[i] = &ffi_type_pointer;;
+                } break;
+                case 'u': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'U': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'b': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'B': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'q': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'Q': {
+                    m_type[i] = &ffi_type_pointer;
+                } break;
+                case 'o': {
+                    m_type[i] = &ffi_type_uint64;
+                } break;
+                case 'O': {
+                    m_type[i] = &ffi_type_uint64;
+                } break;
+                case 'f': {
+                    m_type[i] = &ffi_type_float;
+                } break;
+                case 'd': {
+                    m_type[i] = &ffi_type_double;
+                } break;
+
+                default: fatal("fatal: invalid callback argument signature %c\n[exit]\n", c);
+            }
+        }
+        ffi_type* ffi_ret_type = NULL;
+        switch (m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
+            case CALLBACK_RETURN_TYPE_INT64_T: ffi_ret_type = &ffi_type_uint64; break;
+            case CALLBACK_RETURN_TYPE_INTPTR: ffi_ret_type = &ffi_type_pointer; break;
+            case CALLBACK_RETURN_TYPE_DOUBLE: ffi_ret_type = &ffi_type_double; break;
+            case CALLBACK_RETURN_TYPE_FLOAT: ffi_ret_type = &ffi_type_float; break;
+
+            default: fatal("fatal: invalid callback return type %d\n", m_ret_type);
+        }
+        m_ffi_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &m_address);
+        if (m_ffi_closure) {
+            if (ffi_prep_cif(&m_cif, FFI_DEFAULT_ABI, m_argc, ffi_ret_type, m_type) == FFI_OK) {
+                if (ffi_prep_closure_loc(m_ffi_closure, &m_cif, c_callback, this, m_address) == FFI_OK) {
+                    return;
+                }
+            }
+        }
+        fatal("%s:%u internal error: cannot prepare c callback trampoline",__FILE__ , __LINE__);
+    }
+    ~c_trampoline_t() {
+        ffi_closure_free(m_ffi_closure);
+        delete [] m_signature;
+    }
+    scm_obj_t address() {
+        return uintptr_to_integer(m_vm->m_heap, (uintptr_t)m_address);
     }
 };
 
@@ -436,133 +551,11 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
 }
 */
 
-class c_trampoline_t {
-    union value_t {
-        int8_t s8; int16_t s16; int32_t s32; int64_t s64;
-        uint8_t u8; uint16_t u16; uint32_t u32; uint64_t u64;
-        intptr_t ip; float f32; double f64;
-    };
-    int             m_argc;
-    char*           m_signature;
-    ffi_type*       m_type[FFI_MAX_ARGC];
-    scm_closure_t   m_scm_closure;
-    void*           m_address;
-    int             m_ret_type;
-    ffi_closure*    m_ffi_closure;
-    ffi_cif         m_cif;
-    VM*             m_vm;
-
-    static void c_callback(ffi_cif* cif, void* ret, void* args[], void* context) {
-        c_trampoline_t* trampoline = (c_trampoline_t*)context;
-        puts("callback");
-        puts(trampoline->m_signature);
-        void* arg0 = args[0]; // arg0 point box that parameter is stored
-        void* arg1 = args[1];
-        printf("n0 %d\n", **(int**)arg0);
-        printf("n1 %d\n", **(int**)arg1);
-        *(int*)ret = **(int**)arg0 < **(int**)arg1;
-
-
-
-    }
-
-public:
-    c_trampoline_t(VM* vm, int ret_type, const char* signature, scm_closure_t closure)
-        : m_vm(vm), m_ret_type(ret_type), m_scm_closure(closure), m_address(NULL), m_ffi_closure(NULL) {
-        m_argc = strlen(signature);
-        m_signature = new char[m_argc + 1];
-        strncpy(m_signature, signature, m_argc + 1);
-        for (int i = 0; i < m_argc; i++) {
-            char c = m_signature[i];
-            switch (c) {
-                case 'L': {
-                    m_type[i] = &ffi_type_pointer;;
-                } break;
-                case 'u': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'U': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'b': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'B': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'q': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'Q': {
-                    m_type[i] = &ffi_type_pointer;
-                } break;
-                case 'o': {
-                    m_type[i] = &ffi_type_uint64;
-                } break;
-                case 'O': {
-                    m_type[i] = &ffi_type_uint64;
-                } break;
-                case 'f': {
-                    m_type[i] = &ffi_type_float;
-                } break;
-                case 'd': {
-                    m_type[i] = &ffi_type_double;
-                } break;
-
-                default: fatal("fatal: invalid callback argument signature %c\n[exit]\n", c);
-            }
-        }
-        ffi_type* ffi_ret_type = NULL;
-        switch (m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
-            case CALLBACK_RETURN_TYPE_INT64_T: ffi_ret_type = &ffi_type_uint64; break;
-            case CALLBACK_RETURN_TYPE_INTPTR: ffi_ret_type = &ffi_type_pointer; break;
-            case CALLBACK_RETURN_TYPE_DOUBLE: ffi_ret_type = &ffi_type_double; break;
-            case CALLBACK_RETURN_TYPE_FLOAT: ffi_ret_type = &ffi_type_float; break;
-            default: fatal("fatal: invalid callback return type %d\n", m_ret_type);
-        }
-        m_ffi_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &m_address);
-        if (m_ffi_closure) {
-            if (ffi_prep_cif(&m_cif, FFI_DEFAULT_ABI, m_argc, ffi_ret_type, m_type) == FFI_OK) {
-                if (ffi_prep_closure_loc(m_ffi_closure, &m_cif, c_callback, this, m_address) == FFI_OK) {
-                    return;
-                }
-            }
-        }
-        fatal("%s:%u internal error: cannot prepare c callback trampoline",__FILE__ , __LINE__);
-    }
-    ~c_trampoline_t() {
-        ffi_closure_free(m_ffi_closure);
-        delete [] m_signature;
-    }
-    scm_obj_t address() {
-        return uintptr_to_integer(m_vm->m_heap, (uintptr_t)m_address);
-    }
-};
-
 // (import (digamma ffi))
 // int (*comparator)(const void*, const void*))
 // (define proc (lambda (n m) (> n m)))
 // (make-cdecl-callback 'int '(void* void*) proc)
 
-/*
-(import (rnrs) (digamma ffi))
-(define libc (load-shared-object "libc.so.6")) ; Ubuntu 8.10
-(define qsort
-    (c-function libc "libc"
-      void qsort (void* int int [c-callback int (void* void*)])))
-(define comp
-    (lambda (a1 a2)
-      (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
-            (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
-        (cond ((= n1 n2) 0)
-              ((> n1 n2) 1)
-              (else -1)))))
-(define nums (uint-list->bytevector '(10000 1000 10 100000 100) (native-endianness) 4))
-(bytevector->uint-list nums (native-endianness) 4) ; => (10000 1000 10 100000 100)
-(qsort nums 5 4 comp)
-(bytevector->uint-list nums (native-endianness) 4) ; => (10 100 1000 10000 100000)
-
-*/
 
 // make-callback-trampoline
 scm_obj_t
