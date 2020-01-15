@@ -32,5 +32,5 @@
 *.sublime-project
 *.sublime-workspace
 spheres.pgm
-digamma
 .vscode
+/digamma
