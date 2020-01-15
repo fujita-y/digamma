@@ -436,16 +436,6 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
 }
 */
 
-void c_callback(ffi_cif* cif, void* ret, void* args[], void* trampoline)
-{
-  puts("callback");
-  void* arg0 = args[0]; // arg0 point box that parameter is stored
-  void* arg1 = args[1];
-  printf("n0 %d\n", **(int**)arg0);
-  printf("n1 %d\n", **(int**)arg1);
-  *(int*)ret = **(int**)arg0 < **(int**)arg1;
-}
-
 class c_trampoline_t {
     union value_t {
         int8_t s8; int16_t s16; int32_t s32; int64_t s64;
@@ -455,17 +445,30 @@ class c_trampoline_t {
     int             m_argc;
     char*           m_signature;
     ffi_type*       m_type[FFI_MAX_ARGC];
-    scm_closure_t   m_scheme;
+    scm_closure_t   m_scm_closure;
     void*           m_address;
     int             m_ret_type;
-    ffi_closure*    m_closure;
+    ffi_closure*    m_ffi_closure;
     ffi_cif         m_cif;
     VM*             m_vm;
-//    value_t     m_value[FFI_MAX_ARGC];
-//    value_t*    m_argv[FFI_MAX_ARGC];
+
+    static void c_callback(ffi_cif* cif, void* ret, void* args[], void* context) {
+        c_trampoline_t* trampoline = (c_trampoline_t*)context;
+        puts("callback");
+        puts(trampoline->m_signature);
+        void* arg0 = args[0]; // arg0 point box that parameter is stored
+        void* arg1 = args[1];
+        printf("n0 %d\n", **(int**)arg0);
+        printf("n1 %d\n", **(int**)arg1);
+        *(int*)ret = **(int**)arg0 < **(int**)arg1;
+
+
+
+    }
+
 public:
-    c_trampoline_t(VM* vm, int ret_type, const char* signature, scm_closure_t scheme)
-        : m_vm(vm), m_ret_type(ret_type), m_scheme(scheme), m_address(NULL), m_closure(NULL) {
+    c_trampoline_t(VM* vm, int ret_type, const char* signature, scm_closure_t closure)
+        : m_vm(vm), m_ret_type(ret_type), m_scm_closure(closure), m_address(NULL), m_ffi_closure(NULL) {
         m_argc = strlen(signature);
         m_signature = new char[m_argc + 1];
         strncpy(m_signature, signature, m_argc + 1);
@@ -511,26 +514,16 @@ public:
         }
         ffi_type* ffi_ret_type = NULL;
         switch (m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
-            case CALLBACK_RETURN_TYPE_INTPTR: {
-                ffi_ret_type = &ffi_type_pointer;
-            } break;
-            case CALLBACK_RETURN_TYPE_INT64_T: {
-                ffi_ret_type = &ffi_type_uint64;
-            } break;
-            case CALLBACK_RETURN_TYPE_FLOAT: {
-                ffi_ret_type = &ffi_type_float;
-            } break;
-            case CALLBACK_RETURN_TYPE_DOUBLE: {
-                ffi_ret_type = &ffi_type_double;
-            } break;
-
+            case CALLBACK_RETURN_TYPE_INT64_T: ffi_ret_type = &ffi_type_uint64; break;
+            case CALLBACK_RETURN_TYPE_INTPTR: ffi_ret_type = &ffi_type_pointer; break;
+            case CALLBACK_RETURN_TYPE_DOUBLE: ffi_ret_type = &ffi_type_double; break;
+            case CALLBACK_RETURN_TYPE_FLOAT: ffi_ret_type = &ffi_type_float; break;
             default: fatal("fatal: invalid callback return type %d\n", m_ret_type);
         }
-
-        m_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &m_address);
-        if (m_closure) {
+        m_ffi_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &m_address);
+        if (m_ffi_closure) {
             if (ffi_prep_cif(&m_cif, FFI_DEFAULT_ABI, m_argc, ffi_ret_type, m_type) == FFI_OK) {
-                if (ffi_prep_closure_loc(m_closure, &m_cif, c_callback, this, m_address) == FFI_OK) {
+                if (ffi_prep_closure_loc(m_ffi_closure, &m_cif, c_callback, this, m_address) == FFI_OK) {
                     return;
                 }
             }
@@ -538,7 +531,7 @@ public:
         fatal("%s:%u internal error: cannot prepare c callback trampoline",__FILE__ , __LINE__);
     }
     ~c_trampoline_t() {
-        ffi_closure_free(m_closure);
+        ffi_closure_free(m_ffi_closure);
         delete [] m_signature;
     }
     scm_obj_t address() {
@@ -580,11 +573,10 @@ subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[])
             if (STRINGP(argv[1])) {
                 const char* signature = ((scm_string_t)argv[1])->name;
                 if (CLOSUREP(argv[2])) {
+                    scoped_lock lock(vm->m_heap->m_trampolines->lock);
                     c_trampoline_t* trampoline = new c_trampoline_t(vm, FIXNUM(argv[0]), signature, (scm_closure_t)argv[2]);
                     return trampoline->address();
-                    // return make_callback(vm, FIXNUM(argv[0]), signature, (scm_closure_t)argv[2]);
-                    // see callback_scheme in ffi.cpp
-                    fatal("%s:%u make-callback-trampoline not supported on this build", __FILE__, __LINE__);
+                    // return make_callback(vm, FIXNUM(argv[0]), signature, (scm_ffi_closure_t)argv[2]);
                 }
                 wrong_type_argument_violation(vm, "make-callback-trampoline", 2, "closure", argv[2], argc, argv);
                 return scm_undef;
