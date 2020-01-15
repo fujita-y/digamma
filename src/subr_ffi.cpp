@@ -159,6 +159,7 @@ public:
       void qsort (void* int int [c-callback int (void* void*)])))
 (define comp
     (lambda (a1 a2)
+      (display "[scheme proc invoked]") (newline)
       (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
             (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
         (cond ((= n1 n2) 0)
@@ -182,14 +183,100 @@ class c_trampoline_t {
     VM*             m_vm;
 
     static void c_callback(ffi_cif* cif, void* ret, void* args[], void* context) {
-        c_trampoline_t* trampoline = (c_trampoline_t*)context;
+        /*
         puts("callback");
-        puts(trampoline->m_signature);
         void* arg0 = args[0]; // arg0 point box that parameter is stored
         void* arg1 = args[1];
         printf("n0 %d\n", **(int**)arg0);
         printf("n1 %d\n", **(int**)arg1);
         *(int*)ret = **(int**)arg0 < **(int**)arg1;
+*/
+
+        c_trampoline_t* trampoline = (c_trampoline_t*)context;
+        //printf("ret type %d\n", trampoline->m_ret_type);
+
+        VM* vm = trampoline->m_vm;
+        try {
+            scm_obj_t* argv = (scm_obj_t*)alloca(sizeof(scm_obj_t*) * trampoline->m_argc);
+            for (int i = 0; i < trampoline->m_argc; i++) {
+                char c = trampoline->m_signature[i];
+                void* arg = args[i];
+                switch (c) {
+                    case 'L': {
+                        int8_t s8 = *(int8_t*)arg;
+                        argv[i] = s8 ? MAKEFIXNUM(1) : MAKEFIXNUM(0);
+                    } break;
+                    case 'u': {
+                        int8_t s8 = *(int8_t*)arg;
+                        argv[i] = intptr_to_integer(vm->m_heap, s8);
+                    } break;
+                    case 'U': {
+                        uint8_t u8 = *(uint8_t*)arg;
+                        argv[i] = uintptr_to_integer(vm->m_heap, u8);
+                    } break;
+                    case 'b': {
+                        int16_t s16 = *(int16_t*)arg;
+                        argv[i] = intptr_to_integer(vm->m_heap, s16);
+                    } break;
+                    case 'B': {
+                        uint16_t u16 = *(uint16_t*)arg;
+                        argv[i] = uintptr_to_integer(vm->m_heap, u16);
+                    } break;
+                    case 'q': {
+                        int32_t s32 = *(int32_t*)arg;
+                        argv[i] = int32_to_integer(vm->m_heap, s32);
+                    } break;
+                    case 'Q': {
+                        uint32_t u32 = *(uint32_t*)arg;
+                        argv[i] = uint32_to_integer(vm->m_heap, u32);
+                    } break;
+                    case 'o': {
+                        int64_t s64 = *(int64_t*)arg;
+                        argv[i] = int64_to_integer(vm->m_heap, s64);
+                    } break;
+                    case 'O': {
+                        uint64_t u64 = *(uint64_t*)arg;
+                        argv[i] = uint64_to_integer(vm->m_heap, u64);
+                    } break;
+                    case 'f': {
+                        float f32 = *(float*)arg;
+                        argv[i] = make_flonum(vm->m_heap, f32);
+                    } break;
+                    case 'd': {
+                        double f64 = *(double*)arg;
+                        argv[i] = make_flonum(vm->m_heap, f64);
+                    } break;
+
+                    default: fatal("fatal: invalid callback argument signature %c\n[exit]\n", c);
+                }
+            }
+            scm_obj_t ans = vm->call_scheme_argv(trampoline->m_scm_closure, trampoline->m_argc, argv);
+            switch (trampoline->m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
+                case CALLBACK_RETURN_TYPE_INT64_T: {
+                    if (exact_integer_pred(ans)) *(int64_t*)ret = coerce_exact_integer_to_int64(ans);
+                    else *(int64_t*)ret = 0;
+                } break;
+                case CALLBACK_RETURN_TYPE_INTPTR: {
+                    if (exact_integer_pred(ans)) *(intptr_t*)ret = coerce_exact_integer_to_intptr(ans);
+                    else *(intptr_t*)ret = 0;
+                } break;
+                case CALLBACK_RETURN_TYPE_DOUBLE: {
+                    if (real_valued_pred(ans)) *(double*)ret = real_to_double(ans);
+                    else *(double*)ret = 0.0;
+                } break;
+                case CALLBACK_RETURN_TYPE_FLOAT: {
+                    if (real_valued_pred(ans)) *(float*)ret = real_to_double(ans);
+                    else *(float*)ret = 0.0;
+                } break;
+
+                default: fatal("fatal: invalid callback return type %d\n", trampoline->m_ret_type);
+            }
+           // *(int*)ret = FIXNUM(ans);
+        } catch (vm_exit_t& e) {
+            exit(e.m_code);
+        } catch (...) {
+            fatal("fatal: unhandled exception in callback\n[exit]\n");
+        }
     }
 
 public:
@@ -202,28 +289,28 @@ public:
             char c = m_signature[i];
             switch (c) {
                 case 'L': {
-                    m_type[i] = &ffi_type_pointer;;
+                    m_type[i] = &ffi_type_sint8;
                 } break;
                 case 'u': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_sint8;
                 } break;
                 case 'U': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_uint8;
                 } break;
                 case 'b': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_sint16;
                 } break;
                 case 'B': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_uint16;
                 } break;
                 case 'q': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_sint32;
                 } break;
                 case 'Q': {
-                    m_type[i] = &ffi_type_pointer;
+                    m_type[i] = &ffi_type_uint32;
                 } break;
                 case 'o': {
-                    m_type[i] = &ffi_type_uint64;
+                    m_type[i] = &ffi_type_sint64;
                 } break;
                 case 'O': {
                     m_type[i] = &ffi_type_uint64;
