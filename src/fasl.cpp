@@ -102,17 +102,15 @@ fasl_printer_t::put_datum(scm_obj_t obj)
         if (obj == MAKEFIXNUM(1)) { emit_u8(FASL_TAG_INT1); return; }
         if (obj == MAKEFIXNUM(2)) { emit_u8(FASL_TAG_INT2); return; }
         if (obj == MAKEFIXNUM(3)) { emit_u8(FASL_TAG_INT3); return; }
-#if ARCH_LP64
-        assert(sizeof(intptr_t) == sizeof(uint64_t));
+        int64_t num = FIXNUM(obj);
+        if (-1073741825 < num && num < 1073741824) {
+            emit_u8(FASL_TAG_FIXNUM32);
+            emit_u32((uint32_t)num);
+            return;
+        }
         emit_u8(FASL_TAG_FIXNUM64);
-        emit_u64((uint64_t)FIXNUM(obj));
+        emit_u64((uint64_t)num);
         return;
-#else
-        assert(sizeof(intptr_t) == sizeof(uint32_t));
-        emit_u8(FASL_TAG_FIXNUM32);
-        emit_u32((uint32_t)FIXNUM(obj));
-        return;
-#endif
     }
     if (PAIRP(obj)) {
         put_list(obj);
@@ -156,12 +154,26 @@ fasl_printer_t::put_datum(scm_obj_t obj)
         scm_bignum_t bn = (scm_bignum_t)obj;
         int sign = bn_get_sign(bn); // 0 or 1 or -1
         int count = bn_get_count(bn);
+        int64_t num;
+        if (bignum_to_int64(bn, &num)) {
+            if (-1073741825 < num && num < 1073741824) {
+                emit_u8(FASL_TAG_FIXNUM32);
+                emit_u32((uint32_t)num);
+                return;
+            }
+            if (-4611686018427387905 < num && num < 4611686018427387904) {
+                emit_u8(FASL_TAG_FIXNUM64);
+                emit_u64((uint64_t)num);
+                return;
+            }
+        }
         emit_u8(FASL_TAG_BIGNUM);
         emit_u32(sign);
-        emit_u32(count);
 #if USE_DIGIT32
+        emit_u32(count);
         for (int i = 0; i < count; i++) emit_u32(bn->elts[i]);
 #else
+        emit_u32(count + count);
         for (int i = 0; i < count; i++) {
             uint64_t digit = bn->elts[i];
             emit_u32(digit & 0xffffffff);
@@ -263,11 +275,10 @@ fasl_reader_t::get_datum()
         return MAKEFIXNUM(value);
     }
     case FASL_TAG_FIXNUM64: {
-#if ARCH_LP64
         int64_t value = (int64_t)fetch_u64();
+#if ARCH_LP64
         return MAKEFIXNUM(value);
 #else
-        int64_t value = (int64_t)fetch_u64();
         return int64_to_integer(m_vm->m_heap, value);
 #endif
     }
@@ -323,25 +334,26 @@ fasl_reader_t::get_datum()
     case FASL_TAG_BIGNUM: {
         int sign = (int)fetch_u32();
         int count = (int)fetch_u32();
+#if USE_DIGIT32
         scm_bignum_t bn = make_bignum(m_vm->m_heap, count);
         bn_set_sign(bn, sign);
-#if USE_DIGIT32
         for (int i = 0; i < count; i++) bn->elts[i] = fetch_u32();
         return bn;
 #else
-        for (int i = 0; i < count; i++) {
+        scm_bignum_t bn = make_bignum(m_vm->m_heap, (count + 1) / 2);
+        bn_set_sign(bn, sign);
+        for (int i = 0; i < count / 2; i++) {
             uint32_t lo = fetch_u32();
             uint32_t hi = fetch_u32();
             bn->elts[i] = ((uint64_t)hi << 32) + lo;
         }
-        if (count == 1) {
-            int128_t n = bn->elts[0];
-            if (sign < 0) n = -n;
-            if ((n >= FIXNUM_MIN) & (n <= FIXNUM_MAX)) return MAKEFIXNUM(n);
+        if (count & 1) {
+            bn->elts[count / 2] = fetch_u32();
         }
         return bn;
 #endif
     }
+
     case FASL_TAG_BVECTOR: {
         uint32_t count = fetch_u32();
         scm_bvector_t bv = make_bvector(m_vm->m_heap, count);
