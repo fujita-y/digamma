@@ -97,7 +97,6 @@ VM::init(object_heap_t* heap)
         m_current_dynamic_wind_record = scm_nil;
         m_recursion_level = 0;
         m_shared_object_errno = 0;
-        m_shared_object_win32_lasterror = 0;
 #if BOOT_R6RS_COMPLIANT_SYNTAX
         m_flags.lexical_syntax_version = MAKEFIXNUM(6);
 #else
