@@ -54,14 +54,14 @@ ifneq (,$(findstring Linux, $(UNAME)))
   LDLIBS = -pthread -Wl,--no-as-needed -ldl -lffi
 endif
 
-ifneq (,$(findstring Darwin, $(UNAME)))
-    CXXFLAGS += -fomit-frame-pointer -momit-leaf-frame-pointer
-  ifeq ($(DATAMODEL), ILP32)
-    CXXFLAGS += -m32
-  else
-    CXXFLAGS += -m64
-  endif
-endif
+# ifneq (,$(findstring Darwin, $(UNAME)))
+#     CXXFLAGS += -fomit-frame-pointer -momit-leaf-frame-pointer
+#   ifeq ($(DATAMODEL), ILP32)
+#     CXXFLAGS += -m32
+#   else
+#     CXXFLAGS += -m64
+#   endif
+# endif
 
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))
 DEPS = $(patsubst %.cpp, %.d, $(filter %.cpp, $(SRCS)))
