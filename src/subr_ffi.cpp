@@ -8,48 +8,41 @@
 #include "heap.h"
 #include "subr.h"
 #include "arith.h"
+#include "hash.h"
 #include "violation.h"
 
-#define FFI_RETURN_TYPE_VOID        0x0000
-#define FFI_RETURN_TYPE_BOOL        0x0001
-#define FFI_RETURN_TYPE_SHORT       0x0002
-#define FFI_RETURN_TYPE_INT         0x0003
-#define FFI_RETURN_TYPE_INTPTR      0x0004
-#define FFI_RETURN_TYPE_USHORT      0x0005
-#define FFI_RETURN_TYPE_UINT        0x0006
-#define FFI_RETURN_TYPE_UINTPTR     0x0007
-#define FFI_RETURN_TYPE_FLOAT       0x0008
-#define FFI_RETURN_TYPE_DOUBLE      0x0009
-#define FFI_RETURN_TYPE_STRING      0x000a
-#define FFI_RETURN_TYPE_SIZE_T      0x000b
-#define FFI_RETURN_TYPE_INT8_T      0x000c
-#define FFI_RETURN_TYPE_UINT8_T     0x000d
-#define FFI_RETURN_TYPE_INT16_T     0x000e
-#define FFI_RETURN_TYPE_UINT16_T    0x000f
-#define FFI_RETURN_TYPE_INT32_T     0x0010
-#define FFI_RETURN_TYPE_UINT32_T    0x0011
-#define FFI_RETURN_TYPE_INT64_T     0x0012
-#define FFI_RETURN_TYPE_UINT64_T    0x0013
-#define FFI_RETURN_TYPE_MASK        0x00ff
-
-#define FFI_CALL_TYPE_STDCALL       0x0100
-#define FFI_CALL_TYPE_MASK          0xff00
+#define FFI_RETURN_TYPE_VOID            0x0000
+#define FFI_RETURN_TYPE_BOOL            0x0001
+#define FFI_RETURN_TYPE_SHORT           0x0002
+#define FFI_RETURN_TYPE_INT             0x0003
+#define FFI_RETURN_TYPE_INTPTR          0x0004
+#define FFI_RETURN_TYPE_USHORT          0x0005
+#define FFI_RETURN_TYPE_UINT            0x0006
+#define FFI_RETURN_TYPE_UINTPTR         0x0007
+#define FFI_RETURN_TYPE_FLOAT           0x0008
+#define FFI_RETURN_TYPE_DOUBLE          0x0009
+#define FFI_RETURN_TYPE_STRING          0x000a
+#define FFI_RETURN_TYPE_SIZE_T          0x000b
+#define FFI_RETURN_TYPE_INT8_T          0x000c
+#define FFI_RETURN_TYPE_UINT8_T         0x000d
+#define FFI_RETURN_TYPE_INT16_T         0x000e
+#define FFI_RETURN_TYPE_UINT16_T        0x000f
+#define FFI_RETURN_TYPE_INT32_T         0x0010
+#define FFI_RETURN_TYPE_UINT32_T        0x0011
+#define FFI_RETURN_TYPE_INT64_T         0x0012
+#define FFI_RETURN_TYPE_UINT64_T        0x0013
 
 #define CALLBACK_RETURN_TYPE_INTPTR     0x0000
 #define CALLBACK_RETURN_TYPE_INT64_T    0x0001
 #define CALLBACK_RETURN_TYPE_FLOAT      0x0002
 #define CALLBACK_RETURN_TYPE_DOUBLE     0x0003
-#define CALLBACK_RETURN_TYPE_MASK       0x00ff
-#define CALLBACK_CALL_TYPE_STDCALL      0x0100
-#define CALLBACK_CALL_TYPE_MASK         0xff00
 
 #define FFI_MAX_ARGC 32
 
 class capture_errno {
     VM* m_vm;
 public:
-    capture_errno(VM* vm) {
-        m_vm = vm;
+    capture_errno(VM* vm) : m_vm(vm)  {
         errno = m_vm->m_shared_object_errno;
     }
     ~capture_errno() {
@@ -151,32 +144,11 @@ public:
     }
 };
 
-/*
-(import (rnrs) (digamma ffi))
-(define libc (load-shared-object "libc.so.6")) ; Ubuntu 8.10
-(define qsort
-    (c-function libc "libc"
-      void qsort (void* int int [c-callback int (void* void*)])))
-(define comp
-    (lambda (a1 a2)
-      (display "[scheme proc invoked]") (newline)
-      (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
-            (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
-        (cond ((= n1 n2) 0)
-              ((> n1 n2) 1)
-              (else -1)))))
-(define nums (uint-list->bytevector '(10000 1000 10 100000 100) (native-endianness) 4))
-(bytevector->uint-list nums (native-endianness) 4) ; => (10000 1000 10 100000 100)
-(qsort nums 5 4 comp)
-(bytevector->uint-list nums (native-endianness) 4) ; => (10 100 1000 10000 100000)
-*/
-
 class c_trampoline_t {
     int             m_argc;
     char*           m_signature;
     ffi_type*       m_type[FFI_MAX_ARGC];
-    scm_closure_t   m_scm_closure;
-    void*           m_address;
+    scm_obj_t       m_uid;
     int             m_ret_type;
     ffi_closure*    m_ffi_closure;
     ffi_cif         m_cif;
@@ -239,8 +211,13 @@ class c_trampoline_t {
                     default: fatal("fatal: invalid callback argument signature %c\n[exit]\n", c);
                 }
             }
-            scm_obj_t ans = vm->call_scheme_argv(trampoline->m_scm_closure, trampoline->m_argc, argv);
-            switch (trampoline->m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
+
+            scoped_lock lock(vm->m_heap->m_trampolines->lock);
+            scm_obj_t closure = get_hashtable(vm->m_heap->m_trampolines, trampoline->m_uid);
+            if (!CLOSUREP(closure)) fatal("fatal: callback was destroyed\n[exit]\n");
+
+            scm_obj_t ans = vm->call_scheme_argv(closure, trampoline->m_argc, argv);
+            switch (trampoline->m_ret_type) {
                 case CALLBACK_RETURN_TYPE_INT64_T: {
                     if (exact_integer_pred(ans)) *(int64_t*)ret = coerce_exact_integer_to_int64(ans);
                     else *(int64_t*)ret = 0;
@@ -260,7 +237,6 @@ class c_trampoline_t {
 
                 default: fatal("fatal: invalid callback return type %d\n", trampoline->m_ret_type);
             }
-           // *(int*)ret = FIXNUM(ans);
         } catch (vm_exit_t& e) {
             exit(e.m_code);
         } catch (...) {
@@ -270,7 +246,7 @@ class c_trampoline_t {
 
 public:
     c_trampoline_t(VM* vm, int ret_type, const char* signature, scm_closure_t closure)
-        : m_vm(vm), m_ret_type(ret_type), m_scm_closure(closure), m_address(NULL), m_ffi_closure(NULL) {
+        : m_vm(vm), m_ret_type(ret_type), m_uid(MAKEFIXNUM(0)), m_ffi_closure(NULL) {
         m_argc = strlen(signature);
         m_signature = new char[m_argc + 1];
         strncpy(m_signature, signature, m_argc + 1);
@@ -315,7 +291,7 @@ public:
             }
         }
         ffi_type* ffi_ret_type = NULL;
-        switch (m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
+        switch (m_ret_type) {
             case CALLBACK_RETURN_TYPE_INT64_T: {
                 ffi_ret_type = &ffi_type_uint64;
             } break;
@@ -331,10 +307,12 @@ public:
 
             default: fatal("fatal: invalid callback return type %d\n", m_ret_type);
         }
-        m_ffi_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &m_address);
+        void* address;
+        m_ffi_closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &address);
         if (m_ffi_closure) {
             if (ffi_prep_cif(&m_cif, FFI_DEFAULT_ABI, m_argc, ffi_ret_type, m_type) == FFI_OK) {
-                if (ffi_prep_closure_loc(m_ffi_closure, &m_cif, c_callback, this, m_address) == FFI_OK) {
+                if (ffi_prep_closure_loc(m_ffi_closure, &m_cif, c_callback, this, address) == FFI_OK) {
+                    m_uid = uintptr_to_integer(m_vm->m_heap, (uintptr_t)address);
                     return;
                 }
             }
@@ -345,8 +323,8 @@ public:
         ffi_closure_free(m_ffi_closure);
         delete [] m_signature;
     }
-    scm_obj_t address() {
-        return uintptr_to_integer(m_vm->m_heap, (uintptr_t)m_address);
+    scm_obj_t uid() {
+        return m_uid;
     }
 };
 
@@ -406,14 +384,6 @@ call_c_double(VM* vm, void* func, c_arguments_t& args)
     return rc;
 }
 
-/*
-(define libc (load-shared-object "libc.so.6"))
-(define c-puts (lookup-shared-object libc "puts"))
-(call-shared-object 0 c-puts #f "p" (string->utf8/nul "hello world!")) ;=> hello world!
-(define c-strcat (lookup-shared-object libc "strcat"))
-(call-shared-object 10 c-strcat #f "pp" (string->utf8/nul "foo!") (string->utf8/nul "bar!")) ;=> "foo!bar!""
-*/
-
 // call-shared-object
 scm_obj_t
 subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
@@ -460,7 +430,7 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
                 }
                 if (signature[0] != '*') signature++;
             }
-            switch (type & FFI_RETURN_TYPE_MASK) {
+            switch (type) {
                 case FFI_RETURN_TYPE_VOID: {
                     call_c_intptr(vm, func, args);
                     return scm_unspecified;
@@ -575,10 +545,14 @@ subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[])
             if (STRINGP(argv[1])) {
                 const char* signature = ((scm_string_t)argv[1])->name;
                 if (CLOSUREP(argv[2])) {
+                    scm_closure_t closure = (scm_closure_t)argv[2];
+                    c_trampoline_t* trampoline = new c_trampoline_t(vm, FIXNUM(argv[0]), signature, closure);
+                    scm_obj_t uid = trampoline->uid();
                     scoped_lock lock(vm->m_heap->m_trampolines->lock);
-                    c_trampoline_t* trampoline = new c_trampoline_t(vm, FIXNUM(argv[0]), signature, (scm_closure_t)argv[2]);
-                    return trampoline->address();
-                    // return make_callback(vm, FIXNUM(argv[0]), signature, (scm_ffi_closure_t)argv[2]);
+                    vm->m_heap->write_barrier(closure);
+                    int nsize = put_hashtable(vm->m_heap->m_trampolines, uid, closure);
+                    if (nsize) rehash_hashtable(vm->m_heap, vm->m_heap->m_trampolines, nsize);
+                    return uid;
                 }
                 wrong_type_argument_violation(vm, "make-callback-trampoline", 2, "closure", argv[2], argc, argv);
                 return scm_undef;
@@ -601,3 +575,31 @@ void init_subr_ffi(object_heap_t* heap)
     DEFSUBR("make-callback-trampoline", subr_make_callback_trampoline);
     DEFSUBR("shared-object-errno", subr_shared_object_errno);
 }
+
+/*
+(define libc (load-shared-object "libc.so.6"))
+(define c-puts (lookup-shared-object libc "puts"))
+(call-shared-object 0 c-puts #f "p" (string->utf8/nul "hello world!")) ;=> hello world!
+(define c-strcat (lookup-shared-object libc "strcat"))
+(call-shared-object 10 c-strcat #f "pp" (string->utf8/nul "foo!") (string->utf8/nul "bar!")) ;=> "foo!bar!""
+*/
+
+/*
+(import (rnrs) (digamma ffi))
+(define libc (load-shared-object "libc.so.6")) ; Ubuntu 8.10
+(define qsort
+    (c-function libc "libc"
+      void qsort (void* int int [c-callback int (void* void*)])))
+(define comp
+    (lambda (a1 a2)
+      (display "[scheme proc invoked]") (newline)
+      (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
+            (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
+        (cond ((= n1 n2) 0)
+              ((> n1 n2) 1)
+              (else -1)))))
+(define nums (uint-list->bytevector '(10000 1000 10 100000 100) (native-endianness) 4))
+(bytevector->uint-list nums (native-endianness) 4) ; => (10000 1000 10 100000 100)
+(qsort nums 5 4 comp)
+(bytevector->uint-list nums (native-endianness) 4) ; => (10 100 1000 10000 100000)
+*/

@@ -1,6 +1,6 @@
+#!nobacktrace
 ;;; Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
-#!nobacktrace
 
 (library (digamma ffi)
   (export load-shared-object
@@ -10,8 +10,6 @@
           shared-object-errno
           make-cdecl-callout
           make-cdecl-callback
-          make-stdcall-callout
-          make-stdcall-callback
           bytevector-mapping?
           make-bytevector-mapping
           define-c-enum
@@ -128,13 +126,13 @@
 
   (import (core) (ypsilon concurrent) (ypsilon c-types) (ypsilon assert))
 
-  (define on-arm32         (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 4)))
-  (define on-arm64         (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 8)))
-  (define on-ppc32         (and (string-contains (architecture-feature 'machine-hardware) "ppc") (= sizeof:long 4)))
-  (define on-ppc64         (and (string-contains (architecture-feature 'machine-hardware) "ppc") (= sizeof:long 8)))
-  (define on-x64           (and (or (string-contains (architecture-feature 'machine-hardware) "amd64")
-                                    (string-contains (architecture-feature 'machine-hardware) "x86_64"))))
-  (define on-ia32          (not (or on-x64 on-ppc32 on-ppc64)))
+  (define on-arm32 (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 4)))
+  (define on-arm64 (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 8)))
+  (define on-ppc32 (and (string-contains (architecture-feature 'machine-hardware) "ppc") (= sizeof:long 4)))
+  (define on-ppc64 (and (string-contains (architecture-feature 'machine-hardware) "ppc") (= sizeof:long 8)))
+  (define on-x64   (and (or (string-contains (architecture-feature 'machine-hardware) "amd64")
+                            (string-contains (architecture-feature 'machine-hardware) "x86_64"))))
+  (define on-ia32  (not (or on-x64 on-ppc32 on-ppc64)))
 
   (define expect-string
     (lambda (name n s)
@@ -311,8 +309,6 @@
 
   (define-thread-variable ht-cdecl-callback-trampolines (make-parameter (make-weak-hashtable)))
 
-  (define-thread-variable ht-stdcall-callback-trampolines (make-parameter (make-weak-hashtable)))
-
   (define make-callback-thunk
     (lambda (verifier callee)
       (lambda x (verifier (apply callee x)))))
@@ -330,15 +326,6 @@
       (assert-argument name 1 ret "symbol" symbol? (list ret args proc))
       (assert-argument name 2 args "list" list? (list ret args proc))
       (assert-argument name 3 proc "procedure" procedure? (list ret args proc))))
-
-  (define-syntax make-stdcall-callback-trampoline
-    (syntax-rules ()
-      ((_ type args ret proc)
-       (begin
-         (check-callback-param 'make-stdcall-callback ret args proc)
-         (make-callback-trampoline (+ (cdr type) STDCALL)
-                                   (make-callback-signature 'make-stdcall-callback ret args proc)
-                                   (make-callback-thunk (callback-return-type-verifier ret) proc))))))
 
   (define-syntax make-cdecl-callback-trampoline
     (syntax-rules ()
@@ -363,21 +350,6 @@
                         trampoline)))
                 (else
                  (assertion-violation 'make-cdecl-callback (format "invalid return type ~u" ret) (list ret args proc)))))))
-
-  (define make-stdcall-callback
-    (lambda (ret args proc)
-      (or (cond ((hashtable-ref (ht-stdcall-callback-trampolines) proc #f)
-                 => (lambda (rec)
-                      (destructuring-bind (trampoline ret-memo args-memo) rec
-                        (and (equal? ret ret-memo) (equal? args args-memo) trampoline))))
-                (else #f))
-          (cond ((assq ret callback-return-type-alist)
-                 => (lambda (type)
-                      (let ((trampoline (make-stdcall-callback-trampoline type args ret proc)))
-                        (hashtable-set! (ht-stdcall-callback-trampolines) proc (list trampoline ret args))
-                        trampoline)))
-                (else
-                 (assertion-violation 'make-stdcall-callback (format "invalid return type ~u" ret) (list ret args proc)))))))
 
   (define make-argument-thunk
     (lambda (name type)
@@ -492,33 +464,6 @@
                                                                            (list ret args addrs))))
                                                addrs signature thunk))))))))
 
-  (define make-stdcall-callout
-    (lambda (ret args addrs)
-
-      (define make-stdcall-callout-closure
-        (lambda (type addrs signature thunks)
-          (lambda x
-            (let loop ((in x) (thunk thunks) (out '()))
-              (cond ((and (pair? in) (pair? thunk))
-                     (loop (cdr in) (cdr thunk) (cons ((car thunk) (car in)) out)))
-                    ((or (pair? in) (pair? thunk))
-                     (assertion-violation #f (format "expected ~a, but ~a arguments given" (length thunks) (length x)) x))
-                    (else
-                     (apply call-shared-object (+ type STDCALL) addrs #f signature (reverse out))))))))
-
-      (assert-argument make-cdecl-callout 1 ret "symbol" symbol? (list ret args addrs))
-      (assert-argument make-cdecl-callout 2 args "list" list? (list ret args addrs))
-      (assert-argument make-cdecl-callout 3 addrs "c function address" (and (integer? addrs) (exact? addrs)) (list ret args addrs))
-      (and (memq '... args) (assertion-violation 'make-stdcall-callout "... in argument type list" args))
-      (let ((lst (map (lambda (a) (make-argument-thunk 'make-stdcall-callout a)) args)))
-        (let ((signature (apply string (map car lst))) (thunk (map cdr lst)))
-          (make-stdcall-callout-closure (cond ((assq ret c-function-return-type-alist) => cdr)
-                                              (else
-                                               (assertion-violation 'make-stdcall-callout
-                                                                    (format "invalid return type ~u" ret)
-                                                                    (list ret args addrs))))
-                                        addrs signature thunk)))))
-
   (define-syntax c-function
     (lambda (x)
       (syntax-case x ()
@@ -564,9 +509,6 @@
                              (['c-callback e1 '__cdecl (e2 ...)]
                               (with-syntax ((e1 (c-callback-return e1)) (e2 (c-callback-arguments e2)))
                                 (list #\p #'(make-cdecl-callback 'e1 'e2 (expect-proc 'func-name n var)))))
-                             (['c-callback e1 '__stdcall (e2 ...)]
-                              (with-syntax ((e1 (c-callback-return e1)) (e2 (c-callback-arguments e2)))
-                                (list #\p #'(make-stdcall-callback 'e1 'e2 (expect-proc 'func-name n var)))))
                              (['int]
                               (list #\p #'(make-binary-array-of-int (expect-exact-int-vector 'func-name n var))))
                              (['char*]
@@ -585,9 +527,6 @@
                                ((type
                                  (case (datum func-conv)
                                    ((__cdecl) (cdr lst))
-                                   ((__stdcall)
-                                    (and variadic (syntax-violation 'c-function "invalid syntax" x))
-                                    (+ (cdr lst) STDCALL))
                                    (else (syntax-violation 'c-function "invalid syntax" x))))
                                 ((args ...) (generate-temporaries symbolic-arg-types)))
                              (with-syntax ((((signature thunk) ...) (c-arguments #'(args ...))))
