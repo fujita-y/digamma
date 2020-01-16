@@ -183,18 +183,7 @@ class c_trampoline_t {
     VM*             m_vm;
 
     static void c_callback(ffi_cif* cif, void* ret, void* args[], void* context) {
-        /*
-        puts("callback");
-        void* arg0 = args[0]; // arg0 point box that parameter is stored
-        void* arg1 = args[1];
-        printf("n0 %d\n", **(int**)arg0);
-        printf("n1 %d\n", **(int**)arg1);
-        *(int*)ret = **(int**)arg0 < **(int**)arg1;
-*/
-
         c_trampoline_t* trampoline = (c_trampoline_t*)context;
-        //printf("ret type %d\n", trampoline->m_ret_type);
-
         VM* vm = trampoline->m_vm;
         try {
             scm_obj_t* argv = (scm_obj_t*)alloca(sizeof(scm_obj_t*) * trampoline->m_argc);
@@ -327,10 +316,18 @@ public:
         }
         ffi_type* ffi_ret_type = NULL;
         switch (m_ret_type & CALLBACK_RETURN_TYPE_MASK) {
-            case CALLBACK_RETURN_TYPE_INT64_T: ffi_ret_type = &ffi_type_uint64; break;
-            case CALLBACK_RETURN_TYPE_INTPTR: ffi_ret_type = &ffi_type_pointer; break;
-            case CALLBACK_RETURN_TYPE_DOUBLE: ffi_ret_type = &ffi_type_double; break;
-            case CALLBACK_RETURN_TYPE_FLOAT: ffi_ret_type = &ffi_type_float; break;
+            case CALLBACK_RETURN_TYPE_INT64_T: {
+                ffi_ret_type = &ffi_type_uint64;
+            } break;
+            case CALLBACK_RETURN_TYPE_INTPTR: {
+                ffi_ret_type = &ffi_type_pointer;
+            } break;
+            case CALLBACK_RETURN_TYPE_DOUBLE: {
+                ffi_ret_type = &ffi_type_double;
+            } break;
+            case CALLBACK_RETURN_TYPE_FLOAT: {
+                ffi_ret_type = &ffi_type_float;
+            } break;
 
             default: fatal("fatal: invalid callback return type %d\n", m_ret_type);
         }
@@ -569,81 +566,6 @@ subr_shared_object_errno(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
-/*
-void callback(ffi_cif* cif, void* ret, void* args[], void* context)
-{
-  puts("callback");
-  void* arg0 = args[0]; // arg0 point box that parameter is stored
-  void* arg1 = args[1];
-  printf("n0 %d\n", **(int**)arg0);
-  printf("n1 %d\n", **(int**)arg1);
-  *(int*)ret = **(int**)arg0 < **(int**)arg1;
-}
-
-// call-shared-object
-scm_obj_t
-subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
-{
-
-    ffi_cif ccif;
-    ffi_type* cargs[2];
-    void *address;
-    ffi_closure* closure = (ffi_closure*)ffi_closure_alloc(sizeof(ffi_closure), &address);
-    if (closure) {
-        cargs[0] = &ffi_type_pointer;
-        cargs[1] = &ffi_type_pointer;
-        if (ffi_prep_cif(&ccif, FFI_DEFAULT_ABI, 2, &ffi_type_sint, cargs) == FFI_OK) {
-            if (ffi_prep_closure_loc(closure, &ccif, callback, (void*)1234, address) == FFI_OK) {
-                puts("closure created");
-            }
-        }
-    }
-
-    // (call-shared-object)
-
-    int* base = (int*)malloc(sizeof(int) * 5);
-    base[0] = 3;
-    base[1] = 5;
-    base[2] = 7;
-    base[3] = 2;
-    base[4] = 1;
-
-    // void qsort (void* base, size_t num, size_t size, int (*comparator)(const void*, const void*));
-    ffi_cif cif;
-    ffi_type* args[4];
-    void* values[4];
-    int rc;
-    int p1 = 5;
-    int p2 = 4;
-    args[0] = &ffi_type_pointer;
-    values[0] = &base;
-    args[1] = &ffi_type_sint;
-    values[1] = &p1;
-    args[2] = &ffi_type_sint;
-    values[2] = &p2;
-    args[3] = &ffi_type_pointer;
-    values[3] = &address;
-    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 4, &ffi_type_void, args) == FFI_OK) {
-        puts("called");
-        ffi_call(&cif, FFI_FN(qsort), &rc, values);
-    } else {
-        puts("error");
-    }
-    for (int i = 0; i < 5; i++) printf("%d ", base[i]);
-    puts("");
-
-
-    raise_error(vm, "call-shared-object", "implementation does not support this feature", 0, argc, argv);
-    return scm_undef;
-}
-*/
-
-// (import (digamma ffi))
-// int (*comparator)(const void*, const void*))
-// (define proc (lambda (n m) (> n m)))
-// (make-cdecl-callback 'int '(void* void*) proc)
-
-
 // make-callback-trampoline
 scm_obj_t
 subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[])
@@ -679,14 +601,3 @@ void init_subr_ffi(object_heap_t* heap)
     DEFSUBR("make-callback-trampoline", subr_make_callback_trampoline);
     DEFSUBR("shared-object-errno", subr_shared_object_errno);
 }
-
-/*
-objdump -p digamma
-
-(define libm.so (load-shared-object "libm.so"))
-(lookup-shared-object libm.so "qsort")
-
-(define libc.so (load-shared-object "libc.so.6"))
-(lookup-shared-object libc.so "puts")
-(call-shared-object (lookup-shared-object libc.so "puts"))
-*/

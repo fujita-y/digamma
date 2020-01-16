@@ -353,7 +353,6 @@ fasl_reader_t::get_datum()
         return bn;
 #endif
     }
-
     case FASL_TAG_BVECTOR: {
         uint32_t count = fetch_u32();
         scm_bvector_t bv = make_bvector(m_vm->m_heap, count);
