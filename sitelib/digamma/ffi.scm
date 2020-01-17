@@ -124,7 +124,7 @@
           on-ia32
           on-x64)
 
-  (import (core) (ypsilon concurrent) (ypsilon c-types) (ypsilon assert))
+  (import (core) (ypsilon concurrent) (digamma c-types) (digamma assert))
 
   (define on-arm32 (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 4)))
   (define on-arm64 (and (string-contains (architecture-feature 'machine-hardware) "arm") (= sizeof:long 8)))
