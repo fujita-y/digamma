@@ -1,6 +1,5 @@
 #!nobacktrace
-;;; porting srfi-14 reference implementation to ypsilon
-;;; -- y.fujita.lwp
+;;; porting srfi-14 reference implementation
 
 (library (srfi srfi-14)
   (export

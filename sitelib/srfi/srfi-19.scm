@@ -1,6 +1,5 @@
 #!nobacktrace
-;;; porting srfi-19 reference implementation to ypsilon
-;;; -- y.fujita.lwp
+;;; porting srfi-19 reference implementation
 
 (library (srfi srfi-19)
   (export time-duration
@@ -221,7 +220,7 @@
 ;; 'fractional part'. Will Fitzgerald 5/16/2003.
 ;; --------------------------------------------------------------
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 
   (define-syntax receive
     (syntax-rules ()
@@ -301,7 +300,7 @@
       invalid-month-specification
       ))
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 #|
   (define (tm:time-error caller type value)
     (if (member type tm:time-error-types)
@@ -393,7 +392,7 @@
 ;;; the time structure; creates the accessors, too.
 ;;; wf: changed to match srfi documentation. uses mzscheme structures & inspectors
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 #|
   (define-struct time (type nanosecond second) (make-inspector))
 |#
@@ -409,7 +408,7 @@
 ;;; specific time getters.
 ;;; these should be rewritten to be os specific.
 
-  ;; ypsilon -- y.fujita.lwp
+  ;; -- y.fujita.lwp
   (define (tm:current-time-monotonic)
     (let ((usec (microsecond)))
       (let ((nsec (* (mod usec 1000000) 1000)) (sec (div usec 1000000)))
@@ -458,7 +457,7 @@
                  (* (remainder current-ms 1000) 10000)
                  (quotient current-ms 10000)
                  )))
-  
+
 ;; -- we define it to be the same as tai.
 ;;    a different implemation of current-time-montonic
 ;;    will require rewriting all of the time-monotonic converters,
@@ -723,7 +722,7 @@
   (set-time-type! time-in time-monotonic)
   time-in)
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 #|
 ;; -- date structures
 
@@ -807,7 +806,7 @@
 ;; differently from MzScheme's....
 ;; This should be written to be OS specific.
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 #|
   (define (tm:local-tz-offset)
     (date-time-zone-offset (seconds->date (current-seconds))))
@@ -963,7 +962,7 @@
      (else
       (+ (- current-century 100) n)))))
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 #|
   (define (date->julian-day date)
     (let ( (nanosecond (date-nanosecond date))
@@ -981,7 +980,7 @@
                (- offset))))))
 |#
 
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 (define (date->julian-day date)
   (let ( (nanosecond (date-nanosecond date))
          (second (date-second date))
@@ -999,7 +998,7 @@
                 (/ nanosecond tm:nano)
                 (- offset))
              tm:sid)))))
-;; ypsilon -- y.fujita.lwp
+;; -- y.fujita.lwp
 
 (define (date->modified-julian-day date)
   (- (date->julian-day date)
@@ -1198,7 +1197,7 @@
                                         pad-with 2)
                             port))
 
-               ;; ypsilon -- y.fujita.lwp
+               ;; -- y.fujita.lwp
                #;(let* ((ns (tm:fractional-part (/
                                                  (date-nanosecond date)
                                                  tm:nano 1.0)))
@@ -1231,7 +1230,7 @@
                         port)))
    (cons #\k (lambda (date pad-with port)
                (display (tm:padding (date-hour date)
-                                    #\space 2) ;; ypsilon -- y.fujita.lwp (#\0 -> #\space)
+                                    #\space 2) ;; -- y.fujita.lwp (#\0 -> #\space)
                         port)))
    (cons #\l (lambda (date pad-with port)
                (let ((hr (if (> (date-hour date) 12)

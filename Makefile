@@ -160,6 +160,7 @@ distclean: clean
 	rm -f ./test/tmp*
 	rm -f ./bench/gambit-benchmarks/tmp*
 	rm -f ./bench/gambit-benchmarks/spheres.pgm
+	rm -f ./heap/debug-*.vmi
 	rm -f $(PROG)
 
 moreclean: distclean

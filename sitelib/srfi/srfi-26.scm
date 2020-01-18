@@ -1,6 +1,5 @@
 #!nobacktrace
-;;; porting srfi-26 reference implementation to ypsilon
-;;; -- y.fujita.lwp
+;;; porting srfi-26 reference implementation
 
 (library (srfi srfi-26)
   (export cut cute)

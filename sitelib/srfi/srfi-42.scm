@@ -1,6 +1,5 @@
 #!nobacktrace
-;;; porting srfi-42 reference implementation to ypsilon
-;;; -- y.fujita.lwp
+;;; porting srfi-42 reference implementation
 
 (library (srfi srfi-42)
   (export do-ec list-ec append-ec string-ec string-append-ec vector-ec vector-of-length-ec

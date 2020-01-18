@@ -1,9 +1,8 @@
 #!nobacktrace
-;;; porting srfi-13 reference implementation to ypsilon
-;;; list of identifiers conflict with r6rs:
+;;; porting srfi-13 reference implementation
+;;; list of identifiers conflict with r6rs ->
 ;;;   string-copy string-for-each string-hash string-upcase string-downcase
 ;;;   string-titlecase string-fill! string->list
-;;; -- y.fujita.lwp
 
 (library (srfi srfi-13)
   (export
@@ -1488,7 +1487,7 @@
 ;;; Searching for an occurrence of a substring
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; ypsilon -- y.fujita.lwp
+; -- y.fujita.lwp
 #|
   (define (string-contains text pattern . maybe-starts+ends)
     (let-string-start+end2 (t-start t-end p-start p-end)

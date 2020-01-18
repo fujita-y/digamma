@@ -1,6 +1,5 @@
 #!nobacktrace
-;;; porting srfi-8 reference implementation to ypsilon
-;;; -- y.fujita.lwp
+;;; porting srfi-8 reference implementation
 
 (library (srfi srfi-8)
   (export receive)
