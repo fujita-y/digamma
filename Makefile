@@ -115,40 +115,40 @@ extension:
 check: all
 	@echo '----------------------------------------'
 	@echo 'r4rstest.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r4rstest.scm
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r4rstest.scm
 	@echo '----------------------------------------'
 	@echo 'tspl.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/tspl.scm
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/tspl.scm
 	@echo '----------------------------------------'
 	@echo 'arith.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/arith.scm
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/arith.scm
 	@echo '----------------------------------------'
 	@echo 'r5rs_pitfall.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r5rs_pitfall.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r5rs_pitfall.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r6rs.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs-lib.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-lib.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r6rs-lib.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs-more.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r6rs-more.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r6rs-more.scm
 	@echo '----------------------------------------'
 	@echo 'r7rs-test.scm:'
-	@./$(PROG) --r7rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/r7rs-test.scm
+	@./$(PROG) --r7rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r7rs-test.scm
 	@echo '----------------------------------------'
 	@echo 'syntax-rule-stress-test.scm:'
-	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib ./test/syntax-rule-stress-test.scm
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/syntax-rule-stress-test.scm
 	@echo '----------------------------------------'
 	@echo 'Passed all tests'
 	@rm -f ./test/tmp*
 
 eval: all
-	./$(PROG) --verbose --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./sitelib:./stdlib
+	./$(PROG) --verbose --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./sitelib
 
 bench: all
-	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib:./stdlib -- bench/run-digamma.scm
+	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma.scm
 
 clean:
 	rm -f *.o *.d *.dylib
