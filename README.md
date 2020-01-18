@@ -17,13 +17,13 @@ You may want try "export MACOSX_DEPLOYMENT_TARGET=10.14" if you get "Segmentatio
 
 * To run R7RS script from project root, try following:
 ```
-./digamma --r7rs --top-level-program --disable-acc --sitelib=./stdlib -- test/r7rs-sample.scm
+./digamma --r7rs --top-level-program --disable-acc -- test/r7rs-sample.scm
 ```
 
 ### Limitations and Notes
 
 * REPL start with '(import (core))' regardless what command line option is given.
-* Without '-top-level-program', the contents of the specified script file will be interpreted as if they had been entered into the REPL.
+* Without '--top-level-program', the contents of the specified script file will be interpreted as if they had been entered into the REPL.
 
 ### Rebuild Heap Files
 
