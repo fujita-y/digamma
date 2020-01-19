@@ -3,13 +3,36 @@
 
 #include "core.h"
 #include "vm.h"
-#include <ffi.h>
+
+#if defined(NO_FFI)
+
+scm_obj_t
+subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[]) {
+    fatal("%s:%u ffi not supported on this build", __FILE__, __LINE__);
+    return scm_undef;
+}
+
+scm_obj_t
+subr_shared_object_errno(VM* vm, int argc, scm_obj_t argv[]) {
+    fatal("%s:%u ffi not supported on this build", __FILE__, __LINE__);
+    return scm_undef;
+}
+
+scm_obj_t
+subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[]) {
+    fatal("%s:%u ffi not supported on this build", __FILE__, __LINE__);
+    return scm_undef;
+}
+
+#else // NO_FFI
+
 #include "file.h"
 #include "heap.h"
 #include "subr.h"
 #include "arith.h"
 #include "hash.h"
 #include "violation.h"
+#include <ffi.h>
 
 #define FFI_RETURN_TYPE_VOID            0x0000
 #define FFI_RETURN_TYPE_BOOL            0x0001
@@ -567,6 +590,8 @@ subr_make_callback_trampoline(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+#endif // NO_FFI
+
 void init_subr_ffi(object_heap_t* heap)
 {
     #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
@@ -575,6 +600,7 @@ void init_subr_ffi(object_heap_t* heap)
     DEFSUBR("make-callback-trampoline", subr_make_callback_trampoline);
     DEFSUBR("shared-object-errno", subr_shared_object_errno);
 }
+
 
 /*
 (define libc (load-shared-object "libc.so.6"))
