@@ -14,6 +14,8 @@ CXXFLAGS = -std=c++17 -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fc
 
 LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 
+LDFLAGS = -fuse-ld=lld
+
 SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp object_set.cpp \
        subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp interpreter.cpp serialize.cpp \
        vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp subr_port.cpp subr_r5rs_arith.cpp \
