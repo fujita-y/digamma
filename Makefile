@@ -1,5 +1,5 @@
 #   Makefile for Linux, Darwin
-#   Requirements: GNU Make, clang++, libffi, llvm
+#   Requirements: GNU Make, llvm, libffi
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
 PROG = digamma
