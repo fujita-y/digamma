@@ -1,5 +1,5 @@
 #   Makefile for Linux, Darwin
-#   Requirements: GNU Make, clang++
+#   Requirements: GNU Make, clang++, libffi, llvm
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
 PROG = digamma
@@ -10,9 +10,9 @@ CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -D
 
 CXX = clang++
 
-CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
+CXXFLAGS = -std=c++17 -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
 
-LDFLAGS = `llvm-config --ldflags --system-libs --libs core orcjit native`
+LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 
 SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp object_set.cpp \
        subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp interpreter.cpp serialize.cpp \
@@ -20,7 +20,7 @@ SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp
        equiv.cpp reader.cpp subr_base.cpp bag.cpp uuid.cpp subr_thread.cpp subr_socket.cpp \
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp \
        main.cpp subr_bvector.cpp violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp \
-       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp
+       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp llvm_mcjit.cpp
 
 VPATH = src
 
@@ -53,7 +53,7 @@ ifneq (,$(findstring Linux, $(UNAME)))
       CXXFLAGS += -march=x86-64
     endif
   endif
-  LDLIBS = -pthread -Wl,--no-as-needed -ldl -lffi
+  LDLIBS += -pthread -Wl,--no-as-needed -ldl -lffi
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
@@ -70,7 +70,7 @@ all: $(PROG) $(EXTS)
 	@mkdir -p -m755 $(HOME)/.digamma
 
 $(PROG): $(OBJS)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 vm1.s: vm1.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) \
