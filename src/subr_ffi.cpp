@@ -73,7 +73,7 @@ public:
     }
 };
 
-class c_arguments_t {
+class c_function_t {
     union value_t {
         int8_t s8; int16_t s16; int32_t s32; int64_t s64;
         uint8_t u8; uint16_t u16; uint32_t u32; uint64_t u64;
@@ -84,7 +84,7 @@ class c_arguments_t {
     ffi_type*   m_type[FFI_MAX_ARGC];
     value_t     m_value[FFI_MAX_ARGC];
 public:
-    c_arguments_t() : m_argc(0) {
+    c_function_t() : m_argc(0) {
         for (int i = 0; i < FFI_MAX_ARGC; i++) m_argv[i] = &m_value[i];
     }
     int argc() { return m_argc; }
@@ -352,7 +352,7 @@ public:
 };
 
 static intptr_t
-call_c_intptr(VM* vm, void* func, c_arguments_t& args)
+call_c_intptr(VM* vm, void* func, c_function_t& args)
 {
     capture_errno sync(vm);
     ffi_cif cif;
@@ -366,7 +366,7 @@ call_c_intptr(VM* vm, void* func, c_arguments_t& args)
 }
 
 static int64_t
-call_c_int64(VM* vm, void* func, c_arguments_t& args)
+call_c_int64(VM* vm, void* func, c_function_t& args)
 {
     capture_errno sync(vm);
     ffi_cif cif;
@@ -380,7 +380,7 @@ call_c_int64(VM* vm, void* func, c_arguments_t& args)
 }
 
 static float
-call_c_float(VM* vm, void* func, c_arguments_t& args)
+call_c_float(VM* vm, void* func, c_function_t& args)
 {
     capture_errno sync(vm);
     ffi_cif cif;
@@ -394,7 +394,7 @@ call_c_float(VM* vm, void* func, c_arguments_t& args)
 }
 
 static double
-call_c_double(VM* vm, void* func, c_arguments_t& args)
+call_c_double(VM* vm, void* func, c_function_t& args)
 {
     capture_errno sync(vm);
     ffi_cif cif;
@@ -444,7 +444,7 @@ subr_call_shared_object(VM* vm, int argc, scm_obj_t argv[])
             return scm_undef;
         }
         if (argc - 4 <= FFI_MAX_ARGC) {
-            c_arguments_t args;
+            c_function_t args;
             for (int i = 4; i < argc; i++) {
                 const char* err = args.add(vm, argv[i], signature[0]);
                 if (err) {

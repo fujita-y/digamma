@@ -1,10 +1,10 @@
-#include "core.h"
-#include "vm.h"
-#include "heap.h"
-
+//#include "core.h"
+//#include "vm.h"
+//#include "heap.h"
 /*
 (current-environment (system-environment)) (native-compile)
 */
+#include <memory>
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
