@@ -23,7 +23,7 @@ SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp \
        main.cpp subr_bvector.cpp violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp \
        object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp \
-       llvm_orcjit.cpp
+       llvm_orcjit.cpp orcjit.cpp
 
 VPATH = src
 

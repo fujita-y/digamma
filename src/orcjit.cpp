@@ -1,25 +1,29 @@
-//#include "core.h"
-//#include "vm.h"
-//#include "heap.h"
-/*
-(current-environment (system-environment)) (native-compile)
-*/
-#include <memory>
+#include "core.h"
+
+#if ENABLE_LLVM_JIT
+
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/Support/Error.h"
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/TargetSelect.h"
+
 #include "llvm/Support/raw_ostream.h"
 
-//using namespace std;
 using namespace llvm;
 using namespace llvm::orc;
 
-ExitOnError ExitOnErr;
+static std::shared_ptr<LLJIT> s_jit;
 
-ThreadSafeModule createDemoModule() {
+static ExitOnError ExitOnErr;
+
+
+///
+
+ThreadSafeModule createDemoModule2() {
     auto Context = llvm::make_unique<LLVMContext>();
     auto M = llvm::make_unique<Module>("test", *Context);
 
@@ -54,46 +58,34 @@ ThreadSafeModule createDemoModule() {
 
     return ThreadSafeModule(std::move(M), std::move(Context));
 }
+///
 
-int test_orcjit_pipeline() {
-
-    int argc = 1;
-    const char** argv;
-    argv = (const char **)malloc(sizeof(char*));
-    argv[0] = strdup("orc jit test");
-
-    // Initialize LLVM.
-    InitLLVM X(argc, argv);
-
+void orcjit_init() {
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
-
-    cl::ParseCommandLineOptions(argc, argv, "HowToUseLLJIT");
-    ExitOnErr.setBanner(std::string(argv[0]) + ": ");
-
-    puts("Create an LLJIT instance.");
-    auto J = ExitOnErr(LLJITBuilder().create());
+    auto J = ExitOnErr(LLJITBuilder().create()); // std::unique_ptr<LLJIT>
     auto DL = J->getDataLayout();
     J->getMainJITDylib().setGenerator(
         ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(DL.getGlobalPrefix())));
+    s_jit = std::move(J);
+}
 
-    auto M = createDemoModule();
-    ExitOnErr(J->addIRModule(std::move(M)));
+void orcjit_compile() {
+    auto M = createDemoModule2();
+    ExitOnErr(s_jit->addIRModule(std::move(M)));
+    s_jit->getMainJITDylib().dump(llvm::outs());
 
-    J->getMainJITDylib().dump(llvm::outs());
-
-    puts("Look up the JIT'd function, cast it to a function pointer, then call it.");
-    auto Add1Sym = ExitOnErr(J->lookup("add1"));
-
+    puts("Look symbol");
+    auto Add1Sym = ExitOnErr(s_jit->lookup("add1"));
     puts("got symbol");
     int (*Add1)(int) = (int (*)(int))Add1Sym.getAddress();
-
     int Result = Add1(42);
     outs() << "add1(42) = " << Result << "\n";
-
-    return 0;
 }
 
 /*
 (current-environment (system-environment)) (native-compile)
 */
+
+
+#endif

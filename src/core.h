@@ -29,6 +29,8 @@
 
 #define UNBOUND_GLOC_RETURN_UNSPEC  0
 
+#define ENABLE_LLVM_JIT             1
+
 #ifdef NDEBUG
     #define MTDEBUG                 0
     #define GCDEBUG                 0
@@ -97,7 +99,7 @@ class VM;
 #include "sysdep.h"
 
 extern int          main_command_line_argc;
-extern char* const* main_command_line_argv;
+extern const char** main_command_line_argv;
 extern void         fatal(const char* fmt, ...) ATTRIBUTE(noreturn);
 extern void         warning(const char* fmt, ...);
 extern void         trace(const char* fmt, ...);

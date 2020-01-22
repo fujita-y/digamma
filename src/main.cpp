@@ -5,8 +5,13 @@
 #include "vm.h"
 #include "interpreter.h"
 
+#if ENABLE_LLVM_JIT
+  #include "llvm/Support/InitLLVM.h"
+  #include "orcjit.h"
+#endif
+
 int main_command_line_argc;
-char* const* main_command_line_argv;
+const char** main_command_line_argv;
 
 #if defined(NO_TLS)
   pthread_key_t s_current_vm;
@@ -14,7 +19,7 @@ char* const* main_command_line_argv;
   __thread VM* s_current_vm;
 #endif
 
-static int opt_heap_limit(int argc, char* const argv[])
+static int opt_heap_limit(int argc, const char** argv)
 {
     int value = DEFAULT_HEAP_LIMIT;
     for (int i = 0; i < argc; i++) {
@@ -97,11 +102,15 @@ signal_waiter(void* param)
     return NULL;
 }
 
-int main(int argc, char* const argv[])
+int main(int argc, const char** argv)
 {
     srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
     main_command_line_argc = argc;
     main_command_line_argv = argv;
+#if ENABLE_LLVM_JIT
+    llvm::InitLLVM X(argc, argv);
+    orcjit_init();
+#endif
 #ifndef NDEBUG
     struct foo { char i; };
     struct bar { int i; struct foo o; };
