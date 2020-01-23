@@ -2243,13 +2243,11 @@ subr_cmwc_random_real(VM* vm, int argc, scm_obj_t argv[])
 }
 
 #include "orcjit.h"
-#include "llvm_orcjit.h"
 
 // native-compile
 scm_obj_t
 subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
 {
-//    test_orcjit_pipeline();
     orcjit_compile();
     return scm_unspecified;
 }

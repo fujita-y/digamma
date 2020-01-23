@@ -16,23 +16,32 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-static std::shared_ptr<LLJIT> s_jit;
-
 static ExitOnError ExitOnErr;
+static std::unique_ptr<LLJIT> s_jit;
 
+void orcjit_init() {
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    auto J = ExitOnErr(LLJITBuilder().create()); // std::unique_ptr<LLJIT>
+    auto D = J->getDataLayout();
+    auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
+    J->getMainJITDylib().setGenerator(G);
+    s_jit = std::move(J);
+}
 
-///
-
-ThreadSafeModule createDemoModule2() {
+ThreadSafeModule orcjit_make_module()
+{
     auto Context = llvm::make_unique<LLVMContext>();
     auto M = llvm::make_unique<Module>("test", *Context);
 
     // Create the add1 function entry and insert this entry into module M.  The
     // function will have a return type of "int" and take an argument of "int".
     Function *Add1F =
-        Function::Create(FunctionType::get(Type::getInt32Ty(*Context),
-                                            {Type::getInt32Ty(*Context)}, false),
-                        Function::ExternalLinkage, "add1", M.get());
+        Function::Create(
+            FunctionType::get(Type::getInt32Ty(*Context), {Type::getInt32Ty(*Context)}, false),
+            Function::ExternalLinkage,
+            "add1",
+            M.get());
 
     // Add a basic block to the function. As before, it automatically inserts
     // because of the last argument.
@@ -58,27 +67,19 @@ ThreadSafeModule createDemoModule2() {
 
     return ThreadSafeModule(std::move(M), std::move(Context));
 }
-///
-
-void orcjit_init() {
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    auto J = ExitOnErr(LLJITBuilder().create()); // std::unique_ptr<LLJIT>
-    auto DL = J->getDataLayout();
-    J->getMainJITDylib().setGenerator(
-        ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(DL.getGlobalPrefix())));
-    s_jit = std::move(J);
-}
 
 void orcjit_compile() {
-    auto M = createDemoModule2();
+    auto M = orcjit_make_module();
     ExitOnErr(s_jit->addIRModule(std::move(M)));
     s_jit->getMainJITDylib().dump(llvm::outs());
 
     puts("Look symbol");
     auto Add1Sym = ExitOnErr(s_jit->lookup("add1"));
-    puts("got symbol");
+
+    puts("Get address");
     int (*Add1)(int) = (int (*)(int))Add1Sym.getAddress();
+
+    puts("Call");
     int Result = Add1(42);
     outs() << "add1(42) = " << Result << "\n";
 }
