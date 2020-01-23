@@ -1,4 +1,5 @@
 #include "core.h"
+#include "object.h"
 
 #if ENABLE_LLVM_JIT
 
@@ -20,8 +21,6 @@ static ExitOnError ExitOnErr;
 static std::unique_ptr<LLJIT> s_jit;
 
 void orcjit_init() {
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
     auto J = ExitOnErr(LLJITBuilder().create()); // std::unique_ptr<LLJIT>
     auto D = J->getDataLayout();
     auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
@@ -36,13 +35,27 @@ ThreadSafeModule orcjit_make_module()
 
     // Create the add1 function entry and insert this entry into module M.  The
     // function will have a return type of "int" and take an argument of "int".
+
+    std::vector<Type*> argTypes;
+    argTypes.push_back(Type::getInt32Ty(*Context));
+
+    Type* retType = Type::getInt32Ty(*Context);
+
+    Function *Add1F =
+        Function::Create(
+            FunctionType::get(retType, argTypes, false),
+            Function::ExternalLinkage,
+            "add1",
+            M.get());
+
+/*
     Function *Add1F =
         Function::Create(
             FunctionType::get(Type::getInt32Ty(*Context), {Type::getInt32Ty(*Context)}, false),
             Function::ExternalLinkage,
             "add1",
             M.get());
-
+*/
     // Add a basic block to the function. As before, it automatically inserts
     // because of the last argument.
     BasicBlock *BB = BasicBlock::Create(*Context, "EntryBlock", Add1F);
@@ -88,5 +101,16 @@ void orcjit_compile() {
 (current-environment (system-environment)) (native-compile)
 */
 
+class code_generator_t {
+    ExitOnError ExitOnErr;
+    static std::unique_ptr<LLJIT> s_main;
+public:
+    code_generator_t() {
+
+    }
+    void assemble(scm_closure_t closure) {
+
+    }
+};
 
 #endif

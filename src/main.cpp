@@ -7,6 +7,7 @@
 
 #if ENABLE_LLVM_JIT
   #include "llvm/Support/InitLLVM.h"
+  #include "llvm/Support/TargetSelect.h"
   #include "orcjit.h"
 #endif
 
@@ -109,6 +110,8 @@ int main(int argc, const char** argv)
     main_command_line_argv = argv;
 #if ENABLE_LLVM_JIT
     llvm::InitLLVM X(argc, argv);
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
     orcjit_init();
 #endif
 #ifndef NDEBUG
