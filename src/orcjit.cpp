@@ -122,8 +122,8 @@ void testflight() {
 }
 
 void orcjit_compile() {
-    testflight();
-    return;
+//    testflight();
+//    return;
     auto M = orcjit_make_module();
     ExitOnErr(s_jit->addIRModule(std::move(M)));
     s_jit->getMainJITDylib().dump(llvm::outs());
