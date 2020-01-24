@@ -73,7 +73,7 @@ all: $(PROG) $(EXTS)
 	@mkdir -p -m755 $(HOME)/.digamma
 
 $(PROG): $(OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 vm1.s: vm1.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) \

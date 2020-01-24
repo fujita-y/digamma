@@ -28,6 +28,14 @@ void orcjit_init() {
     s_jit = std::move(J);
 }
 
+static void emit_foobar(Function& F, IRBuilder<>& B)
+{
+    auto one = B.getInt32(1);
+    auto x = F.arg_begin() + 0; // F.getArg(0);
+    auto add = B.CreateAdd(one, x);
+    B.CreateRet(add);
+}
+
 ThreadSafeModule orcjit_make_module()
 {
     auto Context = llvm::make_unique<LLVMContext>();
@@ -64,6 +72,8 @@ ThreadSafeModule orcjit_make_module()
     // automatically append instructions to the basic block `BB'.
     IRBuilder<> builder(BB);
 
+    emit_foobar(*Add1F, builder);
+/*
     // Get pointers to the constant `1'.
     Value *One = builder.getInt32(1);
 
@@ -77,11 +87,43 @@ ThreadSafeModule orcjit_make_module()
 
     // Create the return instruction and add it to the basic block
     builder.CreateRet(Add);
-
+*/
     return ThreadSafeModule(std::move(M), std::move(Context));
 }
 
+void testflight() {
+    auto Context = llvm::make_unique<LLVMContext>();
+    auto M = llvm::make_unique<Module>("test", *Context);
+
+    std::vector<Type*> argTypes;
+    argTypes.push_back(Type::getInt64PtrTy(*Context));
+
+    Type* retType = Type::getInt64Ty(*Context);
+
+    Function* get2nd =
+        Function::Create(
+            FunctionType::get(retType, argTypes, false),
+            Function::ExternalLinkage,
+            "get2nd",
+            M.get());
+
+    BasicBlock *BB = BasicBlock::Create(*Context, "EntryBlock", get2nd);
+    IRBuilder<> builder(BB);
+    auto base = (*get2nd).arg_begin() + 0;
+
+    Value* index = builder.getInt64(2);
+    Value* ea = builder.CreateGEP(base, index);
+    Value* val1 = builder.CreateLoad(Type::getInt64Ty(*Context), ea);
+
+    Value* val2 = builder.CreateExtractElement(base, 2);
+
+    builder.CreateRet(val2);
+    M.get()->print(outs(), nullptr);
+}
+
 void orcjit_compile() {
+    testflight();
+    return;
     auto M = orcjit_make_module();
     ExitOnErr(s_jit->addIRModule(std::move(M)));
     s_jit->getMainJITDylib().dump(llvm::outs());
