@@ -2242,16 +2242,6 @@ subr_cmwc_random_real(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
-#include "orcjit.h"
-
-// native-compile
-scm_obj_t
-subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
-{
-    orcjit_compile();
-    return scm_unspecified;
-}
-
 void
 init_subr_others(object_heap_t* heap)
 {
@@ -2339,5 +2329,4 @@ init_subr_others(object_heap_t* heap)
     DEFSUBR("make-cmwc-random-state", subr_make_cmwc_random_state);
     DEFSUBR("cmwc-random-u32", subr_cmwc_random_u32);
     DEFSUBR("cmwc-random-real", subr_cmwc_random_real);
-    DEFSUBR("native-compile", subr_native_compile);
 }

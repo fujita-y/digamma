@@ -314,6 +314,7 @@ object_heap_t::init_primordial(size_t pool_size, size_t init_size)
     init_subr_process(this);
     init_subr_thread(this);
     init_subr_others(this);
+    init_subr_codegen(this);
     // procedure
     intern_system_environment(make_symbol(this, "apply"), scm_proc_apply);
     intern_system_environment(make_symbol(this, "call-with-current-continuation"), scm_proc_callcc);

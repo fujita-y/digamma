@@ -134,6 +134,8 @@ void orcjit_compile() {
     puts("Get address");
     int (*Add1)(int) = (int (*)(int))Add1Sym.getAddress();
 
+    printf("address:%p\n", Add1);
+
     puts("Call");
     int Result = Add1(42);
     outs() << "add1(42) = " << Result << "\n";
@@ -142,17 +144,5 @@ void orcjit_compile() {
 /*
 (current-environment (system-environment)) (native-compile)
 */
-
-class code_generator_t {
-    ExitOnError ExitOnErr;
-    static std::unique_ptr<LLJIT> s_main;
-public:
-    code_generator_t() {
-
-    }
-    void assemble(scm_closure_t closure) {
-
-    }
-};
 
 #endif
