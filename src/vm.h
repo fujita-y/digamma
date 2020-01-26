@@ -61,6 +61,11 @@ public:
         scm_obj_t   warning_level;                // #t or #f or fixnum
     } m_flags;
 
+    enum {
+        native_return_loop = 0,   // goto trace_n_loop;
+        native_return_pop_cont,   // goto pop_cont;
+    };
+
     scm_port_t          m_bootport;
     scm_port_t          m_current_input;
     scm_port_t          m_current_output;

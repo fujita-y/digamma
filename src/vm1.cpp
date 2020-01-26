@@ -1384,9 +1384,12 @@ VM::loop(bool init, bool resume)
             }
 
             CASE(VMOP_NATIVE) {
-                // nop
-                m_pc = CDR(m_pc);
-                goto loop;
+                intptr_t operand = coerce_exact_integer_to_intptr(CAR(OPERANDS));
+                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
+                printf("address:%p\n", thunk);
+                intptr_t n = (*thunk)((intptr_t)this);
+                if (n == native_return_pop_cont) goto pop_cont;
+                fatal("unsupported thunk protocol %d", n);
             }
 
             CASE(VMOP_TOUCH_GLOC) {

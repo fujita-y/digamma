@@ -19,6 +19,7 @@ public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
 private:
-    void transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, VM* vm);
+    void transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, VM* vm, scm_obj_t code);
+    void emit_ret_const(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands);
     void emit_push_iloc(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands);
 };
