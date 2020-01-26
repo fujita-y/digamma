@@ -65,6 +65,9 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*address)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
+    // rewrite closure->code reference ((native . <address>))
+    // ? how to create const pairs in data segment
+
     printf("address:%p\n", address);
 }
 

@@ -8,3 +8,4 @@ push_iloc.out : push_iloc.cpp
 
 # notation: https://llvm.org/doxygen/EfficiencySanitizer_8cpp_source.html
 # construct: https://buildmedia.readthedocs.org/media/pdf/mapping-high-level-constructs-to-llvm-ir/latest/mapping-high-level-constructs-to-llvm-ir.pdf
+# constant list: https://stackoverflow.com/questions/42255453/how-do-i-initialize-an-integer-array-in-llvm-using-a-list-of-integers
