@@ -25,17 +25,19 @@ subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
  (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
 */
 
+static codegen_t* s_codegen;
+
 // closure-compile
 scm_obj_t
 subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
+            if (!s_codegen) s_codegen = new codegen_t;
             scm_closure_t closure = (scm_closure_t)argv[0];
             printer_t prt(vm, vm->m_current_output);
             prt.format("~s~&", closure->doc);
-            codegen_t codegen;
-            codegen.compile(vm, closure);
+            s_codegen->compile(vm, closure);
             return scm_unspecified;
         }
         wrong_type_argument_violation(vm, "closure-compile", 0, "closure", argv[0], argc, argv);

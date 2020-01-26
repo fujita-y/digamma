@@ -1383,6 +1383,12 @@ VM::loop(bool init, bool resume)
                 goto ERROR_VECTREF_ILOC;
             }
 
+            CASE(VMOP_NATIVE) {
+                // nop
+                m_pc = CDR(m_pc);
+                goto loop;
+            }
+
             CASE(VMOP_TOUCH_GLOC) {
                 goto THUNK_TOUCH_GLOC_OF;
             }
