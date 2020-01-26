@@ -147,12 +147,12 @@ public:
     void display_subr_profile();
 #endif
 
-    scm_obj_t symbol_to_instruction(scm_obj_t obj) {
+    static scm_obj_t symbol_to_instruction(scm_obj_t obj) {
         assert(OPCODESYMBOLP(obj));
         return obj;
     }
 
-    int instruction_to_opcode(scm_obj_t obj) {
+    static int instruction_to_opcode(scm_obj_t obj) {
         assert(OPCODESYMBOLP(obj));
         return HDR_SYMBOL_CODE(((scm_symbol_t)obj)->hdr);
     }

@@ -73,7 +73,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     BasicBlock* BEGIN = BasicBlock::Create(C, "begin", F);
     IRBuilder<> IRB(BEGIN);
 
-    transform(C, F, IRB, vm, closure->code);
+    transform(C, F, IRB, closure->code);
 
     verifyModule(*M, &outs());
     M.get()->print(outs(), nullptr);
@@ -94,11 +94,11 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 }
 
 void
-codegen_t::transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, VM* vm, scm_obj_t code)
+codegen_t::transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t code)
 {
     while (code != scm_nil) {
         scm_obj_t operands = CDAR(code);
-        switch (vm->instruction_to_opcode(CAAR(code))) {
+        switch (VM::instruction_to_opcode(CAAR(code))) {
             case VMOP_RET_CONST:
                 emit_ret_const(C, F, IRB, operands);
                 break;
