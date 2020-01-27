@@ -47,7 +47,10 @@ extend vm_cont_rec_t to support native cont?
 
 #define DECLEAR_INTPTR_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
-    auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
+    auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C); \
+    std::vector<Type*> argTypes; \
+    argTypes.push_back(IntptrPtrTy); \
+    auto returnType = IntptrTy;
 
 #define CREATE_LOAD_VM_REG(_VM_,_REG_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
@@ -88,15 +91,12 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 
     auto M = llvm::make_unique<Module>(module_id, C);
 
-    std::vector<Type*> argTypes;
-    argTypes.push_back(IntptrPtrTy);
-    Type* returnType = IntptrTy;
     Function* F = Function::Create(FunctionType::get(returnType, argTypes, false), Function::ExternalLinkage, function_id, M.get());
 
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 
-    transform(C, F, IRB, closure->code);
+    transform(C, M.get(), F, IRB, closure->code);
 
     verifyModule(*M, &outs());
     M.get()->print(outs(), nullptr);
@@ -117,13 +117,13 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 }
 
 void
-codegen_t::transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t code)
+codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t code)
 {
     while (code != scm_nil) {
         scm_obj_t operands = CDAR(code);
         switch (VM::instruction_to_opcode(CAAR(code))) {
             case VMOP_RET_CONST:
-                emit_ret_const(C, F, IRB, operands);
+                emit_ret_const(C, M, F, IRB, operands);
                 break;
             default:
                 fatal("unsupported instruction");
@@ -134,7 +134,7 @@ codegen_t::transform(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t co
 }
 
 void
-codegen_t::emit_ret_const(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
+codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
 {
     DECLEAR_INTPTR_TYPES;
     auto vm = F->arg_begin();
@@ -144,7 +144,7 @@ codegen_t::emit_ret_const(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj
 }
 
 void
-codegen_t::emit_push_iloc(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
+codegen_t::emit_push_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
 {
     DECLEAR_INTPTR_TYPES;
     auto vm = F->arg_begin();
