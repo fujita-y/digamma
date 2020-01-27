@@ -11,6 +11,29 @@
  (foo)
 */
 
+/*
+extend vm_cont_rec_t to support native cont?
+
+(backtrace #f)
+(define (tak x y z)
+  (if (not (< y x))
+      z
+      (tak (tak (- x 1) y z)
+           (tak (- y 1) z x)
+           (tak (- z 1) x y))))
+(closure-code tak)
+((iloc.0 . 1)
+ (<.iloc (0 . 0))
+ (if.true
+   (call (push.n+.iloc (0 . 0) -1) (push.iloc.0 . 1) (push.iloc.0 . 2) (apply.gloc #<gloc tak>))
+   (push)
+   (call (push.n+.iloc (0 . 1) -1) (push.iloc.0 . 2) (push.iloc.0 . 0) (apply.gloc #<gloc tak>))
+   (push)
+   (call (push.n+.iloc (0 . 2) -1) (push.iloc.0 . 0) (push.iloc.0 . 1) (apply.gloc #<gloc tak>))
+   (push)
+   (apply.gloc #<gloc tak>))
+ (ret.iloc 0 . 2))
+*/
 
 #include "codegen.h"
 #include "arith.h"
@@ -70,8 +93,8 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     Type* returnType = IntptrTy;
     Function* F = Function::Create(FunctionType::get(returnType, argTypes, false), Function::ExternalLinkage, function_id, M.get());
 
-    BasicBlock* BEGIN = BasicBlock::Create(C, "begin", F);
-    IRBuilder<> IRB(BEGIN);
+    BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
+    IRBuilder<> IRB(ENTRY);
 
     transform(C, F, IRB, closure->code);
 

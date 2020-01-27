@@ -30,10 +30,25 @@ using namespace llvm::orc;
         }
     */
 
-#define DECLEAR_INTPTR_TYPES auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
-#define CREATE_LOAD_VM_REG(_VM_,_REG_) (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
+#define DECLEAR_INTPTR_TYPES \
+    auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
+    auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
 
-void emit_call(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
+#define CREATE_LOAD_VM_REG(_VM_,_REG_) \
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
+
+#define CREATE_STORE_VM_REG(_VM_,_REG_,_VAL_) \
+    (IRB.CreateStore(_VAL_, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
+
+#define VALUE_INTPTR(_VAL_) \
+    (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
+
+#define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
+#define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
+#define LIST1(e1)       CONS((e1), scm_nil)
+#define LIST2(e1, e2)   CONS((e1), LIST1((e2)))
+
+void emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
 {
     DECLEAR_INTPTR_TYPES;
 
@@ -41,14 +56,28 @@ void emit_call(LLVMContext& C, Function* F, IRBuilder<>& IRB, scm_obj_t operands
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
 
-    BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
-    BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-    Value* cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(cond, cond_true, cond_false);
-    IRB.SetInsertPoint(cond_true);
-    IRB.CreateRet(sp);
-    IRB.SetInsertPoint(cond_false);
+    std::vector<Type*> argTypes;
+    argTypes.push_back(IntptrPtrTy);
+    Type* returnType = IntptrTy;
+    Function* F2 =
+        Function::Create(
+            FunctionType::get(returnType, argTypes, false),
+            Function::ExternalLinkage,
+            "cont-func-0",
+            M);
+
+    BasicBlock* CONT = BasicBlock::Create(C, "begin", F2);
+
+    // emit inst to save address of F2 to m_cont
+
+    auto funcPtr = IRB.CreateLoad(IntptrTy, F2);
+//    CREATE_STORE_VM_REG(vm, m_value, val);
+
+    // emit inside call op
     IRB.CreateRet(stack_limit);
+
+    //
+    IRB.SetInsertPoint(CONT);
 }
 
 int main(int argc, char** argv) {
@@ -76,8 +105,9 @@ int main(int argc, char** argv) {
 
     IRBuilder<> IRB(BEGIN);
 
-    emit_call(C, F, IRB, nullptr);
+    emit_call(C, M.get(), F, IRB, nullptr);
 
+    IRB.CreateRet(IRB.getInt64(400));
 //    IRB.SetInsertPoint(BEGIN);
 //    Value* r = IRB.getInt64(200);;
 //    IRB.CreateRet(r);
