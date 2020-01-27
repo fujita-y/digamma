@@ -119,8 +119,9 @@ void emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj
         // cont->pc = CDR(m_pc);
         CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     }
+
     // cont->code = NULL;
-    CREATE_STORE_CONT_REC(cont, code, IRB.CreateLoad(IntptrTy, K));
+    CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
 
     // cont->env = m_env;
     CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));

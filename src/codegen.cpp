@@ -52,14 +52,14 @@ extend vm_cont_rec_t to support native cont?
     argTypes.push_back(IntptrPtrTy); \
     auto returnType = IntptrTy;
 
+#define VALUE_INTPTR(_VAL_) \
+    (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
+
 #define CREATE_LOAD_VM_REG(_VM_,_REG_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
 
 #define CREATE_STORE_VM_REG(_VM_,_REG_,_VAL_) \
     (IRB.CreateStore(_VAL_, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
-
-#define VALUE_INTPTR(_VAL_) \
-    (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
 
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
@@ -117,26 +117,26 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 }
 
 void
-codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t code)
+codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    while (code != scm_nil) {
-        scm_obj_t operands = CDAR(code);
-        switch (VM::instruction_to_opcode(CAAR(code))) {
+    while (inst != scm_nil) {
+        switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_RET_CONST:
-                emit_ret_const(C, M, F, IRB, operands);
+                emit_ret_const(C, M, F, IRB, inst);
                 break;
             default:
                 fatal("unsupported instruction");
         }
-        code = CDR(code);
+        inst = CDR(inst);
     }
     // emit_push_iloc(C, F, IRB, nullptr);
 }
 
 void
-codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
+codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
     DECLEAR_INTPTR_TYPES;
+    scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     auto val = VALUE_INTPTR(operands);
     CREATE_STORE_VM_REG(vm, m_value, val);
@@ -144,9 +144,10 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 void
-codegen_t::emit_push_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t operands)
+codegen_t::emit_push_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
     DECLEAR_INTPTR_TYPES;
+    scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);

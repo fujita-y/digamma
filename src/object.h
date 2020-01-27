@@ -418,6 +418,7 @@ struct vm_cont_rec_t {          // record size is variable
     scm_obj_t   pc;
     scm_obj_t   trace;
     scm_obj_t*  fp;
+    void*       code;
     void*       env;
     void*       up;             // 'm_cont' and 'up' point here
 };

@@ -212,8 +212,9 @@ VM::backtrace_seek_make_cont(scm_obj_t note)
         vm_cont_t cont = (vm_cont_t)m_sp;
         cont->trace = note;
         cont->fp = m_fp;
-        cont->env = m_env;
         cont->pc = scm_nil;
+        cont->code = NULL;
+        cont->env = m_env;
         cont->up = m_cont;
         m_sp = m_fp = (scm_obj_t*)(cont + 1);
         m_cont = &cont->up;

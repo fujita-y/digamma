@@ -463,9 +463,16 @@ VM::loop(bool init, bool resume)
                 m_fp = m_stack_top;
                 m_sp = m_fp + nargs;
             }
+            m_trace_tail = scm_unspecified;
+            if (m_heap->m_stop_the_world) stop();
+            if (cont->code != NULL) {
+                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
+                intptr_t n = (*thunk)((intptr_t)this);
+                if (n == native_return_pop_cont) goto pop_cont;
+                fatal("unsupported thunk protocol %d", n);
+            }
         }
-        m_trace_tail = scm_unspecified;
-        if (m_heap->m_stop_the_world) stop();
+
 
     loop:
         assert(m_sp <= m_stack_limit);
@@ -497,6 +504,7 @@ VM::loop(bool init, bool resume)
                     cont->trace = m_trace;
                     cont->fp = m_fp;
                     cont->pc = CDR(m_pc);
+                    cont->code = NULL;
                     cont->env = m_env;
                     cont->up = m_cont;
                     m_sp = m_fp = (scm_obj_t*)(cont + 1);
