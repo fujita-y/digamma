@@ -16,6 +16,7 @@
 using namespace llvm;
 using namespace llvm::orc;
 
+// llc --march=x86-64 --x86-asm-syntax=intel
     /*
         #define OPERANDS        (CDAR(m_pc))
         CASE(VMOP_PUSH_ILOC) {

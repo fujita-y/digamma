@@ -64,6 +64,7 @@ public:
     enum {
         native_return_loop = 0,   // goto trace_n_loop;
         native_return_pop_cont,   // goto pop_cont;
+        native_return_invalid_state,
     };
 
     scm_port_t          m_bootport;
