@@ -62,7 +62,7 @@ public:
     } m_flags;
 
     enum {
-        native_return_loop = 0,   // goto trace_n_loop;
+        native_return_apply = 0,   // goto apply;
         native_return_pop_cont,   // goto pop_cont;
         native_return_invalid_state,
     };

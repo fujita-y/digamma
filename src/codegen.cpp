@@ -330,7 +330,11 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 void
 codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    IRB.CreateRet(VALUE_INTPTR(VM::native_return_pop_cont));
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(MAKEFIXNUM(200)));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_return_apply));
 }
 
 void
@@ -346,7 +350,6 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, argc, fp});
-//    auto val = VALUE_INTPTR(MAKEFIXNUM(10));
     CREATE_STORE_VM_REG(vm, m_value, val);
     IRB.CreateRet(VALUE_INTPTR(VM::native_return_pop_cont));
 }

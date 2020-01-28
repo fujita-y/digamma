@@ -469,6 +469,7 @@ VM::loop(bool init, bool resume)
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
                 intptr_t n = (*thunk)((intptr_t)this);
                 if (n == native_return_pop_cont) goto pop_cont;
+                if (n == native_return_apply) goto apply;
                 fatal("unsupported thunk protocol %d", n);
             }
         }
@@ -1397,6 +1398,7 @@ VM::loop(bool init, bool resume)
                 printf("address:%p\n", thunk);
                 intptr_t n = (*thunk)((intptr_t)this);
                 if (n == native_return_pop_cont) goto pop_cont;
+                if (n == native_return_apply) goto apply;
                 fatal("unsupported thunk protocol %d", n);
             }
 
