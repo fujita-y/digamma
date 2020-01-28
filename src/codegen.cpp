@@ -18,6 +18,27 @@ llc --march=x86-64 --x86-asm-syntax=intel
 
 extend vm_cont_rec_t to support native cont?
 
+(current-environment (system-environment))
+(define (n m) (list 1 (m) 3))
+(n (lambda () 2)) ; => (1 2 3)
+(closure-code n)
+(closure-compile n)
+
+(
+ (push.const . 1)
+ (call
+   (apply.iloc (0 . 0)))
+ (push)
+ (push.const . 3)
+ (ret.subr #<subr list>)
+)
+
+- unsupported instruction push.const
+- unsupported instruction apply.iloc
+- unsupported instruction push
+- unsupported instruction push.const
+- unsupported instruction ret.subr
+
 (backtrace #f)
 (define (fib n)
   (if (< n 2)
@@ -49,12 +70,13 @@ extend vm_cont_rec_t to support native cont?
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Error.h"
 
-#define DECLEAR_INTPTR_TYPES \
+#define DECLEAR_COMMON_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C); \
+    auto VoidTy = Type::getVoidTy(C); \
     std::vector<Type*> argTypes; \
     argTypes.push_back(IntptrPtrTy); \
-    auto returnType = IntptrTy;
+    auto returnType = IntptrTy; \
 
 #define VALUE_INTPTR(_VAL_) \
     (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
@@ -78,6 +100,11 @@ extend vm_cont_rec_t to support native cont?
 
 static ExitOnError ExitOnErr;
 
+extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
+    printf("- thunk_collect_stack(%p, %d)\n", vm, acquire);
+    vm->collect_stack(acquire);
+}
+
 codegen_t::codegen_t()
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -92,7 +119,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 {
     auto Context = llvm::make_unique<LLVMContext>();
     LLVMContext& C = *Context;
-    DECLEAR_INTPTR_TYPES;
+    DECLEAR_COMMON_TYPES;
 
     char module_id[40];
     uuid_v4(module_id, sizeof(module_id));
@@ -116,9 +143,6 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*address)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
-    // rewrite closure->code reference ((native . <address>))
-    // ? how to create const pairs in data segment
-
     vm->m_heap->write_barrier(closure->code);
     closure->code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
 
@@ -130,21 +154,29 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
+            case VMOP_CALL:
+                emit_call(C, M, F, IRB, inst);
+                break;
+            //case VMOP_PUSH_CONST:
+            //    emit_push_const(C, M, F, IRB, inst);
+            //    break;
             case VMOP_RET_CONST:
                 emit_ret_const(C, M, F, IRB, inst);
                 break;
             default:
-                fatal("unsupported instruction");
+                printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
+                break;
         }
         inst = CDR(inst);
     }
+    IRB.CreateRet(VALUE_INTPTR(VM::native_return_invalid_state));
     // emit_push_iloc(C, F, IRB, nullptr);
 }
 
 void
 codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_INTPTR_TYPES;
+    DECLEAR_COMMON_TYPES;
 
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
@@ -210,22 +242,48 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     // continue emit code in operands
     transform(C, M, F, IRB, operands);
 
-    // note: to avoid llvm error, control should not reach this return instruction
-    IRB.CreateRet(VALUE_INTPTR(VM::native_return_invalid_state));
-
     IRB.SetInsertPoint(cond_false);
 
     // COLLECT_STACK_CONT_REC
-    IRB.CreateRet(sp);  // placeholder
+    auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(vm_cont_rec_t))} );
+    IRB.CreateBr(cond_true);
 
-    //
     IRB.SetInsertPoint(RETURN);
+}
+
+void
+codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
+    BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    Value* cond = IRB.CreateICmpULT(sp, stack_limit);
+    IRB.CreateCondBr(cond, cond_true, cond_false);
+
+    IRB.SetInsertPoint(cond_false);
+//    auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+//    IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
+    IRB.CreateBr(cond_true);
+
+    IRB.SetInsertPoint(cond_true);
+//    auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+//    IRB.CreateStore(VALUE_INTPTR(operands), sp_0);
+//    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+    IRB.CreateBr(CONTINUE);
+
+    IRB.SetInsertPoint(CONTINUE);
 }
 
 void
 codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_INTPTR_TYPES;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     auto val = VALUE_INTPTR(operands);
@@ -236,7 +294,7 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 void
 codegen_t::emit_push_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_INTPTR_TYPES;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
@@ -249,5 +307,5 @@ codegen_t::emit_push_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
     IRB.SetInsertPoint(cond_true);
     IRB.CreateRet(sp);
     IRB.SetInsertPoint(cond_false);
-    IRB.CreateRet(stack_limit);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_return_invalid_state));
 }

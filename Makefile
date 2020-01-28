@@ -12,7 +12,7 @@ CXX = clang++
 
 CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
 
-LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
+LDLIBS = -Wl,--export-dynamic -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all)
 
 LDFLAGS = -fuse-ld=lld
 
