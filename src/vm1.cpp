@@ -470,6 +470,7 @@ VM::loop(bool init, bool resume)
                 intptr_t n = (*thunk)((intptr_t)this);
                 if (n == native_return_pop_cont) goto pop_cont;
                 if (n == native_return_apply) goto apply;
+                if (n == native_return_error_apply_iloc) goto ERROR_APPLY_ILOC;
                 fatal("unsupported thunk protocol %d", n);
             }
         }
@@ -1399,6 +1400,7 @@ VM::loop(bool init, bool resume)
                 intptr_t n = (*thunk)((intptr_t)this);
                 if (n == native_return_pop_cont) goto pop_cont;
                 if (n == native_return_apply) goto apply;
+                if (n == native_return_error_apply_iloc) goto ERROR_APPLY_ILOC;
                 fatal("unsupported thunk protocol %d", n);
             }
 

@@ -24,6 +24,23 @@ extend vm_cont_rec_t to support native cont?
 (closure-code n)
 (closure-compile n)
 
+
+(current-environment (system-environment))
+(define c)
+(define (n m) (list 1 (m) 3))
+(n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
+(c 1000) ; => (1 1000 3)
+
+(closure-code n)
+(closure-compile n)
+
+
+
+ ; => (1 2 3)
+(closure-code n)
+(closure-compile n)
+
+
 (
  (push.const . 1)
  (call
@@ -32,6 +49,10 @@ extend vm_cont_rec_t to support native cont?
  (push.const . 3)
  (ret.subr #<subr list>)
 )
+
+(current-environment (system-environment))
+(define (n) (list 1 2 3))
+(closure-compile n)
 
 - unsupported instruction push.const
 - unsupported instruction apply.iloc
@@ -98,11 +119,27 @@ extend vm_cont_rec_t to support native cont?
 #define LIST1(e1)       CONS((e1), scm_nil)
 #define LIST2(e1, e2)   CONS((e1), LIST1((e2)))
 
+static int log2_of_intptr_size()
+{
+    if (sizeof(intptr_t) == 4) return 2;
+    if (sizeof(intptr_t) == 8) return 3;
+    return (int)log2(sizeof(intptr_t));
+}
+
 static ExitOnError ExitOnErr;
 
 extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
     printf("- thunk_collect_stack(%p, %d)\n", vm, acquire);
     vm->collect_stack(acquire);
+}
+
+extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t first, intptr_t second) {
+    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, first, second);
+    void* lnk = vm->m_env;
+    intptr_t level = first;
+    while (level) { lnk = *(void**)lnk; level = level - 1; }
+    vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
+    return (scm_obj_t*)env - env->count + second;
 }
 
 codegen_t::codegen_t()
@@ -253,7 +290,7 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 
     // COLLECT_STACK_CONT_REC
     auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-    IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(vm_cont_rec_t))} );
+    IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(vm_cont_rec_t))});
     IRB.CreateBr(cond_true);
 
     IRB.SetInsertPoint(RETURN);
@@ -327,14 +364,34 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
     IRB.CreateRet(VALUE_INTPTR(VM::native_return_pop_cont));
 }
 
+Value*
+codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t loc)
+{
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+    auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(FIXNUM(CAR(loc))), VALUE_INTPTR(FIXNUM(CDR(loc)))});
+}
+
 void
 codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(MAKEFIXNUM(200)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    //auto val = VALUE_INTPTR(MAKEFIXNUM(100));
+
+    CREATE_STORE_VM_REG(vm, m_value, val);
+
+    BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
+    BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
+    auto cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(cond, cond_true, cond_false);
+    IRB.SetInsertPoint(cond_false);
     IRB.CreateRet(VALUE_INTPTR(VM::native_return_apply));
+    IRB.SetInsertPoint(cond_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_return_error_apply_iloc));
 }
 
 void
@@ -345,7 +402,9 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     auto vm = F->arg_begin();
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
-    auto argc = IRB.CreateSub(sp, fp);
+
+    auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
+//    auto argc = IRB.CreateExactSDiv(IRB.CreateSub(sp, fp), VALUE_INTPTR(sizeof(intptr_t)));
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
@@ -358,4 +417,9 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (current-environment (system-environment))
 (define (a) (current-input-port))
 (closure-compile a)
+
+(current-environment (system-environment))
+(define (n) (list 1 2 3))
+(closure-compile n)
+
 */
