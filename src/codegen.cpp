@@ -307,9 +307,13 @@ codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
     BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
     BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     Value* cond = IRB.CreateICmpULT(sp, stack_limit);
     IRB.CreateCondBr(cond, cond_true, cond_false);
+
+    IRB.SetInsertPoint(cond_true);
+    auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+    IRB.CreateStore(VALUE_INTPTR(operands), sp_0);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
 
     IRB.SetInsertPoint(cond_false);
     auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
@@ -317,12 +321,6 @@ codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     IRB.CreateBr(cond_true);
 
     IRB.SetInsertPoint(cond_true);
-    auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-    IRB.CreateStore(VALUE_INTPTR(operands), sp_0);
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
-    IRB.CreateBr(CONTINUE);
-
-    IRB.SetInsertPoint(CONTINUE);
 }
 
 void
@@ -334,9 +332,14 @@ codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
     BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
     BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     Value* cond = IRB.CreateICmpULT(sp, stack_limit);
     IRB.CreateCondBr(cond, cond_true, cond_false);
+
+    IRB.SetInsertPoint(cond_true);
+    auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    IRB.CreateStore(value, sp_0);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
 
     IRB.SetInsertPoint(cond_false);
     auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
@@ -344,13 +347,6 @@ codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     IRB.CreateBr(cond_true);
 
     IRB.SetInsertPoint(cond_true);
-    auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-    auto value = CREATE_LOAD_VM_REG(vm, m_value);
-    IRB.CreateStore(value, sp_0);
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
-    IRB.CreateBr(CONTINUE);
-
-    IRB.SetInsertPoint(CONTINUE);
 }
 
 void
