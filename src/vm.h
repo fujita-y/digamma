@@ -62,10 +62,11 @@ public:
     } m_flags;
 
     enum {
-        native_return_apply = 0,   // goto apply;
-        native_return_pop_cont,   // goto pop_cont;
-        native_return_error_apply_iloc, // goto ERROR_APPLY_ILOC
-        native_return_invalid_state,
+        native_thunk_apply = 0,   // goto apply;
+        native_thunk_pop_cont,   // goto pop_cont;
+        native_thunk_error_apply_iloc, // goto ERROR_APPLY_ILOC
+        native_thunk_error_ret_iloc,
+        native_thunk_invalid_state,
     };
 
     scm_port_t          m_bootport;

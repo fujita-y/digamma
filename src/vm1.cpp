@@ -468,13 +468,15 @@ VM::loop(bool init, bool resume)
             if (cont->code != NULL) {
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
                 intptr_t n = (*thunk)((intptr_t)this);
-                if (n == native_return_pop_cont) goto pop_cont;
-                if (n == native_return_apply) goto apply;
-                if (n == native_return_error_apply_iloc) goto ERROR_APPLY_ILOC;
-                fatal("unsupported thunk protocol %d", n);
+                switch (n) {
+                    case native_thunk_pop_cont: goto pop_cont;
+                    case native_thunk_apply: goto apply;
+                    case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
+                    case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
+                    default: fatal("unsupported thunk protocol %d", n);
+                }
             }
         }
-
 
     loop:
         assert(m_sp <= m_stack_limit);
@@ -1398,10 +1400,13 @@ VM::loop(bool init, bool resume)
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
                 printf("address:%p\n", thunk);
                 intptr_t n = (*thunk)((intptr_t)this);
-                if (n == native_return_pop_cont) goto pop_cont;
-                if (n == native_return_apply) goto apply;
-                if (n == native_return_error_apply_iloc) goto ERROR_APPLY_ILOC;
-                fatal("unsupported thunk protocol %d", n);
+                switch (n) {
+                    case native_thunk_pop_cont: goto pop_cont;
+                    case native_thunk_apply: goto apply;
+                    case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
+                    case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
+                    default: fatal("unsupported thunk protocol %d", n);
+                }
             }
 
             CASE(VMOP_TOUCH_GLOC) {
