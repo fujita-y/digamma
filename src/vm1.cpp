@@ -1398,7 +1398,7 @@ VM::loop(bool init, bool resume)
             CASE(VMOP_NATIVE) {
                 intptr_t operand = coerce_exact_integer_to_intptr(CAR(OPERANDS));
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
-                printf("address:%p\n", thunk);
+//                printf("address:%p\n", thunk);
                 intptr_t n = (*thunk)((intptr_t)this);
                 switch (n) {
                     case native_thunk_pop_cont: goto pop_cont;

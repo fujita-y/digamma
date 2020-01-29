@@ -135,12 +135,12 @@ static int log2_of_intptr_size()
 static ExitOnError ExitOnErr;
 
 extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
-    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
+//    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
     vm->collect_stack(acquire);
 }
 
 extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
+//    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
     void* lnk = vm->m_env;
     intptr_t level = depth;
     while (level) { lnk = *(void**)lnk; level = level - 1; }
@@ -193,7 +193,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     vm->m_heap->write_barrier(closure->code);
     closure->code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
 
-    printf("address:%p\n", address);
+//    printf("address:%p\n", address);
 }
 
 void
@@ -626,6 +626,18 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
        (fib (- n 2)))))
 (closure-code fib)
 (closure-compile fib)
+
+(define start (time-usage))
+(fib 32)
+(define end (time-usage))
+(map - end start)
+
+(1.0635550022125244 1.061279 0.0)
+(1.1754271984100342 1.1738849999999998 0.0)
+(1.1603269577026367 1.15823 0.0)
+
+(0.8518800735473633 0.8506149999999995 0.0)
+(0.8235650062561035 0.8224790000000004 0.0)
 
 (current-environment (system-environment))
 (backtrace #f)
