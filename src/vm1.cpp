@@ -472,7 +472,10 @@ VM::loop(bool init, bool resume)
                     case native_thunk_pop_cont: goto pop_cont;
                     case native_thunk_apply: goto apply;
                     case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
+<<<<<<< HEAD
                     case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
+=======
+>>>>>>> d20ef7273de363574ec224a1de8b7c6e1304f753
                     default: fatal("unsupported thunk protocol %d", n);
                 }
             }
@@ -1404,7 +1407,10 @@ VM::loop(bool init, bool resume)
                     case native_thunk_pop_cont: goto pop_cont;
                     case native_thunk_apply: goto apply;
                     case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
+<<<<<<< HEAD
                     case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
+=======
+>>>>>>> d20ef7273de363574ec224a1de8b7c6e1304f753
                     default: fatal("unsupported thunk protocol %d", n);
                 }
             }
