@@ -117,6 +117,9 @@ extend vm_cont_rec_t to support native cont?
 #define CREATE_STORE_CONT_REC(_CONT_,_REC_,_VAL_) \
     (IRB.CreateStore(_VAL_, IRB.CreateGEP(_CONT_, IRB.getInt32(offsetof(vm_cont_rec_t, _REC_) / sizeof(intptr_t)))))
 
+#define CREATE_LOAD_GLOC_REC(_GLOC_,_REC_) \
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_GLOC_, IRB.getInt32(offsetof(scm_gloc_rec_t, _REC_) / sizeof(intptr_t)))))
+
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
@@ -132,19 +135,23 @@ static int log2_of_intptr_size()
 static ExitOnError ExitOnErr;
 
 extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
-    printf("- thunk_collect_stack(%p, %ld)\n", vm, acquire);
+    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
     vm->collect_stack(acquire);
 }
 
 extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-    printf("- thunk_lookup_iloc(%p, %ld, %ld)\n", vm, depth, index);
+    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
     void* lnk = vm->m_env;
     intptr_t level = depth;
     while (level) { lnk = *(void**)lnk; level = level - 1; }
     vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
     return (scm_obj_t*)env - env->count + index;
 }
-
+/*
+extern "C" intptr_t thunk_number_pred(scm_obj_t obj) {
+    return number_pred(obj);
+}
+*/
 codegen_t::codegen_t()
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -445,9 +452,25 @@ codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB
     IRB.SetInsertPoint(cond_true);
 }
 
+/*
+            CASE(VMOP_APPLY_GLOC) {
+                operand_trace = CDR(OPERANDS);
+                assert(GLOCP(CAR(OPERANDS)));
+                m_value = ((scm_gloc_t)CAR(OPERANDS))->value;
+                if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
+                goto apply;
+            }
+*/
+
 void
 codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
+    auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+    CREATE_STORE_VM_REG(vm, m_value, val);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
 }
 
@@ -460,6 +483,7 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, operands));
     BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
     BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
+    CREATE_STORE_VM_REG(vm, m_value, val);
     auto cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(cond, cond_true, cond_false);
     IRB.SetInsertPoint(cond_false);
@@ -468,14 +492,119 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_ret_iloc));
 }
 
+/*
+    CASE(VMOP_LT_N_ILOC) {
+        obj = *lookup_iloc(CAR(OPERANDS));
+        if (FIXNUMP(obj)) {
+            m_value = ((intptr_t)CADR(OPERANDS) > (intptr_t)obj) ? scm_true : scm_false;
+            m_pc = CDR(m_pc);
+            goto loop;
+        }
+        goto FALLBACK_LT_N_ILOC;
+    }
+
+    FALLBACK_LT_N_ILOC
+        if (number_pred(obj)) {
+            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
+            m_pc = CDR(m_pc);
+            goto loop;
+        }
+        goto ERROR_LT_N_ILOC;
+*/
 void
 codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    BasicBlock* cond1_false = BasicBlock::Create(C, "cond1_false", F);
+    BasicBlock* cond2_true = BasicBlock::Create(C, "cond2_true", F);
+    BasicBlock* cond2_false = BasicBlock::Create(C, "cond2_false", F);
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(cond1, cond1_true, cond1_false);
+    IRB.SetInsertPoint(cond1_false);
+        auto cond2 = IRB.CreateICmpSGT(VALUE_INTPTR(CADR(operands)), val);
+        IRB.CreateCondBr(cond2, cond2_true, cond2_false);
+        IRB.SetInsertPoint(cond2_true);
+        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
+        IRB.CreateBr(CONTINUE);
+        IRB.SetInsertPoint(cond2_false);
+        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
+        IRB.CreateBr(CONTINUE);
+    IRB.SetInsertPoint(cond1_true);
+        // TODO:fallback
+        IRB.CreateBr(CONTINUE);
+    IRB.SetInsertPoint(CONTINUE);
 }
+/*
+    CASE(VMOP_PUSH_NADD_ILOC) {
+        assert(FIXNUMP(CADR(OPERANDS)));
+        if (m_sp < m_stack_limit) {
+            obj = *lookup_iloc(CAR(OPERANDS));
+            if (FIXNUMP(obj)) {
+                intptr_t n = FIXNUM(obj) + FIXNUM(CADR(OPERANDS));
+                if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
+                    m_sp[0] = MAKEFIXNUM(n);
+                    m_sp++;
+                    m_pc = CDR(m_pc);
+                    goto loop;
+                }
+            }
+            goto FALLBACK_PUSH_NADD_ILOC;
+        }
+        goto COLLECT_STACK_ONE;
+    }
+
+    FALLBACK_LT_N_ILOC:
+        if (number_pred(obj)) {
+            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
+            m_pc = CDR(m_pc);
+            goto loop;
+        }
+        goto ERROR_LT_N_ILOC;
+*/
 
 void
 codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    BasicBlock* cond1_false = BasicBlock::Create(C, "cond1_false", F);
+    BasicBlock* cond2_true = BasicBlock::Create(C, "cond2_true", F);
+    BasicBlock* cond2_false = BasicBlock::Create(C, "cond2_false", F);
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    Value* cond1 = IRB.CreateICmpULT(sp, stack_limit);
+    IRB.CreateCondBr(cond1, cond1_true, cond1_false);
+    IRB.SetInsertPoint(cond1_true);
+        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+        auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+        IRB.CreateCondBr(cond2, cond2_true, cond2_false);
+        IRB.SetInsertPoint(cond2_false);
+            auto n = IRB.CreateAdd(
+                        IRB.CreateAShr(val, VALUE_INTPTR(1)),
+                        IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
+            // TODO:check if n is out fix num IRB.CreateBr(cond2_true);
+            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+            IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), sp_0);
+            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+            IRB.CreateBr(CONTINUE);
+        IRB.SetInsertPoint(cond2_true);
+            // TODO:fallback
+            IRB.CreateBr(CONTINUE);
+
+    IRB.SetInsertPoint(cond1_false);
+        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
+        IRB.CreateBr(cond1_true);
+
+    IRB.SetInsertPoint(CONTINUE);
 }
 
 
@@ -498,5 +627,39 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 (closure-code fib)
 (closure-compile fib)
 
+(current-environment (system-environment))
+(backtrace #f)
+(define (l n)
+    (if (< n 20)
+        n
+        (l (+ n 1))))
+(closure-code l)
+(closure-compile l)
+(l 10)
+
+((<n.iloc (0 . 0) 2)
+ (if.true (ret.iloc 0 . 0))
+ (call (push.n+.iloc (0 . 0) -1) (apply.gloc #<gloc fib>))
+ (push)
+ (call (push.n+.iloc (0 . 0) -2) (apply.gloc #<gloc fib>))
+ (push)
+ (ret.subr #<subr +>))
+
+((<n.iloc (0 . 0) 20)
+ (if.true (ret.iloc 0 . 0))
+ (push.n+.iloc (0 . 0) 1)
+ (apply.gloc #<gloc l>))
+
+
+
+(current-environment (system-environment))
+(backtrace #f)
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib 0)
+       (fib 1))))
+(closure-code fib)
+(closure-compile fib)
 
 */
