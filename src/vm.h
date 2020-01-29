@@ -65,10 +65,7 @@ public:
         native_thunk_apply = 0,   // goto apply;
         native_thunk_pop_cont,   // goto pop_cont;
         native_thunk_error_apply_iloc, // goto ERROR_APPLY_ILOC
-<<<<<<< HEAD
         native_thunk_error_ret_iloc,
-=======
->>>>>>> d20ef7273de363574ec224a1de8b7c6e1304f753
         native_thunk_invalid_state,
     };
 
