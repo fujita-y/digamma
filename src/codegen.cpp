@@ -289,10 +289,10 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         CREATE_STORE_VM_REG(vm, m_cont, ea2);
         // m_pc = OPERANDS;
         scm_obj_t operands = CDAR(inst);
-        //CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
         // m_trace = m_trace_tail = scm_unspecified;
-        //CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-        //CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
+        CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
+        CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
         // continue emit code in operands
         transform(C, M, F, IRB, operands);
 
@@ -618,39 +618,26 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 (0.8277268409729004 0.8261890000000003 0.00011599999999999111)
 (0.7562940120697021 0.7488189999999997 0.007497999999999991)
 
-(current-environment (system-environment))
-(backtrace #f)
-(define (l n)
-    (if (< n 20)
-        n
-        (l (+ n 1))))
-(closure-code l)
-(closure-compile l)
-(l 10)
-
-((<n.iloc (0 . 0) 2)
- (if.true (ret.iloc 0 . 0))
- (call (push.n+.iloc (0 . 0) -1) (apply.gloc #<gloc fib>))
- (push)
- (call (push.n+.iloc (0 . 0) -2) (apply.gloc #<gloc fib>))
- (push)
- (ret.subr #<subr +>))
-
-((<n.iloc (0 . 0) 20)
- (if.true (ret.iloc 0 . 0))
- (push.n+.iloc (0 . 0) 1)
- (apply.gloc #<gloc l>))
-
-
+(0.29166603088378906 0.2916669999999999 0.0)
+-> 67.8%
+(0.19778013229370117 0.19778099999999998 0.0)
 
 (current-environment (system-environment))
 (backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib 0)
-       (fib 1))))
-(closure-code fib)
-(closure-compile fib)
+(define map-1
+    (lambda (proc lst)
+    (cond ((null? lst) '())
+            (else
+            (cons (proc (car lst))
+                    (map-1 proc (cdr lst)))))))
+(closure-code map-1)
+(closure-compile map-1)
+
+- unsupported instruction iloc.0
+- unsupported instruction if.null?.ret.const
+- unsupported instruction push.car.iloc
+- unsupported instruction push.iloc.0
+- unsupported instruction push.cdr.iloc
+- unsupported instruction ret.cons
 
 */
