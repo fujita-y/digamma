@@ -117,6 +117,9 @@ extend vm_cont_rec_t to support native cont?
 #define CREATE_LOAD_GLOC_REC(_GLOC_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_GLOC_, IRB.getInt32(offsetof(scm_gloc_rec_t, _REC_) / sizeof(intptr_t)))))
 
+#define CREATE_LOAD_ENV_REC(_ENV_,_REC_) \
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
+
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
@@ -286,10 +289,10 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         CREATE_STORE_VM_REG(vm, m_cont, ea2);
         // m_pc = OPERANDS;
         scm_obj_t operands = CDAR(inst);
-        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
+        //CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
         // m_trace = m_trace_tail = scm_unspecified;
-        CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-        CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
+        //CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
+        //CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
         // continue emit code in operands
         transform(C, M, F, IRB, operands);
 
@@ -365,6 +368,11 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
     auto vm = F->arg_begin();
     intptr_t depth = FIXNUM(CAR(loc));
     intptr_t index = FIXNUM(CDR(loc));
+    if (depth == 0 && index == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateNeg(count));
+    }
     auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
 }
@@ -606,8 +614,9 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 (1.1754271984100342 1.1738849999999998 0.0)
 (1.1603269577026367 1.15823 0.0)
 
-(0.8518800735473633 0.8506149999999995 0.0)
 (0.8235650062561035 0.8224790000000004 0.0)
+(0.8277268409729004 0.8261890000000003 0.00011599999999999111)
+(0.7562940120697021 0.7488189999999997 0.007497999999999991)
 
 (current-environment (system-environment))
 (backtrace #f)
