@@ -86,6 +86,7 @@ extend vm_cont_rec_t to support native cont?
 
 #include "codegen.h"
 #include "arith.h"
+#include "violation.h"
 #include "uuid.h"
 
 #include "llvm/IR/Verifier.h"
@@ -120,6 +121,9 @@ extend vm_cont_rec_t to support native cont?
 #define CREATE_LOAD_ENV_REC(_ENV_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
 
+#define CREATE_LOAD_PAIR_REC(_PAIR_,_REC_) \
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
+
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
@@ -147,6 +151,12 @@ extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) 
     vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
     return (scm_obj_t*)env - env->count + index;
 }
+
+extern "C" void thunk_letrec_violation(VM* vm) {
+//    printf("- thunk_letrec_violation(%p)\n", vm);
+    letrec_violation(vm);
+}
+
 /*
 extern "C" intptr_t thunk_number_pred(scm_obj_t obj) {
     return number_pred(obj);
@@ -362,12 +372,10 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 Value*
-codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t loc)
+codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index)
 {
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
-    intptr_t depth = FIXNUM(CAR(loc));
-    intptr_t index = FIXNUM(CDR(loc));
     if (depth == 0 && index == 0) {
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         auto count = CREATE_LOAD_ENV_REC(env, count);
@@ -375,6 +383,12 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
     }
     auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
+}
+
+Value*
+codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t loc)
+{
+    return emit_lookup_iloc(C, M, F, IRB, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
 }
 
 void
@@ -451,9 +465,9 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, operands));
+    CREATE_STORE_VM_REG(vm, m_value, val);
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    CREATE_STORE_VM_REG(vm, m_value, val);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, undef_false);
     // valid
@@ -511,7 +525,7 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-        // TODO:fallback FALLBACK_LT_N_ILOC
+        // TODO: fallback FALLBACK_LT_N_ILOC
         IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -572,19 +586,115 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
         // fixnum
         IRB.SetInsertPoint(nonfixnum_false);
             auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
-            // TODO:check if n is out fix num IRB.CreateBr(cond2_true);
+            // TODO: check if n is out fixnum then IRB.CreateBr(nonfixnum_true);
             auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
             IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), sp_0);
             CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
             IRB.CreateBr(CONTINUE);
         // others
         IRB.SetInsertPoint(nonfixnum_true);
-            // TODO:fallback FALLBACK_PUSH_NADD_ILOC
+            // TODO: fallback FALLBACK_PUSH_NADD_ILOC
             IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
 }
 
+void
+codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
+    CREATE_STORE_VM_REG(vm, m_value, val);
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    auto thunk_letrec_violation = M->getOrInsertFunction("thunk_letrec_violation", VoidTy, IntptrPtrTy);
+    IRB.CreateCall(thunk_letrec_violation, {vm});
+    IRB.CreateBr(undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
+}
+
+void
+codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+    auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // not taken
+    IRB.SetInsertPoint(taken_false);
+}
+
+/*
+                if (m_sp < m_stack_limit) {
+                    obj = *lookup_iloc(CAR(OPERANDS));
+                    if (PAIRP(obj)) {
+                        m_sp[0] = CAR(obj);
+                        m_sp++;
+                        m_pc = CDR(m_pc);
+                        goto loop;
+                    }
+                    goto ERROR_PUSH_CAR_ILOC;
+                }
+                goto COLLECT_STACK_ONE;
+*/
+void
+codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    // stack check
+    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
+    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
+    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
+    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
+    // stack overflow
+    IRB.SetInsertPoint(stack_false);
+        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
+        IRB.CreateBr(stack_true);
+    // stack ok
+    IRB.SetInsertPoint(stack_true);
+        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+        // check if pair
+        BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+        BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+        auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+        IRB.CreateCondBr(pair_cond, pair_true, pair_false);
+        // nonpair
+        IRB.SetInsertPoint(pair_false);
+            // TODO: create thunk func
+            // if (val == scm_undef) goto ERROR_LETREC_VIOLATION;
+            // wrong_type_argument_violation(this, "car", 0, "pair", obj, 1, &obj);
+            // goto BACK_TO_LOOP;
+            IRB.CreateBr(CONTINUE);
+        // pair
+        IRB.SetInsertPoint(pair_true);
+            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+            IRB.CreateStore(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr), sp_0);
+            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+            IRB.CreateBr(CONTINUE);
+
+    IRB.SetInsertPoint(CONTINUE);
+}
 
 /*
 (current-environment (system-environment))
