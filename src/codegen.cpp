@@ -806,8 +806,19 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (define end (time-usage))
 (map - end start)
 
+(define start (time-usage))
+(define sink)
+(define (b n)
+    (cond ((< n 100000)
+            (map-1 - '(1 2 3 4 6 7 8 9 10 1 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 10))
+            (b (+ n 1)))))
+(b 1)
+(define end (time-usage))
+(map - end start)
+
 (1.285045862197876 1.563275 0.0)
 (1.137603998184204 1.4177029999999995 0.0)
+(1.1186790466308594 1.4051300000000007 0.0)
 
 - unsupported instruction iloc.0
 - unsupported instruction if.null?.ret.const
