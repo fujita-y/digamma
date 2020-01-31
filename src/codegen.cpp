@@ -139,12 +139,12 @@ static int log2_of_intptr_size()
 static ExitOnError ExitOnErr;
 
 extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
-    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
+    //printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
     vm->collect_stack(acquire);
 }
 
 extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
+    //printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
     void* lnk = vm->m_env;
     intptr_t level = depth;
     while (level) { lnk = *(void**)lnk; level = level - 1; }
@@ -871,4 +871,16 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 
 (collect) cause problem!
 
-*/
+;;  0.036292 real    0.061184 user    0.000000 sys
+> (time (set! sink (map-1 - lst)))
+
+;;  0.034642 real    0.070080 user    0.000000 sys
+> (time (set! sink (map-1 - lst)))
+
+;;  0.040432 real    0.076968 user    0.000000 sys
+> (time (set! sink (map-1 - lst)))
+
+;;  0.035028 real    0.061653 user    0.000000 sys
+> (time (set! sink (map-1 - lst)))
+
+;;  0.033721 real    0.068744 user    0.000000 sys*/

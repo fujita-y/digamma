@@ -770,25 +770,28 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
                 return scm_undef;
             }
         }
-        do {
-            vm->m_heap->collect();
-            usleep(100);
-        } while (!vm->m_heap->m_collector_kicked);
-        do {
-            if (vm->m_heap->m_stop_the_world) vm->stop();
-            usleep(100);
-        } while (vm->m_heap->m_collector_kicked);
-        relocate_info_t* info = vm->m_heap->relocate(false);
-        vm->resolve();
-        vm->m_heap->resolve(info);
-        vm->m_heap->relocate_privates(pack);
         if (pack) {
+            do {
+                vm->m_heap->collect();
+                usleep(100);
+            } while (!vm->m_heap->m_collector_kicked);
+            do {
+                if (vm->m_heap->m_stop_the_world) vm->stop();
+                usleep(100);
+            } while (vm->m_heap->m_collector_kicked);
+            relocate_info_t* info = vm->m_heap->relocate(false);
+            vm->resolve();
+            vm->m_heap->resolve(info);
+            vm->m_heap->relocate_privates(pack);
             info = vm->m_heap->relocate(true);
             vm->resolve();
             vm->m_heap->resolve(info);
             vm->m_heap->compact_pool();
+            return scm_unspecified;
+        } else {
+            vm->m_heap->collect();
+            return scm_unspecified;
         }
-        return scm_unspecified;
     }
     wrong_number_of_arguments_violation(vm, "collect", 0, 1, argc, argv);
     return scm_undef;
