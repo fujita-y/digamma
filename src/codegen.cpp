@@ -208,8 +208,9 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*address)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
-    vm->m_heap->write_barrier(closure->code);
-    closure->code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
+    scm_obj_t compiled_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
+    vm->m_heap->write_barrier(compiled_code);
+    closure->code = compiled_code;
 }
 
 void
@@ -835,18 +836,23 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 - unsupported instruction push.cdr.iloc
 - unsupported instruction ret.cons
 
-  (define-syntax time
-    (syntax-rules ()
-      ((_ expr)
-       (destructuring-bind (real-start user-start sys-start) (time-usage)
-         (let ((result (apply (lambda () expr) '())))
-           (destructuring-bind (real-end user-end sys-end) (time-usage)
-             (format #t
-                     "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!"
-                     (- real-end real-start)
-                     (- user-end user-start)
-                     (- sys-end sys-start)))
-           result)))))
+(define-syntax time
+  (syntax-rules ()
+    ((_ expr)
+     (destructuring-bind (real-start user-start sys-start) (time-usage)
+       (let ((result (apply (lambda () expr) '())))
+         (destructuring-bind (real-end user-end sys-end) (time-usage)
+           (format #t
+                   "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!"
+                   (- real-end real-start)
+                   (- user-end user-start)
+                   (- sys-end sys-start)))
+         result)))))
+
+(define lst (make-list 100000 1))
+(define sink #f)
+(define (minus x) (- x))
+;(time (set! sink (map-1 minus lst)))
 
 (backtrace #f)
 (define map-1
@@ -856,11 +862,10 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
         (cons (proc (car lst))
               (map-1 proc (cdr lst))))))
 
-(define lst (make-list 100000 1))
-(define sink #f)
+(closure-compile map-1)
+(collect)
 (time (set! sink (map-1 - lst)))
 
-(closure-compile map-1)
 (define lst (make-list 100000 1))
 (define (minus x) (- x))
 (define sink #f)
@@ -868,6 +873,11 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (length sink)
 (set! sink (map-1 minus lst))
 (length sink)
+
+
+
+
+
 
 (collect) cause problem!
 
