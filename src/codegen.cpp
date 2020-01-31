@@ -208,9 +208,9 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*address)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
-    scm_obj_t compiled_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
-    vm->m_heap->write_barrier(compiled_code);
-    closure->code = compiled_code;
+    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
+    vm->m_heap->write_barrier(n_code);
+    closure->code = n_code;
 }
 
 void
@@ -852,7 +852,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (define lst (make-list 100000 1))
 (define sink #f)
 (define (minus x) (- x))
-;(time (set! sink (map-1 minus lst)))
+(time (set! sink (map-1 minus lst)))
 
 (backtrace #f)
 (define map-1
@@ -864,7 +864,8 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 
 (closure-compile map-1)
 (collect)
-(time (set! sink (map-1 - lst)))
+(time (set! sink (map-1 minus lst)))
+;(time (set! sink (map-1 - lst)))
 
 (define lst (make-list 100000 1))
 (define (minus x) (- x))
@@ -874,8 +875,19 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (set! sink (map-1 minus lst))
 (length sink)
 
+;; no JIT
+;;  0.035965 real    0.071242 user    0.000000 sys
+;;  0.039149 real    0.074854 user    0.000000 sys
+;;  0.039270 real    0.078679 user    0.000000 sys
+;;  0.043609 real    0.087141 user    0.000000 sys
+;;  0.036911 real    0.071785 user    0.000243 sys
 
-
+;; with JIT
+;;  0.031414 real    0.053286 user    0.000000 sys
+;;  0.032145 real    0.063468 user    0.000000 sys
+;;  0.036857 real    0.070466 user    0.000000 sys
+;;  0.037044 real    0.064553 user    0.000000 sys
+;;  0.036849 real    0.072118 user    0.000000 sys
 
 
 
@@ -893,4 +905,22 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 ;;  0.035028 real    0.061653 user    0.000000 sys
 > (time (set! sink (map-1 - lst)))
 
-;;  0.033721 real    0.068744 user    0.000000 sys*/
+;;  0.033721 real    0.068744 user    0.000000 sys
+
+
+(backtrace #t)
+(define (minus x) (- x))
+(define lst (make-list 100000 'a))
+
+(define map-1
+  (lambda (proc lst)
+    (if (null? lst)
+        '()
+        (cons (proc (car lst))
+              (map-1 proc (cdr lst))))))
+(define (k)
+    (list (map-1 minus lst) 'tail))
+(k)
+(closure-compile map-1)
+(k)
+*/
