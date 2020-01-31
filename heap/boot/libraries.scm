@@ -439,7 +439,7 @@
                         warning-level
                         restricted-print-line-length
                         record-print-nesting-limit
-                        macro-expand compile compile-coreform closure-code
+                        macro-expand compile compile-coreform closure-code closure-compile
                         current-environment current-macro-environment current-variable-environment current-dynamic-environment
                         system-environment interaction-environment
                         make-environment

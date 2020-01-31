@@ -139,7 +139,7 @@ static int log2_of_intptr_size()
 static ExitOnError ExitOnErr;
 
 extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
-//    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
+    printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
     vm->collect_stack(acquire);
 }
 
@@ -826,5 +826,37 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 - unsupported instruction push.iloc.0
 - unsupported instruction push.cdr.iloc
 - unsupported instruction ret.cons
+
+  (define-syntax time
+    (syntax-rules ()
+      ((_ expr)
+       (destructuring-bind (real-start user-start sys-start) (time-usage)
+         (let ((result (apply (lambda () expr) '())))
+           (destructuring-bind (real-end user-end sys-end) (time-usage)
+             (format #t
+                     "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!"
+                     (- real-end real-start)
+                     (- user-end user-start)
+                     (- sys-end sys-start)))
+           result)))))
+
+(backtrace #f)
+(define map-1
+  (lambda (proc lst)
+    (if (null? lst)
+        '()
+        (cons (proc (car lst))
+              (map-1 proc (cdr lst))))))
+
+(collect #t)
+(define lst (make-list 100 1))
+(define minus (lambda (x) (- x)))
+(define sink #f)
+(time (set! sink (map-1 minus lst)))
+
+;;  0.000965 real    0.000813 user    0.000150 sys
+(closure-compile map-1)
+
+;;  0.000113 real    0.000076 user    0.000035 sys
 
 */

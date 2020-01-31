@@ -241,6 +241,7 @@
     close-output-port
     close-port
     closure-code
+    closure-compile
     cmwc-random-real
     cmwc-random-u32
     collect
