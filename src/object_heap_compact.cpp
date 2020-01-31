@@ -66,7 +66,7 @@ relocate_collectible(void* obj, int size, void* desc)
     scm_obj_t from = (scm_obj_t)obj;
     scm_obj_t to;
     if (PAIRP(obj)) {
-        assert(size == sizeof(scm_pair_rec_t));
+        assert(size >= sizeof(scm_pair_rec_t));
 
 #if USE_CONST_LITERAL
         object_slab_traits_t* traits = OBJECT_SLAB_TRAITS_OF(obj);
@@ -79,10 +79,10 @@ relocate_collectible(void* obj, int size, void* desc)
         to = heap->allocate_cons();
 #endif
     } else if (FLONUMP(obj)) {
-        assert(size == sizeof(scm_flonum_rec_t));
+        assert(size >= sizeof(scm_flonum_rec_t));
         to = heap->allocate_flonum();
     } else if (WEAKMAPPINGP(obj)) {
-        assert(size == sizeof(scm_weakmapping_rec_t));
+        assert(size >= sizeof(scm_weakmapping_rec_t));
         to = heap->allocate_weakmapping();
     } else {
         to = heap->allocate_collectible(size);
