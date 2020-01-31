@@ -310,21 +310,24 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        // [TODO] no need this?
         sp = CREATE_LOAD_VM_REG(vm, m_sp);
+
         // vm_cont_t cont = (vm_cont_t)m_sp;
         auto cont = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+
+        // pepare_call(vm, cont)
         // cont->trace = m_trace;
         CREATE_STORE_CONT_REC(cont, trace, CREATE_LOAD_VM_REG(vm, m_trace));
         // cont->fp = m_fp;
         CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
-        // cont->pc = CDR(m_pc);
-        CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
-        // cont->code = NULL;
-        CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
         // cont->env = m_env;
         CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
         // cont->up = m_cont;
         CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
+        // m_trace = m_trace_tail = scm_unspecified;
+        CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
+        CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
         // m_sp = m_fp = (scm_obj_t*)(cont + 1);
         auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
         CREATE_STORE_VM_REG(vm, m_sp, ea1);
@@ -332,12 +335,15 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         // m_cont = &cont->up;
         auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
         CREATE_STORE_VM_REG(vm, m_cont, ea2);
+
+
+        // cont->pc = CDR(m_pc);
+        CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
+        // cont->code = NULL;
+        CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
         // m_pc = OPERANDS;
         scm_obj_t operands = CDAR(inst);
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
-        // m_trace = m_trace_tail = scm_unspecified;
-        CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-        CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
         // continue emit code in operands
         transform(C, M, F, IRB, operands);
 
@@ -918,7 +924,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 
 (backtrace #t)
 (define (minus x) (- x))
-(define lst (make-list 100000 'a))
+(define lst (make-list 100000 '4))
 
 (define map-1
   (lambda (proc lst)
@@ -928,7 +934,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
               (map-1 proc (cdr lst))))))
 (define (k)
     (list (map-1 minus lst) 'tail))
-(k)
+(length (car (k)))
 (closure-compile map-1)
-(k)
+(length (car (k)))
 */
