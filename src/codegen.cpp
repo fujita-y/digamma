@@ -144,7 +144,7 @@ extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
 }
 
 extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-//    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
+    printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
     void* lnk = vm->m_env;
     intptr_t level = depth;
     while (level) { lnk = *(void**)lnk; level = level - 1; }
@@ -303,6 +303,7 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         // vm_cont_t cont = (vm_cont_t)m_sp;
         auto cont = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
         // cont->trace = m_trace;
@@ -357,6 +358,7 @@ codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
         IRB.CreateStore(VALUE_INTPTR(operands), sp_0);
         CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
@@ -381,6 +383,7 @@ codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
         auto value = CREATE_LOAD_VM_REG(vm, m_value);
         IRB.CreateStore(value, sp_0);
@@ -563,6 +566,7 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
         BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
@@ -644,6 +648,7 @@ codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
         auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
         IRB.CreateStore(val, sp_0);
@@ -671,6 +676,7 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
         // check if pair
         BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -713,6 +719,7 @@ codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
+        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
         // check if pair
         BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -848,15 +855,19 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
         (cons (proc (car lst))
               (map-1 proc (cdr lst))))))
 
-(collect #t)
-(define lst (make-list 100 1))
-(define minus (lambda (x) (- x)))
+(define lst (make-list 100000 1))
 (define sink #f)
-(time (set! sink (map-1 minus lst)))
+(time (set! sink (map-1 - lst)))
 
-;;  0.000965 real    0.000813 user    0.000150 sys
 (closure-compile map-1)
+(define lst (make-list 100000 1))
+(define (minus x) (- x))
+(define sink #f)
+(set! sink (map-1 - lst))
+(length sink)
+(set! sink (map-1 minus lst))
+(length sink)
 
-;;  0.000113 real    0.000076 user    0.000035 sys
+(collect) cause problem!
 
 */
