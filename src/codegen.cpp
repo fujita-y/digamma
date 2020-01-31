@@ -489,6 +489,7 @@ codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     CREATE_STORE_VM_REG(vm, m_value, val);
+    // [TODO] check if val is undef
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
 }
 
