@@ -1396,8 +1396,12 @@ VM::loop(bool init, bool resume)
             }
 
             CASE(VMOP_NATIVE) {
-                intptr_t operand = coerce_exact_integer_to_intptr(CAR(OPERANDS));
-                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
+                scm_bvector_t operand = (scm_bvector_t)CAR(OPERANDS);
+                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)operand->elts);
+
+                //intptr_t operand = coerce_exact_integer_to_intptr(CAR(OPERANDS));
+                //intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
+
 //                printf("address:%p\n", thunk);
                 intptr_t n = (*thunk)((intptr_t)this);
                 switch (n) {

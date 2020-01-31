@@ -206,11 +206,17 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     m_jit->getMainJITDylib().dump(llvm::outs());
 
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
-    intptr_t (*address)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
+    intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
-    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
+    scm_bvector_t operand = make_bvector(vm->m_heap, sizeof(intptr_t));
+    *(intptr_t*)operand->elts = (intptr_t)thunk;
+    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(operand, closure->code)));
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
+
+//    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
+//    vm->m_heap->write_barrier(n_code);
+//    closure->code = n_code;
 }
 
 void
@@ -849,10 +855,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
                    (- sys-end sys-start)))
          result)))))
 
-(define lst (make-list 100000 1))
-(define sink #f)
-(define (minus x) (- x))
-(time (set! sink (map-1 minus lst)))
+;(time (set! sink (map-1 minus lst)))
 
 (backtrace #f)
 (define map-1
@@ -862,8 +865,13 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
         (cons (proc (car lst))
               (map-1 proc (cdr lst))))))
 
+(define lst (make-list 100000 1))
+(define sink #f)
+(define (minus x) (- x))
+
 (closure-compile map-1)
 (collect)
+(usleep 10000)
 (time (set! sink (map-1 minus lst)))
 ;(time (set! sink (map-1 - lst)))
 
