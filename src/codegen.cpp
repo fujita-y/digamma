@@ -157,11 +157,20 @@ extern "C" void thunk_letrec_violation(VM* vm) {
     letrec_violation(vm);
 }
 
-/*
-extern "C" intptr_t thunk_number_pred(scm_obj_t obj) {
-    return number_pred(obj);
+extern "C" void thunk_error_push_car_iloc(VM* vm, scm_obj_t obj) {
+    if (obj == scm_undef) letrec_violation(vm);
+    wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
 }
-*/
+
+extern "C" void thunk_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
+    if (obj == scm_undef) letrec_violation(vm);
+    wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
+}
+
+extern "C" scm_obj_t thunk_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
+    return make_pair(vm->m_heap, car, cdr);
+}
+
 codegen_t::codegen_t()
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -240,6 +249,24 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
                 break;
             case VMOP_PUSH_NADD_ILOC:
                 emit_push_nadd_iloc(C, M, F, IRB, inst);
+                break;
+            case VMOP_ILOC0:
+                emit_iloc0(C, M, F, IRB, inst);
+                break;
+            case VMOP_IF_NULLP_RET_CONST:
+                emit_if_nullp_ret_const(C, M, F, IRB, inst);
+                break;
+            case VMOP_PUSH_CAR_ILOC:
+                emit_push_car_iloc(C, M, F, IRB, inst);
+                break;
+            case VMOP_PUSH_ILOC0:
+                emit_push_iloc0(C, M, F, IRB, inst);
+                break;
+            case VMOP_PUSH_CDR_ILOC:
+                emit_push_cdr_iloc(C, M, F, IRB, inst);
+                break;
+            case VMOP_RET_CONS:
+                emit_ret_cons(C, M, F, IRB, inst);
                 break;
             default:
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
@@ -380,6 +407,10 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         auto count = CREATE_LOAD_ENV_REC(env, count);
         return IRB.CreateGEP(env, IRB.CreateNeg(count));
+    } else if (depth == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
     }
     auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
@@ -478,25 +509,6 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_ret_iloc));
 }
 
-/*
-    CASE(VMOP_LT_N_ILOC) {
-        obj = *lookup_iloc(CAR(OPERANDS));
-        if (FIXNUMP(obj)) {
-            m_value = ((intptr_t)CADR(OPERANDS) > (intptr_t)obj) ? scm_true : scm_false;
-            m_pc = CDR(m_pc);
-            goto loop;
-        }
-        goto FALLBACK_LT_N_ILOC;
-    }
-
-    FALLBACK_LT_N_ILOC
-        if (number_pred(obj)) {
-            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
-            m_pc = CDR(m_pc);
-            goto loop;
-        }
-        goto ERROR_LT_N_ILOC;
-*/
 void
 codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
@@ -529,33 +541,6 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
         IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(CONTINUE);
 }
-/*
-    CASE(VMOP_PUSH_NADD_ILOC) {
-        assert(FIXNUMP(CADR(OPERANDS)));
-        if (m_sp < m_stack_limit) {
-            obj = *lookup_iloc(CAR(OPERANDS));
-            if (FIXNUMP(obj)) {
-                intptr_t n = FIXNUM(obj) + FIXNUM(CADR(OPERANDS));
-                if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
-                    m_sp[0] = MAKEFIXNUM(n);
-                    m_sp++;
-                    m_pc = CDR(m_pc);
-                    goto loop;
-                }
-            }
-            goto FALLBACK_PUSH_NADD_ILOC;
-        }
-        goto COLLECT_STACK_ONE;
-    }
-
-    FALLBACK_LT_N_ILOC:
-        if (number_pred(obj)) {
-            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
-            m_pc = CDR(m_pc);
-            goto loop;
-        }
-        goto ERROR_LT_N_ILOC;
-*/
 
 void
 codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
@@ -639,19 +624,32 @@ codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBui
     IRB.SetInsertPoint(taken_false);
 }
 
-/*
-                if (m_sp < m_stack_limit) {
-                    obj = *lookup_iloc(CAR(OPERANDS));
-                    if (PAIRP(obj)) {
-                        m_sp[0] = CAR(obj);
-                        m_sp++;
-                        m_pc = CDR(m_pc);
-                        goto loop;
-                    }
-                    goto ERROR_PUSH_CAR_ILOC;
-                }
-                goto COLLECT_STACK_ONE;
-*/
+void
+codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    // stack check
+    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
+    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
+    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
+    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
+    // stack overflow
+    IRB.SetInsertPoint(stack_false);
+        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
+        IRB.CreateBr(stack_true);
+    // stack ok
+    IRB.SetInsertPoint(stack_true);
+        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
+        auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+        IRB.CreateStore(val, sp_0);
+        CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+}
+
 void
 codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
@@ -681,10 +679,50 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.CreateCondBr(pair_cond, pair_true, pair_false);
         // nonpair
         IRB.SetInsertPoint(pair_false);
-            // TODO: create thunk func
-            // if (val == scm_undef) goto ERROR_LETREC_VIOLATION;
-            // wrong_type_argument_violation(this, "car", 0, "pair", obj, 1, &obj);
-            // goto BACK_TO_LOOP;
+            auto thunk_error_push_car_iloc = M->getOrInsertFunction("thunk_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+            IRB.CreateCall(thunk_error_push_car_iloc, {vm, val});
+            IRB.CreateBr(CONTINUE);
+        // pair
+        IRB.SetInsertPoint(pair_true);
+            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
+            IRB.CreateStore(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car), sp_0);
+            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+            IRB.CreateBr(CONTINUE);
+
+    IRB.SetInsertPoint(CONTINUE);
+}
+
+void
+codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    // stack check
+    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
+    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
+    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
+    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
+    // stack overflow
+    IRB.SetInsertPoint(stack_false);
+        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
+        IRB.CreateBr(stack_true);
+    // stack ok
+    IRB.SetInsertPoint(stack_true);
+        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+        // check if pair
+        BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+        BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+        auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+        IRB.CreateCondBr(pair_cond, pair_true, pair_false);
+        // nonpair
+        IRB.SetInsertPoint(pair_false);
+            auto thunk_error_push_cdr_iloc = M->getOrInsertFunction("thunk_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+            IRB.CreateCall(thunk_error_push_cdr_iloc, {vm, val});
             IRB.CreateBr(CONTINUE);
         // pair
         IRB.SetInsertPoint(pair_true);
@@ -694,6 +732,20 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
             IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
+}
+
+void
+codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto val = CREATE_LOAD_VM_REG(vm, m_value);
+    auto sp_minus_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
+    auto thunk_make_pair = M->getOrInsertFunction("thunk_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(thunk_make_pair, {vm, sp_minus_1, val}));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 }
 
 /*
@@ -742,6 +794,20 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
                     (map-1 proc (cdr lst)))))))
 (closure-code map-1)
 (closure-compile map-1)
+
+(define start (time-usage))
+(define sink)
+(define (b)
+    (let loop ((n 1))
+        (cond ((< n 100000)
+               (map-1 - '(1 2 3 4 6 7 8 9 10 1 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 10))
+               (loop (+ n 1))))))
+(b)
+(define end (time-usage))
+(map - end start)
+
+(1.285045862197876 1.563275 0.0)
+(1.137603998184204 1.4177029999999995 0.0)
 
 - unsupported instruction iloc.0
 - unsupported instruction if.null?.ret.const
