@@ -16,6 +16,21 @@
 #define FORWARD(from,to)    ((*(uintptr_t*)(from)) = ((uintptr_t)(to) | 1))
 #define RESOLVE(p)          ((void*)((*(uintptr_t*)(p)) & (~1)))
 
+#define NATIVE_THUNK_DISPATCH(_N_) \
+        { \
+            switch (n) { \
+                case native_thunk_pop_cont: goto pop_cont; \
+                case native_thunk_apply: goto apply; \
+                case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
+                case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
+                case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC; \
+                case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
+                default: fatal("unsupported thunk protocol %d", n); \
+            } \
+        }
+
+
+
 static void
 object_copy(void* dst, const void* src, intptr_t bsize)
 {
@@ -468,13 +483,7 @@ VM::loop(bool init, bool resume)
             if (cont->code != NULL) {
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
                 intptr_t n = (*thunk)((intptr_t)this);
-                switch (n) {
-                    case native_thunk_pop_cont: goto pop_cont;
-                    case native_thunk_apply: goto apply;
-                    case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
-                    case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
-                    default: fatal("unsupported thunk protocol %d", n);
-                }
+                NATIVE_THUNK_DISPATCH(n);
             }
         }
 
@@ -1398,19 +1407,8 @@ VM::loop(bool init, bool resume)
             CASE(VMOP_NATIVE) {
                 scm_bvector_t operand = (scm_bvector_t)CAR(OPERANDS);
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)operand->elts);
-
-                //intptr_t operand = coerce_exact_integer_to_intptr(CAR(OPERANDS));
-                //intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))operand;
-
-//                printf("address:%p\n", thunk);
                 intptr_t n = (*thunk)((intptr_t)this);
-                switch (n) {
-                    case native_thunk_pop_cont: goto pop_cont;
-                    case native_thunk_apply: goto apply;
-                    case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC;
-                    case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC;
-                    default: fatal("unsupported thunk protocol %d", n);
-                }
+                NATIVE_THUNK_DISPATCH(n);
             }
 
             CASE(VMOP_TOUCH_GLOC) {

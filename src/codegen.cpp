@@ -167,8 +167,21 @@ extern "C" void thunk_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
     wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
 }
 
+extern "C" void thunk_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    printf("- thunk_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
+    if (obj == scm_undef) letrec_violation(vm);
+    scm_obj_t argv[2] = { obj, CADR(operands) };
+    wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+}
+
 extern "C" scm_obj_t thunk_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
     return make_pair(vm->m_heap, car, cdr);
+}
+
+extern "C" intptr_t thunk_number_pred(scm_obj_t obj)
+{
+    printf("- thunk_number_pred(%p) => %d\n", obj, number_pred(obj));
+    return (intptr_t)number_pred(obj);
 }
 
 codegen_t::codegen_t()
@@ -351,12 +364,8 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        // [TODO] no need this?
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
-
         // vm_cont_t cont = (vm_cont_t)m_sp;
-        auto cont = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-
+        auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
 
         auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
         IRB.CreateCall(prepare_call, {vm, cont});
@@ -547,8 +556,16 @@ codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     CREATE_STORE_VM_REG(vm, m_value, val);
-    // [TODO] check if val is undef
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
 }
 
 void
@@ -599,7 +616,30 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-        // TODO: fallback FALLBACK_LT_N_ILOC
+        auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
+        BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
+        BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
+        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
+        IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
+        // non number
+        IRB.SetInsertPoint(nonnum_true);
+        auto thunk_error_lt_n_iloc = M->getOrInsertFunction("thunk_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+        IRB.CreateCall(thunk_error_lt_n_iloc, {vm, val, VALUE_INTPTR(operands)});
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+
+        // number
+        IRB.SetInsertPoint(nonnum_false);
+
+/*
+        if (number_pred(obj)) {
+            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
+            m_pc = CDR(m_pc);
+            goto loop;
+        }
+        goto ERROR_LT_N_ILOC;
+*/
+        // TODO: implement fallback FALLBACK_LT_N_ILOC
+        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
         IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -746,7 +786,7 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.SetInsertPoint(pair_false);
             auto thunk_error_push_car_iloc = M->getOrInsertFunction("thunk_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
             IRB.CreateCall(thunk_error_push_car_iloc, {vm, val});
-            IRB.CreateBr(CONTINUE);
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // pair
         IRB.SetInsertPoint(pair_true);
             auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
@@ -789,7 +829,7 @@ codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.SetInsertPoint(pair_false);
             auto thunk_error_push_cdr_iloc = M->getOrInsertFunction("thunk_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
             IRB.CreateCall(thunk_error_push_cdr_iloc, {vm, val});
-            IRB.CreateBr(CONTINUE);
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // pair
         IRB.SetInsertPoint(pair_true);
             auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
@@ -982,23 +1022,6 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (length (car (k)))
 (closure-compile map-1)
 (length (car (k)))
-*/
-
-/*
-;;  0.345724 real    0.587713 user    0.038782 sys
-> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
-
-;;  0.318513 real    0.598887 user    0.009532 sys
-> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
-
-;;  0.307531 real    0.590046 user    0.000000 sys
-> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
-
-;;  0.324239 real    0.618332 user    0.000000 sys
-> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
-
-;;  0.333915 real    0.644442 user    0.000000 sys
-
 
 (backtrace #f)
 (define (fib n)
@@ -1010,21 +1033,4 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (closure-compile fib)
 (time (fib 32))
 
-;;  0.697509 real    0.697041 user    0.000000 sys
-2178309
-> (time (fib 32))
-
-;;  0.712371 real    0.712130 user    0.000000 sys
-2178309
-> (time (fib 32))
-
-;;  0.650633 real    0.650617 user    0.000000 sys
-2178309
-> (time (fib 32))
-
-;;  0.689100 real    0.688890 user    0.000000 sys
-2178309
-> (time (fib 32))
-
-;;  0.689697 real    0.689524 user    0.000000 sys
-2178309*/
+*/
