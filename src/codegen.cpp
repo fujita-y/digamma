@@ -168,7 +168,7 @@ extern "C" void thunk_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
 }
 
 extern "C" void thunk_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-    printf("- thunk_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
+    //printf("- thunk_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
     if (obj == scm_undef) letrec_violation(vm);
     scm_obj_t argv[2] = { obj, CADR(operands) };
     wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
@@ -180,7 +180,7 @@ extern "C" scm_obj_t thunk_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
 
 extern "C" intptr_t thunk_number_pred(scm_obj_t obj)
 {
-    printf("- thunk_number_pred(%p) => %d\n", obj, number_pred(obj));
+    //printf("- thunk_number_pred(%p) => %d\n", obj, number_pred(obj));
     return (intptr_t)number_pred(obj);
 }
 
@@ -267,10 +267,6 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(operand, closure->code)));
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
-
-//    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(intptr_to_integer(vm->m_heap, (intptr_t)address), closure->code)));
-//    vm->m_heap->write_barrier(n_code);
-//    closure->code = n_code;
 }
 
 void
@@ -621,7 +617,7 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
         BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
         auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
         IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
-        // non number
+        // not number
         IRB.SetInsertPoint(nonnum_true);
         auto thunk_error_lt_n_iloc = M->getOrInsertFunction("thunk_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
         IRB.CreateCall(thunk_error_lt_n_iloc, {vm, val, VALUE_INTPTR(operands)});
@@ -1032,5 +1028,15 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (closure-code fib)
 (closure-compile fib)
 (time (fib 32))
+
+map
+- unsupported instruction if.null?
+- unsupported instruction push.gloc
+- unsupported instruction extend
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.subr
 
 */
