@@ -178,6 +178,47 @@ codegen_t::codegen_t()
     auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
     J->getMainJITDylib().setGenerator(G);
     m_jit = std::move(J);
+    define_prepare_call();
+}
+
+void
+codegen_t::define_prepare_call()
+{
+    auto Context = llvm::make_unique<LLVMContext>();
+    LLVMContext& C = *Context;
+    DECLEAR_COMMON_TYPES;
+
+    auto M = llvm::make_unique<Module>("intrinsics", C);
+    Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::LinkOnceAnyLinkage, "prepare_call", M.get());
+    F->setCallingConv(CallingConv::Fast);
+    BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
+    IRBuilder<> IRB(ENTRY);
+    auto vm = F->arg_begin();
+    auto cont = F->arg_begin() + 1;
+
+    CREATE_STORE_CONT_REC(cont, trace, CREATE_LOAD_VM_REG(vm, m_trace));
+    // cont->fp = m_fp;
+    CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
+    // cont->env = m_env;
+    CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
+    // cont->up = m_cont;
+    CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
+    // m_trace = m_trace_tail = scm_unspecified;
+    CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
+    CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
+    // m_sp = m_fp = (scm_obj_t*)(cont + 1);
+    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    // m_cont = &cont->up;
+    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_cont, ea2);
+    IRB.CreateRetVoid();
+
+    //verifyModule(*M, &outs());
+    //M.get()->print(outs(), nullptr);
+    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+    m_jit->getMainJITDylib().dump(llvm::outs());
 }
 
 void
@@ -316,6 +357,10 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         // vm_cont_t cont = (vm_cont_t)m_sp;
         auto cont = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
 
+
+        auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
+        IRB.CreateCall(prepare_call, {vm, cont});
+/*
         // pepare_call(vm, cont)
         // cont->trace = m_trace;
         CREATE_STORE_CONT_REC(cont, trace, CREATE_LOAD_VM_REG(vm, m_trace));
@@ -335,7 +380,7 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         // m_cont = &cont->up;
         auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
         CREATE_STORE_VM_REG(vm, m_cont, ea2);
-
+*/
 
         // cont->pc = CDR(m_pc);
         CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
@@ -878,7 +923,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (closure-compile map-1)
 (collect)
 (usleep 10000)
-(time (set! sink (map-1 minus lst)))
+(time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
 ;(time (set! sink (map-1 - lst)))
 
 (define lst (make-list 100000 1))
@@ -938,3 +983,48 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (closure-compile map-1)
 (length (car (k)))
 */
+
+/*
+;;  0.345724 real    0.587713 user    0.038782 sys
+> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
+
+;;  0.318513 real    0.598887 user    0.009532 sys
+> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
+
+;;  0.307531 real    0.590046 user    0.000000 sys
+> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
+
+;;  0.324239 real    0.618332 user    0.000000 sys
+> (time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
+
+;;  0.333915 real    0.644442 user    0.000000 sys
+
+
+(backtrace #f)
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+(closure-code fib)
+(closure-compile fib)
+(time (fib 32))
+
+;;  0.697509 real    0.697041 user    0.000000 sys
+2178309
+> (time (fib 32))
+
+;;  0.712371 real    0.712130 user    0.000000 sys
+2178309
+> (time (fib 32))
+
+;;  0.650633 real    0.650617 user    0.000000 sys
+2178309
+> (time (fib 32))
+
+;;  0.689100 real    0.688890 user    0.000000 sys
+2178309
+> (time (fib 32))
+
+;;  0.689697 real    0.689524 user    0.000000 sys
+2178309*/
