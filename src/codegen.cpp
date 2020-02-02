@@ -86,6 +86,7 @@ extend vm_cont_rec_t to support native cont?
 
 #include "codegen.h"
 #include "arith.h"
+#include "printer.h"
 #include "violation.h"
 #include "uuid.h"
 
@@ -170,8 +171,14 @@ extern "C" void thunk_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
 extern "C" void thunk_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
     //printf("- thunk_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
     if (obj == scm_undef) letrec_violation(vm);
-    scm_obj_t argv[2] = { obj, CADR(operands) };
-    wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+    scm_obj_t argv[2] = { obj, operands };
+    wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+}
+
+extern "C" void thunk_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    if (obj == scm_undef) letrec_violation(vm);
+    scm_obj_t argv[2] = { obj, operands };
+    wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
 }
 
 extern "C" scm_obj_t thunk_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
@@ -182,6 +189,24 @@ extern "C" intptr_t thunk_number_pred(scm_obj_t obj)
 {
     //printf("- thunk_number_pred(%p) => %d\n", obj, number_pred(obj));
     return (intptr_t)number_pred(obj);
+}
+
+extern "C" intptr_t thunk_real_pred(scm_obj_t obj)
+{
+    //printf("- thunk_real_pred(%p) => %d\n", obj, real_pred(obj));
+    return (intptr_t)real_pred(obj);
+}
+
+extern "C" intptr_t thunk_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+//    printer_t prt(vm, vm->m_current_output);
+//    prt.format("- thunk_n_compare ~s ~s => %d ~%~!", obj, operands, n_compare(vm->m_heap, obj, operands));
+    return n_compare(vm->m_heap, obj, operands);
+}
+
+extern "C" scm_obj_t thunk_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+//    printer_t prt(vm, vm->m_current_output);
+//    prt.format("- thunk_arith_add ~s ~s => ~s ~%~!", obj, operands, arith_add(vm->m_heap, obj, operands));
+    return arith_add(vm->m_heap, obj, operands);
 }
 
 codegen_t::codegen_t()
@@ -612,31 +637,31 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-        auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
-        BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
-        BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
-        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
-        IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
-        // not number
-        IRB.SetInsertPoint(nonnum_true);
-        auto thunk_error_lt_n_iloc = M->getOrInsertFunction("thunk_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-        IRB.CreateCall(thunk_error_lt_n_iloc, {vm, val, VALUE_INTPTR(operands)});
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
-
-        // number
-        IRB.SetInsertPoint(nonnum_false);
-
-/*
-        if (number_pred(obj)) {
-            m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
-            m_pc = CDR(m_pc);
-            goto loop;
-        }
-        goto ERROR_LT_N_ILOC;
-*/
-        // TODO: implement fallback FALLBACK_LT_N_ILOC
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-        IRB.CreateBr(CONTINUE);
+        auto thunk_real_pred = M->getOrInsertFunction("thunk_real_pred", IntptrTy, IntptrTy);
+        BasicBlock* nonreal_true = BasicBlock::Create(C, "nonreal_true", F);
+        BasicBlock* nonreal_false = BasicBlock::Create(C, "nonreal_false", F);
+        auto nonreal_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_real_pred, {val}), VALUE_INTPTR(0));
+        IRB.CreateCondBr(nonreal_cond, nonreal_true, nonreal_false);
+        // not real
+        IRB.SetInsertPoint(nonreal_true);
+            auto thunk_error_lt_n_iloc = M->getOrInsertFunction("thunk_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            IRB.CreateCall(thunk_error_lt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        // real
+        IRB.SetInsertPoint(nonreal_false);
+            auto thunk_n_compare = M->getOrInsertFunction("thunk_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            auto taken_cond = IRB.CreateICmpSLT(IRB.CreateCall(thunk_n_compare, {vm, val, VALUE_INTPTR(CADR(operands))}), VALUE_INTPTR(0));
+            BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+            BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+            IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+            // taken
+            IRB.SetInsertPoint(taken_true);
+                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
+                IRB.CreateBr(CONTINUE);
+            // not taken
+            IRB.SetInsertPoint(taken_false);
+                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
+                IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(CONTINUE);
 }
 
@@ -670,18 +695,45 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
         // fixnum
         IRB.SetInsertPoint(nonfixnum_false);
             auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
-            // TODO: check if n is out fixnum then IRB.CreateBr(nonfixnum_true);
-            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-            IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), sp_0);
+            // [TODO] check if n is out fixnum then IRB.CreateBr(nonfixnum_true);
+            // m_sp[0] = val; m_sp++;
+            IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
             CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
             IRB.CreateBr(CONTINUE);
         // others
         IRB.SetInsertPoint(nonfixnum_true);
-            // TODO: fallback FALLBACK_PUSH_NADD_ILOC
-            IRB.CreateBr(CONTINUE);
+            auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
+            BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
+            BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
+            auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
+            IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
+            // not number
+            IRB.SetInsertPoint(nonnum_true);
+                auto thunk_error_push_nadd_iloc = M->getOrInsertFunction("thunk_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+                IRB.CreateCall(thunk_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+                IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+            // number
+            IRB.SetInsertPoint(nonnum_false);
+                auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+                // m_sp[0] = val; m_sp++;
+                IRB.CreateStore(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
+                CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+                IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
 }
+
+/*
+(backtrace #f)
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+(closure-code fib)
+(closure-compile fib)
+(fib 2.0)
+*/
 
 void
 codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)

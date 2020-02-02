@@ -1629,7 +1629,7 @@ VM::loop(bool init, bool resume)
         goto ERROR_EQ_N_ILOC;
 
     FALLBACK_LT_N_ILOC:
-        if (number_pred(obj)) {
+        if (real_pred(obj)) {
             m_value = n_compare(m_heap, obj, CADR(OPERANDS)) < 0 ? scm_true : scm_false;
             m_pc = CDR(m_pc);
             goto loop;
@@ -1637,7 +1637,7 @@ VM::loop(bool init, bool resume)
         goto ERROR_LT_N_ILOC;
 
     FALLBACK_LE_N_ILOC:
-        if (number_pred(obj)) {
+        if (real_pred(obj)) {
             m_value = n_compare(m_heap, obj, CADR(OPERANDS)) <= 0 ? scm_true : scm_false;
             m_pc = CDR(m_pc);
             goto loop;
@@ -1645,7 +1645,7 @@ VM::loop(bool init, bool resume)
         goto ERROR_LE_N_ILOC;
 
     FALLBACK_GT_N_ILOC:
-        if (number_pred(obj)) {
+        if (real_pred(obj)) {
             m_value = n_compare(m_heap, obj, CADR(OPERANDS)) > 0 ? scm_true : scm_false;
             m_pc = CDR(m_pc);
             goto loop;
@@ -1653,7 +1653,7 @@ VM::loop(bool init, bool resume)
         goto ERROR_GT_N_ILOC;
 
     FALLBACK_GE_N_ILOC:
-        if (number_pred(obj)) {
+        if (real_pred(obj)) {
             m_value = n_compare(m_heap, obj, CADR(OPERANDS)) >= 0 ? scm_true : scm_false;
             m_pc = CDR(m_pc);
             goto loop;
@@ -1680,8 +1680,8 @@ VM::loop(bool init, bool resume)
 
     FALLBACK_LT_ILOC: {
             int bad;
-            if (number_pred(m_value)) {
-                if (number_pred(obj)) {
+            if (real_pred(m_value)) {
+                if (real_pred(obj)) {
                     m_value = (n_compare(m_heap, m_value, obj) < 0) ? scm_true : scm_false;
                     m_pc = CDR(m_pc);
                     goto loop;
@@ -1698,8 +1698,8 @@ VM::loop(bool init, bool resume)
 
     FALLBACK_LE_ILOC: {
             int bad;
-            if (number_pred(m_value)) {
-                if (number_pred(obj)) {
+            if (real_pred(m_value)) {
+                if (real_pred(obj)) {
                     m_value = (n_compare(m_heap, m_value, obj) <= 0) ? scm_true : scm_false;
                     m_pc = CDR(m_pc);
                     goto loop;
@@ -1716,8 +1716,8 @@ VM::loop(bool init, bool resume)
 
     FALLBACK_GT_ILOC: {
             int bad;
-            if (number_pred(m_value)) {
-                if (number_pred(obj)) {
+            if (real_pred(m_value)) {
+                if (real_pred(obj)) {
                     m_value = (n_compare(m_heap, m_value, obj) > 0) ? scm_true : scm_false;
                     m_pc = CDR(m_pc);
                     goto loop;
@@ -1734,8 +1734,8 @@ VM::loop(bool init, bool resume)
 
     FALLBACK_GE_ILOC: {
             int bad;
-            if (number_pred(m_value)) {
-                if (number_pred(obj)) {
+            if (real_pred(m_value)) {
+                if (real_pred(obj)) {
                     m_value = (n_compare(m_heap, m_value, obj) >= 0) ? scm_true : scm_false;
                     m_pc = CDR(m_pc);
                     goto loop;
@@ -1816,28 +1816,28 @@ VM::loop(bool init, bool resume)
     ERROR_LT_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
-            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
             goto BACK_TO_LOOP;
         }
 
     ERROR_LE_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
-            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
             goto BACK_TO_LOOP;
         }
 
     ERROR_GT_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
-            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
             goto BACK_TO_LOOP;
         }
 
     ERROR_GE_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
-            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "number", argv[0], 2, argv);
+            wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
             goto BACK_TO_LOOP;
         }
 
