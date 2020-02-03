@@ -20,8 +20,8 @@ public:
     void compile(VM* vm, scm_closure_t closure);
 private:
     void define_prepare_call();
-    void transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index);
+    void transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     Function* emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     void emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);

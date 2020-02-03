@@ -42,12 +42,25 @@
 #define CREATE_LOAD_PAIR_REC(_PAIR_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
 
-
 #define CREATE_PUSH_VM_STACK(_VAL_) { \
             auto sp = CREATE_LOAD_VM_REG(vm, m_sp); \
             auto sp0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy); \
             IRB.CreateStore(_VAL_, sp0); \
             CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t)))); \
+        }
+
+#define CREATE_STACK_OVERFLOW_HANDLER(_BYTES_REQUIRED_) { \
+            auto sp = CREATE_LOAD_VM_REG(vm, m_sp); \
+            auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit); \
+            BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F); \
+            BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F); \
+            Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(_BYTES_REQUIRED_)), stack_limit); \
+            IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow); \
+            IRB.SetInsertPoint(stack_overflow); \
+            auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy); \
+            IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(_BYTES_REQUIRED_)}); \
+            IRB.CreateBr(stack_ok); \
+            IRB.SetInsertPoint(stack_ok); \
         }
 
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
@@ -149,6 +162,7 @@ codegen_t::define_prepare_call()
 {
     auto Context = llvm::make_unique<LLVMContext>();
     LLVMContext& C = *Context;
+
     DECLEAR_COMMON_TYPES;
 
     auto M = llvm::make_unique<Module>("intrinsics", C);
@@ -183,6 +197,25 @@ codegen_t::define_prepare_call()
 
     ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
     m_jit->getMainJITDylib().dump(llvm::outs());
+}
+
+Value*
+codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index)
+{
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    if (depth == 0 && index == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateNeg(count));
+    } else if (depth == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+    }
+    auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
 }
 
 void
@@ -293,43 +326,30 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 Function*
 codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_cont_rec_t));
+
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
-
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
 
     Function* K = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, cont_id, M);
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(vm_cont_rec_t))), stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        // COLLECT_STACK_CONT_REC
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(vm_cont_rec_t))});
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        // vm_cont_t cont = (vm_cont_t)m_sp;
-        auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
-        auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
-        IRB.CreateCall(prepare_call, {vm, cont});
-        // cont->pc = CDR(m_pc);
-        CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
-        // cont->code = NULL;
-        CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
-        // m_pc = OPERANDS;
-        scm_obj_t operands = CDAR(inst);
-        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
-        // continue emit code in operands
-        transform(C, M, F, IRB, operands);
+    // vm_cont_t cont = (vm_cont_t)m_sp;
+    auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
+    IRB.CreateCall(prepare_call, {vm, cont});
+    // cont->pc = CDR(m_pc);
+    CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
+    // cont->code = NULL;
+    CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
+    // m_pc = OPERANDS;
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
+    // continue emit code in operands
+    transform(C, M, F, IRB, operands);
 
     IRB.SetInsertPoint(RETURN);
     return K;
@@ -338,75 +358,37 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 void
 codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
+    DECLEAR_COMMON_TYPES;
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
 }
 
 void
 codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
+    DECLEAR_COMMON_TYPES;
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
 }
 
 void
 codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto val = VALUE_INTPTR(operands);
     CREATE_STORE_VM_REG(vm, m_value, val);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-}
-
-Value*
-codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index)
-{
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-    if (depth == 0 && index == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateNeg(count));
-    } else if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
-    }
-    auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
 }
 
 Value*
@@ -418,9 +400,10 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
 void
 codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -438,9 +421,10 @@ codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
 void
 codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
     auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
@@ -455,9 +439,10 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 void
 codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto value = CREATE_LOAD_VM_REG(vm, m_value);
     BasicBlock* f9h_true = BasicBlock::Create(C, "f9h_true", F);
     BasicBlock* f9h_false = BasicBlock::Create(C, "f9h_false", F);
@@ -473,9 +458,10 @@ codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB
 void
 codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     CREATE_STORE_VM_REG(vm, m_value, val);
@@ -494,9 +480,10 @@ codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
 void
 codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, operands));
     CREATE_STORE_VM_REG(vm, m_value, val);
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -514,9 +501,10 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 void
 codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
@@ -570,62 +558,51 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 void
 codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
-        BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
-        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
-        auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
-        IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
-        // fixnum
-        IRB.SetInsertPoint(nonfixnum_false);
-            auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
-            // if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
-            auto in_upper_cond = IRB.CreateICmpSLE(n, VALUE_INTPTR(FIXNUM_MAX));
-            BasicBlock* in_upper_true = BasicBlock::Create(C, "in_upper_true", F);
-            BasicBlock* in_upper_false = BasicBlock::Create(C, "in_range_false", F);
-            IRB.CreateCondBr(in_upper_cond, in_upper_true, in_upper_false);
-            IRB.SetInsertPoint(in_upper_true);
-                auto in_lower_cond = IRB.CreateICmpSGE(n, VALUE_INTPTR(FIXNUM_MIN));
-                BasicBlock* in_lower_true = BasicBlock::Create(C, "in_lower_true", F);
-                BasicBlock* in_lower_false = BasicBlock::Create(C, "in_lower_false", F);
-                IRB.CreateCondBr(in_lower_cond, in_lower_true, in_lower_false);
-                IRB.SetInsertPoint(in_lower_true);
-                CREATE_PUSH_VM_STACK(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)));
-                IRB.CreateBr(CONTINUE);
-        // others
-        IRB.SetInsertPoint(nonfixnum_true);
-            auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
-            BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
-            BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
-            auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
-            IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
-            // not number
-            IRB.SetInsertPoint(nonnum_true);
-                auto thunk_error_push_nadd_iloc = M->getOrInsertFunction("thunk_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-                IRB.CreateCall(thunk_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-                IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
-            // number
-            IRB.SetInsertPoint(nonnum_false);
-                auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-                CREATE_PUSH_VM_STACK(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
-                IRB.CreateBr(CONTINUE);
+    BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
+    BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
+    // fixnum
+    IRB.SetInsertPoint(nonfixnum_false);
+        auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
+        // if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
+        auto in_upper_cond = IRB.CreateICmpSLE(n, VALUE_INTPTR(FIXNUM_MAX));
+        BasicBlock* in_upper_true = BasicBlock::Create(C, "in_upper_true", F);
+        BasicBlock* in_upper_false = BasicBlock::Create(C, "in_range_false", F);
+        IRB.CreateCondBr(in_upper_cond, in_upper_true, in_upper_false);
+        IRB.SetInsertPoint(in_upper_true);
+            auto in_lower_cond = IRB.CreateICmpSGE(n, VALUE_INTPTR(FIXNUM_MIN));
+            BasicBlock* in_lower_true = BasicBlock::Create(C, "in_lower_true", F);
+            BasicBlock* in_lower_false = BasicBlock::Create(C, "in_lower_false", F);
+            IRB.CreateCondBr(in_lower_cond, in_lower_true, in_lower_false);
+            IRB.SetInsertPoint(in_lower_true);
+            CREATE_PUSH_VM_STACK(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)));
+            IRB.CreateBr(CONTINUE);
+    // others
+    IRB.SetInsertPoint(nonfixnum_true);
+        auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
+        BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
+        BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
+        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
+        IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
+        // not number
+        IRB.SetInsertPoint(nonnum_true);
+            auto thunk_error_push_nadd_iloc = M->getOrInsertFunction("thunk_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            IRB.CreateCall(thunk_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        // number
+        IRB.SetInsertPoint(nonnum_false);
+            auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            CREATE_PUSH_VM_STACK(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
+            IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(in_upper_false);
     IRB.CreateBr(nonnum_false);
@@ -638,9 +615,10 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 void
 codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -659,9 +637,10 @@ codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, 
 void
 codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto value = CREATE_LOAD_VM_REG(vm, m_value);
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
@@ -678,112 +657,72 @@ codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBui
 void
 codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
+    DECLEAR_COMMON_TYPES;
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
 }
 
 void
 codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
-        // check if pair
-        BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
-        BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
-        auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
-        IRB.CreateCondBr(pair_cond, pair_true, pair_false);
-        // nonpair
-        IRB.SetInsertPoint(pair_false);
-            auto thunk_error_push_car_iloc = M->getOrInsertFunction("thunk_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-            IRB.CreateCall(thunk_error_push_car_iloc, {vm, val});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
-        // pair
-        IRB.SetInsertPoint(pair_true);
-            CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car));
-            IRB.CreateBr(CONTINUE);
+    DECLEAR_COMMON_TYPES;
 
-    IRB.SetInsertPoint(CONTINUE);
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    // check if pair
+    BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+    BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
+    // nonpair
+    IRB.SetInsertPoint(pair_false);
+        auto thunk_error_push_car_iloc = M->getOrInsertFunction("thunk_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_error_push_car_iloc, {vm, val});
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    // pair
+    IRB.SetInsertPoint(pair_true);
+    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car));
 }
 
 void
 codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-    // stack check
-    BasicBlock* stack_true = BasicBlock::Create(C, "stack_true", F);
-    BasicBlock* stack_false = BasicBlock::Create(C, "stack_false", F);
-    Value* stack_cond = IRB.CreateICmpULT(sp, stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_true, stack_false);
-    // stack overflow
-    IRB.SetInsertPoint(stack_false);
-        auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(sizeof(scm_obj_t))} );
-        IRB.CreateBr(stack_true);
-    // stack ok
-    IRB.SetInsertPoint(stack_true);
-        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
-        // check if pair
-        BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
-        BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
-        auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
-        IRB.CreateCondBr(pair_cond, pair_true, pair_false);
-        // nonpair
-        IRB.SetInsertPoint(pair_false);
-            auto thunk_error_push_cdr_iloc = M->getOrInsertFunction("thunk_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-            IRB.CreateCall(thunk_error_push_cdr_iloc, {vm, val});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
-        // pair
-        IRB.SetInsertPoint(pair_true);
-            CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr));
-            IRB.CreateBr(CONTINUE);
+    DECLEAR_COMMON_TYPES;
 
-    IRB.SetInsertPoint(CONTINUE);
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    // check if pair
+    BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+    BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
+    // nonpair
+    IRB.SetInsertPoint(pair_false);
+        auto thunk_error_push_cdr_iloc = M->getOrInsertFunction("thunk_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_error_push_cdr_iloc, {vm, val});
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    // pair
+    IRB.SetInsertPoint(pair_true);
+    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr));
 }
 
 void
 codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
-    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto val = CREATE_LOAD_VM_REG(vm, m_value);
     auto sp_minus_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
