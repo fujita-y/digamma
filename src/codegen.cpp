@@ -8,10 +8,12 @@
 #include "uuid.h"
 
 #include "llvm/IR/Verifier.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #define DECLEAR_COMMON_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
@@ -157,6 +159,26 @@ codegen_t::codegen_t()
     define_prepare_call();
 }
 
+ThreadSafeModule
+codegen_t::optimize(ThreadSafeModule TSM) {
+    PassManagerBuilder B;
+    B.OptLevel = 3;
+
+    Module &M = *TSM.getModule();
+
+    legacy::FunctionPassManager FPM(&M);
+    B.populateFunctionPassManager(FPM);
+
+    FPM.doInitialization();
+    for (Function &F : M) FPM.run(F);
+    FPM.doFinalization();
+
+    legacy::PassManager MPM;
+    B.populateModulePassManager(MPM);
+    MPM.run(M);
+    return std::move(TSM);
+}
+
 void
 codegen_t::define_prepare_call()
 {
@@ -246,6 +268,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     verifyModule(*M, &outs());
 //  M.get()->print(outs(), nullptr);
 
+//    ExitOnErr(m_jit->addIRModule(optimize(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
     ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
     m_jit->getMainJITDylib().dump(llvm::outs());
 
@@ -738,6 +761,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 /*
 
 (backtrace #f)
+(import (digamma time))
 
 (define (fib n)
   (if (< n 2)
@@ -745,7 +769,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     (+ (fib (- n 1))
        (fib (- n 2)))))
 (closure-compile fib)
-(fib 10) ;=> 55
+(time (fib 30)) ;=> 55
 
 (define (minus x) (- x))
 (define lst (make-list 10 '4))
@@ -756,7 +780,7 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
         (cons (proc (car lst))
               (map-1 proc (cdr lst))))))
 (closure-compile map-1)
-(map-1 minus lst) ;=> (-4 -4 -4 -4 -4 -4 -4 -4 -4 -4)
+(time (map-1 minus lst)) ;=> (-4 -4 -4 -4 -4 -4 -4 -4 -4 -4)
 
 (define (n m) (list 1 (m) 3))
 (closure-compile n)

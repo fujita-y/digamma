@@ -18,6 +18,7 @@ class codegen_t {
 public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
+    ThreadSafeModule optimize(ThreadSafeModule TSM);
 private:
     void define_prepare_call();
     Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index);
