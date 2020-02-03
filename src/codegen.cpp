@@ -1,89 +1,6 @@
 // Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
-/*
- (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
- (current-environment (system-environment))
- (define (foo) "hello")
- (closure-code foo)
- (closure-compile foo)
- (closure-code foo)
- (foo)
-*/
-/*
-llc --march=x86-64 --x86-asm-syntax=intel
-*/
-
-/*
-
-extend vm_cont_rec_t to support native cont?
-
-(current-environment (system-environment))
-(define (n m) (list 1 (m) 3))
-(n (lambda () 2)) ; => (1 2 3)
-(closure-code n)
-(closure-compile n)
-
-
-(current-environment (system-environment))
-(define c)
-(define (n m) (list 1 (m) 3))
-(n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
-(c 1000) ; => (1 1000 3)
-
-(closure-code n)
-(closure-compile n)
-
-
-
- ; => (1 2 3)
-(closure-code n)
-(closure-compile n)
-
-
-(
- (push.const . 1)
- (call
-   (apply.iloc (0 . 0)))
- (push)
- (push.const . 3)
- (ret.subr #<subr list>)
-)
-
-(current-environment (system-environment))
-(define (n) (list 1 2 3))
-(closure-compile n)
-
-- unsupported instruction push.const
-- unsupported instruction apply.iloc
-- unsupported instruction push
-- unsupported instruction push.const
-- unsupported instruction ret.subr
-
-(current-environment (system-environment))
-(backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-code fib)
-(closure-compile fib)
-
-((<n.iloc (0 . 0) 2)
- (if.true
-    (ret.iloc 0 . 0))
- (call
-    (push.n+.iloc (0 . 0) -1)
-    (apply.gloc #<gloc fib>))
- (push)
- (call
-    (push.n+.iloc (0 . 0) -2)
-    (apply.gloc #<gloc fib>))
- (push)
- (ret.subr #<subr +>))
-*/
-
 #include "codegen.h"
 #include "arith.h"
 #include "printer.h"
@@ -262,6 +179,12 @@ codegen_t::define_prepare_call()
 void
 codegen_t::compile(VM* vm, scm_closure_t closure)
 {
+    printer_t prt(vm, vm->m_current_output);
+    prt.format("generating native code: ~s~&", closure->doc);
+    if (CAAR(closure->code) == INST_NATIVE) {
+        puts("- already compiled");
+        return;
+    }
     char module_id[40];
     uuid_v4(module_id, sizeof(module_id));
     char function_id[40];
@@ -279,7 +202,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     transform(C, M.get(), F, IRB, closure->code);
 
     verifyModule(*M, &outs());
-    M.get()->print(outs(), nullptr);
+//  M.get()->print(outs(), nullptr);
 
     ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
     m_jit->getMainJITDylib().dump(llvm::outs());
@@ -695,11 +618,21 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
         // fixnum
         IRB.SetInsertPoint(nonfixnum_false);
             auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
-            // [TODO] check if n is out fixnum then IRB.CreateBr(nonfixnum_true);
-            // m_sp[0] = val; m_sp++;
-            IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
-            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
-            IRB.CreateBr(CONTINUE);
+            // if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
+            auto in_upper_cond = IRB.CreateICmpSLE(n, VALUE_INTPTR(FIXNUM_MAX));
+            BasicBlock* in_upper_true = BasicBlock::Create(C, "in_upper_true", F);
+            BasicBlock* in_upper_false = BasicBlock::Create(C, "in_range_false", F);
+            IRB.CreateCondBr(in_upper_cond, in_upper_true, in_upper_false);
+            IRB.SetInsertPoint(in_upper_true);
+                auto in_lower_cond = IRB.CreateICmpSGE(n, VALUE_INTPTR(FIXNUM_MIN));
+                BasicBlock* in_lower_true = BasicBlock::Create(C, "in_lower_true", F);
+                BasicBlock* in_lower_false = BasicBlock::Create(C, "in_lower_false", F);
+                IRB.CreateCondBr(in_lower_cond, in_lower_true, in_lower_false);
+                IRB.SetInsertPoint(in_lower_true);
+                // m_sp[0] = val; m_sp++;
+                IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
+                CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+                IRB.CreateBr(CONTINUE);
         // others
         IRB.SetInsertPoint(nonfixnum_true);
             auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
@@ -719,6 +652,11 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
                 IRB.CreateStore(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
                 CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
                 IRB.CreateBr(CONTINUE);
+
+    IRB.SetInsertPoint(in_upper_false);
+    IRB.CreateBr(nonnum_false);
+    IRB.SetInsertPoint(in_lower_false);
+    IRB.CreateBr(nonnum_false);
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -901,6 +839,89 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(thunk_make_pair, {vm, sp_minus_1, val}));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 }
+
+/*
+ (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
+ (current-environment (system-environment))
+ (define (foo) "hello")
+ (closure-code foo)
+ (closure-compile foo)
+ (closure-code foo)
+ (foo)
+*/
+/*
+llc --march=x86-64 --x86-asm-syntax=intel
+*/
+
+/*
+
+extend vm_cont_rec_t to support native cont?
+
+(current-environment (system-environment))
+(define (n m) (list 1 (m) 3))
+(n (lambda () 2)) ; => (1 2 3)
+(closure-code n)
+(closure-compile n)
+
+
+(current-environment (system-environment))
+(define c)
+(define (n m) (list 1 (m) 3))
+(n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
+(c 1000) ; => (1 1000 3)
+
+(closure-code n)
+(closure-compile n)
+
+
+
+ ; => (1 2 3)
+(closure-code n)
+(closure-compile n)
+
+
+(
+ (push.const . 1)
+ (call
+   (apply.iloc (0 . 0)))
+ (push)
+ (push.const . 3)
+ (ret.subr #<subr list>)
+)
+
+(current-environment (system-environment))
+(define (n) (list 1 2 3))
+(closure-compile n)
+
+- unsupported instruction push.const
+- unsupported instruction apply.iloc
+- unsupported instruction push
+- unsupported instruction push.const
+- unsupported instruction ret.subr
+
+(current-environment (system-environment))
+(backtrace #f)
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+(closure-code fib)
+(closure-compile fib)
+
+((<n.iloc (0 . 0) 2)
+ (if.true
+    (ret.iloc 0 . 0))
+ (call
+    (push.n+.iloc (0 . 0) -1)
+    (apply.gloc #<gloc fib>))
+ (push)
+ (call
+    (push.n+.iloc (0 . 0) -2)
+    (apply.gloc #<gloc fib>))
+ (push)
+ (ret.subr #<subr +>))
+*/
 
 /*
 (current-environment (system-environment))

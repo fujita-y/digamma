@@ -35,8 +35,6 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
         if (CLOSUREP(argv[0])) {
             if (!s_codegen) s_codegen = new codegen_t;
             scm_closure_t closure = (scm_closure_t)argv[0];
-            printer_t prt(vm, vm->m_current_output);
-            prt.format("~s~&", closure->doc);
             s_codegen->compile(vm, closure);
             return scm_unspecified;
         }
