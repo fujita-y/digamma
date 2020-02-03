@@ -406,6 +406,7 @@ codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
+
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
@@ -465,6 +466,7 @@ codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     CREATE_STORE_VM_REG(vm, m_value, val);
+
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
@@ -486,6 +488,7 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, operands));
     CREATE_STORE_VM_REG(vm, m_value, val);
+
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
@@ -621,6 +624,7 @@ codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, 
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
+
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
