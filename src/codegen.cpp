@@ -42,6 +42,14 @@
 #define CREATE_LOAD_PAIR_REC(_PAIR_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
 
+
+#define CREATE_PUSH_VM_STACK(_VAL_) { \
+            auto sp = CREATE_LOAD_VM_REG(vm, m_sp); \
+            auto sp0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy); \
+            IRB.CreateStore(_VAL_, sp0); \
+            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t)))); \
+        }
+
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
@@ -172,6 +180,7 @@ codegen_t::define_prepare_call()
 
     //verifyModule(*M, &outs());
     //M.get()->print(outs(), nullptr);
+
     ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
     m_jit->getMainJITDylib().dump(llvm::outs());
 }
@@ -310,31 +319,8 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     IRB.SetInsertPoint(stack_true);
         // vm_cont_t cont = (vm_cont_t)m_sp;
         auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
-
         auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
         IRB.CreateCall(prepare_call, {vm, cont});
-/*
-        // pepare_call(vm, cont)
-        // cont->trace = m_trace;
-        CREATE_STORE_CONT_REC(cont, trace, CREATE_LOAD_VM_REG(vm, m_trace));
-        // cont->fp = m_fp;
-        CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
-        // cont->env = m_env;
-        CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
-        // cont->up = m_cont;
-        CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
-        // m_trace = m_trace_tail = scm_unspecified;
-        CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-        CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
-        // m_sp = m_fp = (scm_obj_t*)(cont + 1);
-        auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
-        CREATE_STORE_VM_REG(vm, m_sp, ea1);
-        CREATE_STORE_VM_REG(vm, m_fp, ea1);
-        // m_cont = &cont->up;
-        auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
-        CREATE_STORE_VM_REG(vm, m_cont, ea2);
-*/
-
         // cont->pc = CDR(m_pc);
         CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
         // cont->code = NULL;
@@ -369,10 +355,7 @@ codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
-        auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-        IRB.CreateStore(VALUE_INTPTR(operands), sp_0);
-        CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+        CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
 }
 
 void
@@ -394,11 +377,7 @@ codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
-        auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-        auto value = CREATE_LOAD_VM_REG(vm, m_value);
-        IRB.CreateStore(value, sp_0);
-        CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+        CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
 }
 
 void
@@ -609,7 +588,6 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
         BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
@@ -629,9 +607,7 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
                 BasicBlock* in_lower_false = BasicBlock::Create(C, "in_lower_false", F);
                 IRB.CreateCondBr(in_lower_cond, in_lower_true, in_lower_false);
                 IRB.SetInsertPoint(in_lower_true);
-                // m_sp[0] = val; m_sp++;
-                IRB.CreateStore(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
-                CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+                CREATE_PUSH_VM_STACK(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)));
                 IRB.CreateBr(CONTINUE);
         // others
         IRB.SetInsertPoint(nonfixnum_true);
@@ -648,9 +624,7 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
             // number
             IRB.SetInsertPoint(nonnum_false);
                 auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-                // m_sp[0] = val; m_sp++;
-                IRB.CreateStore(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}), IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
-                CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+                CREATE_PUSH_VM_STACK(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
                 IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(in_upper_false);
@@ -660,18 +634,6 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 
     IRB.SetInsertPoint(CONTINUE);
 }
-
-/*
-(backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-code fib)
-(closure-compile fib)
-(fib 2.0)
-*/
 
 void
 codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
@@ -733,11 +695,7 @@ codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
-        auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
-        auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-        IRB.CreateStore(val, sp_0);
-        CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+        CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
 }
 
 void
@@ -761,7 +719,6 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
         // check if pair
         BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -775,9 +732,7 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
             IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // pair
         IRB.SetInsertPoint(pair_true);
-            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-            IRB.CreateStore(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car), sp_0);
-            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+            CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car));
             IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
@@ -804,7 +759,6 @@ codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
         IRB.CreateBr(stack_true);
     // stack ok
     IRB.SetInsertPoint(stack_true);
-        sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
         // check if pair
         BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -818,9 +772,7 @@ codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
             IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // pair
         IRB.SetInsertPoint(pair_true);
-            auto sp_0 = IRB.CreateBitOrPointerCast(sp, IntptrPtrTy);
-            IRB.CreateStore(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr), sp_0);
-            CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+            CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr));
             IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
@@ -841,275 +793,36 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 }
 
 /*
- (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
- (current-environment (system-environment))
- (define (foo) "hello")
- (closure-code foo)
- (closure-compile foo)
- (closure-code foo)
- (foo)
-*/
-/*
-llc --march=x86-64 --x86-asm-syntax=intel
-*/
 
-/*
+(backtrace #f)
 
-extend vm_cont_rec_t to support native cont?
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+(closure-compile fib)
+(fib 10) ;=> 55
 
-(current-environment (system-environment))
+(define (minus x) (- x))
+(define lst (make-list 10 '4))
+(define map-1
+  (lambda (proc lst)
+    (if (null? lst)
+        '()
+        (cons (proc (car lst))
+              (map-1 proc (cdr lst))))))
+(closure-compile map-1)
+(map-1 minus lst) ;=> (-4 -4 -4 -4 -4 -4 -4 -4 -4 -4)
+
 (define (n m) (list 1 (m) 3))
-(n (lambda () 2)) ; => (1 2 3)
-(closure-code n)
 (closure-compile n)
+(n (lambda () 2)) ; => (1 2 3)
 
-
-(current-environment (system-environment))
 (define c)
 (define (n m) (list 1 (m) 3))
+(closure-compile n)
 (n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
 (c 1000) ; => (1 1000 3)
-
-(closure-code n)
-(closure-compile n)
-
-
-
- ; => (1 2 3)
-(closure-code n)
-(closure-compile n)
-
-
-(
- (push.const . 1)
- (call
-   (apply.iloc (0 . 0)))
- (push)
- (push.const . 3)
- (ret.subr #<subr list>)
-)
-
-(current-environment (system-environment))
-(define (n) (list 1 2 3))
-(closure-compile n)
-
-- unsupported instruction push.const
-- unsupported instruction apply.iloc
-- unsupported instruction push
-- unsupported instruction push.const
-- unsupported instruction ret.subr
-
-(current-environment (system-environment))
-(backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-code fib)
-(closure-compile fib)
-
-((<n.iloc (0 . 0) 2)
- (if.true
-    (ret.iloc 0 . 0))
- (call
-    (push.n+.iloc (0 . 0) -1)
-    (apply.gloc #<gloc fib>))
- (push)
- (call
-    (push.n+.iloc (0 . 0) -2)
-    (apply.gloc #<gloc fib>))
- (push)
- (ret.subr #<subr +>))
-*/
-
-/*
-(current-environment (system-environment))
-(define (a) (current-input-port))
-(closure-compile a)
-
-(current-environment (system-environment))
-(define (n) (list 1 2 3))
-(closure-compile n)
-
-(current-environment (system-environment))
-(backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-code fib)
-(closure-compile fib)
-
-(define start (time-usage))
-(fib 32)
-(define end (time-usage))
-(map - end start)
-
-(1.0635550022125244 1.061279 0.0)
-(1.1754271984100342 1.1738849999999998 0.0)
-(1.1603269577026367 1.15823 0.0)
-
-(0.8235650062561035 0.8224790000000004 0.0)
-(0.8277268409729004 0.8261890000000003 0.00011599999999999111)
-(0.7562940120697021 0.7488189999999997 0.007497999999999991)
-
-(0.29166603088378906 0.2916669999999999 0.0)
--> 67.8%
-(0.19778013229370117 0.19778099999999998 0.0)
-
-(current-environment (system-environment))
-(backtrace #f)
-(define map-1
-    (lambda (proc lst)
-    (cond ((null? lst) '())
-            (else
-            (cons (proc (car lst))
-                    (map-1 proc (cdr lst)))))))
-(closure-code map-1)
-(closure-compile map-1)
-
-(define start (time-usage))
-(define sink)
-(define (b)
-    (let loop ((n 1))
-        (cond ((< n 100000)
-               (map-1 - '(1 2 3 4 6 7 8 9 10 1 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 10))
-               (loop (+ n 1))))))
-(b)
-(define end (time-usage))
-(map - end start)
-
-(define start (time-usage))
-(define sink)
-(define (b n)
-    (cond ((< n 100000)
-            (map-1 - '(1 2 3 4 6 7 8 9 10 1 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 101 2 3 4 6 7 8 9 10))
-            (b (+ n 1)))))
-(b 1)
-(define end (time-usage))
-(map - end start)
-
-(1.285045862197876 1.563275 0.0)
-(1.137603998184204 1.4177029999999995 0.0)
-(1.1186790466308594 1.4051300000000007 0.0)
-
-- unsupported instruction iloc.0
-- unsupported instruction if.null?.ret.const
-- unsupported instruction push.car.iloc
-- unsupported instruction push.iloc.0
-- unsupported instruction push.cdr.iloc
-- unsupported instruction ret.cons
-
-(define-syntax time
-  (syntax-rules ()
-    ((_ expr)
-     (destructuring-bind (real-start user-start sys-start) (time-usage)
-       (let ((result (apply (lambda () expr) '())))
-         (destructuring-bind (real-end user-end sys-end) (time-usage)
-           (format #t
-                   "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!"
-                   (- real-end real-start)
-                   (- user-end user-start)
-                   (- sys-end sys-start)))
-         result)))))
-
-;(time (set! sink (map-1 minus lst)))
-
-(backtrace #f)
-(define map-1
-  (lambda (proc lst)
-    (if (null? lst)
-        '()
-        (cons (proc (car lst))
-              (map-1 proc (cdr lst))))))
-
-(define lst (make-list 100000 1))
-(define sink #f)
-(define (minus x) (- x))
-
-(closure-compile map-1)
-(collect)
-(usleep 10000)
-(time (set! sink (begin (map-1 minus lst) (map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst)(map-1 minus lst))))
-;(time (set! sink (map-1 - lst)))
-
-(define lst (make-list 100000 1))
-(define (minus x) (- x))
-(define sink #f)
-(set! sink (map-1 - lst))
-(length sink)
-(set! sink (map-1 minus lst))
-(length sink)
-
-;; no JIT
-;;  0.035965 real    0.071242 user    0.000000 sys
-;;  0.039149 real    0.074854 user    0.000000 sys
-;;  0.039270 real    0.078679 user    0.000000 sys
-;;  0.043609 real    0.087141 user    0.000000 sys
-;;  0.036911 real    0.071785 user    0.000243 sys
-
-;; with JIT
-;;  0.031414 real    0.053286 user    0.000000 sys
-;;  0.032145 real    0.063468 user    0.000000 sys
-;;  0.036857 real    0.070466 user    0.000000 sys
-;;  0.037044 real    0.064553 user    0.000000 sys
-;;  0.036849 real    0.072118 user    0.000000 sys
-
-
-
-(collect) cause problem!
-
-;;  0.036292 real    0.061184 user    0.000000 sys
-> (time (set! sink (map-1 - lst)))
-
-;;  0.034642 real    0.070080 user    0.000000 sys
-> (time (set! sink (map-1 - lst)))
-
-;;  0.040432 real    0.076968 user    0.000000 sys
-> (time (set! sink (map-1 - lst)))
-
-;;  0.035028 real    0.061653 user    0.000000 sys
-> (time (set! sink (map-1 - lst)))
-
-;;  0.033721 real    0.068744 user    0.000000 sys
-
-
-(backtrace #t)
-(define (minus x) (- x))
-(define lst (make-list 100000 '4))
-
-(define map-1
-  (lambda (proc lst)
-    (if (null? lst)
-        '()
-        (cons (proc (car lst))
-              (map-1 proc (cdr lst))))))
-(define (k)
-    (list (map-1 minus lst) 'tail))
-(length (car (k)))
-(closure-compile map-1)
-(length (car (k)))
-
-(backtrace #f)
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-code fib)
-(closure-compile fib)
-(time (fib 32))
-
-map
-- unsupported instruction if.null?
-- unsupported instruction push.gloc
-- unsupported instruction extend
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.subr
 
 */
