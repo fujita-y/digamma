@@ -160,15 +160,17 @@ codegen_t::codegen_t()
 }
 
 ThreadSafeModule
-codegen_t::optimize(ThreadSafeModule TSM) {
-    PassManagerBuilder B;
-    B.OptLevel = 3;
-
+codegen_t::optimizeModule(ThreadSafeModule TSM) {
     Module &M = *TSM.getModule();
+    PassManagerBuilder B;
+    B.OptLevel = 2;
+    B.SizeLevel = 1;
+
+//  puts("=== IR before optimize ===");
+//  M.print(outs(), nullptr);
 
     legacy::FunctionPassManager FPM(&M);
     B.populateFunctionPassManager(FPM);
-
     FPM.doInitialization();
     for (Function &F : M) FPM.run(F);
     FPM.doFinalization();
@@ -176,6 +178,10 @@ codegen_t::optimize(ThreadSafeModule TSM) {
     legacy::PassManager MPM;
     B.populateModulePassManager(MPM);
     MPM.run(M);
+
+//  puts("*** IR after optimize ***");
+//  M.print(outs(), nullptr);
+
     return std::move(TSM);
 }
 
@@ -188,8 +194,9 @@ codegen_t::define_prepare_call()
     DECLEAR_COMMON_TYPES;
 
     auto M = llvm::make_unique<Module>("intrinsics", C);
-    Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::LinkOnceAnyLinkage, "prepare_call", M.get());
-    F->setCallingConv(CallingConv::Fast);
+    Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
+//  Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::LinkOnceAnyLinkage, "prepare_call", M.get());
+//  F->setCallingConv(CallingConv::Fast);
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
     auto vm = F->arg_begin();
@@ -217,7 +224,8 @@ codegen_t::define_prepare_call()
     //verifyModule(*M, &outs());
     //M.get()->print(outs(), nullptr);
 
-    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+    ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
+//  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
     m_jit->getMainJITDylib().dump(llvm::outs());
 }
 
@@ -266,10 +274,10 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     transform(C, M.get(), F, IRB, closure->code);
 
     verifyModule(*M, &outs());
-//  M.get()->print(outs(), nullptr);
 
-//    ExitOnErr(m_jit->addIRModule(optimize(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
-    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+    ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
+//  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+
     m_jit->getMainJITDylib().dump(llvm::outs());
 
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
@@ -384,9 +392,7 @@ codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     DECLEAR_COMMON_TYPES;
-
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
     CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
 }
 
@@ -396,9 +402,7 @@ codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     DECLEAR_COMMON_TYPES;
-
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
     CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
 }
 
@@ -687,9 +691,7 @@ codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
     DECLEAR_COMMON_TYPES;
-
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
     CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
 }
 
@@ -770,6 +772,8 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
        (fib (- n 2)))))
 (closure-compile fib)
 (time (fib 30)) ;=> 55
+;;  0.344398 real    0.344043 user    0.000139 sys
+;;  0.353730 real    0.353562 user    0.000000 sys
 
 (define (minus x) (- x))
 (define lst (make-list 10 '4))
@@ -792,4 +796,13 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 (n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
 (c 1000) ; => (1 1000 3)
 
+generating native code: map
+- unsupported instruction if.null?
+- unsupported instruction push.gloc
+- unsupported instruction extend
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.iloc.1
+- unsupported instruction push.subr
 */
