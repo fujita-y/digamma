@@ -41,6 +41,12 @@
 #define CREATE_LOAD_ENV_REC(_ENV_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
 
+#define CREATE_STORE_ENV_REC(_ENV_,_REC_,_VAL_) \
+    (IRB.CreateStore(_VAL_, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
+
+#define CREATE_LEA_ENV_REC(_ENV_,_REC_) \
+    (IRB.CreateBitOrPointerCast(IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t))), IntptrTy))
+
 #define CREATE_LOAD_PAIR_REC(_PAIR_,_REC_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
 
@@ -312,6 +318,9 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
             case VMOP_ILOC0:
                 emit_iloc0(C, M, F, IRB, inst);
                 break;
+            case VMOP_IF_NULLP:
+                emit_if_nullp(C, M, F, IRB, inst);
+                break;
             case VMOP_IF_NULLP_RET_CONST:
                 emit_if_nullp_ret_const(C, M, F, IRB, inst);
                 break;
@@ -321,11 +330,26 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
             case VMOP_PUSH_ILOC0:
                 emit_push_iloc0(C, M, F, IRB, inst);
                 break;
+            case VMOP_PUSH_ILOC1:
+                emit_push_iloc1(C, M, F, IRB, inst);
+                break;
             case VMOP_PUSH_CDR_ILOC:
                 emit_push_cdr_iloc(C, M, F, IRB, inst);
                 break;
             case VMOP_RET_CONS:
                 emit_ret_cons(C, M, F, IRB, inst);
+                break;
+            case VMOP_EXTEND:
+                emit_extend(C, M, F, IRB, inst);
+                break;
+            case VMOP_PUSH_GLOC:
+                emit_push_gloc(C, M, F, IRB, inst);
+                break;
+            case VMOP_SUBR:
+                emit_subr(C, M, F, IRB, inst);
+                break;
+            case VMOP_PUSH_SUBR:
+                emit_push_subr(C, M, F, IRB, inst);
                 break;
             default:
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
@@ -347,6 +371,11 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
         return IRB.CreateGEP(env, IRB.CreateNeg(count));
     } else if (depth == 0) {
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+    } else if (depth == 1) {
+        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         auto count = CREATE_LOAD_ENV_REC(env, count);
         return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
     }
@@ -420,6 +449,38 @@ codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
     DECLEAR_COMMON_TYPES;
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
+}
+
+void
+codegen_t::emit_push_iloc1(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 1, FIXNUM(operands))));
+}
+
+void
+codegen_t::emit_push_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
+    auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
+    auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_push_gloc));
+    // valid
+    IRB.SetInsertPoint(undef_false);
+    CREATE_PUSH_VM_STACK(val);
 }
 
 void
@@ -624,6 +685,25 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 }
 
 void
+codegen_t::emit_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    intptr_t argc = FIXNUM(CADR(operands));
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+
+    scm_subr_t subr = (scm_subr_t)CAR(operands);
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
+    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+    CREATE_STORE_VM_REG(vm, m_value, val);
+    CREATE_STORE_VM_REG(vm, m_sp, argv);
+}
+
+void
 codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
 {
     scm_obj_t operands = CDAR(inst);
@@ -639,6 +719,36 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     auto val = IRB.CreateCall(ptr, {vm, argc, fp});
     CREATE_STORE_VM_REG(vm, m_value, val);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+}
+
+void
+codegen_t::emit_push_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    intptr_t argc = FIXNUM(CADR(operands));
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+
+    scm_subr_t subr = (scm_subr_t)CAR(operands);
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
+    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+    CREATE_STORE_VM_REG(vm, m_value, val);
+    CREATE_STORE_VM_REG(vm, m_sp, argv);
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
+    CREATE_PUSH_VM_STACK(val);
+    IRB.CreateBr(undef_true);
+    // invalid
+    IRB.SetInsertPoint(undef_true);
 }
 
 void
@@ -658,6 +768,25 @@ codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB
     transform(C, M, F, IRB, operands);
     // not taken
     IRB.SetInsertPoint(f9h_true);
+}
+
+void
+codegen_t::emit_if_nullp(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+    auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    transform(C, M, F, IRB, operands);
+    // not taken
+    IRB.SetInsertPoint(taken_false);
 }
 
 void
@@ -760,6 +889,23 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
     IRB.SetInsertPoint(CONTINUE);
 }
 
+void
+codegen_t::emit_extend(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+{
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+    DECLEAR_COMMON_TYPES;
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+
+    auto argc = VALUE_INTPTR(FIXNUM(operands));
+    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, argc);
+    CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+}
 
 /*
 
@@ -798,12 +944,59 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 (c 1000) ; => (1 1000 3)
 
 generating native code: map
-- unsupported instruction if.null?
-- unsupported instruction push.gloc
+* unsupported instruction if.null?
+* unsupported instruction push.gloc
 - unsupported instruction extend
 - unsupported instruction push.iloc.1
 - unsupported instruction push.iloc.1
 - unsupported instruction push.iloc.1
 - unsupported instruction push.iloc.1
 - unsupported instruction push.subr
+
+
+    (define map-1
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (proc (car lst))
+                          (map-1 proc (cdr lst)))))))
+
+    (define map-n
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (apply proc (car lst))
+                          (map-n proc (cdr lst)))))))
+
+    (define map
+      (lambda (proc lst1 . lst2)
+        (if (null? lst2)
+            (map-1 proc lst1)
+            (map-n proc (apply list-transpose* lst1 lst2)))))
+
+====
+
+    (define map-1
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (proc (car lst))
+                          (map-1 proc (cdr lst)))))))
+
+    (define map-n
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else (cons (apply proc (car lst))
+                          (map-n proc (cdr lst)))))))
+
+    (define map
+      (lambda (proc lst1 . lst2)
+        (if (null? lst2)
+            (map-1 proc lst1)
+            (map-n proc (apply list-transpose* lst1 lst2)))))
+
+
+    (closure-compile map)
+    (closure-compile map-1)
+    (closure-compile map-n)
+    (map cons '(1 2) '(3 4))
+(import (digamma time))
+(time (load "test/syntax-rule-stress-test.scm"))
 */

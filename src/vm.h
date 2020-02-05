@@ -69,6 +69,7 @@ public:
         native_thunk_error_ret_iloc,
         native_thunk_invalid_state,
         native_thunk_back_to_loop,
+        native_thunk_error_push_gloc,
     };
 
     scm_port_t          m_bootport;
