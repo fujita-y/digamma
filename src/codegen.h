@@ -22,9 +22,9 @@ public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
 private:
-    Function* emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index);
     Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    Function* emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
 
     void emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     void emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
@@ -37,9 +37,9 @@ private:
     void emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
 
     void emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     void emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     void emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
 
     void emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
     void emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
