@@ -999,4 +999,57 @@ generating native code: map
     (map cons '(1 2) '(3 4))
 (import (digamma time))
 (time (load "test/syntax-rule-stress-test.scm"))
+
+(backtrace #f)
+(define (p n m)
+  (let loop1 ((n n))
+    (cond ((> n 2))
+          (else
+            (let loop2 ((m m))
+              (cond ((> m 2))
+                    (else
+                     (display n)
+                     (display m)
+                     (loop2 (+ m 1)))))
+            (loop1 (+ n 1))))))
+(p 0 0)
+
+            CASE(VMOP_EXTEND_ENCLOSE_LOCAL) {
+                if ((uintptr_t)m_sp + sizeof(scm_obj_t) + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
+                    m_sp[0] = OPERANDS;
+                    m_sp++;
+                    vm_env_t env = (vm_env_t)m_sp;
+                    env->count = 1;
+                    env->up = m_env;
+                    m_sp = m_fp = (scm_obj_t*)(env + 1);
+                    m_env = &env->up;
+                    m_pc = CDR(m_pc);
+                    goto loop;
+                }
+                goto COLLECT_STACK_ENV_REC_N_ONE;
+
+- unsupported instruction extend.enclose+
+
+            CASE(VMOP_APPLY_ILOC_LOCAL) {
+                if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
+                    operand_trace = CDR(OPERANDS);
+                    void* lnk = m_env;
+                    intptr_t level = FIXNUM(CAAR(OPERANDS));
+                    while (level) { lnk = *(void**)lnk; level = level - 1; }
+                    vm_env_t env2 = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
+                    scm_obj_t obj = *((scm_obj_t*)env2 - env2->count + FIXNUM(CDAR(OPERANDS)));
+                    vm_env_t env = (vm_env_t)m_sp;
+                    env->count = m_sp - m_fp;
+                    env->up = &env2->up;
+                    m_env = &env->up;
+                    m_sp = m_fp = (scm_obj_t*)(env + 1);
+                    m_pc = obj;
+                    goto trace_n_loop;
+                }
+                goto COLLECT_STACK_ENV_REC;
+            }
+
+- unsupported instruction apply.iloc+
+
+TODO: detect self recursive
 */
