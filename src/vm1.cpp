@@ -16,7 +16,7 @@
 #define FORWARD(from,to)    ((*(uintptr_t*)(from)) = ((uintptr_t)(to) | 1))
 #define RESOLVE(p)          ((void*)((*(uintptr_t*)(p)) & (~1)))
 
-#define NATIVE_THUNK_DISPATCH(_N_) \
+#define NATIVE_THUNK_POST_DISPATCH(_N_) \
         { \
             switch (n) { \
                 case native_thunk_pop_cont: goto pop_cont; \
@@ -484,7 +484,7 @@ VM::loop(bool init, bool resume)
             if (cont->code != NULL) {
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
                 intptr_t n = (*thunk)((intptr_t)this);
-                NATIVE_THUNK_DISPATCH(n);
+                NATIVE_THUNK_POST_DISPATCH(n);
             }
         }
 
@@ -1409,7 +1409,7 @@ VM::loop(bool init, bool resume)
                 scm_bvector_t operand = (scm_bvector_t)CAR(OPERANDS);
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)operand->elts);
                 intptr_t n = (*thunk)((intptr_t)this);
-                NATIVE_THUNK_DISPATCH(n);
+                NATIVE_THUNK_POST_DISPATCH(n);
             }
 
             CASE(VMOP_TOUCH_GLOC) {

@@ -207,8 +207,7 @@ codegen_t::define_prepare_call()
 
     auto M = llvm::make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
-//  Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::LinkOnceAnyLinkage, "prepare_call", M.get());
-//  F->setCallingConv(CallingConv::Fast);
+    F->setCallingConv(CallingConv::Fast);
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
     auto vm = F->arg_begin();
@@ -233,12 +232,13 @@ codegen_t::define_prepare_call()
     CREATE_STORE_VM_REG(vm, m_cont, ea2);
     IRB.CreateRetVoid();
 
-    //verifyModule(*M, &outs());
-    //M.get()->print(outs(), nullptr);
+    verifyModule(*M, &outs());
+
+//  M.get()->print(outs(), nullptr);
 
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
-//  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
-    m_jit->getMainJITDylib().dump(llvm::outs());
+
+//  m_jit->getMainJITDylib().dump(llvm::outs());
 }
 
 void
@@ -277,7 +277,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
 //  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
 
-    m_jit->getMainJITDylib().dump(llvm::outs());
+//  m_jit->getMainJITDylib().dump(llvm::outs());
 
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
@@ -290,7 +290,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 }
 
 void
-codegen_t::transform(context_t& ctx, scm_obj_t inst)
+codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
@@ -644,6 +644,11 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    scm_gloc_t g = (scm_gloc_t)CAR(operands);
+    if (g->value == ctx.m_top_level_closure) {
+        puts("--- self recursive call");
+    }
+
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     CREATE_STORE_VM_REG(vm, m_value, val);
@@ -932,8 +937,8 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
 
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto argc = VALUE_INTPTR(FIXNUM(operands));
     auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, argc);

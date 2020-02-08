@@ -26,7 +26,7 @@ class codegen_t {
     std::unique_ptr<LLJIT> m_jit;
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
-    void transform(context_t& ctx, scm_obj_t inst);
+    void transform(context_t ctx, scm_obj_t inst);
 public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
