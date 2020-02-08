@@ -20,6 +20,12 @@
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C); \
     auto VoidTy = Type::getVoidTy(C);
 
+#define DECLEAR_CONTEXT_VARS \
+    LLVMContext& C = ctx.m_llvm_context; \
+    IRBuilder<>& IRB = ctx.m_irb; \
+    Module* M = ctx.m_module; \
+    Function* F = ctx.m_function;
+
 #define VALUE_INTPTR(_VAL_) \
     (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
 
@@ -258,7 +264,13 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 
-    transform(C, M.get(), F, IRB, closure->code);
+    context_t context(C, IRB);
+    context.m_module = M.get();
+    context.m_function = F;
+    context.m_top_level_closure = closure;
+    context.m_top_level_function = F;
+
+    transform(context, closure->code);
 
     verifyModule(*M, &outs());
 
@@ -278,78 +290,78 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 }
 
 void
-codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::transform(context_t& ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_CALL:
-                F = emit_call(C, M, F, IRB, inst);
+                ctx.m_function = emit_call(ctx, inst);
                 break;
             case VMOP_IF_TRUE:
-                emit_if_true(C, M, F, IRB, inst);
+                emit_if_true(ctx, inst);
                 break;
             case VMOP_PUSH:
-                emit_push(C, M, F, IRB, inst);
+                emit_push(ctx, inst);
                 break;
             case VMOP_PUSH_CONST:
-                emit_push_const(C, M, F, IRB, inst);
+                emit_push_const(ctx, inst);
                 break;
             case VMOP_RET_CONST:
-                emit_ret_const(C, M, F, IRB, inst);
+                emit_ret_const(ctx, inst);
                 break;
             case VMOP_APPLY_ILOC:
-                emit_apply_iloc(C, M, F, IRB, inst);
+                emit_apply_iloc(ctx, inst);
                 break;
             case VMOP_APPLY_GLOC:
-                emit_apply_gloc(C, M, F, IRB, inst);
+                emit_apply_gloc(ctx, inst);
                 break;
             case VMOP_RET_SUBR:
-                emit_ret_subr(C, M, F, IRB, inst);
+                emit_ret_subr(ctx, inst);
                 break;
             case VMOP_RET_ILOC:
-                emit_ret_iloc(C, M, F, IRB, inst);
+                emit_ret_iloc(ctx, inst);
                 break;
             case VMOP_LT_N_ILOC:
-                emit_lt_n_iloc(C, M, F, IRB, inst);
+                emit_lt_n_iloc(ctx, inst);
                 break;
             case VMOP_PUSH_NADD_ILOC:
-                emit_push_nadd_iloc(C, M, F, IRB, inst);
+                emit_push_nadd_iloc(ctx, inst);
                 break;
             case VMOP_ILOC0:
-                emit_iloc0(C, M, F, IRB, inst);
+                emit_iloc0(ctx, inst);
                 break;
             case VMOP_IF_NULLP:
-                emit_if_nullp(C, M, F, IRB, inst);
+                emit_if_nullp(ctx, inst);
                 break;
             case VMOP_IF_NULLP_RET_CONST:
-                emit_if_nullp_ret_const(C, M, F, IRB, inst);
+                emit_if_nullp_ret_const(ctx, inst);
                 break;
             case VMOP_PUSH_CAR_ILOC:
-                emit_push_car_iloc(C, M, F, IRB, inst);
+                emit_push_car_iloc(ctx, inst);
                 break;
             case VMOP_PUSH_ILOC0:
-                emit_push_iloc0(C, M, F, IRB, inst);
+                emit_push_iloc0(ctx, inst);
                 break;
             case VMOP_PUSH_ILOC1:
-                emit_push_iloc1(C, M, F, IRB, inst);
+                emit_push_iloc1(ctx, inst);
                 break;
             case VMOP_PUSH_CDR_ILOC:
-                emit_push_cdr_iloc(C, M, F, IRB, inst);
+                emit_push_cdr_iloc(ctx, inst);
                 break;
             case VMOP_RET_CONS:
-                emit_ret_cons(C, M, F, IRB, inst);
+                emit_ret_cons(ctx, inst);
                 break;
             case VMOP_EXTEND:
-                emit_extend(C, M, F, IRB, inst);
+                emit_extend(ctx, inst);
                 break;
             case VMOP_PUSH_GLOC:
-                emit_push_gloc(C, M, F, IRB, inst);
+                emit_push_gloc(ctx, inst);
                 break;
             case VMOP_SUBR:
-                emit_subr(C, M, F, IRB, inst);
+                emit_subr(ctx, inst);
                 break;
             case VMOP_PUSH_SUBR:
-                emit_push_subr(C, M, F, IRB, inst);
+                emit_push_subr(ctx, inst);
                 break;
             default:
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
@@ -360,10 +372,11 @@ codegen_t::transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 }
 
 Value*
-codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index)
+codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
 {
-    auto vm = F->arg_begin();
+    DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
 
     if (depth == 0 && index == 0) {
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
@@ -384,17 +397,18 @@ codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>&
 }
 
 Value*
-codegen_t::emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t loc)
+codegen_t::emit_lookup_iloc(context_t& ctx, scm_obj_t loc)
 {
-    return emit_lookup_iloc(C, M, F, IRB, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
+    return emit_lookup_iloc(ctx, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
 }
 
 Function*
-codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_cont_rec_t));
 
@@ -415,60 +429,69 @@ codegen_t::emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
     // m_pc = OPERANDS;
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
     // continue emit code in operands
-    transform(C, M, F, IRB, operands);
+    transform(ctx, operands);
 
     IRB.SetInsertPoint(RETURN);
     return K;
 }
 
 void
-codegen_t::emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
 }
 
 void
-codegen_t::emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_const(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
 }
 
 void
-codegen_t::emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_iloc0(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands))));
+    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
 }
 
 void
-codegen_t::emit_push_iloc1(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_iloc1(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 1, FIXNUM(operands))));
+    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
 }
 
 void
-codegen_t::emit_push_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
 
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -484,15 +507,15 @@ codegen_t::emit_push_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 void
-codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
@@ -509,15 +532,15 @@ codegen_t::emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
 }
 
 void
-codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
@@ -534,18 +557,18 @@ codegen_t::emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<
 }
 
 void
-codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
     BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
     IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
     // fixnum
@@ -591,13 +614,14 @@ codegen_t::emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder
 }
 
 void
-codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -613,11 +637,12 @@ codegen_t::emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
 }
 
 void
-codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
@@ -636,11 +661,12 @@ codegen_t::emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& 
 }
 
 void
-codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_ret_const(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto val = VALUE_INTPTR(operands);
     CREATE_STORE_VM_REG(vm, m_value, val);
@@ -648,13 +674,14 @@ codegen_t::emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 void
-codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_ret_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, operands));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
     CREATE_STORE_VM_REG(vm, m_value, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -670,11 +697,12 @@ codegen_t::emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 }
 
 void
-codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_ret_cons(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto val = CREATE_LOAD_VM_REG(vm, m_value);
@@ -685,11 +713,12 @@ codegen_t::emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 }
 
 void
-codegen_t::emit_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
@@ -704,11 +733,12 @@ codegen_t::emit_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, s
 }
 
 void
-codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
@@ -722,11 +752,12 @@ codegen_t::emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
 }
 
 void
-codegen_t::emit_push_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
@@ -752,11 +783,12 @@ codegen_t::emit_push_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 void
-codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_if_true(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto value = CREATE_LOAD_VM_REG(vm, m_value);
     BasicBlock* f9h_true = BasicBlock::Create(C, "f9h_true", F);
@@ -765,17 +797,18 @@ codegen_t::emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB
     IRB.CreateCondBr(f9h_cond, f9h_true, f9h_false);
     // taken
     IRB.SetInsertPoint(f9h_false);
-    transform(C, M, F, IRB, operands);
+    transform(ctx, operands);
     // not taken
     IRB.SetInsertPoint(f9h_true);
 }
 
 void
-codegen_t::emit_if_nullp(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto value = CREATE_LOAD_VM_REG(vm, m_value);
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -784,17 +817,18 @@ codegen_t::emit_if_nullp(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IR
     IRB.CreateCondBr(taken_cond, taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
-    transform(C, M, F, IRB, operands);
+    transform(ctx, operands);
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
 
 void
-codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
     auto value = CREATE_LOAD_VM_REG(vm, m_value);
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -810,13 +844,14 @@ codegen_t::emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBui
 }
 
 void
-codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, 0, FIXNUM(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -833,13 +868,14 @@ codegen_t::emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, 
 }
 
 void
-codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_lt_n_iloc(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(C, M, F, IRB, CAR(operands)));
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
     BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
@@ -890,11 +926,12 @@ codegen_t::emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& I
 }
 
 void
-codegen_t::emit_extend(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst)
+codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-    DECLEAR_COMMON_TYPES;
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
 
     auto argc = VALUE_INTPTR(FIXNUM(operands));

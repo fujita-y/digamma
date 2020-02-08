@@ -14,43 +14,52 @@ using namespace llvm;
 using namespace llvm::orc;
 
 class codegen_t {
+    struct context_t {
+        LLVMContext& m_llvm_context;
+        Module* m_module;
+        Function* m_function;
+        IRBuilder<>& m_irb;
+        scm_closure_t m_top_level_closure;
+        Function* m_top_level_function;
+        context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb) {}
+    };
     std::unique_ptr<LLJIT> m_jit;
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
-    void transform(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void transform(context_t& ctx, scm_obj_t inst);
 public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
 private:
-    Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, intptr_t depth, intptr_t index);
-    Value* emit_lookup_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    Function* emit_call(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
+    Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
+    Function* emit_call(context_t& ctx, scm_obj_t inst);
 
-    void emit_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_subr(context_t& ctx, scm_obj_t inst);
 
-    void emit_push(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_iloc1(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_car_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_cdr_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_push_nadd_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_push(context_t& ctx, scm_obj_t inst);
+    void emit_push_const(context_t& ctx, scm_obj_t inst);
+    void emit_push_iloc0(context_t& ctx, scm_obj_t inst);
+    void emit_push_iloc1(context_t& ctx, scm_obj_t inst);
+    void emit_push_gloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_subr(context_t& ctx, scm_obj_t inst);
+    void emit_push_car_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst);
 
-    void emit_apply_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_apply_gloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_apply_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_apply_gloc(context_t& ctx, scm_obj_t inst);
 
-    void emit_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_ret_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_ret_cons(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_ret_subr(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_ret_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_ret_cons(context_t& ctx, scm_obj_t inst);
+    void emit_ret_subr(context_t& ctx, scm_obj_t inst);
 
-    void emit_if_true(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_if_nullp(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_if_nullp_ret_const(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_if_true(context_t& ctx, scm_obj_t inst);
+    void emit_if_nullp(context_t& ctx, scm_obj_t inst);
+    void emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst);
 
-    void emit_iloc0(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_lt_n_iloc(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
-    void emit_extend(LLVMContext& C, Module* M, Function* F, IRBuilder<>& IRB, scm_obj_t inst);
+    void emit_iloc0(context_t& ctx, scm_obj_t inst);
+    void emit_lt_n_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_extend(context_t& ctx, scm_obj_t inst);
 };
