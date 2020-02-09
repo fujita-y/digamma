@@ -296,7 +296,8 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 
     scm_bvector_t operand = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)operand->elts = (intptr_t)thunk;
-    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(operand, closure->code)));
+    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, operand), closure->code);
+//    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(operand, closure->code)));
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
 }
