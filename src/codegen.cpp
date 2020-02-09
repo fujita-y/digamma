@@ -203,8 +203,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-    puts("*** IR after optimize ***");
-    M.print(outs(), nullptr);
+//  puts("*** IR after optimize ***");
+//  M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
@@ -312,75 +312,88 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
-            case VMOP_CALL:
+            case VMOP_CALL: {
+                intptr_t argc = ctx.m_argc;
+                ctx.m_argc = 0;
                 ctx.m_function = emit_call(ctx, inst);
-                break;
-            case VMOP_IF_TRUE:
+                ctx.m_argc = argc;
+            } break;
+            case VMOP_IF_TRUE: {
                 emit_if_true(ctx, inst);
-                break;
-            case VMOP_PUSH:
+            } break;
+            case VMOP_PUSH: {
                 emit_push(ctx, inst);
-                break;
-            case VMOP_PUSH_CONST:
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_CONST: {
                 emit_push_const(ctx, inst);
-                break;
-            case VMOP_RET_CONST:
+                ctx.m_argc++;
+            } break;
+            case VMOP_RET_CONST: {
                 emit_ret_const(ctx, inst);
-                break;
-            case VMOP_APPLY_ILOC:
+            } break;
+            case VMOP_APPLY_ILOC: {
                 emit_apply_iloc(ctx, inst);
-                break;
-            case VMOP_APPLY_GLOC:
+            } break;
+            case VMOP_APPLY_GLOC: {
                 emit_apply_gloc(ctx, inst);
-                break;
-            case VMOP_RET_SUBR:
+            } break;
+            case VMOP_RET_SUBR: {
                 emit_ret_subr(ctx, inst);
-                break;
-            case VMOP_RET_ILOC:
+            } break;
+            case VMOP_RET_ILOC: {
                 emit_ret_iloc(ctx, inst);
-                break;
-            case VMOP_LT_N_ILOC:
+            } break;
+            case VMOP_LT_N_ILOC: {
                 emit_lt_n_iloc(ctx, inst);
-                break;
-            case VMOP_PUSH_NADD_ILOC:
+            } break;
+            case VMOP_PUSH_NADD_ILOC: {
                 emit_push_nadd_iloc(ctx, inst);
-                break;
-            case VMOP_ILOC0:
+                ctx.m_argc++;
+            } break;
+            case VMOP_ILOC0: {
                 emit_iloc0(ctx, inst);
-                break;
-            case VMOP_IF_NULLP:
+            } break;
+            case VMOP_IF_NULLP: {
                 emit_if_nullp(ctx, inst);
-                break;
-            case VMOP_IF_NULLP_RET_CONST:
+            } break;
+            case VMOP_IF_NULLP_RET_CONST: {
                 emit_if_nullp_ret_const(ctx, inst);
-                break;
-            case VMOP_PUSH_CAR_ILOC:
+            } break;
+            case VMOP_PUSH_CAR_ILOC: {
                 emit_push_car_iloc(ctx, inst);
-                break;
-            case VMOP_PUSH_ILOC0:
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_ILOC0: {
                 emit_push_iloc0(ctx, inst);
-                break;
-            case VMOP_PUSH_ILOC1:
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_ILOC1: {
                 emit_push_iloc1(ctx, inst);
-                break;
-            case VMOP_PUSH_CDR_ILOC:
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_CDR_ILOC: {
                 emit_push_cdr_iloc(ctx, inst);
-                break;
-            case VMOP_RET_CONS:
+                ctx.m_argc++;
+            } break;
+            case VMOP_RET_CONS: {
                 emit_ret_cons(ctx, inst);
-                break;
-            case VMOP_EXTEND:
+            } break;
+            case VMOP_EXTEND: {
                 emit_extend(ctx, inst);
-                break;
-            case VMOP_PUSH_GLOC:
+                ctx.m_argc = 0;
+            } break;
+            case VMOP_PUSH_GLOC: {
                 emit_push_gloc(ctx, inst);
-                break;
-            case VMOP_SUBR:
+                ctx.m_argc++;
+            } break;
+            case VMOP_SUBR: {
                 emit_subr(ctx, inst);
-                break;
-            case VMOP_PUSH_SUBR:
+            } break;
+            case VMOP_PUSH_SUBR: {
                 emit_push_subr(ctx, inst);
-                break;
+                ctx.m_argc++;
+            } break;
             default:
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
                 break;
@@ -665,9 +678,12 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 
     // [TODO] subr
     scm_obj_t obj = ((scm_gloc_t)CAR(operands))->value;
-    if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) >= 0) {
+    if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
         // self recursive, no varargs
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+
+        printf("argc = %d\n", ctx.m_argc);
+
         // [TODO] arg count check
         auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
@@ -1127,4 +1143,7 @@ generating native code: map
 - unsupported instruction apply.iloc+
 
 TODO: detect self recursive
+
+(define (f m n p)
+    (cons #f (if m (list n) (list p))))
 */

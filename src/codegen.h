@@ -21,7 +21,8 @@ class codegen_t {
         IRBuilder<>& m_irb;
         scm_closure_t m_top_level_closure;
         Function* m_top_level_function;
-        context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb) {}
+        int m_argc;
+        context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0) {}
     };
     std::unique_ptr<LLJIT> m_jit;
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
