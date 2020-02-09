@@ -161,6 +161,18 @@ extern "C" scm_obj_t thunk_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) 
     return arith_add(vm->m_heap, obj, operands);
 }
 
+extern "C" void thunk_prepare_apply_self(VM* vm, scm_closure_t closure) {
+    // assume vm->m_sp - vm->m_fp == args
+    //if (m_heap->m_stop_the_world) stop();
+    intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
+    vm_env_t env = (vm_env_t)vm->m_sp;
+    env->count = args;
+    env->up = closure->env;
+    vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
+    vm->m_pc = closure->code;
+    vm->m_env = &env->up;
+}
+
 codegen_t::codegen_t()
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -191,8 +203,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-//  puts("*** IR after optimize ***");
-//  M.print(outs(), nullptr);
+    puts("*** IR after optimize ***");
+    M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
@@ -639,14 +651,25 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 {
+    // [TODO] operand_trace
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    scm_gloc_t g = (scm_gloc_t)CAR(operands);
-    if (g->value == ctx.m_top_level_closure) {
-        puts("--- self recursive call");
+    // [TODO] subr
+    if (((scm_gloc_t)CAR(operands))->value == ctx.m_top_level_closure) {
+        if (HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) >= 0) {
+            // [TODO] arg cound check
+            puts("--- self recursive call");
+            CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+            auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
+            IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
+            auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
+            call->setTailCallKind(CallInst::TCK_MustTail);
+            IRB.CreateRet(call);
+            return;
+        }
     }
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
@@ -963,6 +986,12 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
 (time (fib 30)) ;=> 55
 ;;  0.344398 real    0.344043 user    0.000139 sys
 ;;  0.353730 real    0.353562 user    0.000000 sys
+
+;;  0.475678 real    0.474068 user    0.001347 sys
+;;  0.264808 real    0.264689 user    0.000000 sys
+
+(time (fib 30.0))
+;;  0.585781 real    0.926367 user    0.001209 sys
 
 (define (minus x) (- x))
 (define lst (make-list 10 '4))
