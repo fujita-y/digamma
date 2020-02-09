@@ -231,9 +231,9 @@ codegen_t::define_prepare_call()
     CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
     // cont->up = m_cont;
     CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
-    // m_trace = m_trace_tail = scm_unspecified;
-    CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-    CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
+    // m_trace = m_trace_tail = scm_unspecified; [TODO] think if need
+    // CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
+    // CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
     // m_sp = m_fp = (scm_obj_t*)(cont + 1);
     auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
@@ -394,9 +394,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_subr(ctx, inst);
                 ctx.m_argc++;
             } break;
-            default:
+            default: {
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
-                break;
+            } break;
         }
         inst = CDR(inst);
     }
@@ -457,8 +457,8 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->code = NULL;
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
-    // m_pc = OPERANDS;
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
+    // m_pc = OPERANDS; [TODO] think if need
+    //CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
     // continue emit code in operands
     transform(ctx, operands);
 
@@ -796,7 +796,17 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, argc, fp});
     CREATE_STORE_VM_REG(vm, m_value, val);
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
 }
 
 void

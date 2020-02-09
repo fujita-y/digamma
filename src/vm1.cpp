@@ -21,10 +21,10 @@
             switch (n) { \
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
+                case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
                 case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
                 case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC; \
-                case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
                 case native_thunk_error_push_gloc: goto ERROR_PUSH_GLOC; \
                 default: fatal("unsupported thunk protocol %d", n); \
             } \
@@ -1406,6 +1406,8 @@ VM::loop(bool init, bool resume)
             }
 
             CASE(VMOP_NATIVE) {
+                m_trace = m_trace_tail = scm_unspecified;
+                operand_trace = scm_nil;
                 scm_bvector_t operand = (scm_bvector_t)CAR(OPERANDS);
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)operand->elts);
                 intptr_t n = (*thunk)((intptr_t)this);
