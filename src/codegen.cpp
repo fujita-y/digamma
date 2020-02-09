@@ -220,8 +220,7 @@ codegen_t::define_prepare_call()
     auto M = llvm::make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
     F->setCallingConv(CallingConv::Fast);
-    BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
-    IRBuilder<> IRB(ENTRY);
+    IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
     auto vm = F->arg_begin();
     auto cont = F->arg_begin() + 1;
 
@@ -253,12 +252,18 @@ codegen_t::define_prepare_call()
 //  m_jit->getMainJITDylib().dump(llvm::outs());
 }
 
+bool
+codegen_t::is_compiled(VM* vm, scm_closure_t closure)
+{
+    return CAAR(closure->code) == INST_NATIVE;
+}
+
 void
 codegen_t::compile(VM* vm, scm_closure_t closure)
 {
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
-    if (CAAR(closure->code) == INST_NATIVE) {
+    if (is_compiled(vm, closure)) {
         puts("- already compiled");
         return;
     }
@@ -659,34 +664,32 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     // [TODO] subr
-    if (((scm_gloc_t)CAR(operands))->value == ctx.m_top_level_closure) {
-        if (HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) >= 0) {
-            // [TODO] arg cound check
-            puts("--- self recursive call");
-            CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-            auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
-            IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
-            auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
-            call->setTailCallKind(CallInst::TCK_MustTail);
-            IRB.CreateRet(call);
-            return;
-        }
+    scm_obj_t obj = ((scm_gloc_t)CAR(operands))->value;
+    if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) >= 0) {
+        // self recursive, no varargs
+        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+        // [TODO] arg count check
+        auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
+        auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
+        call->setTailCallKind(CallInst::TCK_MustTail);
+        IRB.CreateRet(call);
+    } else {
+        auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
+        auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+        CREATE_STORE_VM_REG(vm, m_value, val);
+
+        BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+        BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+        auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+        IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+        // valid
+        IRB.SetInsertPoint(undef_false);
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
+        // invalid
+        IRB.SetInsertPoint(undef_true);
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
     }
-
-    auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
-    auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-    CREATE_STORE_VM_REG(vm, m_value, val);
-
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // valid
-    IRB.SetInsertPoint(undef_false);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
 }
 
 void

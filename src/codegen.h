@@ -27,6 +27,7 @@ class codegen_t {
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst);
+    bool is_compiled(VM* vm, scm_closure_t closure);
 public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
