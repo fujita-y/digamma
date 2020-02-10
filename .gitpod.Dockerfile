@@ -8,4 +8,4 @@ USER gitpod
 # RUN sudo apt-get -q update && #     sudo apt-get install -yq bastet && #     sudo rm -rf /var/lib/apt/lists/*
 #
 # More information: https://www.gitpod.io/docs/config-docker/
-RUN sudo apt-get -q update && sudo apt-get install -yq llvm/disco && sudo apt-get install -yq clang/disco && sudo rm -rf /var/lib/apt/lists/*
+# RUN sudo apt-get -q update && sudo apt-get install -yq llvm/disco && sudo apt-get install -yq clang/disco && sudo rm -rf /var/lib/apt/lists/*
