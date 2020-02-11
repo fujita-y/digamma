@@ -27,7 +27,7 @@
     Function* F = ctx.m_function;
 
 #define VALUE_INTPTR(_VAL_) \
-    (sizeof(intptr_t) == 4 ? IRB.getInt32((intptr_t)(_VAL_)) : IRB.getInt64((intptr_t)(_VAL_)))
+    (sizeof(intptr_t) == 4 ? IRB.getInt32((int32_t)(_VAL_)) : IRB.getInt64((int64_t)(_VAL_)))
 
 #define CREATE_LOAD_VM_REG(_VM_,_REG_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
