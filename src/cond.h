@@ -5,6 +5,7 @@
 #define COND_H_INCLUDED
 
 #include "core.h"
+#include "mutex.h"
 
 class cond_t {
     cond_t(const cond_t&);

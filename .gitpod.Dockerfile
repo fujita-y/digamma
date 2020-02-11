@@ -3,6 +3,8 @@ FROM gitpod/workspace-full
 USER gitpod
 
 ENV PATH "/usr/lib/llvm-10/bin:${PATH}"
+ENV C_INCLUDE_PATH "/usr/lib/llvm-10/include"
+ENV CPLUS_INCLUDE_PATH "/usr/lib/llvm-10/include"
 
 # Install custom tools, runtime, etc. using apt-get
 # For example, the command below would install "bastet" - a command line tetris clone:
