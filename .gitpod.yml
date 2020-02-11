@@ -1,4 +1,2 @@
-tasks:
-  - init: export PATH=/usr/lib/llvm-10/bin:$PATH
 image:
   file: .gitpod.Dockerfile
