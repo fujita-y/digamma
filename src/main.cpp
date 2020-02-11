@@ -9,7 +9,6 @@
   #include "llvm/Support/InitLLVM.h"
   #include "llvm/Support/TargetSelect.h"
   #include "llvm/Support/DynamicLibrary.h"
-  #include "orcjit.h"
 #endif
 
 int main_command_line_argc;
@@ -114,7 +113,6 @@ int main(int argc, const char** argv)
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
-    orcjit_init();
 #endif
 #ifndef NDEBUG
     struct foo { char i; };

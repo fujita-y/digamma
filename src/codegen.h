@@ -10,6 +10,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
+using namespace std;
 using namespace llvm;
 using namespace llvm::orc;
 

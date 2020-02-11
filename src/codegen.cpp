@@ -178,7 +178,11 @@ codegen_t::codegen_t()
     auto J = ExitOnErr(LLJITBuilder().create());
     auto D = J->getDataLayout();
     auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
+#if __clang_major__ < 10
     J->getMainJITDylib().setGenerator(G);
+#else
+    J->getMainJITDylib().addGenerator(G);
+#endif
     m_jit = std::move(J);
     define_prepare_call();
 }
@@ -212,12 +216,12 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
 void
 codegen_t::define_prepare_call()
 {
-    auto Context = llvm::make_unique<LLVMContext>();
+    auto Context = make_unique<LLVMContext>();
     LLVMContext& C = *Context;
 
     DECLEAR_COMMON_TYPES;
 
-    auto M = llvm::make_unique<Module>("intrinsics", C);
+    auto M = make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
     F->setCallingConv(CallingConv::Fast);
     IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
@@ -272,11 +276,11 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));
 
-    auto Context = llvm::make_unique<LLVMContext>();
+    auto Context = make_unique<LLVMContext>();
     LLVMContext& C = *Context;
     DECLEAR_COMMON_TYPES;
 
-    auto M = llvm::make_unique<Module>(module_id, C);
+    auto M = make_unique<Module>(module_id, C);
     Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M.get());
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);

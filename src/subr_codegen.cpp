@@ -6,7 +6,6 @@
 #include "printer.h"
 #include "violation.h"
 
-#include "orcjit.h"
 #include "codegen.h"
 
 /*
@@ -17,7 +16,7 @@
 scm_obj_t
 subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
 {
-    orcjit_compile();
+//    orcjit_compile();
     return scm_unspecified;
 }
 
