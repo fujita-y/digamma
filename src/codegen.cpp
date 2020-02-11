@@ -20,14 +20,19 @@
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C); \
     auto VoidTy = Type::getVoidTy(C);
 
+#if INTPTR_MAX == INT32_MAX
+    #define VALUE_INTPTR(_VAL_) IRB.getInt32((intptr_t)(_VAL_))
+#elif INTPTR_MAX == INT64_MAX
+    #define VALUE_INTPTR(_VAL_) IRB.getInt64((intptr_t)(_VAL_))
+#else
+    #error unsupported intptr_t size
+#endif
+
 #define DECLEAR_CONTEXT_VARS \
     LLVMContext& C = ctx.m_llvm_context; \
     IRBuilder<>& IRB = ctx.m_irb; \
     Module* M = ctx.m_module; \
     Function* F = ctx.m_function;
-
-#define VALUE_INTPTR(_VAL_) \
-    (sizeof(intptr_t) == 4 ? IRB.getInt32((int32_t)(_VAL_)) : IRB.getInt64((int64_t)(_VAL_)))
 
 #define CREATE_LOAD_VM_REG(_VM_,_REG_) \
     (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
