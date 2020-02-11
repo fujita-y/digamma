@@ -199,7 +199,6 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
 #else
     Module &M = *TSM.getModuleUnlocked();
 #endif
-
     PassManagerBuilder B;
     B.OptLevel = 2;
     B.SizeLevel = 1;
