@@ -186,7 +186,7 @@ codegen_t::codegen_t()
 #if __clang_major__ < 10
     J->getMainJITDylib().setGenerator(G);
 #else
-    J->getMainJITDylib().addGenerator(G);
+    J->getMainJITDylib().addGenerator(std::move(G));
 #endif
     m_jit = std::move(J);
     define_prepare_call();
@@ -194,7 +194,12 @@ codegen_t::codegen_t()
 
 ThreadSafeModule
 codegen_t::optimizeModule(ThreadSafeModule TSM) {
+#if __clang_major__ < 10
     Module &M = *TSM.getModule();
+#else
+    Module &M = *TSM.getModuleUnlocked();
+#endif
+
     PassManagerBuilder B;
     B.OptLevel = 2;
     B.SizeLevel = 1;
