@@ -84,7 +84,7 @@
   (map cons '(1 2) '(3 4)) => ((1 . 3) (2 . 4)))
 (test-end)
 
-(test-begin "stack closure")
+(test-begin "stackable closure")
 (test-eval!
   (define acc #f))
 (test-eval!
