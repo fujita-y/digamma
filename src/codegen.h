@@ -10,7 +10,10 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
+#if __clang_major__ > 9
 using namespace std;
+#endif
+
 using namespace llvm;
 using namespace llvm::orc;
 
