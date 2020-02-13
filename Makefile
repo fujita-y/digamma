@@ -12,10 +12,6 @@ CXX = clang++
 
 CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
 
-LDLIBS = -Wl,--export-dynamic -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all)
-
-LDFLAGS = -fuse-ld=lld
-
 SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp object_set.cpp \
        subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp interpreter.cpp serialize.cpp \
        vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp subr_port.cpp subr_r5rs_arith.cpp \
@@ -41,6 +37,8 @@ endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
   CXXFLAGS += -O3 -pthread -fomit-frame-pointer
+  LDFLAGS = -fuse-ld=lld
+  LDLIBS = -Wl,--export-dynamic -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all)
   ifneq (,$(findstring arm, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
       CXXFLAGS += -march=armv7-a
@@ -61,7 +59,8 @@ endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
   CPPFLAGS += -DNO_FFI
-  CXXFLAGS += -O2 -fomit-frame-pointer -momit-leaf-frame-pointer
+  CXXFLAGS += -O3 -fomit-frame-pointer -momit-leaf-frame-pointer
+  LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))
