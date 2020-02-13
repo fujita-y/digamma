@@ -244,9 +244,6 @@ codegen_t::define_prepare_call()
     CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
     // cont->up = m_cont;
     CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
-    // m_trace = m_trace_tail = scm_unspecified; [TODO] think if need
-    // CREATE_STORE_VM_REG(vm, m_trace, VALUE_INTPTR(scm_unspecified));
-    // CREATE_STORE_VM_REG(vm, m_trace_tail, VALUE_INTPTR(scm_unspecified));
     // m_sp = m_fp = (scm_obj_t*)(cont + 1);
     auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
@@ -315,7 +312,6 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
     scm_bvector_t operand = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)operand->elts = (intptr_t)thunk;
     scm_obj_t n_code = CONS(LIST2(INST_NATIVE, operand), closure->code);
-//    scm_obj_t n_code = LIST1(CONS(INST_NATIVE, CONS(operand, closure->code)));
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
 }
@@ -407,9 +403,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_subr(ctx, inst);
                 ctx.m_argc++;
             } break;
-            default: {
+            case VMOP_TOUCH_GLOC:
+                break;
+            default:
                 printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
-            } break;
+                break;
         }
         inst = CDR(inst);
     }
@@ -470,8 +468,6 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->code = NULL;
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
-    // m_pc = OPERANDS; [TODO] think if need
-    //CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(operands));
     // continue emit code in operands
     transform(ctx, operands);
 
@@ -1112,7 +1108,8 @@ generating native code: map
 (import (digamma time))
 (time (load "test/syntax-rule-stress-test.scm"))
 
-(backtrace #f)
+(define acc #f)
+(define add (lambda (n) (set! acc (cons n acc))))
 (define (p n m)
   (let loop1 ((n n))
     (cond ((> n 2))
