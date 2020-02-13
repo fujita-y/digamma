@@ -683,7 +683,6 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] operand_trace
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -697,7 +696,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 
         printf("argc = %d\n", ctx.m_argc);
 
-        // [TODO] arg count check
         auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
         auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
