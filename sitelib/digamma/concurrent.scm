@@ -6,7 +6,7 @@
   (export define-thread-variable
           define-autoload-variable
           make-uuid
-          future
+          async
           make-shared-queue
           shared-queue?
           shared-queue-push!
@@ -66,59 +66,47 @@
              ((set! var x)
               (assertion-violation 'set! (format "attempt to modify autoload variable ~u" 'var) '(set! var x)))))))))
 
-  (define future-error
-    (condition
-     (make-error)
-     (make-who-condition 'future)
-     (make-message-condition "child thread has terminated by unhandled exception")))
-
-  (define-syntax future
+  (define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
-       (let ((queue (make-shared-queue)))
+       (let ((queue (make-shared-queue)) (completed #f) (value #f))
          (spawn*
           (lambda () e0 e1 ...)
           (lambda (ans)
-            (if (condition? ans)
-                (shared-queue-push! queue future-error)
-                (shared-queue-push! queue ans))
+            (shared-queue-push! queue ans)
             (shared-queue-shutdown queue)))
          (lambda timeout
-           (let ((ans (apply shared-queue-pop! queue timeout)))
-             (if (condition? ans) (raise ans) ans)))))))
+           (cond
+            (completed
+             (if (condition? value) (raise value) value))
+            (else
+             (set! value (apply shared-queue-pop! queue timeout))
+             (cond
+              ((timeout-object? value) value)
+              (else
+               (set! completed #t)
+               (if (condition? value) (raise value) value))))))))))
 
   (define spawn*
     (lambda (body finally)
-
-      (define print-exception
-        (lambda (c)
-          (let ((e (current-error-port)))
-            (format e "\nerror in thread: unhandled exception has occurred\n")
-            (let ((in (open-string-input-port
-                       (call-with-string-output-port
-                        (lambda (s)
-                          (set-current-error-port! s)
-                          ((current-exception-printer) c)
-                          (set-current-error-port! e))))))
-              (or (char=? (lookahead-char in) #\linefeed) (put-string e "  "))
-              (let loop ((ch (get-char in)))
-                (cond ((eof-object? ch)
-                       (format e "[thread exit]\n\n"))
-                      ((char=? ch #\linefeed)
-                       (put-string e "\n  ")
-                       (loop (get-char in)))
-                      (else
-                       (put-char e ch)
-                       (loop (get-char in)))))))))
-
       (spawn (lambda ()
                (finally
                 (call/cc
                  (lambda (escape)
                    (with-exception-handler
-                    (lambda (c)
-                      (print-exception c)
-                      (and (serious-condition? c) (escape c)))
+                    (lambda (c) (escape c))
                     (lambda () (body))))))))))
 
   ) ;[end]
+
+#|
+(import (digamma concurrent))
+(define f (async (list 1 2 3)))
+(f)
+(define f (async (list 1 2 3) (usleep 10000) #t))
+(f 1)
+(display-thread-status)
+(define f2 (async (list 1 a 3)))
+(f2)
+
+|#
