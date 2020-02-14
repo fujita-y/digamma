@@ -109,4 +109,7 @@
 (define f2 (async (list 1 a 3)))
 (f2)
 
+(import (digamma time) (digamma concurrent))
+(time ((lambda () #f)))
+(time (async (lambda () #f)))
 |#
