@@ -684,14 +684,11 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    // [TODO] subr
     scm_obj_t obj = ((scm_gloc_t)CAR(operands))->value;
     if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
-        // self recursive, no varargs
+        // recursive
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-
-        printf("argc = %d\n", ctx.m_argc);
-
+        // printf("argc = %d\n", ctx.m_argc);
         auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
         auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
@@ -1159,8 +1156,6 @@ generating native code: map
             }
 
 - unsupported instruction apply.iloc+
-
-TODO: detect self recursive
 
 (define (f m n p)
     (cons #f (if m (list n) (list p))))
