@@ -35,14 +35,8 @@
          (define accessor
            (lambda ()
              (let ((p (param)))
-               (if (local-heap-object? p)
-                   (car p)
-                   (let ((val init))
-                     (param (list val)) val)))))
-         (define-syntax var
-           (identifier-syntax
-             (_ (accessor))
-             ((set! _ x) (mutator x))))))))
+               (if (local-heap-object? p) (car p) (let ((val init)) (param (list val)) val)))))
+         (define-syntax var (identifier-syntax (_ (accessor)) ((set! _ x) (mutator x))))))))
 
   (define-syntax define-autoload-variable
     (syntax-rules ()
@@ -53,50 +47,40 @@
          (define accessor
            (lambda ()
              (if (on-primordial-thread?)
-                 (let ((val init))
-                   (set! accessor (lambda () val)) val)
+                 (let ((val init)) (set! accessor (lambda () val)) val)
                  (let ((val (param)))
-                   (if (not (eq? val undefined))
-                       val
-                       (let ((val init))
-                         (param val) val))))))
+                   (if (not (eq? val undefined)) val (let ((val init)) (param val) val))))))
          (define-syntax var
            (identifier-syntax
              (_ (accessor))
              ((set! var x)
-              (assertion-violation 'set! (format "attempt to modify autoload variable ~u" 'var) '(set! var x)))))))))
+              (assertion-violation
+                'set!
+                (format "attempt to modify autoload variable ~u" 'var)
+                '(set! var x)))))))))
 
   (define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
-       (let ((queue (make-shared-queue)) (completed #f) (value #f))
-         (spawn*
-          (lambda () e0 e1 ...)
-          (lambda (ans)
-            (shared-queue-push! queue ans)
-            (shared-queue-shutdown queue)))
+       (let ((queue (make-shared-queue)) (completed #f) (result #f))
+         (spawn* (lambda () e0 e1 ...) (lambda (ans) (shared-queue-push! queue ans)))
          (lambda timeout
-           (cond
-            (completed
-             (if (condition? value) (raise value) value))
-            (else
-             (set! value (apply shared-queue-pop! queue timeout))
-             (cond
-              ((timeout-object? value) value)
-              (else
-               (set! completed #t)
-               (if (condition? value) (raise value) value))))))))))
+           (cond (completed (if (condition? result) (raise result) result))
+                 (else
+                   (set! result (apply shared-queue-pop! queue timeout))
+                   (cond ((timeout-object? result) result)
+                         (else
+                           (set! completed #t)
+                           (if (condition? result) (raise result) result))))))))))
 
   (define spawn*
     (lambda (body finally)
-      (spawn (lambda ()
-               (finally
-                (call/cc
-                 (lambda (escape)
-                   (with-exception-handler
-                    (lambda (c) (escape c))
-                    (lambda () (body))))))))))
-
+      (spawn
+        (lambda ()
+          (finally
+            (call/cc
+              (lambda (escape)
+                (with-exception-handler (lambda (c) (escape c)) (lambda () (body))))))))))
   ) ;[end]
 
 #|
@@ -112,4 +96,8 @@
 (import (digamma time) (digamma concurrent))
 (time ((lambda () #f)))
 (time (async (lambda () #f)))
+
+(define pp
+  (lambda (expr)
+      (pretty-print `(begin ,expr))))
 |#
