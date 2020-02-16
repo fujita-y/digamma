@@ -203,8 +203,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.OptLevel = 2;
     B.SizeLevel = 1;
 
-//  puts("=== IR before optimize ===");
-//  M.print(outs(), nullptr);
+    // puts("=== IR before optimize ===");
+    // M.print(outs(), nullptr);
 
     legacy::FunctionPassManager FPM(&M);
     B.populateFunctionPassManager(FPM);
@@ -216,8 +216,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-//  puts("*** IR after optimize ***");
-//  M.print(outs(), nullptr);
+    // puts("*** IR after optimize ***");
+    // M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
@@ -613,26 +613,23 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
     // fixnum
     IRB.SetInsertPoint(nonfixnum_false);
-        auto n = IRB.CreateAdd(IRB.CreateAShr(val, VALUE_INTPTR(1)), IRB.CreateAShr(VALUE_INTPTR(CADR(operands)), VALUE_INTPTR(1)));
-        // if ((n <= FIXNUM_MAX) & (n >= FIXNUM_MIN)) {
-        auto n_le_cond = IRB.CreateICmpSLE(n, VALUE_INTPTR(FIXNUM_MAX));
-        BasicBlock* n_le_true = BasicBlock::Create(C, "n_le_true", F);
-        BasicBlock* n_le_false = BasicBlock::Create(C, "n_le_false", F);
-        IRB.CreateCondBr(n_le_cond, n_le_true, n_le_false);
-        IRB.SetInsertPoint(n_le_true);
-            auto n_ge_cond = IRB.CreateICmpSGE(n, VALUE_INTPTR(FIXNUM_MIN));
-            BasicBlock* n_ge_true = BasicBlock::Create(C, "n_ge_true", F);
-            BasicBlock* n_ge_false = BasicBlock::Create(C, "n_ge_false", F);
-            IRB.CreateCondBr(n_ge_cond, n_ge_true, n_ge_false);
-            IRB.SetInsertPoint(n_ge_true);
-            CREATE_PUSH_VM_STACK(IRB.CreateAdd(IRB.CreateShl(n, VALUE_INTPTR(1)), VALUE_INTPTR(1)));
-            IRB.CreateBr(CONTINUE);
+        auto intr = Intrinsic::getDeclaration(ctx.m_module, llvm::Intrinsic::ID(Intrinsic::sadd_with_overflow), { IntptrTy });
+        auto rs = IRB.CreateCall(intr, { val, VALUE_INTPTR((uintptr_t)CADR(operands) - 1) });
+        auto ans = IRB.CreateExtractValue(rs, { 0 });
+        auto overflow = IRB.CreateExtractValue(rs, { 1 });
+        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, VALUE_INTPTR(0));
+        BasicBlock* ans_valid_true = BasicBlock::Create(C, "ans_valid_true", F);
+        BasicBlock* ans_valid_false = BasicBlock::Create(C, "ans_valid_false", F);
+        IRB.CreateCondBr(ans_valid_cond, ans_valid_true, ans_valid_false);
+        IRB.SetInsertPoint(ans_valid_true);
+        CREATE_PUSH_VM_STACK(ans);
+        IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
         auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
+        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
         BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
         BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
-        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
         IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
         // not number
         IRB.SetInsertPoint(nonnum_true);
@@ -644,10 +641,7 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
             auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
             CREATE_PUSH_VM_STACK(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
             IRB.CreateBr(CONTINUE);
-
-    IRB.SetInsertPoint(n_le_false);
-    IRB.CreateBr(nonnum_false);
-    IRB.SetInsertPoint(n_ge_false);
+    IRB.SetInsertPoint(ans_valid_false);
     IRB.CreateBr(nonnum_false);
 
     IRB.SetInsertPoint(CONTINUE);
@@ -1164,4 +1158,8 @@ TODO: detect self recursive
 
 (define (f m n p)
     (cons #f (if m (list n) (list p))))
+
+
+
+    --x86-asm-syntax=intel
 */
