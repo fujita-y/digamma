@@ -774,6 +774,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+
     CREATE_STORE_VM_REG(vm, m_value, val);
     CREATE_STORE_VM_REG(vm, m_sp, argv);
 }
@@ -789,10 +790,12 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
     auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
+
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, argc, fp});
+
     CREATE_STORE_VM_REG(vm, m_value, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -823,6 +826,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+
     CREATE_STORE_VM_REG(vm, m_value, val);
     CREATE_STORE_VM_REG(vm, m_sp, argv);
 
