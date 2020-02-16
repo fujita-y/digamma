@@ -15,6 +15,8 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
+
 #define DECLEAR_COMMON_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C); \
@@ -216,8 +218,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-    // puts("*** IR after optimize ***");
-    // M.print(outs(), nullptr);
+     puts("*** IR after optimize ***");
+     M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
@@ -778,6 +780,64 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_value, val);
     CREATE_STORE_VM_REG(vm, m_sp, argv);
 }
+/*
+void
+codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    BasicBlock* FALLBACK = BasicBlock::Create(C, "fallback", F);
+
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
+    auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
+    scm_subr_t subr = (scm_subr_t)CAR(operands);
+
+    if (ctx.m_argc == 2 && subr->adrs == subr_num_add) {
+        puts("shortcut");
+        auto fp_0 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(fp, IntptrPtrTy), VALUE_INTPTR(0)));
+        auto fp_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(fp, IntptrPtrTy), VALUE_INTPTR(1)));
+        auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateAnd(IRB.CreateAnd(fp_0, fp_1), VALUE_INTPTR(1)), VALUE_INTPTR(0));
+        BasicBlock* fallback_false = BasicBlock::Create(C, "fixnum_true", F);
+        IRB.CreateCondBr(fallback_cond, FALLBACK, fallback_false);
+        IRB.SetInsertPoint(fallback_false);
+        auto intr = Intrinsic::getDeclaration(ctx.m_module, llvm::Intrinsic::ID(Intrinsic::sadd_with_overflow), { IntptrTy });
+        auto rs = IRB.CreateCall(intr, { fp_0, IRB.CreateSub(fp_1, VALUE_INTPTR(1)) });
+        auto ans = IRB.CreateExtractValue(rs, { 0 });
+        auto overflow = IRB.CreateExtractValue(rs, { 1 });
+        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
+        BasicBlock* ans_valid_true = BasicBlock::Create(C, "ans_valid_true", F);
+        IRB.CreateCondBr(ans_valid_cond, ans_valid_true, FALLBACK);
+        IRB.SetInsertPoint(ans_valid_true);
+        CREATE_STORE_VM_REG(vm, m_value, ans);
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    } else {
+        IRB.CreateBr(FALLBACK);
+    }
+
+    IRB.SetInsertPoint(FALLBACK);
+
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
+    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    auto val = IRB.CreateCall(ptr, {vm, argc, fp});
+
+    CREATE_STORE_VM_REG(vm, m_value, val);
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+}
+*/
 
 void
 codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
@@ -789,7 +849,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
 
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
-    auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
+    auto argc = VALUE_INTPTR(ctx.m_argc);
 
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);

@@ -69,3 +69,16 @@ private:
     void emit_lt_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_extend(context_t& ctx, scm_obj_t inst);
 };
+
+/*
+(backtrace #f)
+(import (digamma time))
+
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+(closure-compile fib)
+(time (fib 30)) ;=> 55
+*/
