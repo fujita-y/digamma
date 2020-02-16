@@ -617,7 +617,7 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
         auto rs = IRB.CreateCall(intr, { val, VALUE_INTPTR((uintptr_t)CADR(operands) - 1) });
         auto ans = IRB.CreateExtractValue(rs, { 0 });
         auto overflow = IRB.CreateExtractValue(rs, { 1 });
-        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, VALUE_INTPTR(0));
+        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
         BasicBlock* ans_valid_true = BasicBlock::Create(C, "ans_valid_true", F);
         BasicBlock* ans_valid_false = BasicBlock::Create(C, "ans_valid_false", F);
         IRB.CreateCondBr(ans_valid_cond, ans_valid_true, ans_valid_false);
