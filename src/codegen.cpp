@@ -780,6 +780,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_value, val);
     CREATE_STORE_VM_REG(vm, m_sp, argv);
 }
+
 /*
 void
 codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
