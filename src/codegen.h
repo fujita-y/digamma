@@ -81,6 +81,10 @@ private:
        (fib (- n 2)))))
 (closure-compile fib)
 (time (fib 40)) ;=> 102334155
+
+macbook default
+;; 18.153539 real   18.145671 user    0.005424 sys
+macbook jit
 ;;  8.706625 real    8.699991 user    0.004582 sys
-;;  7.350153 real    7.345971 user    0.002947 sys
+   (7.350153 real    7.345971 user    0.002947 sys)
 */

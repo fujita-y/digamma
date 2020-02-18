@@ -218,8 +218,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-     puts("*** IR after optimize ***");
-     M.print(outs(), nullptr);
+    // puts("*** IR after optimize ***");
+    // M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
