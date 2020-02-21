@@ -37,6 +37,7 @@ public:
     codegen_t();
     void compile(VM* vm, scm_closure_t closure);
 private:
+    Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
     Function* emit_call(context_t& ctx, scm_obj_t inst);
@@ -68,6 +69,8 @@ private:
     void emit_iloc0(context_t& ctx, scm_obj_t inst);
     void emit_lt_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_extend(context_t& ctx, scm_obj_t inst);
+    void emit_extend_enclose_local(context_t& ctx, scm_obj_t inst);
+    void emit_apply_iloc_local(context_t& ctx, scm_obj_t inst);
 };
 
 /*

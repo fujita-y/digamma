@@ -115,6 +115,14 @@ extern "C" {
         return (scm_obj_t*)env - env->count + index;
     }
 
+    vm_env_t c_lookup_env(VM* vm, intptr_t depth) {
+        void* lnk = vm->m_env;
+        intptr_t level = depth;
+        while (level) { lnk = *(void**)lnk; level = level - 1; }
+        vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
+        return env;
+    }
+
     void c_letrec_violation(VM* vm) {
     //    printf("- c_letrec_violation(%p)\n", vm);
         letrec_violation(vm);
@@ -410,6 +418,13 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_subr(ctx, inst);
                 ctx.m_argc++;
             } break;
+            case VMOP_EXTEND_ENCLOSE_LOCAL: {
+                emit_extend_enclose_local(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
+            case VMOP_APPLY_ILOC_LOCAL: {
+                emit_apply_iloc_local(ctx, inst);
+            } break;
             case VMOP_TOUCH_GLOC:
                 break;
             default:
@@ -418,6 +433,18 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
         }
         inst = CDR(inst);
     }
+}
+
+Value*
+codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    // [TODO] optimize
+    auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
+    return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
 }
 
 Value*
@@ -438,7 +465,7 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
         return index == 0 ? IRB.CreateGEP(env, IRB.CreateNeg(count)) : IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
     }
     auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    return IRB.CreateCall(c_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
+    return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
 }
 
 Value*
@@ -1065,7 +1092,83 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 }
+/*
+            CASE(VMOP_EXTEND_ENCLOSE_LOCAL) {
+                if ((uintptr_t)m_sp + sizeof(scm_obj_t) + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
+                    m_sp[0] = OPERANDS;
+                    m_sp++;
+                    vm_env_t env = (vm_env_t)m_sp;
+                    env->count = 1;
+                    env->up = m_env;
+                    m_sp = m_fp = (scm_obj_t*)(env + 1);
+                    m_env = &env->up;
+                    m_pc = CDR(m_pc);
+                    goto loop;
+                }
+                goto COLLECT_STACK_ENV_REC_N_ONE;
+*/
+void
+codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
+{
+    // TODO, compile enclosed code
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
 
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t));
+    CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
+    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
+    CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+}
+/*
+            CASE(VMOP_APPLY_ILOC_LOCAL) {
+                if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
+                    operand_trace = CDR(OPERANDS);
+                    void* lnk = m_env;
+                    intptr_t level = FIXNUM(CAAR(OPERANDS));
+                    while (level) { lnk = *(void**)lnk; level = level - 1; }
+                    vm_env_t env2 = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
+                    scm_obj_t obj = *((scm_obj_t*)env2 - env2->count + FIXNUM(CDAR(OPERANDS)));
+                    vm_env_t env = (vm_env_t)m_sp;
+                    env->count = m_sp - m_fp;
+                    env->up = &env2->up;
+                    m_env = &env->up;
+                    m_sp = m_fp = (scm_obj_t*)(env + 1);
+                    m_pc = obj;
+                    goto trace_n_loop;
+                }
+                goto COLLECT_STACK_ENV_REC;
+            }
+*/
+void
+codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+    auto env2 = emit_lookup_env(ctx, FIXNUM(CAAR(operands)));
+    auto count = CREATE_LOAD_ENV_REC(env2, count);
+    int index = FIXNUM(CDAR(operands));
+    auto obj = IRB.CreateLoad((index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count))));
+    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
+    CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+    CREATE_STORE_VM_REG(vm, m_pc, obj);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
+}
 /*
 
 (backtrace #f)
@@ -1180,19 +1283,6 @@ generating native code: map
             (loop1 (+ n 1))))))
 (p 0 0)
 
-            CASE(VMOP_EXTEND_ENCLOSE_LOCAL) {
-                if ((uintptr_t)m_sp + sizeof(scm_obj_t) + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
-                    m_sp[0] = OPERANDS;
-                    m_sp++;
-                    vm_env_t env = (vm_env_t)m_sp;
-                    env->count = 1;
-                    env->up = m_env;
-                    m_sp = m_fp = (scm_obj_t*)(env + 1);
-                    m_env = &env->up;
-                    m_pc = CDR(m_pc);
-                    goto loop;
-                }
-                goto COLLECT_STACK_ENV_REC_N_ONE;
 
 - unsupported instruction extend.enclose+
 

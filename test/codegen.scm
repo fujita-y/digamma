@@ -103,7 +103,7 @@
               (loop1 (+ n 1)))))))
 (test-eval!
   (p 0 0))
-#;(test-eval!
+(test-eval!
   (closure-compile p))
 (test-equal "acc"
   acc => (2 2 1 2 0 2 2 1 1 1 0 1 2 0 1 0 0 0 . #f))

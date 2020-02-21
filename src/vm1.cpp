@@ -21,6 +21,7 @@
             switch (n) { \
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
+                case native_thunk_loop: goto loop; \
                 case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
                 case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
