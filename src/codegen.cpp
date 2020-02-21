@@ -78,8 +78,8 @@ extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
             Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(_BYTES_REQUIRED_)), stack_limit); \
             IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow); \
             IRB.SetInsertPoint(stack_overflow); \
-            auto thunk_collect_stack = M->getOrInsertFunction("thunk_collect_stack", VoidTy, IntptrPtrTy, IntptrTy); \
-            IRB.CreateCall(thunk_collect_stack, {vm, VALUE_INTPTR(_BYTES_REQUIRED_)}); \
+            auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy); \
+            IRB.CreateCall(c_collect_stack, {vm, VALUE_INTPTR(_BYTES_REQUIRED_)}); \
             IRB.CreateBr(stack_ok); \
             IRB.SetInsertPoint(stack_ok); \
         }
@@ -98,86 +98,91 @@ static int log2_of_intptr_size()
 
 static ExitOnError ExitOnErr;
 
-extern "C" void thunk_collect_stack(VM* vm, intptr_t acquire) {
-    //printf("- thunk_collect_stack(%p, %d)\n", vm, (int)acquire);
-    vm->collect_stack(acquire);
-}
+extern "C" {
 
-extern "C" scm_obj_t* thunk_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-    //printf("- thunk_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
-    void* lnk = vm->m_env;
-    intptr_t level = depth;
-    while (level) { lnk = *(void**)lnk; level = level - 1; }
-    vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
-    return (scm_obj_t*)env - env->count + index;
-}
+    void c_collect_stack(VM* vm, intptr_t acquire) {
+        //printf("- c_collect_stack(%p, %d)\n", vm, (int)acquire);
+        vm->collect_stack(acquire);
+        // [TODO] m_heap->m_stop_the_world check here ?
+    }
 
-extern "C" void thunk_letrec_violation(VM* vm) {
-//    printf("- thunk_letrec_violation(%p)\n", vm);
-    letrec_violation(vm);
-}
+    scm_obj_t* c_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
+        //printf("- c_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
+        void* lnk = vm->m_env;
+        intptr_t level = depth;
+        while (level) { lnk = *(void**)lnk; level = level - 1; }
+        vm_env_t env = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
+        return (scm_obj_t*)env - env->count + index;
+    }
 
-extern "C" void thunk_error_push_car_iloc(VM* vm, scm_obj_t obj) {
-    if (obj == scm_undef) letrec_violation(vm);
-    wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
-}
+    void c_letrec_violation(VM* vm) {
+    //    printf("- c_letrec_violation(%p)\n", vm);
+        letrec_violation(vm);
+    }
 
-extern "C" void thunk_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
-    if (obj == scm_undef) letrec_violation(vm);
-    wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
-}
+    void c_error_push_car_iloc(VM* vm, scm_obj_t obj) {
+        if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
+    }
 
-extern "C" void thunk_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-    //printf("- thunk_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
-    if (obj == scm_undef) letrec_violation(vm);
-    scm_obj_t argv[2] = { obj, operands };
-    wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-}
+    void c_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
+        if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
+    }
 
-extern "C" void thunk_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-    if (obj == scm_undef) letrec_violation(vm);
-    scm_obj_t argv[2] = { obj, operands };
-    wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
-}
+    void c_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
+        if (obj == scm_undef) letrec_violation(vm);
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+    }
 
-extern "C" scm_obj_t thunk_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
-    return make_pair(vm->m_heap, car, cdr);
-}
+    void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (obj == scm_undef) letrec_violation(vm);
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
+    }
 
-extern "C" intptr_t thunk_number_pred(scm_obj_t obj)
-{
-    //printf("- thunk_number_pred(%p) => %d\n", obj, number_pred(obj));
-    return (intptr_t)number_pred(obj);
-}
+    scm_obj_t c_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
+        return make_pair(vm->m_heap, car, cdr);
+    }
 
-extern "C" intptr_t thunk_real_pred(scm_obj_t obj)
-{
-    //printf("- thunk_real_pred(%p) => %d\n", obj, real_pred(obj));
-    return (intptr_t)real_pred(obj);
-}
+    intptr_t c_number_pred(scm_obj_t obj)
+    {
+        //printf("- c_number_pred(%p) => %d\n", obj, number_pred(obj));
+        return (intptr_t)number_pred(obj);
+    }
 
-extern "C" intptr_t thunk_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-//    printer_t prt(vm, vm->m_current_output);
-//    prt.format("- thunk_n_compare ~s ~s => %d ~%~!", obj, operands, n_compare(vm->m_heap, obj, operands));
-    return n_compare(vm->m_heap, obj, operands);
-}
+    intptr_t c_real_pred(scm_obj_t obj)
+    {
+        //printf("- c_real_pred(%p) => %d\n", obj, real_pred(obj));
+        return (intptr_t)real_pred(obj);
+    }
 
-extern "C" scm_obj_t thunk_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-//    printer_t prt(vm, vm->m_current_output);
-//    prt.format("- thunk_arith_add ~s ~s => ~s ~%~!", obj, operands, arith_add(vm->m_heap, obj, operands));
-    return arith_add(vm->m_heap, obj, operands);
-}
+    intptr_t c_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    //    printer_t prt(vm, vm->m_current_output);
+    //    prt.format("- c_n_compare ~s ~s => %d ~%~!", obj, operands, n_compare(vm->m_heap, obj, operands));
+        return n_compare(vm->m_heap, obj, operands);
+    }
 
-extern "C" void thunk_prepare_apply_self(VM* vm, scm_closure_t closure) {
-    // assume vm->m_sp - vm->m_fp == args
-    //if (m_heap->m_stop_the_world) stop();
-    intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
-    vm_env_t env = (vm_env_t)vm->m_sp;
-    env->count = args;
-    env->up = closure->env;
-    vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
-    vm->m_pc = closure->code;
-    vm->m_env = &env->up;
+    scm_obj_t c_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    //    printer_t prt(vm, vm->m_current_output);
+    //    prt.format("- c_arith_add ~s ~s => ~s ~%~!", obj, operands, arith_add(vm->m_heap, obj, operands));
+        return arith_add(vm->m_heap, obj, operands);
+    }
+
+    void c_prepare_apply(VM* vm, scm_closure_t closure) {
+        // assume vm->m_sp - vm->m_fp == args
+        //if (m_heap->m_stop_the_world) stop();
+        intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
+        vm_env_t env = (vm_env_t)vm->m_sp;
+        env->count = args;
+        env->up = closure->env;
+        vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
+        vm->m_pc = closure->code;
+        vm->m_env = &env->up;
+    }
+
 }
 
 codegen_t::codegen_t()
@@ -422,22 +427,18 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
 
-    if (depth == 0 && index == 0) {
+    if (depth == 0) {
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateNeg(count));
-    } else if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+        return index == 0 ? IRB.CreateGEP(env, IRB.CreateNeg(count)) : IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
     } else if (depth == 1) {
         auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+        return index == 0 ? IRB.CreateGEP(env, IRB.CreateNeg(count)) : IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
     }
-    auto thunk_lookup_iloc = M->getOrInsertFunction("thunk_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    return IRB.CreateCall(thunk_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
+    auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    return IRB.CreateCall(c_lookup_iloc, {vm, VALUE_INTPTR(depth), VALUE_INTPTR(index)});
 }
 
 Value*
@@ -565,8 +566,8 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
-        auto thunk_error_push_car_iloc = M->getOrInsertFunction("thunk_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_error_push_car_iloc, {vm, val});
+        auto c_error_push_car_iloc = M->getOrInsertFunction("c_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_error_push_car_iloc, {vm, val});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
@@ -590,8 +591,8 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
-        auto thunk_error_push_cdr_iloc = M->getOrInsertFunction("thunk_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_error_push_cdr_iloc, {vm, val});
+        auto c_error_push_cdr_iloc = M->getOrInsertFunction("c_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_error_push_cdr_iloc, {vm, val});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
@@ -628,20 +629,20 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-        auto thunk_number_pred = M->getOrInsertFunction("thunk_number_pred", IntptrTy, IntptrTy);
-        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_number_pred, {val}), VALUE_INTPTR(0));
+        auto c_number_pred = M->getOrInsertFunction("c_number_pred", IntptrTy, IntptrTy);
+        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_number_pred, {val}), VALUE_INTPTR(0));
         BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
         BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
         IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
         // not number
         IRB.SetInsertPoint(nonnum_true);
-            auto thunk_error_push_nadd_iloc = M->getOrInsertFunction("thunk_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            IRB.CreateCall(thunk_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+            auto c_error_push_nadd_iloc = M->getOrInsertFunction("c_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            IRB.CreateCall(c_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
             IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // number
         IRB.SetInsertPoint(nonnum_false);
-            auto thunk_arith_add = M->getOrInsertFunction("thunk_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            CREATE_PUSH_VM_STACK(IRB.CreateCall(thunk_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
+            auto c_arith_add = M->getOrInsertFunction("c_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            CREATE_PUSH_VM_STACK(IRB.CreateCall(c_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
             IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(ans_valid_false);
     IRB.CreateBr(nonnum_false);
@@ -685,9 +686,9 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         // recursive
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         // printf("argc = %d\n", ctx.m_argc);
-        auto thunk_prepare_apply_self = M->getOrInsertFunction("thunk_prepare_apply_self", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(thunk_prepare_apply_self, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
-        auto call = IRB.CreateCall(ctx.m_top_level_function, {vm});
+        auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
+        auto call = IRB.CreateCall(ctx.m_top_level_function, { vm });
         call->setTailCallKind(CallInst::TCK_MustTail);
         IRB.CreateRet(call);
     } else {
@@ -755,8 +756,8 @@ codegen_t::emit_ret_cons(context_t& ctx, scm_obj_t inst)
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto val = CREATE_LOAD_VM_REG(vm, m_value);
     auto sp_minus_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
-    auto thunk_make_pair = M->getOrInsertFunction("thunk_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(thunk_make_pair, {vm, sp_minus_1, val}));
+    auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(c_make_pair, {vm, sp_minus_1, val}));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 }
 
@@ -981,8 +982,8 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(undef_cond, undef_true, undef_false);
     // invalid
     IRB.SetInsertPoint(undef_true);
-    auto thunk_letrec_violation = M->getOrInsertFunction("thunk_letrec_violation", VoidTy, IntptrPtrTy);
-    IRB.CreateCall(thunk_letrec_violation, {vm});
+    auto c_letrec_violation = M->getOrInsertFunction("c_letrec_violation", VoidTy, IntptrPtrTy);
+    IRB.CreateCall(c_letrec_violation, {vm});
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // valid
     IRB.SetInsertPoint(undef_false);
@@ -1018,20 +1019,20 @@ codegen_t::emit_lt_n_iloc(context_t& ctx, scm_obj_t inst)
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-        auto thunk_real_pred = M->getOrInsertFunction("thunk_real_pred", IntptrTy, IntptrTy);
+        auto c_real_pred = M->getOrInsertFunction("c_real_pred", IntptrTy, IntptrTy);
         BasicBlock* nonreal_true = BasicBlock::Create(C, "nonreal_true", F);
         BasicBlock* nonreal_false = BasicBlock::Create(C, "nonreal_false", F);
-        auto nonreal_cond = IRB.CreateICmpEQ(IRB.CreateCall(thunk_real_pred, {val}), VALUE_INTPTR(0));
+        auto nonreal_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_real_pred, {val}), VALUE_INTPTR(0));
         IRB.CreateCondBr(nonreal_cond, nonreal_true, nonreal_false);
         // not real
         IRB.SetInsertPoint(nonreal_true);
-            auto thunk_error_lt_n_iloc = M->getOrInsertFunction("thunk_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            IRB.CreateCall(thunk_error_lt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+            auto c_error_lt_n_iloc = M->getOrInsertFunction("c_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            IRB.CreateCall(c_error_lt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
             IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
         // real
         IRB.SetInsertPoint(nonreal_false);
-            auto thunk_n_compare = M->getOrInsertFunction("thunk_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            auto taken_cond = IRB.CreateICmpSLT(IRB.CreateCall(thunk_n_compare, {vm, val, VALUE_INTPTR(CADR(operands))}), VALUE_INTPTR(0));
+            auto c_n_compare = M->getOrInsertFunction("c_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            auto taken_cond = IRB.CreateICmpSLT(IRB.CreateCall(c_n_compare, {vm, val, VALUE_INTPTR(CADR(operands))}), VALUE_INTPTR(0));
             BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
             BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
             IRB.CreateCondBr(taken_cond, taken_true, taken_false);
