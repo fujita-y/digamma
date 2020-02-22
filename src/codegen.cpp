@@ -558,14 +558,16 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     // continue emit code in operands
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
-    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, local_id, M);
+    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
+    L->setCallingConv(CallingConv::Fast);
+    ctx.m_local_functions.reserve(ctx.m_depth + 1);
+    ctx.m_local_functions[ctx.m_depth] = L;
+    context_t ctx2 = ctx;
+    ctx2.m_function = L;
+    ctx2.m_depth++;
+    ctx2.m_argc = 0;
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
     IRB.SetInsertPoint(LOOP);
-
-    context_t ctx2 = ctx;
-    ctx2.m_argc = 0;
-    ctx2.m_depth++;
-    ctx2.m_function = L;
     transform(ctx2, operands);
 
     IRB.SetInsertPoint(CONTINUE);
@@ -601,6 +603,12 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 }
 
 #include "codegen.inc.cpp"
+
+/*
+- unsupported instruction >n.iloc
+- unsupported instruction if.true.ret
+- unsupported instruction push.iloc
+*/
 
 /*
 

@@ -25,6 +25,7 @@ class codegen_t {
         IRBuilder<>& m_irb;
         scm_closure_t m_top_level_closure;
         Function* m_top_level_function;
+        std::vector<Function*> m_local_functions;
         int m_argc;
         int m_depth;
         context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
