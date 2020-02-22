@@ -145,6 +145,13 @@ extern "C" {
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
     }
 
+    void c_error_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
+        if (obj == scm_undef) letrec_violation(vm);
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+    }
+
     void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (obj == scm_undef) letrec_violation(vm);
         scm_obj_t argv[2] = { obj, operands };
@@ -471,6 +478,16 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_APPLY_ILOC_LOCAL: {
                 emit_apply_iloc_local(ctx, inst);
             } break;
+            case VMOP_PUSH_ILOC: {
+                emit_push_iloc(ctx, inst);
+                ctx.m_argc++;
+            } break;
+            case VMOP_IF_TRUE_RET: {
+                emit_if_true_ret(ctx, inst);
+            } break;
+            case VMOP_GT_N_ILOC: {
+                emit_gt_n_iloc(ctx, inst);
+            }
             case VMOP_TOUCH_GLOC:
                 break;
             default:
@@ -605,9 +622,9 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 #include "codegen.inc.cpp"
 
 /*
-- unsupported instruction >n.iloc
-- unsupported instruction if.true.ret
-- unsupported instruction push.iloc
+- unsupported instruction >n.iloc       VMOP_GT_N_ILOC
+- unsupported instruction if.true.ret   VMOP_IF_TRUE_RET
+- unsupported instruction push.iloc     VMOP_PUSH_ILOC
 */
 
 /*
