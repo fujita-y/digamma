@@ -386,10 +386,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_CALL: {
-                intptr_t argc = ctx.m_argc;
+                int argc = ctx.m_argc;
+                int depth = ctx.m_depth;
                 ctx.m_argc = 0;
                 ctx.m_function = emit_call(ctx, inst);
                 ctx.m_argc = argc;
+                ctx.m_depth = depth;
             } break;
             case VMOP_IF_TRUE: {
                 emit_if_true(ctx, inst);
@@ -455,6 +457,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND: {
                 emit_extend(ctx, inst);
                 ctx.m_argc = 0;
+                ctx.m_depth++;
             } break;
             case VMOP_PUSH_GLOC: {
                 emit_push_gloc(ctx, inst);
@@ -470,6 +473,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
+                ctx.m_depth++;
             } break;
             case VMOP_APPLY_ILOC_LOCAL: {
                 emit_apply_iloc_local(ctx, inst);
@@ -537,6 +541,7 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 {
+    printf("emit_extend_enclose_local ctx.m_depth = %d\n", ctx.m_depth);
     // TODO, compile enclosed code
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
@@ -564,8 +569,13 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    int level = FIXNUM(CAAR(operands));
+
+    int function_index = ctx.m_depth - level - 1;
+    printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-    auto env2 = emit_lookup_env(ctx, FIXNUM(CAAR(operands)));
+    auto env2 = emit_lookup_env(ctx, level);
     auto count = CREATE_LOAD_ENV_REC(env2, count);
     int index = FIXNUM(CDAR(operands));
     auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
@@ -683,6 +693,8 @@ generating native code: map
 
 (define acc #f)
 (define add (lambda (n) (set! acc (cons n acc))))
+
+(backtrace #f)
 (define (p n m)
   (let loop1 ((n n))
     (cond ((> n 2))
