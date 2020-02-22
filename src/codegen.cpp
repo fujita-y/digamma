@@ -386,12 +386,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_CALL: {
-                int argc = ctx.m_argc;
-                int depth = ctx.m_depth;
-                ctx.m_argc = 0;
                 ctx.m_function = emit_call(ctx, inst);
-                ctx.m_argc = argc;
-                ctx.m_depth = depth;
             } break;
             case VMOP_IF_TRUE: {
                 emit_if_true(ctx, inst);
@@ -457,7 +452,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND: {
                 emit_extend(ctx, inst);
                 ctx.m_argc = 0;
-                ctx.m_depth++;
             } break;
             case VMOP_PUSH_GLOC: {
                 emit_push_gloc(ctx, inst);
@@ -473,7 +467,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
-                ctx.m_depth++;
             } break;
             case VMOP_APPLY_ILOC_LOCAL: {
                 emit_apply_iloc_local(ctx, inst);
@@ -500,7 +493,6 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
-
     Function* K = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, cont_id, M);
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
@@ -512,8 +504,11 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->code = NULL;
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
+
     // continue emit code in operands
-    transform(ctx, operands);
+    context_t ctx2 = ctx;
+    ctx2.m_argc = 0;
+    transform(ctx2, operands);
 
     IRB.SetInsertPoint(RETURN);
     return K;
@@ -557,8 +552,23 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    IRB.CreateBr(CONTINUE);
 
+    // continue emit code in operands
+    char local_id[40];
+    uuid_v4(local_id, sizeof(local_id));
+    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, local_id, M);
+    BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
+    IRB.SetInsertPoint(LOOP);
 
+    context_t ctx2 = ctx;
+    ctx2.m_argc = 0;
+    ctx2.m_depth++;
+    ctx2.m_function = L;
+    transform(ctx2, operands);
+
+    IRB.SetInsertPoint(CONTINUE);
 }
 
 void
@@ -571,7 +581,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
 
-    int function_index = ctx.m_depth - level - 1;
+    int function_index = ctx.m_depth - level;
     printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
