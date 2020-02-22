@@ -111,3 +111,45 @@
 
 
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
+#|
+(backtrace #f)
+(define (p n m)
+  (let loop1 ((n n))
+    (cond ((> n 2))
+          (else
+            (let loop2 ((m m))
+              (cond ((> m 2))
+                    (else
+                     (display n)
+                     (display m)
+                     (loop2 (+ m 1)))))
+            (loop1 (+ n 1))))))
+(closure-compile p)
+(p 0 0)
+
+- unsupported instruction >.iloc
+- unsupported instruction if.true.ret.const
+
+(backtrace #f)
+(define (p m)
+    (let loop ((n 0))
+      (display "n+") (display n) (newline)
+      (cond ((> n m) #f)
+            (else
+              (display "n*") (display n) (newline)
+              (loop (+ n 1))))))
+(closure-code p)
+(closure-compile p)
+
+(backtrace #f)
+(import (digamma time))
+(define (p m)
+    (let loop ((n 0))
+      (cond ((> n m) #f)
+            (else
+              (loop (+ n 1))))))
+(closure-code p)
+(closure-compile p)
+(time (p 1000000))
+;;  0.014971 real    0.014894 user    0.000048 sys
+|#

@@ -238,8 +238,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-    // puts("*** IR after optimize ***");
-    // M.print(outs(), nullptr);
+     puts("*** IR after optimize ***");
+     M.print(outs(), nullptr);
 
     return std::move(TSM);
 }
@@ -466,6 +466,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             } break;
             case VMOP_SUBR: {
                 emit_subr(ctx, inst);
+                ctx.m_argc = 0;
             } break;
             case VMOP_PUSH_SUBR: {
                 emit_push_subr(ctx, inst);
@@ -485,8 +486,14 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_TRUE_RET: {
                 emit_if_true_ret(ctx, inst);
             } break;
+            case VMOP_IF_TRUE_RET_CONST: {
+                emit_if_true_ret_const(ctx, inst);
+            } break;
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
+            }
+            case VMOP_GT_ILOC: {
+                emit_gt_iloc(ctx, inst);
             }
             case VMOP_TOUCH_GLOC:
                 break;
@@ -553,8 +560,7 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 {
-    printf("emit_extend_enclose_local ctx.m_depth = %d\n", ctx.m_depth);
-    // TODO, compile enclosed code
+    // printf("emit_extend_enclose_local ctx.m_depth = %d\n", ctx.m_depth);
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -576,14 +582,15 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
     Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
-    L->setCallingConv(CallingConv::Fast);
-    ctx.m_local_functions.reserve(ctx.m_depth + 1);
-    ctx.m_local_functions[ctx.m_depth] = L;
+    BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
+    // L->setCallingConv(CallingConv::Fast);
+    ctx.m_local_functions.resize(ctx.m_depth + 1);
+    ctx.m_local_functions.at(ctx.m_depth) = L;
+    // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
     context_t ctx2 = ctx;
     ctx2.m_function = L;
     ctx2.m_depth++;
     ctx2.m_argc = 0;
-    BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
     IRB.SetInsertPoint(LOOP);
     transform(ctx2, operands);
 
@@ -599,9 +606,8 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     int level = FIXNUM(CAAR(operands));
-
     int function_index = ctx.m_depth - level;
-    printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
+    // printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto env2 = emit_lookup_env(ctx, level);
@@ -615,8 +621,25 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
-    CREATE_STORE_VM_REG(vm, m_pc, obj);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
+
+    // printf("emit_apply_iloc_local ctx.m_local_functions.size() = %lu\n", ctx.m_local_functions.size());
+    Function* L = ctx.m_local_functions[function_index];
+    assert(L != nullptr);
+    auto call = IRB.CreateCall(L, { vm });
+    call->setTailCallKind(CallInst::TCK_MustTail);
+    IRB.CreateRet(call);
+    /*
+    if (L == nullptr) {
+      printf("emit_apply_iloc_local ctx.m_local_functions[function_index] = nullptr\n");
+      CREATE_STORE_VM_REG(vm, m_pc, obj);
+      IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
+    } else {
+      printf("emit_apply_iloc_local ctx.m_local_functions[function_index] = %p\n", L);
+      auto call = IRB.CreateCall(L, { vm });
+      call->setTailCallKind(CallInst::TCK_MustTail);
+      IRB.CreateRet(call);
+    }
+    */
 }
 
 #include "codegen.inc.cpp"
@@ -741,6 +764,7 @@ generating native code: map
                      (display m)
                      (loop2 (+ m 1)))))
             (loop1 (+ n 1))))))
+(closure-compile p)
 (p 0 0)
 
 
