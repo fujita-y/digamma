@@ -553,9 +553,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
             } break;
-//            case VMOP_LT_ILOC: {
-//                emit_lt_iloc(ctx, inst);
-//            } break;
+            case VMOP_LT_ILOC: {
+                emit_lt_iloc(ctx, inst);
+            } break;
             case VMOP_TOUCH_GLOC:
                 break;
             default:
@@ -706,173 +706,15 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 #include "codegen.inc.cpp"
 
 /*
-- unsupported instruction >n.iloc       VMOP_GT_N_ILOC
-- unsupported instruction if.true.ret   VMOP_IF_TRUE_RET
-- unsupported instruction push.iloc     VMOP_PUSH_ILOC
-*/
-
-/*
 
 (backtrace #f)
-(import (digamma time))
 
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-compile fib)
-(time (fib 30)) ;=> 55
-;;  0.344398 real    0.344043 user    0.000139 sys
-;;  0.353730 real    0.353562 user    0.000000 sys
-
-;;  0.475678 real    0.474068 user    0.001347 sys
-;;  0.264808 real    0.264689 user    0.000000 sys
-
-(time (fib 30.0))
-;;  0.585781 real    0.926367 user    0.001209 sys
-
-(define (minus x) (- x))
-(define lst (make-list 10 '4))
-(define map-1
-  (lambda (proc lst)
-    (if (null? lst)
-        '()
-        (cons (proc (car lst))
-              (map-1 proc (cdr lst))))))
-(closure-compile map-1)
-(time (map-1 minus lst)) ;=> (-4 -4 -4 -4 -4 -4 -4 -4 -4 -4)
-
-(define (n m) (list 1 (m) 3))
-(closure-compile n)
-(n (lambda () 2)) ; => (1 2 3)
-
-(define c)
-(define (n m) (list 1 (m) 3))
-(closure-compile n)
-(n (lambda () (call/cc (lambda (k) (set! c k) 2)))) ; => (1 2 3)
-(c 1000) ; => (1 1000 3)
-
-generating native code: map
-* unsupported instruction if.null?
-* unsupported instruction push.gloc
-- unsupported instruction extend
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.iloc.1
-- unsupported instruction push.subr
-
-
-    (define map-1
-      (lambda (proc lst)
-        (cond ((null? lst) '())
-              (else (cons (proc (car lst))
-                          (map-1 proc (cdr lst)))))))
-
-    (define map-n
-      (lambda (proc lst)
-        (cond ((null? lst) '())
-              (else (cons (apply proc (car lst))
-                          (map-n proc (cdr lst)))))))
-
-    (define map
-      (lambda (proc lst1 . lst2)
-        (if (null? lst2)
-            (map-1 proc lst1)
-            (map-n proc (apply list-transpose* lst1 lst2)))))
-
-====
-
-    (define map-1
-      (lambda (proc lst)
-        (cond ((null? lst) '())
-              (else (cons (proc (car lst))
-                          (map-1 proc (cdr lst)))))))
-
-    (define map-n
-      (lambda (proc lst)
-        (cond ((null? lst) '())
-              (else (cons (apply proc (car lst))
-                          (map-n proc (cdr lst)))))))
-
-    (define map
-      (lambda (proc lst1 . lst2)
-        (if (null? lst2)
-            (map-1 proc lst1)
-            (map-n proc (apply list-transpose* lst1 lst2)))))
-
-
-    (closure-compile map)
-    (closure-compile map-1)
-    (closure-compile map-n)
-    (map cons '(1 2) '(3 4))
-(import (digamma time))
-(time (load "test/syntax-rule-stress-test.scm"))
-
-(define acc #f)
-(define add (lambda (n) (set! acc (cons n acc))))
-
-(backtrace #f)
-(define (p n m)
-  (let loop1 ((n n))
-    (cond ((> n 2))
-          (else
-            (let loop2 ((m m))
-              (cond ((> m 2))
-                    (else
-                     (display n)
-                     (display m)
-                     (loop2 (+ m 1)))))
-            (loop1 (+ n 1))))))
-(closure-compile p)
-(p 0 0)
-
-
-- unsupported instruction extend.enclose+
-
-            CASE(VMOP_APPLY_ILOC_LOCAL) {
-                if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
-                    operand_trace = CDR(OPERANDS);
-                    void* lnk = m_env;
-                    intptr_t level = FIXNUM(CAAR(OPERANDS));
-                    while (level) { lnk = *(void**)lnk; level = level - 1; }
-                    vm_env_t env2 = (vm_env_t)((intptr_t)lnk - offsetof(vm_env_rec_t, up));
-                    scm_obj_t obj = *((scm_obj_t*)env2 - env2->count + FIXNUM(CDAR(OPERANDS)));
-                    vm_env_t env = (vm_env_t)m_sp;
-                    env->count = m_sp - m_fp;
-                    env->up = &env2->up;
-                    m_env = &env->up;
-                    m_sp = m_fp = (scm_obj_t*)(env + 1);
-                    m_pc = obj;
-                    goto trace_n_loop;
-                }
-                goto COLLECT_STACK_ENV_REC;
-            }
-
-- unsupported instruction apply.iloc+
-
-(define (f m n p)
-    (cons #f (if m (list n) (list p))))
-
-
-
-    --x86-asm-syntax=intel
-
-
-(backtrace #f)
-(define (p n m)
-  (let loop1 ((n n))
-    (cond ((> n 2))
-          (else
-            (let loop2 ((m m))
-              (cond ((> m 2))
-                    (else
-                     (display n)
-                     (display m)
-                     (loop2 (+ m 1)))))
-            (loop1 (+ n 1))))))
-(closure-compile p)
-(p 0 0)
+(define (run-bench name count ok? run)
+  (let loop ((i 0) (result (list 'undefined)))
+    (if (< i count)
+        (loop (+ i 1) (run))
+        result)))
+(closure-compile run-bench)
+(run-bench "foo" 3 #t (lambda () 1))
 
 */

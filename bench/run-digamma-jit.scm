@@ -116,7 +116,7 @@
 
 #!compatible
 
-;(closure-compile run-bench)
+(closure-compile run-bench)
 ;(closure-compile run-benchmark)
 
 (format #t "\n\n;;  GABRIEL\n")
@@ -157,3 +157,5 @@
 ;(time-bench scheme 3000)
 
 (newline)
+
+; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma-jit.scm
