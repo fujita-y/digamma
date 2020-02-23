@@ -65,6 +65,7 @@ private:
     void emit_push_subr(context_t& ctx, scm_obj_t inst);
     void emit_push_car_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_iloc(context_t& ctx, scm_obj_t inst);
 
@@ -88,6 +89,7 @@ private:
     void emit_extend_enclose_local(context_t& ctx, scm_obj_t inst);
     void emit_apply_iloc_local(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_lt_iloc(context_t& ctx, scm_obj_t inst);
     void emit_gt_iloc(context_t& ctx, scm_obj_t inst);
 };
 

@@ -129,13 +129,18 @@ extern "C" {
     }
 
     void c_error_push_car_iloc(VM* vm, scm_obj_t obj) {
-        if (obj == scm_undef) letrec_violation(vm);
+        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
     }
 
     void c_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
-        if (obj == scm_undef) letrec_violation(vm);
+        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
+    }
+
+    void c_error_push_cddr_iloc(VM* vm, scm_obj_t obj) {
+        //if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "cddr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
     intptr_t c_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
@@ -159,16 +164,27 @@ extern "C" {
     }
 
     intptr_t c_gt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-        puts("enter c_gt_iloc");
-        int bad;
+        int bad = 0;
         if (real_pred(vm->m_value)) {
             if (real_pred(obj)) {
                 vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) > 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
-        } else {
-            bad = 0;
+        }
+        scm_obj_t argv[2] = { vm->m_value, obj };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_lt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        int bad = 0;
+        if (real_pred(vm->m_value)) {
+            if (real_pred(obj)) {
+                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) < 0) ? scm_true : scm_false;
+                return 0;
+            }
+            bad = 1;
         }
         scm_obj_t argv[2] = { vm->m_value, obj };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
@@ -479,6 +495,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_car_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
+            case VMOP_PUSH_CDDR_ILOC: {
+                emit_push_cddr_iloc(ctx, inst);
+                ctx.m_argc++;
+            } break;
             case VMOP_PUSH_ILOC0: {
                 emit_push_iloc0(ctx, inst);
                 ctx.m_argc++;
@@ -533,6 +553,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
             } break;
+//            case VMOP_LT_ILOC: {
+//                emit_lt_iloc(ctx, inst);
+//            } break;
             case VMOP_TOUCH_GLOC:
                 break;
             default:

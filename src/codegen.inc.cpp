@@ -79,20 +79,20 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
-    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(pair, 1), VALUE_INTPTR(0));
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
         auto c_error_push_car_iloc = M->getOrInsertFunction("c_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(c_error_push_car_iloc, {vm, val});
+        IRB.CreateCall(c_error_push_car_iloc, {vm, pair});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
-    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), car));
+    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
 }
 
 void
@@ -104,20 +104,51 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
-    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(pair, 1), VALUE_INTPTR(0));
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
         auto c_error_push_cdr_iloc = M->getOrInsertFunction("c_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(c_error_push_cdr_iloc, {vm, val});
+        IRB.CreateCall(c_error_push_cdr_iloc, {vm, pair});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
-    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(val, IntptrPtrTy), cdr));
+    CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
+}
+
+void
+codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    // check if pair
+    BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+    BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(pair, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
+    // nonpair
+    IRB.SetInsertPoint(pair_false);
+        auto c_error_push_cddr_iloc = M->getOrInsertFunction("c_error_push_cddr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_error_push_cddr_iloc, {vm, pair});
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    // pair
+    IRB.SetInsertPoint(pair_true);
+        auto pair2 = CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr);
+        auto pair2_cond = IRB.CreateICmpEQ(IRB.CreateAnd(pair2, 1), VALUE_INTPTR(0));
+        BasicBlock* pair2_true = BasicBlock::Create(C, "pair2_true", F);
+        IRB.CreateCondBr(pair2_cond, pair2_true, pair_false);
+    // pair + pair
+    IRB.SetInsertPoint(pair2_true);
+      CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
 }
 
 void
@@ -832,4 +863,10 @@ void
 codegen_t::emit_gt_iloc(context_t& ctx, scm_obj_t inst)
 {
   emit_cc_iloc(ctx, inst, GT, "c_gt_iloc");
+}
+
+void
+codegen_t::emit_lt_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_iloc(ctx, inst, LT, "c_lt_iloc");
 }
