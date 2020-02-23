@@ -524,11 +524,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             } break;
             case VMOP_SUBR: {
                 emit_subr(ctx, inst);
-                ctx.m_argc = 0;
+                scm_obj_t operands = CDAR(inst);
+                intptr_t argc = FIXNUM(CADR(operands));
+                ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_PUSH_SUBR: {
                 emit_push_subr(ctx, inst);
-                ctx.m_argc++;
+                scm_obj_t operands = CDAR(inst);
+                intptr_t argc = FIXNUM(CADR(operands));
+                ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
@@ -707,14 +711,22 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
 /*
 
-(backtrace #f)
-
 (define (run-bench name count ok? run)
+  (display "a\n")
   (let loop ((i 0) (result (list 'undefined)))
+    (display "b\n")
     (if (< i count)
         (loop (+ i 1) (run))
         result)))
-(closure-compile run-bench)
-(run-bench "foo" 3 #t (lambda () 1))
+
+
+(backtrace #f)
+(define (p name count ok? run)
+  (let loop ((i 0) (result (list 'undefined)))
+    (if (< i count)
+        (loop (+ i 1) (run i))
+        result)))
+(closure-compile p)
+(p "foo" 3 #t (lambda (n) (display n) (newline))
 
 */

@@ -159,3 +159,10 @@
 (newline)
 
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma-jit.scm
+
+
+;;  divrec  (x140000)
+;;  0.941251 real    1.612507 user    0.023960 sys
+;;  ----------------------------------------------------------------
+;;  divrec  (x140000)
+;;  1.239196 real    1.991197 user    0.017716 sys

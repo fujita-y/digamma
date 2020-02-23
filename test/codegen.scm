@@ -130,6 +130,25 @@
   acc => (2 2 1 2 0 2 2 1 1 1 0 1 2 0 1 0 0 0 . #f))
 (test-end)
 
+(test-begin "subr partial use of args")
+(test-eval!
+  (define acc #f))
+(test-eval!
+  (define add (lambda (n) (set! acc (cons n acc)))))
+(test-eval!
+  (define (p name count ok? run)
+    (let loop ((i 0) (result (list 'undefined)))
+      (if (< i count)
+          (loop (+ i 1) (run i))
+          result))))
+(test-eval!
+  (closure-compile p))
+(test-eval!
+  (p "foo" 3 #t add))
+(test-equal "acc"
+  acc => (2 1 0 . #f))
+(test-end)
+
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
 (backtrace #f)
