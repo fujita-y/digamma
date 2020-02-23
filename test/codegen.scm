@@ -84,7 +84,28 @@
   (map cons '(1 2) '(3 4)) => ((1 . 3) (2 . 4)))
 (test-end)
 
-(test-begin "stackable closure")
+(test-begin "local closure (loop)")
+(test-eval!
+  (define acc #f))
+(test-eval!
+  (define add (lambda (n) (set! acc (cons n acc)))))
+(test-eval!
+  (define (p m)
+      (let loop ((n 0))
+        (add n)
+        (cond ((> n m) #f)
+              (else
+                (add n)
+                (loop (+ n 1)))))))
+(test-eval!
+  (closure-compile p))
+(test-eval!
+  (p 4))
+(test-equal "acc"
+  acc => (5 4 4 3 3 2 2 1 1 0 0 . #f))
+(test-end)
+
+(test-begin "stackable closure (nest loop)")
 (test-eval!
   (define acc #f))
 (test-eval!
@@ -102,13 +123,12 @@
                       (loop2 (+ m 1)))))
               (loop1 (+ n 1)))))))
 (test-eval!
-  (p 0 0))
-(test-eval!
   (closure-compile p))
+(test-eval!
+  (p 0 0))
 (test-equal "acc"
   acc => (2 2 1 2 0 2 2 1 1 1 0 1 2 0 1 0 0 0 . #f))
 (test-end)
-
 
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
@@ -120,8 +140,8 @@
             (let loop2 ((m m))
               (cond ((> m 2))
                     (else
-                     (display n)
-                     (display m)
+                     (display n)(newline)
+                     (display m)(newline)
                      (loop2 (+ m 1)))))
             (loop1 (+ n 1))))))
 (closure-compile p)

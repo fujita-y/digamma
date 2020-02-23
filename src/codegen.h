@@ -30,7 +30,7 @@ class codegen_t {
         int m_depth;
         context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
     };
-    enum condcode_t {
+    enum cc_t {
         LT,
         GT,
         LE,
@@ -50,6 +50,9 @@ private:
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
+    Value* emit_cmp_inst(context_t& ctx, cc_t cc, Value* lhs, Value* rhs);
+    void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
+    void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
     Function* emit_call(context_t& ctx, scm_obj_t inst);
 
     void emit_subr(context_t& ctx, scm_obj_t inst);

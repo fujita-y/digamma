@@ -147,6 +147,33 @@ extern "C" {
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
         return 1;
     }
+
+    intptr_t c_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (real_pred(obj)) {
+            vm->m_value = n_compare(vm->m_heap, obj, operands) > 0 ? scm_true : scm_false;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_gt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        puts("enter c_gt_iloc");
+        int bad;
+        if (real_pred(vm->m_value)) {
+            if (real_pred(obj)) {
+                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) > 0) ? scm_true : scm_false;
+                return 0;
+            }
+            bad = 1;
+        } else {
+            bad = 0;
+        }
+        scm_obj_t argv[2] = { vm->m_value, obj };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
+        return 1;
+    }
 /*
     void c_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
@@ -154,14 +181,14 @@ extern "C" {
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
     }
-*/
+
     void c_error_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
         if (obj == scm_undef) letrec_violation(vm);
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
     }
-
+*/
     void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (obj == scm_undef) letrec_violation(vm);
         scm_obj_t argv[2] = { obj, operands };
@@ -502,10 +529,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             } break;
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
-            }
+            } break;
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
-            }
+            } break;
             case VMOP_TOUCH_GLOC:
                 break;
             default:
@@ -808,4 +835,21 @@ generating native code: map
 
 
     --x86-asm-syntax=intel
+
+
+(backtrace #f)
+(define (p n m)
+  (let loop1 ((n n))
+    (cond ((> n 2))
+          (else
+            (let loop2 ((m m))
+              (cond ((> m 2))
+                    (else
+                     (display n)
+                     (display m)
+                     (loop2 (+ m 1)))))
+            (loop1 (+ n 1))))))
+(closure-compile p)
+(p 0 0)
+
 */
