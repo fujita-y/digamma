@@ -138,13 +138,23 @@ extern "C" {
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
     }
 
+    intptr_t c_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (real_pred(obj)) {
+            vm->m_value = n_compare(vm->m_heap, obj, operands) < 0 ? scm_true : scm_false;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+        return 1;
+    }
+/*
     void c_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
         if (obj == scm_undef) letrec_violation(vm);
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
     }
-
+*/
     void c_error_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
         if (obj == scm_undef) letrec_violation(vm);
@@ -238,8 +248,8 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-     puts("*** IR after optimize ***");
-     M.print(outs(), nullptr);
+    // puts("*** IR after optimize ***");
+    // M.print(outs(), nullptr);
 
     return std::move(TSM);
 }

@@ -30,6 +30,14 @@ class codegen_t {
         int m_depth;
         context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
     };
+    enum condcode_t {
+        LT,
+        GT,
+        LE,
+        GE,
+        EQ,
+    };
+
     std::unique_ptr<LLJIT> m_jit;
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
