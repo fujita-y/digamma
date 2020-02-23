@@ -254,6 +254,7 @@ codegen_t::define_prepare_call()
 
     auto M = make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
+    for (Argument& argument : F->args()) argument.addAttr(Attribute::NoAlias);
     F->setCallingConv(CallingConv::Fast);
     IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
     auto vm = F->arg_begin();
