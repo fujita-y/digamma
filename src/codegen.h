@@ -65,6 +65,7 @@ private:
     void emit_push_subr(context_t& ctx, scm_obj_t inst);
     void emit_push_car_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_iloc(context_t& ctx, scm_obj_t inst);
