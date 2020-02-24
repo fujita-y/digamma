@@ -120,6 +120,7 @@
 ;(closure-compile run-benchmark)
 
 (format #t "\n\n;;  GABRIEL\n")
+(time-bench ack 3)
 ;(time-bench boyer 3)
 ;(time-bench browse 120)
 ;(time-bench cpstak 80)
@@ -159,10 +160,14 @@
 (newline)
 
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma-jit.scm
-
+; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma.scm
 
 ;;  divrec  (x140000)
 ;;  0.941251 real    1.612507 user    0.023960 sys
 ;;  ----------------------------------------------------------------
 ;;  divrec  (x140000)
 ;;  1.239196 real    1.991197 user    0.017716 sys
+
+
+;;  ack     (x3)
+;;  2.440005 real    4.696752 user    0.084363 sys

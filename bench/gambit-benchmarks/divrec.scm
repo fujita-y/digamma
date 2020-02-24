@@ -13,7 +13,8 @@
 
 (define (compile)
   (closure-compile create-n)
-  (closure-compile recursive-div2))
+  (closure-compile recursive-div2)
+  (closure-compile main))
 
 (define (main . args)
   (run-benchmark

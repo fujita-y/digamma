@@ -808,6 +808,12 @@ codegen_t::emit_gt_n_iloc(context_t& ctx, scm_obj_t inst)
 {
   emit_cc_n_iloc(ctx, inst, GT, "c_gt_n_iloc");
 }
+
+void
+codegen_t::emit_eq_n_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_n_iloc(ctx, inst, EQ, "c_eq_n_iloc");
+}
 /*
 void
 codegen_t::emit_gt_iloc(context_t& ctx, scm_obj_t inst)
@@ -902,6 +908,11 @@ codegen_t::emit_lt_iloc(context_t& ctx, scm_obj_t inst)
   emit_cc_iloc(ctx, inst, LT, "c_lt_iloc");
 }
 
+void
+codegen_t::emit_eq_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_iloc(ctx, inst, EQ, "c_eq_iloc");
+}
 
 Function*
 codegen_t::emit_call(context_t& ctx, scm_obj_t inst)

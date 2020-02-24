@@ -168,6 +168,16 @@ extern "C" {
         return 1;
     }
 
+    intptr_t c_eq_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (real_pred(obj)) {
+            vm->m_value = n_compare(vm->m_heap, obj, operands) == 0 ? scm_true : scm_false;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+        return 1;
+    }
+
     intptr_t c_gt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         int bad = 0;
         if (real_pred(vm->m_value)) {
@@ -187,6 +197,20 @@ extern "C" {
         if (real_pred(vm->m_value)) {
             if (real_pred(obj)) {
                 vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) < 0) ? scm_true : scm_false;
+                return 0;
+            }
+            bad = 1;
+        }
+        scm_obj_t argv[2] = { vm->m_value, obj };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_eq_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        int bad = 0;
+        if (real_pred(vm->m_value)) {
+            if (real_pred(obj)) {
+                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) == 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
@@ -563,11 +587,17 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
             } break;
+            case VMOP_EQ_N_ILOC: {
+                emit_eq_n_iloc(ctx, inst);
+            } break;
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
             } break;
             case VMOP_LT_ILOC: {
                 emit_lt_iloc(ctx, inst);
+            } break;
+            case VMOP_EQ_ILOC: {
+                emit_eq_iloc(ctx, inst);
             } break;
             case VMOP_TOUCH_GLOC:
                 break;
@@ -583,22 +613,14 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 
 /*
 
-(define (run-bench name count ok? run)
-  (display "a\n")
-  (let loop ((i 0) (result (list 'undefined)))
-    (display "b\n")
-    (if (< i count)
-        (loop (+ i 1) (run))
-        result)))
-
-
 (backtrace #f)
-(define (p name count ok? run)
-  (let loop ((i 0) (result (list 'undefined)))
-    (if (< i count)
-        (loop (+ i 1) (run i))
-        result)))
-(closure-compile p)
-(p "foo" 3 #t (lambda (n) (display n) (newline))
+(define (foo n m)
+  (let ((a (lambda (b) (+ n b))))
+    (a m)))
+(closure-code foo)
+(closure-compile foo)
 
+((push.close . #<closure a>) (extend . 1) (push.iloc.1 . 1) (apply.iloc (0 . 0)))
+
+(foo 2 3) ;=> 5
 */

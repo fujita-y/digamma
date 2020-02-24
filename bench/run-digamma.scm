@@ -116,6 +116,7 @@
 #!compatible
 
 (format #t "\n\n;;  GABRIEL\n")
+(time-bench ack 3)
 (time-bench boyer 3)
 (time-bench browse 120)
 (time-bench cpstak 80)
