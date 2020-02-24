@@ -613,11 +613,24 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 
 /*
 
+(define (p) (+ 1 'o))
+(closure-code p)
+(p)
+(closure-compile p)
+(p)
+
+(define (p) (list (+ 1 'o)))
+(closure-code p)
+(p)
+(closure-compile p)
+(p)
+
 (define (p) (list (+ 1 'o) (- 2 'p)))
 (closure-code p)
 (p)
 (closure-compile p)
 (p)
+
 
 (backtrace #f)
 (define (foo n m)

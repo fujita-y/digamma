@@ -22,6 +22,7 @@
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
                 case native_thunk_loop: goto loop; \
+                case native_thunk_next_loop: goto next_loop; \
                 case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
                 case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
@@ -457,6 +458,10 @@ VM::loop(bool init, bool resume)
   #endif
 #endif
         }
+        goto loop;
+
+    next_loop:
+        m_pc = CDR(m_pc);
         goto loop;
 
     pop_cont:

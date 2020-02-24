@@ -463,9 +463,13 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst)); //[TODO] SUBR call need this
 
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
@@ -482,9 +486,12 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     // valid
     IRB.SetInsertPoint(undef_false);
     CREATE_PUSH_VM_STACK(val);
-    IRB.CreateBr(undef_true);
+    IRB.CreateBr(CONTINUE);
     // invalid
     IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_next_loop));
+
+    IRB.SetInsertPoint(CONTINUE);
 }
 
 void

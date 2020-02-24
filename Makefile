@@ -6,7 +6,8 @@ PROG = digamma
 
 PREFIX = /usr/local
 
-CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -DSYSTEM_EXTENSION_PATH='"$(DESTDIR)$(PREFIX)/lib/$(PROG)"'
+# -DNDEBUG
+CPPFLAGS = -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -DSYSTEM_EXTENSION_PATH='"$(DESTDIR)$(PREFIX)/lib/$(PROG)"'
 
 CXX = clang++
 
@@ -58,8 +59,8 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  CPPFLAGS += -DNO_FFI
-  CXXFLAGS += -O3 -fomit-frame-pointer -momit-leaf-frame-pointer
+  CPPFLAGS += -DNO_FFI -glldb
+  CXXFLAGS += -O0 -fomit-frame-pointer -momit-leaf-frame-pointer
   LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
