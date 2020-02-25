@@ -631,6 +631,17 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 (closure-compile p)
 (p)
 
+(define (p) (list (car 'o) 7))
+(closure-compile p)
+(p)
+
+(define (p) (+ (list 1) 7))
+(closure-compile p)
+(p)
+
+(define (p) (if (- 'i) 7 8))
+(closure-compile p)
+(p)
 
 (backtrace #f)
 (define (foo n m)

@@ -59,9 +59,9 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  # -O3 -fomit-frame-pointer -momit-leaf-frame-pointer
-  CPPFLAGS += -DNO_FFI -glldb
-	CXXFLAGS += -O0
+  CPPFLAGS += -DNO_FFI
+  CXXFLAGS += -O0 -glldb
+	#CXXFLAGS += -O3 -fomit-frame-pointer -momit-leaf-frame-pointer
   LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
