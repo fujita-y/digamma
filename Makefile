@@ -143,6 +143,9 @@ check: all
 	@echo 'syntax-rule-stress-test.scm:'
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/syntax-rule-stress-test.scm
 	@echo '----------------------------------------'
+	@echo 'codegen.scm:'
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
+	@echo '----------------------------------------'
 	@echo 'Passed all tests'
 	@rm -f ./test/tmp*
 
