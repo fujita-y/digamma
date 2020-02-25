@@ -1026,8 +1026,8 @@ object_heap_t::trace(scm_obj_t obj)
     object_slab_traits_t* traits = OBJECT_SLAB_TRAITS_OF(obj);
     if (traits->cache->test_and_mark(obj)) {
 #if HPDEBUG
-        printf(";; [collector: duplicate objects in mark stack]\n");
-        fflush(stdout);
+//        printf(";; [collector: duplicate objects in mark stack]\n");
+//        fflush(stdout);
 #endif
         return;
     }

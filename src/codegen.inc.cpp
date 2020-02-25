@@ -362,7 +362,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
     CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_STORE_VM_REG(vm, m_sp, argv);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
 }
 
 /*
@@ -477,7 +477,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
     CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_STORE_VM_REG(vm, m_sp, argv);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);

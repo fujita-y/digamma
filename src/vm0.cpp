@@ -439,17 +439,10 @@ VM::backtrace(scm_port_t port)
     while (lnk) {
         vm_cont_t cont = (vm_cont_t)((intptr_t)lnk - offsetof(vm_cont_rec_t, up));
         if (cont->trace != scm_unspecified) {
-puts("backtrace::A");
             backtrace_each(&prt, n++, cont->trace);
-puts("backtrace::B");
             if (n == bt_level) return true;
         }
-puts("backtrace::C");
         lnk = (*(void**)lnk);
-
-printf("backtrace lnk %p\n", lnk);
-if (lnk == scm_unspecified) break;
-
     }
     return true;
 }

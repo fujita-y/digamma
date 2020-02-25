@@ -520,6 +520,9 @@ VM::loop(bool init, bool resume)
 
             CASE(VMOP_CALL) ENT_VMOP_CALL: {
                 if ((uintptr_t)m_sp + sizeof(vm_cont_rec_t) < (uintptr_t)m_stack_limit) {
+#if STDEBUG
+                    check_vm_state();
+#endif
                     vm_cont_t cont = (vm_cont_t)m_sp;
                     cont->trace = m_trace;
                     cont->fp = m_fp;
@@ -531,6 +534,9 @@ VM::loop(bool init, bool resume)
                     m_cont = &cont->up;
                     m_pc = OPERANDS;
                     m_trace = m_trace_tail = scm_unspecified;
+#if STDEBUG
+                    check_vm_state();
+#endif
                     goto loop;
                 }
                 goto COLLECT_STACK_CONT_REC;
@@ -721,6 +727,9 @@ VM::loop(bool init, bool resume)
 
             CASE(VMOP_APPLY) {
                 operand_trace = OPERANDS;
+#if STDEBUG
+                check_vm_state();
+#endif
                 goto apply;
             }
 
