@@ -87,8 +87,9 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_car_iloc = M->getOrInsertFunction("c_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(c_error_push_car_iloc, {vm, pair});
+        IRB.CreateCall(c_error_push_car_iloc, { vm, pair });
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
@@ -112,6 +113,7 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cdr_iloc = M->getOrInsertFunction("c_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cdr_iloc, {vm, pair});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
@@ -137,6 +139,7 @@ codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cddr_iloc = M->getOrInsertFunction("c_error_push_cddr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cddr_iloc, {vm, pair});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
@@ -168,6 +171,7 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cadr_iloc = M->getOrInsertFunction("c_error_push_cadr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cadr_iloc, {vm, pair});
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
@@ -219,6 +223,7 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
         IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
         // not number
         IRB.SetInsertPoint(nonnum_true);
+            CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
             auto c_error_push_nadd_iloc = M->getOrInsertFunction("c_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
             IRB.CreateCall(c_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
             IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
@@ -358,7 +363,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst)); //[TODO] SUBR call need this
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
@@ -471,6 +476,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
     auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
     auto argc = VALUE_INTPTR(ctx.m_argc);
 
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
@@ -504,7 +510,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst)); //[TODO] SUBR call need this
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     scm_subr_t subr = (scm_subr_t)CAR(operands);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
@@ -825,6 +831,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
         auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
         BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
@@ -924,6 +931,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
         IRB.CreateBr(CONTINUE);
     // others
     IRB.SetInsertPoint(nonfixnum_true);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
         auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
         BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
@@ -969,7 +977,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     // vm_cont_t cont = (vm_cont_t)m_sp;
     auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
-    IRB.CreateCall(prepare_call, {vm, cont});
+    IRB.CreateCall(prepare_call, { vm, cont });
     // cont->pc = CDR(m_pc);
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->code = NULL;

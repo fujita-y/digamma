@@ -342,7 +342,7 @@ codegen_t::define_prepare_call()
     auto vm = F->arg_begin();
     auto cont = F->arg_begin() + 1;
 
-    CREATE_STORE_CONT_REC(cont, trace, CREATE_LOAD_VM_REG(vm, m_trace));
+    CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
     // cont->fp = m_fp;
     CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
     // cont->env = m_env;
@@ -613,13 +613,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 
 /*
 
-(define (p) (+ 1 'o))
+(define (p)
+  (+ 1 'o))
 (closure-code p)
 (p)
 (closure-compile p)
 (p)
 
-(define (p) (list (+ 1 'o)))
+(define (p) (list
+(+ 1 'o)))
 ;(closure-code p)
 ;(p)
 (closure-compile p)
@@ -653,4 +655,16 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 ((push.close . #<closure a>) (extend . 1) (push.iloc.1 . 1) (apply.iloc (0 . 0)))
 
 (foo 2 3) ;=> 5
+
+(define (p m)
+  (list (car m) (cdr m)))
+(p '(1 2))
+(p 7)
+
+(define (p m)
+  (list
+  (- m 1)
+  (- m 2)))
+(p 7)
+(p '(1 2))
 */
