@@ -372,7 +372,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_next_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -510,20 +510,16 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
-    CREATE_STORE_VM_REG(vm, m_value, val);
     CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
+    CREATE_STORE_VM_REG(vm, m_value, val);
+    CREATE_PUSH_VM_STACK(val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // valid
-    IRB.SetInsertPoint(undef_false);
-    CREATE_PUSH_VM_STACK(val);
-    IRB.CreateBr(CONTINUE);
+    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_next_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
 
     IRB.SetInsertPoint(CONTINUE);
 }
