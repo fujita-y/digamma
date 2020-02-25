@@ -336,7 +336,7 @@ codegen_t::define_prepare_call()
 
     auto M = make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
-    for (Argument& argument : F->args()) argument.addAttr(Attribute::NoAlias);
+    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
     F->setCallingConv(CallingConv::Fast);
     IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
     auto vm = F->arg_begin();
@@ -442,6 +442,7 @@ codegen_t::compile(VM* vm, scm_closure_t closure)
 
     auto M = make_unique<Module>(module_id, C);
     Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M.get());
+    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 

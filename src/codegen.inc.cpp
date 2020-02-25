@@ -972,6 +972,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
     Function* K = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, cont_id, M);
+    for (Argument& argument : K->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
     // vm_cont_t cont = (vm_cont_t)m_sp;
@@ -1036,6 +1037,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
     Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
+    for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
     // L->setCallingConv(CallingConv::Fast);
     ctx.m_local_functions.resize(ctx.m_depth + 1);
