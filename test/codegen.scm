@@ -149,6 +149,54 @@
   acc => (2 1 0 . #f))
 (test-end)
 
+(test-begin "subr violation 1")
+(test-eval!
+  (begin
+    (define (p) (+ 1 'o))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 1" (p))
+(test-end)
+
+(test-begin "subr violation 2")
+(test-eval!
+  (begin
+    (define (p) (list (+ 1 'o)))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 2" (p))
+(test-end)
+
+(test-begin "subr violation 3")
+(test-eval!
+  (begin
+    (define (p) (list (+ 1 'o) (- 2 'p)))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 3" (p))
+(test-end)
+
+(test-begin "subr violation 4")
+(test-eval!
+  (begin
+    (define (p) (list (car 'o) 7))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 4" (p))
+(test-end)
+
+(test-begin "subr violation 5")
+(test-eval!
+  (begin
+    (define (p) (+ (list 1) 7))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 5" (p))
+(test-end)
+
+(test-begin "subr violation 6")
+(test-eval!
+  (begin
+    (define (p) (if (- 'i) 7 8))
+    (closure-compile p)))
+(test-assertion-violation "subr violation 6" (p))
+(test-end)
+
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
 (backtrace #f)
