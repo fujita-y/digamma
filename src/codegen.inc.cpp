@@ -90,7 +90,7 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_car_iloc = M->getOrInsertFunction("c_error_push_car_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_car_iloc, { vm, pair });
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
     CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
@@ -116,7 +116,7 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cdr_iloc = M->getOrInsertFunction("c_error_push_cdr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cdr_iloc, {vm, pair});
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
     CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
@@ -142,7 +142,7 @@ codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cddr_iloc = M->getOrInsertFunction("c_error_push_cddr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cddr_iloc, {vm, pair});
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
         auto pair2 = CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr);
@@ -174,7 +174,7 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
         auto c_error_push_cadr_iloc = M->getOrInsertFunction("c_error_push_cadr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
         IRB.CreateCall(c_error_push_cadr_iloc, {vm, pair});
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     // pair
     IRB.SetInsertPoint(pair_true);
         auto pair2 = CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr);
@@ -226,7 +226,7 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
             CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
             auto c_error_push_nadd_iloc = M->getOrInsertFunction("c_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
             IRB.CreateCall(c_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
         // number
         IRB.SetInsertPoint(nonnum_false);
             auto c_arith_add = M->getOrInsertFunction("c_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
@@ -377,7 +377,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -460,7 +460,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 }
 */
 
@@ -493,7 +493,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 }
 
 void
@@ -525,7 +525,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
     // invalid
     IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -610,7 +610,7 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(undef_true);
     auto c_letrec_violation = M->getOrInsertFunction("c_letrec_violation", VoidTy, IntptrPtrTy);
     IRB.CreateCall(c_letrec_violation, {vm});
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     // valid
     IRB.SetInsertPoint(undef_false);
 */
@@ -708,7 +708,7 @@ codegen_t::emit_lt_n_iloc(context_t& ctx, scm_obj_t inst)
         IRB.SetInsertPoint(nonreal_true);
             auto c_error_lt_n_iloc = M->getOrInsertFunction("c_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
             IRB.CreateCall(c_error_lt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
         // real
         IRB.SetInsertPoint(nonreal_false);
             auto c_n_compare = M->getOrInsertFunction("c_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
@@ -766,7 +766,7 @@ codegen_t::emit_gt_n_iloc(context_t& ctx, scm_obj_t inst)
         IRB.SetInsertPoint(nonreal_true);
             auto c_error_gt_n_iloc = M->getOrInsertFunction("c_error_gt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
             IRB.CreateCall(c_error_gt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
         // real
         IRB.SetInsertPoint(nonreal_false);
             auto c_n_compare = M->getOrInsertFunction("c_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
@@ -837,7 +837,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
         BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
         IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
         IRB.SetInsertPoint(fallback_fail);
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     IRB.SetInsertPoint(CONTINUE);
 }
 
@@ -896,7 +896,7 @@ codegen_t::emit_gt_iloc(context_t& ctx, scm_obj_t inst)
         BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
         IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
         IRB.SetInsertPoint(fallback_fail);
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     IRB.SetInsertPoint(CONTINUE);
 }
 */
@@ -937,7 +937,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
         BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
         IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
         IRB.SetInsertPoint(fallback_fail);
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_back_to_loop));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     IRB.SetInsertPoint(CONTINUE);
 }
 

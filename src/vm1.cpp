@@ -21,8 +21,7 @@
             switch (n) { \
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
-                case native_thunk_loop: goto loop; \
-                case native_thunk_back_to_loop: goto BACK_TO_LOOP; \
+                case native_thunk_resume_loop: goto RESUME_LOOP; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
                 case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
                 case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC; \
@@ -1688,7 +1687,7 @@ VM::loop(bool init, bool resume)
             }
             scm_obj_t argv[2] = { m_value, obj };
             wrong_type_argument_violation(this, "=", bad, "number", argv[bad], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     FALLBACK_LT_ILOC: {
@@ -1706,7 +1705,7 @@ VM::loop(bool init, bool resume)
             }
             scm_obj_t argv[2] = { m_value, obj };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     FALLBACK_LE_ILOC: {
@@ -1724,7 +1723,7 @@ VM::loop(bool init, bool resume)
             }
             scm_obj_t argv[2] = { m_value, obj };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     FALLBACK_GT_ILOC: {
@@ -1742,7 +1741,7 @@ VM::loop(bool init, bool resume)
             }
             scm_obj_t argv[2] = { m_value, obj };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     FALLBACK_GE_ILOC: {
@@ -1760,7 +1759,7 @@ VM::loop(bool init, bool resume)
             }
             scm_obj_t argv[2] = { m_value, obj };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     THUNK_TOUCH_GLOC_OF: {
@@ -1816,76 +1815,76 @@ VM::loop(bool init, bool resume)
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "operator(+ -)", 0, "number", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_EQ_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "=", 0, "number", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_LT_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_LE_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_GT_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_GE_N_ILOC: {
             if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
             scm_obj_t argv[2] = { obj, CADR(OPERANDS) };
             wrong_type_argument_violation(this, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_PUSH_CAR_ILOC:
     ERROR_CAR_ILOC:
         if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
         wrong_type_argument_violation(this, "car", 0, "pair", obj, 1, &obj);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
     ERROR_PUSH_CDR_ILOC:
     ERROR_CDR_ILOC:
         if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
         wrong_type_argument_violation(this, "cdr", 0, "pair", obj, 1, &obj);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
     ERROR_PUSH_CADR_ILOC:
     ERROR_CADR_ILOC:
         if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
         wrong_type_argument_violation(this, "cadr", 0, "appropriate list structure", obj, 1, &obj);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
     ERROR_PUSH_CDDR_ILOC:
     ERROR_CDDR_ILOC:
         if (obj == scm_undef) goto ERROR_LETREC_VIOLATION;
         wrong_type_argument_violation(this, "cddr", 0, "appropriate list structure", obj, 1, &obj);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
 
     ERROR_GLOC:
     ERROR_RET_GLOC:
     ERROR_PUSH_GLOC:
     ERROR_TOUCH_GLOC:
         undefined_violation(this, ((scm_gloc_t)OPERANDS)->variable, NULL);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
 
     ERROR_RET_ILOC:
     ERROR_APPLY_ILOC:
         letrec_violation(this);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
 
     ERROR_PUSH_VECTREF_ILOC:
         {
@@ -1896,10 +1895,10 @@ VM::loop(bool init, bool resume)
                 } else {
                     wrong_type_argument_violation(this, "vector-ref", 1, "exact non-negative integer", argv[1], 2, argv);
                 }
-                goto BACK_TO_LOOP;
+                goto RESUME_LOOP;
             }
             wrong_type_argument_violation(this, "vector-ref", 0, "vector", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
     ERROR_VECTREF_ILOC:
         {
@@ -1910,15 +1909,15 @@ VM::loop(bool init, bool resume)
                 } else {
                     wrong_type_argument_violation(this, "vector-ref", 1, "exact non-negative integer", argv[1], 2, argv);
                 }
-                goto BACK_TO_LOOP;
+                goto RESUME_LOOP;
             }
             wrong_type_argument_violation(this, "vector-ref", 0, "vector", argv[0], 2, argv);
-            goto BACK_TO_LOOP;
+            goto RESUME_LOOP;
         }
 
     ERROR_LETREC_VIOLATION:
         letrec_violation(this);
-        goto BACK_TO_LOOP;
+        goto RESUME_LOOP;
 
     ERROR_APPLY_GLOC:
         undefined_violation(this, ((scm_gloc_t)CAR(OPERANDS))->variable, NULL);
@@ -1979,7 +1978,7 @@ VM::loop(bool init, bool resume)
         goto BACK_TO_TRACE_N_LOOP;
 #endif
 
-    BACK_TO_LOOP:
+    RESUME_LOOP:
         m_sp = m_fp;
         m_pc = CDR(m_pc);
         goto loop;

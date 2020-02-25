@@ -62,16 +62,14 @@ public:
     } m_flags;
 
     enum {
-        native_thunk_apply = 0,        // goto apply;
-        native_thunk_pop_cont,         // goto pop_cont;
-        native_thunk_loop,             // goto loop;
-        native_thunk_error_apply_iloc, // goto ERROR_APPLY_ILOC
+        native_thunk_apply = 0,
+        native_thunk_pop_cont,
+        native_thunk_resume_loop,
+        native_thunk_error_apply_iloc,
         native_thunk_error_apply_gloc,
         native_thunk_error_ret_iloc,
-        native_thunk_invalid_state,
-        native_thunk_back_to_loop,
         native_thunk_error_push_gloc,
-
+        native_thunk_invalid_state,
         native_thunk_unreachable,
     };
 
