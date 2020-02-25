@@ -128,10 +128,10 @@
 ;(time-bench dderiv 160000)
 ;(time-bench deriv 320000)
 ;(time-bench destruc 100)
-;(time-bench diviter 200000)
+(time-bench diviter 200000)
 (time-bench divrec 140000)
 ;(time-bench puzzle 12)
-;(time-bench takl 35)
+(time-bench takl 35)
 ;(time-bench triangl 1)
 
 (format #t "\n\n;;  ARITHMETIC\n")
@@ -162,12 +162,28 @@
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma-jit.scm
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma.scm
 
-;;  divrec  (x140000)
-;;  0.941251 real    1.612507 user    0.023960 sys
+;;  ack     (x3)
+;;  2.456346 real    4.719212 user    0.088323 sys
+;;  ----------------------------------------------------------------
+;;  diviter (x200000)
+;;  1.172575 real    1.640904 user    0.011719 sys
 ;;  ----------------------------------------------------------------
 ;;  divrec  (x140000)
-;;  1.239196 real    1.991197 user    0.017716 sys
-
+;;  0.933480 real    1.605675 user    0.018658 sys
+;;  ----------------------------------------------------------------
+;;  takl    (x35)
+;;  0.337651 real    0.337301 user    0.000260 sys
+;;  ----------------------------------------------------------------
 
 ;;  ack     (x3)
-;;  2.440005 real    4.696752 user    0.084363 sys
+;;  3.363647 real    5.491526 user    0.082901 sys
+;;  ----------------------------------------------------------------
+;;  diviter (x200000)
+;;  1.576578 real    2.021729 user    0.013038 sys
+;;  ----------------------------------------------------------------
+;;  divrec  (x140000)
+;;  1.503382 real    2.154717 user    0.016229 sys
+;;  ----------------------------------------------------------------
+;;  takl    (x35)
+;;  0.831721 real    0.831120 user    0.000440 sys
+;;  ----------------------------------------------------------------
