@@ -37,15 +37,15 @@ class codegen_t {
         GE,
         EQ,
     };
-
     std::unique_ptr<LLJIT> m_jit;
+    VM* m_vm;
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst);
-    bool is_compiled(VM* vm, scm_closure_t closure);
+    bool is_compiled(scm_closure_t closure);
 public:
-    codegen_t();
-    void compile(VM* vm, scm_closure_t closure);
+    codegen_t(VM* vm);
+    void compile(scm_closure_t closure);
 private:
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);

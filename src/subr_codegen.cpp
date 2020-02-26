@@ -32,9 +32,9 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
-            if (!s_codegen) s_codegen = new codegen_t;
+            if (!s_codegen) s_codegen = new codegen_t(vm);
             scm_closure_t closure = (scm_closure_t)argv[0];
-            s_codegen->compile(vm, closure);
+            s_codegen->compile(closure);
             return scm_unspecified;
         }
         wrong_type_argument_violation(vm, "closure-compile", 0, "closure", argv[0], argc, argv);

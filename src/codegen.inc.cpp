@@ -269,7 +269,8 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    scm_obj_t obj = ((scm_gloc_t)CAR(operands))->value;
+    scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
+    scm_obj_t obj = gloc->value;
     if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
         // recursive
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
@@ -280,6 +281,22 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         call->setTailCallKind(CallInst::TCK_MustTail);
         IRB.CreateRet(call);
     } else {
+        if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
+            printf("obj %p\n", obj);
+            printf("ctx.m_top_level_closure %p\n", ctx.m_top_level_closure);
+            printf("closure argc %ld\n", HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr));
+            printf("ctx.m_argc %d\n", ctx.m_argc);
+            scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+            if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+                printf(" uninterned gloc symbol found: %s\n", symbol->name);
+                compile((scm_closure_t)obj);
+                // [TODO] use tail call to compiled code
+                // [TODO] memo closure to avoid infinite compile
+            }
+        }
+
+        // we cannot assume what is in gloc box at this point
+
         auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
         auto val = CREATE_LOAD_GLOC_REC(gloc, value);
         CREATE_STORE_VM_REG(vm, m_value, val);

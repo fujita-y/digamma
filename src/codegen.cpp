@@ -282,7 +282,7 @@ extern "C" {
 
 }
 
-codegen_t::codegen_t()
+codegen_t::codegen_t(VM* vm) : m_vm(vm)
 {
     auto J = ExitOnErr(LLJITBuilder().create());
     auto D = J->getDataLayout();
@@ -417,17 +417,19 @@ codegen_t::emit_lookup_iloc(context_t& ctx, scm_obj_t loc)
 }
 
 bool
-codegen_t::is_compiled(VM* vm, scm_closure_t closure)
+codegen_t::is_compiled(scm_closure_t closure)
 {
+    VM* vm = m_vm;
     return CAAR(closure->code) == INST_NATIVE;
 }
 
 void
-codegen_t::compile(VM* vm, scm_closure_t closure)
+codegen_t::compile(scm_closure_t closure)
 {
+    VM* vm = m_vm;
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
-    if (is_compiled(vm, closure)) {
+    if (is_compiled(closure)) {
         puts("- already compiled");
         return;
     }
@@ -668,4 +670,30 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
   (- m 2)))
 (p 7)
 (p '(1 2))
+
+(define map
+  (lambda (proc lst1 . lst2)
+
+    (define map-1
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else
+               (cons (proc (car lst))
+                     (map-1 proc (cdr lst)))))))
+
+    (define map-n
+      (lambda (proc lst)
+        (cond ((null? lst) '())
+              (else
+               (cons (apply proc (car lst))
+                     (map-n proc (cdr lst)))))))
+
+    (if (null? lst2)
+        (if (list? lst1)
+            (map-1 proc lst1)
+            (assertion-violation 'map (wrong-type-argument-message "proper list" lst1 2) (cons* proc lst1 lst2)))
+        (cond ((apply list-transpose+ lst1 lst2)
+               => (lambda (lst) (map-n proc lst)))
+              (else
+               (assertion-violation 'map "expected same length proper lists" (cons* proc lst1 lst2)))))))
 */
