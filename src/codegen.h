@@ -37,8 +37,10 @@ class codegen_t {
         GE,
         EQ,
     };
-    std::unique_ptr<LLJIT> m_jit;
     VM* m_vm;
+    std::unique_ptr<LLJIT> m_jit;
+    std::vector<scm_closure_t> m_visit;
+
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst);

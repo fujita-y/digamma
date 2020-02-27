@@ -433,6 +433,13 @@ codegen_t::compile(scm_closure_t closure)
         puts("- already compiled");
         return;
     }
+    if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
+        puts("- already visit");
+        return;
+    }
+
+    m_visit.push_back(closure);
+
     char module_id[40];
     uuid_v4(module_id, sizeof(module_id));
     char function_id[40];
@@ -471,6 +478,8 @@ codegen_t::compile(scm_closure_t closure)
     scm_obj_t n_code = CONS(LIST2(INST_NATIVE, operand), closure->code);
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
+
+    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
 }
 
 void
