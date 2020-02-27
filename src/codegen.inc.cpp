@@ -272,7 +272,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
     scm_obj_t obj = gloc->value;
     if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
-        // recursive
+        puts("+ self recursive");
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         // printf("argc = %d\n", ctx.m_argc);
         auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
@@ -289,39 +289,28 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             //printf("ctx.m_argc %d\n", ctx.m_argc);
             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
             if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
-                printf(" uninterned gloc symbol found: %s\n", symbol->name);
+                printf("+ uninterned gloc found: %s\n", symbol->name);
                 scm_closure_t closure = (scm_closure_t)obj;
-                compile(closure);
-
+                Function* F2 = compile(C, M, closure); // [TODO] return non null even if two call site exists
                 CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
                 auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
                 IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});
-
-                scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
-                intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
-
-                auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
-                auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
-                auto call = IRB.CreateCall(ptr, {vm});
-                call->setTailCallKind(CallInst::TCK_MustTail);
-                IRB.CreateRet(call);
-                return;
-
-/*
-                auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-                IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});
-
-                scm_bvector_t bv = (scm_bvector_t)CAR(CDAR(closure->code));
-                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
-                auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
-                auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(thunk), subrType->getPointerTo());
-                auto call = IRB.CreateCall(func, { vm });
-                call->setTailCallKind(CallInst::TCK_MustTail);
-                IRB.CreateRet(call);
-                return;
-*/
-
-                // [TODO] use tail call to compiled code
+                if (F2 == nullptr) {
+                    puts("*** F2 is null");
+                    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
+                    intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
+                    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
+                    auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
+                    auto call = IRB.CreateCall(func, {vm});
+                    call->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call);
+                    return;
+                } else {
+                    auto call = IRB.CreateCall(F2, {vm});
+                    call->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call);
+                    return;
+                }
             }
         }
 

@@ -197,6 +197,32 @@
 (test-assertion-violation "subr violation 6" (p))
 (test-end)
 
+
+(test-begin "internal definitions")
+(test-eval!
+    (define p
+      (lambda (proc lst1 . lst2)
+        (define map-1
+          (lambda (proc lst)
+            (cond ((null? lst) '())
+                  (else (cons (proc (car lst))
+                              (map-1 proc (cdr lst)))))))
+        (define map-n
+          (lambda (proc lst)
+            (cond ((null? lst) '())
+                  (else (cons (apply proc (car lst))
+                              (map-n proc (cdr lst)))))))
+        (if (null? lst2)
+            (map-1 proc lst1)
+            (map-n proc (apply list-transpose* lst1 lst2))))))
+(test-eval!
+  (closure-compile p))
+(test-equal "map-1"
+  (p - '(1 2 3)) => (-1 -2 -3))
+(test-equal "map-n"
+  (p + '(1 2 3) '(1 2 3)) => (2 4 6))
+(test-end)
+
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
 (backtrace #f)

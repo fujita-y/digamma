@@ -48,6 +48,7 @@ class codegen_t {
 public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);
+    Function* compile(LLVMContext& C, Module* M, scm_closure_t closure);
 private:
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);

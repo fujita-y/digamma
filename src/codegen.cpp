@@ -482,6 +482,45 @@ codegen_t::compile(scm_closure_t closure)
     m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
 }
 
+Function*
+codegen_t::compile(LLVMContext& C, Module* M, scm_closure_t closure)
+{
+    VM* vm = m_vm;
+    printer_t prt(vm, vm->m_current_output);
+    prt.format("generating native code: ~s~&", closure->doc);
+    if (is_compiled(closure)) {
+        puts("- already compiled");
+        return nullptr;
+    }
+    if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
+        puts("- already visit");
+        return nullptr;
+    }
+
+    m_visit.push_back(closure);
+
+    char function_id[40];
+    uuid_v4(function_id, sizeof(function_id));
+
+    DECLEAR_COMMON_TYPES;
+
+    Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M);
+    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
+    IRBuilder<> IRB(ENTRY);
+
+    context_t context(C, IRB);
+    context.m_module = M;
+    context.m_function = F;
+    context.m_top_level_closure = closure;
+    context.m_top_level_function = F;
+
+    transform(context, closure->code);
+
+    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
+    return F;
+}
+
 void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
