@@ -291,7 +291,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
                 printf("+ uninterned gloc found: %s\n", symbol->name);
                 scm_closure_t closure = (scm_closure_t)obj;
-                Function* F2 = compile(C, M, closure); // [TODO] return non null even if two call site exists
+                Function* F2 = compile(ctx, closure); // [TODO] return non null even if two call site exists
                 CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
                 auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
                 IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});

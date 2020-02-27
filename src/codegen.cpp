@@ -483,9 +483,10 @@ codegen_t::compile(scm_closure_t closure)
 }
 
 Function*
-codegen_t::compile(LLVMContext& C, Module* M, scm_closure_t closure)
+codegen_t::compile(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
+
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
     if (is_compiled(closure)) {
@@ -501,6 +502,9 @@ codegen_t::compile(LLVMContext& C, Module* M, scm_closure_t closure)
 
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));
+
+    LLVMContext& C = ctx.m_llvm_context;
+    Module* M = ctx.m_module;
 
     DECLEAR_COMMON_TYPES;
 
