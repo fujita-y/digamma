@@ -198,7 +198,7 @@
 (test-end)
 
 
-(test-begin "internal definitions")
+(test-begin "internal definitions 1")
 (test-eval!
     (define p
       (lambda (proc lst1 . lst2)
@@ -221,6 +221,30 @@
   (p - '(1 2 3)) => (-1 -2 -3))
 (test-equal "map-n"
   (p + '(1 2 3) '(1 2 3)) => (2 4 6))
+(test-end)
+
+(test-begin "internal definitions 2")
+(test-eval!
+  (define acc #f))
+(test-eval!
+  (define add (lambda (n) (set! acc (cons n acc)))))
+(test-eval!
+    (define (p)
+      (define (t v)
+        (add v))
+      (let loop ((n 0))
+        (cond
+          ((> n 5) (t #t))
+          ((= n 2) (t "*") (loop (+ n 1)))
+          (else
+            (t n)
+            (loop (+ n 1)))))))
+(test-eval!
+  (closure-compile p))
+(test-eval!
+  (p))
+(test-equal "acc"
+  acc => (#t 5 4 3 "*" 1 0 . #f))
 (test-end)
 
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm

@@ -40,6 +40,7 @@ class codegen_t {
     VM* m_vm;
     std::unique_ptr<LLJIT> m_jit;
     std::vector<scm_closure_t> m_visit;
+    std::map<scm_closure_t,Function*> m_lifted_functions;
 
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
@@ -48,8 +49,8 @@ class codegen_t {
 public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);
-    Function* compile(context_t& ctx, scm_closure_t closure);
 private:
+    Function* emit_lifted_function(context_t& ctx, scm_closure_t closure);
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);

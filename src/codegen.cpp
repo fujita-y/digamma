@@ -423,6 +423,7 @@ codegen_t::is_compiled(scm_closure_t closure)
     return CAAR(closure->code) == INST_NATIVE;
 }
 
+// compile one top-level function
 void
 codegen_t::compile(scm_closure_t closure)
 {
@@ -480,23 +481,26 @@ codegen_t::compile(scm_closure_t closure)
     closure->code = n_code;
 
     m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
+    m_lifted_functions.clear();
 }
 
 Function*
-codegen_t::compile(context_t& ctx, scm_closure_t closure)
+codegen_t::emit_lifted_function(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
 
-    printer_t prt(vm, vm->m_current_output);
-    prt.format("generating native code: ~s~&", closure->doc);
-    if (is_compiled(closure)) {
-        puts("- already compiled");
-        return nullptr;
+    auto search = m_lifted_functions.find(closure);
+    if (search != m_lifted_functions.end()) {
+      puts(" + found in m_lifted_functions, return Function*");
+      return search->second;
     }
+
     if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
-        puts("- already visit");
+        puts(" ? found in m_visit, return NULL (this should not happen?)");
         return nullptr;
     }
+
+    puts(" + generating native code for lifted function");
 
     m_visit.push_back(closure);
 
@@ -513,6 +517,8 @@ codegen_t::compile(context_t& ctx, scm_closure_t closure)
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 
+    m_lifted_functions.insert({closure, F});
+
     context_t context(C, IRB);
     context.m_module = M;
     context.m_function = F;
@@ -522,6 +528,7 @@ codegen_t::compile(context_t& ctx, scm_closure_t closure)
     transform(context, closure->code);
 
     m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
+
     return F;
 }
 
@@ -747,11 +754,36 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
         (cond ((apply list-transpose+ lst1 lst2)
                => (lambda (lst) (map-n proc lst)))
               (else
+               (map-n proc lst)
                (assertion-violation 'map "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
 (import (digamma time))
 (define lst (iota 1000))
 (time (let loop ((n 0)) (cond ((> n 100) #t) (else (map - lst) (loop (+ n 1))))))
 
-;;  0.002068 real    0.001837 user    0.000213 sys
+(define (p)
+  (define (t v)
+    (display v))
+(let loop ((n 0))
+  (cond
+    ((> n 5) (t #t))
+    ((= n 0) (t "0"))
+    (else
+      (t n)
+      (loop (+ n 1))))
+
+;;  0.024046 real    0.038616 user    0.001176 sys
+
+(define (p)
+  (define (t v)
+    (display v))
+  (let loop ((n 0))
+    (cond
+      ((> n 5) (t #t))
+      ((= n 2)
+       (t "*")
+       (loop (+ n 1)))
+      (else
+        (t n)
+        (loop (+ n 1))))))
 */
