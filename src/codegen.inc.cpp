@@ -280,18 +280,48 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         auto call = IRB.CreateCall(ctx.m_top_level_function, { vm });
         call->setTailCallKind(CallInst::TCK_MustTail);
         IRB.CreateRet(call);
+        return;
     } else {
         if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
-            printf("obj %p\n", obj);
-            printf("ctx.m_top_level_closure %p\n", ctx.m_top_level_closure);
-            printf("closure argc %ld\n", HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr));
-            printf("ctx.m_argc %d\n", ctx.m_argc);
+            //printf("obj %p\n", obj);
+            //printf("ctx.m_top_level_closure %p\n", ctx.m_top_level_closure);
+            //printf("closure argc %ld\n", HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr));
+            //printf("ctx.m_argc %d\n", ctx.m_argc);
             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
             if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
                 printf(" uninterned gloc symbol found: %s\n", symbol->name);
-                compile((scm_closure_t)obj);
+                scm_closure_t closure = (scm_closure_t)obj;
+                compile(closure);
+
+                CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+                auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
+                IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});
+
+                scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
+                intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
+
+                auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
+                auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
+                auto call = IRB.CreateCall(ptr, {vm});
+                call->setTailCallKind(CallInst::TCK_MustTail);
+                IRB.CreateRet(call);
+                return;
+
+/*
+                auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
+                IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});
+
+                scm_bvector_t bv = (scm_bvector_t)CAR(CDAR(closure->code));
+                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
+                auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
+                auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(thunk), subrType->getPointerTo());
+                auto call = IRB.CreateCall(func, { vm });
+                call->setTailCallKind(CallInst::TCK_MustTail);
+                IRB.CreateRet(call);
+                return;
+*/
+
                 // [TODO] use tail call to compiled code
-                // [TODO] memo closure to avoid infinite compile
             }
         }
 

@@ -1417,8 +1417,8 @@ VM::loop(bool init, bool resume)
             CASE(VMOP_NATIVE) {
                 m_trace = m_trace_tail = scm_unspecified;
                 operand_trace = scm_nil;
-                scm_bvector_t operand = (scm_bvector_t)CAR(OPERANDS);
-                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)operand->elts);
+                scm_bvector_t bv = (scm_bvector_t)CAR(OPERANDS);
+                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
                 intptr_t n = (*thunk)((intptr_t)this);
                 NATIVE_THUNK_POST_DISPATCH(n);
             }

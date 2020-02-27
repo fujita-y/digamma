@@ -473,9 +473,9 @@ codegen_t::compile(scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
-    scm_bvector_t operand = make_bvector(vm->m_heap, sizeof(intptr_t));
-    *(intptr_t*)operand->elts = (intptr_t)thunk;
-    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, operand), closure->code);
+    scm_bvector_t bv = make_bvector(vm->m_heap, sizeof(intptr_t));
+    *(intptr_t*)bv->elts = (intptr_t)thunk;
+    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->code);
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
 
@@ -705,4 +705,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                => (lambda (lst) (map-n proc lst)))
               (else
                (assertion-violation 'map "expected same length proper lists" (cons* proc lst1 lst2)))))))
+
+(import (digamma time))
+(define lst (iota 1000))
+(time (let loop ((n 0)) (cond ((> n 100) #t) (else (map - lst) (loop (+ n 1))))))
+
+;;  0.002068 real    0.001837 user    0.000213 sys
 */
