@@ -1133,3 +1133,19 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     }
     */
 }
+
+void
+codegen_t::emit_push_cons(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto val = CREATE_LOAD_VM_REG(vm, m_value);
+    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto sp_minus_1 = IRB.CreateLoad(ea);
+    auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    IRB.CreateStore(IRB.CreateCall(c_make_pair, {vm, sp_minus_1, val}), ea);
+}

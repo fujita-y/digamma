@@ -661,10 +661,13 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EQ_ILOC: {
                 emit_eq_iloc(ctx, inst);
             } break;
+            case VMOP_PUSH_CONS: {
+                emit_push_cons(ctx, inst);
+            } break;
             case VMOP_TOUCH_GLOC:
                 break;
             default:
-                printf("- unsupported instruction %s\n", ((scm_symbol_t)CAAR(inst))->name);
+                printf("##### unsupported instruction %s ######\n", ((scm_symbol_t)CAAR(inst))->name);
                 break;
         }
         inst = CDR(inst);

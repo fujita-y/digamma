@@ -73,6 +73,7 @@ private:
     void emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_push_cons(context_t& ctx, scm_obj_t inst);
 
     void emit_apply_iloc(context_t& ctx, scm_obj_t inst);
     void emit_apply_gloc(context_t& ctx, scm_obj_t inst);
