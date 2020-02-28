@@ -6,6 +6,7 @@
 #include "printer.h"
 #include "violation.h"
 #include "uuid.h"
+#include "interpreter.h"
 
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -135,6 +136,11 @@ extern "C" {
     }
 
     void c_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
+        //if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
+    }
+
+    void c_error_cdr_iloc(VM* vm, scm_obj_t obj) {
         //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
     }
@@ -288,6 +294,30 @@ extern "C" {
         }
         vm->m_sp[0] = make_closure(vm->m_heap, operands, vm->m_env);
         vm->m_sp++;
+    }
+
+    intptr_t c_set_gloc(VM* vm, scm_closure_t operands) {
+        scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
+        assert(GLOCP(gloc));
+#if USE_PARALLEL_VM
+#if UNSPECIFIED_GLOC_IS_SPECIAL
+        if (m_interp->live_thread_count() > 1 && gloc->value != scm_unspecified) {
+            if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
+            m_interp->remember(gloc->value, m_value);
+        }
+#else
+        if (vm->m_interp->live_thread_count() > 1) {
+            if (!vm->m_heap->in_heap(gloc)) {
+                thread_global_access_violation(vm, ((scm_gloc_t)CAR(operands))->variable, vm->m_value);
+                return 1;
+            }
+            vm->m_interp->remember(gloc->value, vm->m_value);
+        }
+#endif
+#endif
+        vm->m_heap->write_barrier(vm->m_value);
+        gloc->value = vm->m_value;
+        return 0;
     }
 
 }
@@ -676,6 +706,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_TRUE_RET: {
                 emit_if_true_ret(ctx, inst);
             } break;
+            case VMOP_IF_FALSE_RET: {
+                emit_if_false_ret(ctx, inst);
+            } break;
             case VMOP_IF_TRUE_RET_CONST: {
                 emit_if_true_ret_const(ctx, inst);
             } break;
@@ -694,12 +727,18 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EQ_ILOC: {
                 emit_eq_iloc(ctx, inst);
             } break;
+            case VMOP_CDR_ILOC: {
+                emit_cdr_iloc(ctx, inst);
+            } break;
             case VMOP_PUSH_CONS: {
                 emit_push_cons(ctx, inst);
             } break;
             case VMOP_PUSH_CLOSE: {
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
+            } break;
+            case VMOP_SET_GLOC: {
+                emit_set_gloc(ctx, inst);
             } break;
             case VMOP_TOUCH_GLOC:
                 break;
