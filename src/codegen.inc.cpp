@@ -293,8 +293,15 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                 scm_closure_t closure = (scm_closure_t)obj;
                 Function* F2 = emit_lifted_function(ctx, closure); // [TODO] return non null even if two call site exists
                 CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+
                 auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-                IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(closure)});
+                auto call = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
+#if USE_LLVM_ATTRIBUTES
+                auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+                attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
+                attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
+                call->setAttributes(attrs);
+#endif
                 if (F2 == nullptr) {
                     puts("*** F2 is null");
                     scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
@@ -1007,14 +1014,30 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
+
     Function* K = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, cont_id, M);
-    for (Argument& argument : K->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+#if USE_LLVM_ATTRIBUTES
+    K->addFnAttr(Attribute::NoUnwind);
+    K->addParamAttr(0, Attribute::NoAlias);
+    K->addParamAttr(0, Attribute::NoCapture);
+#endif
+
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
     // vm_cont_t cont = (vm_cont_t)m_sp;
     auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+
     auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
-    IRB.CreateCall(prepare_call, { vm, cont });
+    auto call = IRB.CreateCall(prepare_call, { vm, cont });
+#if USE_LLVM_ATTRIBUTES
+    auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+    attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
+    attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
+    attrs = attrs.addParamAttribute(C, 1, Attribute::NoAlias);
+    attrs = attrs.addParamAttribute(C, 1, Attribute::NoCapture);
+    call->setAttributes(attrs);
+#endif
+
     // cont->pc = CDR(m_pc);
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->code = NULL;
@@ -1073,7 +1096,12 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
     Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
-    for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+#if USE_LLVM_ATTRIBUTES
+    L->addFnAttr(Attribute::NoUnwind);
+    L->addParamAttr(0, Attribute::NoAlias);
+    L->addParamAttr(0, Attribute::NoCapture);
+#endif
+
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
     // L->setCallingConv(CallingConv::Fast);
     ctx.m_local_functions.resize(ctx.m_depth + 1);

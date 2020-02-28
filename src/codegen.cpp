@@ -513,7 +513,12 @@ codegen_t::emit_lifted_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M);
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+#if USE_LLVM_ATTRIBUTES
+    F->addFnAttr(Attribute::NoUnwind);
+    F->addParamAttr(0, Attribute::NoAlias);
+    F->addParamAttr(0, Attribute::NoCapture);
+#endif
+
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 

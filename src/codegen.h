@@ -10,6 +10,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
+#define USE_LLVM_ATTRIBUTES  1
+//for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+
 #if __clang_major__ > 9
 using namespace std;
 #endif
