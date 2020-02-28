@@ -639,8 +639,8 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_if_nullp(ctx, inst);
             } break;
             case VMOP_IF_EQP: {
-                emit_if_eqp(ctx, inst);
                 ctx.m_argc--;
+                emit_if_eqp(ctx, inst);
             } break;
             case VMOP_IF_NULLP_RET_CONST: {
                 emit_if_nullp_ret_const(ctx, inst);

@@ -125,7 +125,7 @@
 ;(time-bench browse 120)
 (time-bench cpstak 80)
 (time-bench ctak 25)
-;(time-bench dderiv 160000)
+(time-bench dderiv 160000)
 ;(time-bench deriv 320000)
 ;(time-bench destruc 100)
 (time-bench diviter 200000)

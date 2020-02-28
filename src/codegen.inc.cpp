@@ -623,7 +623,7 @@ codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
 
     auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-    CREATE_STORE_VM_REG(vm, m_sp, ea);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     auto val1 = IRB.CreateLoad(ea);
     auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
 
