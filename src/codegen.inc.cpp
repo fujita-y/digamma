@@ -614,6 +614,31 @@ codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
 }
 
 void
+codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    CREATE_STORE_VM_REG(vm, m_sp, ea);
+    auto val1 = IRB.CreateLoad(ea);
+    auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
+
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+    auto taken_cond = IRB.CreateICmpEQ(val1, val2);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    transform(ctx, operands);
+    // not taken
+    IRB.SetInsertPoint(taken_false);
+}
+
+void
 codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
 {
     DECLEAR_CONTEXT_VARS;
@@ -635,6 +660,18 @@ codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
 }
 
 void
+codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
+    CREATE_STORE_VM_REG(vm, m_value, val);
+}
+
+void
 codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
 {
     DECLEAR_CONTEXT_VARS;
@@ -644,19 +681,18 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
     CREATE_STORE_VM_REG(vm, m_value, val);
-/*
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    auto c_letrec_violation = M->getOrInsertFunction("c_letrec_violation", VoidTy, IntptrPtrTy);
-    IRB.CreateCall(c_letrec_violation, {vm});
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-    // valid
-    IRB.SetInsertPoint(undef_false);
-*/
+}
+
+void
+codegen_t::emit_iloc1(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
+    CREATE_STORE_VM_REG(vm, m_value, val);
 }
 
 void
@@ -1178,3 +1214,40 @@ codegen_t::emit_push_cons(context_t& ctx, scm_obj_t inst)
     auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     IRB.CreateStore(IRB.CreateCall(c_make_pair, {vm, sp_minus_1, val}), ea);
 }
+
+void
+codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
+}
+
+/*
+##### unsupported instruction iloc ######
+##### unsupported instruction iloc.1 ######
+
+##### unsupported instruction if.eq? ######
+##### unsupported instruction if.false.ret ######
+##### unsupported instruction cdr.iloc ######
+##### unsupported instruction set.gloc ######
+
+generating native code: lookup
+##### unsupported instruction iloc ######
+##### unsupported instruction if.eq? ######
+> (cc get)
+generating native code: get
+##### unsupported instruction if.false.ret ######
+##### unsupported instruction if.false.ret ######
+> (cc put)
+generating native code: put
+##### unsupported instruction iloc ######
+##### unsupported instruction cdr.iloc ######
+##### unsupported instruction iloc.1 ######
+##### unsupported instruction set.gloc ######
+*/

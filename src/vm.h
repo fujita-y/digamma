@@ -100,7 +100,8 @@ public:
     bool                backtrace(scm_port_t port);
     void                stop();
     void                resolve();
-
+    void*               save_env(void* lnk);
+    void                update_cont(void* lnk);
 private:
     scm_obj_t           prebind_literal(scm_obj_t literal);
     scm_gloc_t          prebind_gloc(scm_obj_t variable);
@@ -110,9 +111,7 @@ private:
     scm_obj_t           backtrace_fetch(const char* name, int line, int column);
     void                backtrace_seek_make_cont(scm_obj_t note);
 
-    void*               save_env(void* lnk);
     void*               save_cont(void* lnk);
-    void                update_cont(void* lnk);
     void                save_stack();
 
     void*               gc_env(void* lnk);

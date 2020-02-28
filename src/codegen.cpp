@@ -88,6 +88,7 @@ extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
 #define LIST2(e1, e2)   CONS((e1), LIST1((e2)))
+#define STACKP(p)       (((p) >= (void*)vm->m_stack_top) & ((p) < (void*)vm->m_stack_limit))
 
 static int log2_of_intptr_size()
 {
@@ -278,6 +279,15 @@ extern "C" {
         vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
         vm->m_pc = closure->code;
         vm->m_env = &env->up;
+    }
+
+    void c_push_close(VM* vm, scm_closure_t operands) {
+        if (STACKP(vm->m_env)) {
+            vm->m_env = vm->save_env(vm->m_env);
+            vm->update_cont(vm->m_cont);
+        }
+        vm->m_sp[0] = make_closure(vm->m_heap, operands, vm->m_env);
+        vm->m_sp++;
     }
 
 }
@@ -586,11 +596,21 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
+            case VMOP_ILOC: {
+                emit_iloc(ctx, inst);
+            } break;
             case VMOP_ILOC0: {
                 emit_iloc0(ctx, inst);
             } break;
+            case VMOP_ILOC1: {
+                emit_iloc1(ctx, inst);
+            } break;
             case VMOP_IF_NULLP: {
                 emit_if_nullp(ctx, inst);
+            } break;
+            case VMOP_IF_EQP: {
+                emit_if_eqp(ctx, inst);
+                ctx.m_argc--;
             } break;
             case VMOP_IF_NULLP_RET_CONST: {
                 emit_if_nullp_ret_const(ctx, inst);
@@ -676,6 +696,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             } break;
             case VMOP_PUSH_CONS: {
                 emit_push_cons(ctx, inst);
+            } break;
+            case VMOP_PUSH_CLOSE: {
+                emit_push_close(ctx, inst);
+                ctx.m_argc++;
             } break;
             case VMOP_TOUCH_GLOC:
                 break;
