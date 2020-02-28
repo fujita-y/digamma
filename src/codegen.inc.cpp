@@ -1029,6 +1029,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
     auto call = IRB.CreateCall(prepare_call, { vm, cont });
+    call->setCallingConv(CallingConv::Fast);
 #if USE_LLVM_ATTRIBUTES
     auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
     attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);

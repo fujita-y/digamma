@@ -197,7 +197,6 @@
 (test-assertion-violation "subr violation 6" (p))
 (test-end)
 
-
 (test-begin "internal definitions 1")
 (test-eval!
     (define p
@@ -245,6 +244,19 @@
   (p))
 (test-equal "acc"
   acc => (#t 5 4 3 "*" 1 0 . #f))
+(test-end)
+
+(test-begin "parameter")
+(test-eval!
+  (begin
+    (define p (make-parameter 9))
+    (closure-compile p)))
+(test-equal "before"
+  (p) => 9)
+(test-eval!
+  (p 100))
+(test-equal "after"
+  (p) => 100)
 (test-end)
 
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm

@@ -336,8 +336,16 @@ codegen_t::define_prepare_call()
 
     auto M = make_unique<Module>("intrinsics", C);
     Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
     F->setCallingConv(CallingConv::Fast);
+#if USE_LLVM_ATTRIBUTES
+    F->addFnAttr(Attribute::NoUnwind);
+    F->addParamAttr(0, Attribute::NoAlias);
+    F->addParamAttr(0, Attribute::NoCapture);
+    F->addParamAttr(1, Attribute::NoAlias);
+    F->addParamAttr(1, Attribute::NoCapture);
+#endif
+//  for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+
     IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
     auto vm = F->arg_begin();
     auto cont = F->arg_begin() + 1;
@@ -626,7 +634,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_subr(ctx, inst);
                 scm_obj_t operands = CDAR(inst);
                 intptr_t argc = FIXNUM(CADR(operands));
-                ctx.m_argc = ctx.m_argc - argc + 1;
+                ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_PUSH_SUBR: {
                 emit_push_subr(ctx, inst);
