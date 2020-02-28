@@ -682,14 +682,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             } break;
             case VMOP_SUBR: {
                 emit_subr(ctx, inst);
-                scm_obj_t operands = CDAR(inst);
-                intptr_t argc = FIXNUM(CADR(operands));
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_PUSH_SUBR: {
                 emit_push_subr(ctx, inst);
-                scm_obj_t operands = CDAR(inst);
-                intptr_t argc = FIXNUM(CADR(operands));
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {

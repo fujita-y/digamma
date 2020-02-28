@@ -80,7 +80,7 @@
   (closure-compile -dderiv)
   (closure-compile *dderiv)
   (closure-compile /dderiv)
-  ;(closure-compile dderiv)
+  (closure-compile dderiv)
 )
 
 (define (main . args)
