@@ -53,6 +53,7 @@ public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);
 private:
+    void emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false);
     Function* emit_lifted_function(context_t& ctx, scm_closure_t closure);
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
@@ -60,10 +61,9 @@ private:
     Value* emit_cmp_inst(context_t& ctx, cc_t cc, Value* lhs, Value* rhs);
     void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
     void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
+
     Function* emit_call(context_t& ctx, scm_obj_t inst);
-
     void emit_subr(context_t& ctx, scm_obj_t inst);
-
     void emit_push(context_t& ctx, scm_obj_t inst);
     void emit_push_const(context_t& ctx, scm_obj_t inst);
     void emit_push_iloc0(context_t& ctx, scm_obj_t inst);
@@ -90,6 +90,7 @@ private:
     void emit_if_true(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_false_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_eqp(context_t& ctx, scm_obj_t inst);

@@ -656,7 +656,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_if_true_ret_const(ctx, inst);
             } break;
             // VMOP_IF_FALSE_RET_CONST
-            // VMOP_IF_EQP_RET_CONST
+            case VMOP_IF_EQP_RET_CONST: {
+                ctx.m_argc--;
+                emit_if_eqp_ret_const(ctx, inst);
+            } break;
             // VMOP_IF_PAIRP_RET_CONST
             // VMOP_IF_SYMBOLP_RET_CONST
             // VMOP_IF_NOT_PAIRP_RET_CONST
@@ -721,7 +724,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 fatal("codegen.cpp: unexpected opcode VMOP_NATIVE");
             } break;
             case VMOP_TOUCH_GLOC: {
-                fatal("codegen.cpp: unexpected opcode VMOP_TOUCH_GLOC");
+                // nop
             } break;
             case VMOP_SUBR_GLOC_OF: {
                 fatal("codegen.cpp: unexpected opcode VMOP_SUBR_GLOC_OF");
@@ -739,6 +742,22 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
         }
         inst = CDR(inst);
     }
+}
+
+void
+codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
+    IRB.CreateCondBr(cond1, cond1_true, pair_false);
+    IRB.SetInsertPoint(cond1_true);
+    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(0xf)), VALUE_INTPTR(0xa));
+    IRB.CreateCondBr(cond2, pair_true, pair_false);
 }
 
 #include "codegen.inc.cpp"
