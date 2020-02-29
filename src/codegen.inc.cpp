@@ -1102,26 +1102,51 @@ codegen_t::emit_set_gloc(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(success_true);
 }
 
+void
+codegen_t::emit_const(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
+}
+
+void
+codegen_t::emit_if_pairp(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+    auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    transform(ctx, operands);
+    // not taken
+    IRB.SetInsertPoint(taken_false);
+
+//    auto pair_cond = IRB.CreateICmpEQ(IRB.CreateAnd(pair, 1), VALUE_INTPTR(0));
+
+}
+
 /*
-##### unsupported instruction iloc ######
-##### unsupported instruction iloc.1 ######
+##### unsupported instruction if.pair? ######
+##### unsupported instruction const ######
+##### unsupported instruction if.eq?.ret.const ######
 
-##### unsupported instruction if.eq? ######
-##### unsupported instruction if.false.ret ######
-##### unsupported instruction cdr.iloc ######
-##### unsupported instruction set.gloc ######
+(define (dderiv a)
+  (if (not (pair? a))
+    (if (eq? a 'x) 1 0)
+    (let ((f (get (car a) 'dderiv)))
+      (if f
+        (f a)
+        (fatal-error "No derivation method available")))))
 
-generating native code: lookup
-##### unsupported instruction iloc ######
-##### unsupported instruction if.eq? ######
-> (cc get)
-generating native code: get
-##### unsupported instruction if.false.ret ######
-##### unsupported instruction if.false.ret ######
-> (cc put)
-generating native code: put
-##### unsupported instruction iloc ######
-##### unsupported instruction cdr.iloc ######
-##### unsupported instruction iloc.1 ######
-##### unsupported instruction set.gloc ######
 */

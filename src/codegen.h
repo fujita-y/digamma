@@ -110,6 +110,8 @@ private:
     void emit_eq_iloc(context_t& ctx, scm_obj_t inst);
 
     void emit_set_gloc(context_t& ctx, scm_obj_t inst);
+    void emit_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_pairp(context_t& ctx, scm_obj_t inst);
 };
 
 /*

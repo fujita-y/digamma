@@ -615,7 +615,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_CDR_ILOC: {
                 emit_cdr_iloc(ctx, inst);
             } break;
-            // VMOP_CONST
+            case VMOP_CONST: {
+                emit_const(ctx, inst);
+            } break;
             case VMOP_SUBR: {
                 emit_subr(ctx, inst);
                 intptr_t argc = FIXNUM(CADR(CDAR(inst)));
@@ -640,7 +642,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_NULLP: {
                 emit_if_nullp(ctx, inst);
             } break;
-            // VMOP_IF_PAIRP
+            case VMOP_IF_PAIRP: {
+                emit_if_pairp(ctx, inst);
+            } break;
             // VMOP_IF_SYMBOLP
             case VMOP_IF_TRUE_RET: {
                 emit_if_true_ret(ctx, inst);
