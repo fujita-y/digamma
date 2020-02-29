@@ -1175,4 +1175,36 @@ codegen_t::emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst)
 
 /*
 
+boyer
+
+> (cc add-lemma)
+##### unsupported instruction if.not.pair?.ret.const ######
+##### unsupported instruction if.not.eq?.ret.const ######
+##### unsupported instruction cadr.iloc ######
+##### unsupported instruction ret.pair? ######
+(define (add-lemma term)
+  (cond ((and (pair? term)
+              (eq? (car term)
+                   (quote equal))
+              (pair? (cadr term)))
+         (put (car (cadr term))
+              (quote lemmas)
+              (cons term (get (car (cadr term)) (quote lemmas)))))
+        (else (fatal-error "ADD-LEMMA did not like term:  " term))))
+
+> (cc one-way-unify1)
+generating native code: one-way-unify1
+##### unsupported instruction if.not.pair?.ret.const ######
+##### unsupported instruction car.iloc ######
+##### unsupported instruction if.not.eq?.ret.const ######
+
+> (cc rewrite-with-lemmas)
+generating native code: rewrite-with-lemmas
+##### unsupported instruction if.false.ret.const ######
+##### unsupported instruction ret.null? ######
+
+> (cc tautologyp)
+generating native code: tautologyp
+##### unsupported instruction if.not.pair?.ret.const ######
+##### unsupported instruction if.not.eq?.ret.const ######
 */
