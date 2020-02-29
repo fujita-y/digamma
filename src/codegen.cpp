@@ -527,11 +527,41 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
+            // VMOP_IF_FALSE_CALL
             case VMOP_CALL: {
                 ctx.m_function = emit_call(ctx, inst);
             } break;
-            case VMOP_IF_TRUE: {
-                emit_if_true(ctx, inst);
+            // VMOP_RET_GLOC
+            case VMOP_RET_CONST: {
+                emit_ret_const(ctx, inst);
+            } break;
+            case VMOP_RET_ILOC: {
+                emit_ret_iloc(ctx, inst);
+            } break;
+            case VMOP_PUSH_GLOC: {
+                emit_push_gloc(ctx, inst);
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_SUBR: {
+                emit_push_subr(ctx, inst);
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+                ctx.m_argc = ctx.m_argc - argc + 1;
+            } break;
+            case VMOP_PUSH_CAR_ILOC: {
+                emit_push_car_iloc(ctx, inst);
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_CDR_ILOC: {
+                emit_push_cdr_iloc(ctx, inst);
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_ILOC0: {
+                emit_push_iloc0(ctx, inst);
+                ctx.m_argc++;
+            } break;
+            case VMOP_PUSH_ILOC: {
+                emit_push_iloc(ctx, inst);
+                ctx.m_argc++;
             } break;
             case VMOP_PUSH: {
                 emit_push(ctx, inst);
@@ -541,49 +571,111 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_const(ctx, inst);
                 ctx.m_argc++;
             } break;
-            case VMOP_RET_CONST: {
-                emit_ret_const(ctx, inst);
+            case VMOP_PUSH_ILOC1: {
+                emit_push_iloc1(ctx, inst);
+                ctx.m_argc++;
             } break;
-            case VMOP_APPLY_ILOC: {
-                emit_apply_iloc(ctx, inst);
-            } break;
+            // VMOP_PUSH_ILOC0
             case VMOP_APPLY_GLOC: {
                 emit_apply_gloc(ctx, inst);
             } break;
             case VMOP_RET_SUBR: {
                 emit_ret_subr(ctx, inst);
             } break;
-            case VMOP_RET_ILOC: {
-                emit_ret_iloc(ctx, inst);
+            case VMOP_APPLY_ILOC: {
+                emit_apply_iloc(ctx, inst);
             } break;
-            case VMOP_LT_N_ILOC: {
-                emit_lt_n_iloc(ctx, inst);
+            case VMOP_APPLY_ILOC_LOCAL: {
+                emit_apply_iloc_local(ctx, inst);
             } break;
-            case VMOP_PUSH_NADD_ILOC: {
-                emit_push_nadd_iloc(ctx, inst);
+            case VMOP_APPLY: {
+                fatal("codegen.cpp: unexpected opcode VMOP_APPLY");
+            } break;
+            case VMOP_EXTEND: {
+                emit_extend(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
+            // VMOP_EXTEND_ENCLOSE
+            case VMOP_EXTEND_ENCLOSE_LOCAL: {
+                emit_extend_enclose_local(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
+            // VMOP_EXTEND_UNBOUND
+            case VMOP_PUSH_CLOSE: {
+                emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
+            // VMOP_PUSH_CLOSE_LOCAL
+            // VMOP_ENCLOSE
+            // VMOP_GLOC
             case VMOP_ILOC: {
                 emit_iloc(ctx, inst);
             } break;
-            case VMOP_ILOC0: {
-                emit_iloc0(ctx, inst);
+            // VMOP_CAR_ILOC
+            case VMOP_CDR_ILOC: {
+                emit_cdr_iloc(ctx, inst);
+            } break;
+            // VMOP_CONST
+            case VMOP_SUBR: {
+                emit_subr(ctx, inst);
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+                ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_ILOC1: {
                 emit_iloc1(ctx, inst);
             } break;
-            case VMOP_IF_NULLP: {
-                emit_if_nullp(ctx, inst);
+            case VMOP_ILOC0: {
+                emit_iloc0(ctx, inst);
+            } break;
+            case VMOP_IF_TRUE: {
+                emit_if_true(ctx, inst);
+            } break;
+            case VMOP_IF_NULLP_RET_CONST: {
+                emit_if_nullp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_EQP: {
                 ctx.m_argc--;
                 emit_if_eqp(ctx, inst);
             } break;
-            case VMOP_IF_NULLP_RET_CONST: {
-                emit_if_nullp_ret_const(ctx, inst);
+            case VMOP_IF_NULLP: {
+                emit_if_nullp(ctx, inst);
             } break;
-            case VMOP_PUSH_CAR_ILOC: {
-                emit_push_car_iloc(ctx, inst);
+            // VMOP_IF_PAIRP
+            // VMOP_IF_SYMBOLP
+            case VMOP_IF_TRUE_RET: {
+                emit_if_true_ret(ctx, inst);
+            } break;
+            case VMOP_IF_FALSE_RET: {
+                emit_if_false_ret(ctx, inst);
+            } break;
+            case VMOP_IF_TRUE_RET_CONST: {
+                emit_if_true_ret_const(ctx, inst);
+            } break;
+            // VMOP_IF_FALSE_RET_CONST
+            // VMOP_IF_EQP_RET_CONST
+            // VMOP_IF_PAIRP_RET_CONST
+            // VMOP_IF_SYMBOLP_RET_CONST
+            // VMOP_IF_NOT_PAIRP_RET_CONST
+            // VMOP_IF_NOT_NULLP_RET_CONST
+            // VMOP_IF_NOT_EQP_RET_CONST
+            // VMOP_IF_NOT_SYMBOLP_RET_CONST
+            // VMOP_CLOSE
+            case VMOP_SET_GLOC: {
+                emit_set_gloc(ctx, inst);
+            } break;
+            // VMOP_SET_ILOC
+            case VMOP_PUSH_CONS: {
+                emit_push_cons(ctx, inst);
+            } break;
+            case VMOP_RET_CONS: {
+                emit_ret_cons(ctx, inst);
+            } break;
+            // VMOP_RET_EQP
+            // VMOP_RET_NULLP
+            // VMOP_RET_PAIRP
+            // VMOP_RET_CLOSE
+            case VMOP_PUSH_NADD_ILOC: {
+                emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CADR_ILOC: {
@@ -594,89 +686,49 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_cddr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
-            case VMOP_PUSH_ILOC0: {
-                emit_push_iloc0(ctx, inst);
-                ctx.m_argc++;
-            } break;
-            case VMOP_PUSH_ILOC1: {
-                emit_push_iloc1(ctx, inst);
-                ctx.m_argc++;
-            } break;
-            case VMOP_PUSH_CDR_ILOC: {
-                emit_push_cdr_iloc(ctx, inst);
-                ctx.m_argc++;
-            } break;
-            case VMOP_RET_CONS: {
-                emit_ret_cons(ctx, inst);
-            } break;
-            case VMOP_EXTEND: {
-                emit_extend(ctx, inst);
-                ctx.m_argc = 0;
-            } break;
-            case VMOP_PUSH_GLOC: {
-                emit_push_gloc(ctx, inst);
-                ctx.m_argc++;
-            } break;
-            case VMOP_SUBR: {
-                emit_subr(ctx, inst);
-                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
-                ctx.m_argc = ctx.m_argc - argc;
-            } break;
-            case VMOP_PUSH_SUBR: {
-                emit_push_subr(ctx, inst);
-                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
-                ctx.m_argc = ctx.m_argc - argc + 1;
-            } break;
-            case VMOP_EXTEND_ENCLOSE_LOCAL: {
-                emit_extend_enclose_local(ctx, inst);
-                ctx.m_argc = 0;
-            } break;
-            case VMOP_APPLY_ILOC_LOCAL: {
-                emit_apply_iloc_local(ctx, inst);
-            } break;
-            case VMOP_PUSH_ILOC: {
-                emit_push_iloc(ctx, inst);
-                ctx.m_argc++;
-            } break;
-            case VMOP_IF_TRUE_RET: {
-                emit_if_true_ret(ctx, inst);
-            } break;
-            case VMOP_IF_FALSE_RET: {
-                emit_if_false_ret(ctx, inst);
-            } break;
-            case VMOP_IF_TRUE_RET_CONST: {
-                emit_if_true_ret_const(ctx, inst);
-            } break;
-            case VMOP_GT_N_ILOC: {
-                emit_gt_n_iloc(ctx, inst);
-            } break;
+            // VMOP_CADR_ILOC
+            // VMOP_CDDR_ILOC
             case VMOP_EQ_N_ILOC: {
                 emit_eq_n_iloc(ctx, inst);
             } break;
-            case VMOP_GT_ILOC: {
-                emit_gt_iloc(ctx, inst);
+            case VMOP_LT_N_ILOC: {
+                emit_lt_n_iloc(ctx, inst);
+            } break;
+            // VMOP_GE_N_ILOC
+            // VMOP_LE_N_ILOC
+            case VMOP_GT_N_ILOC: {
+                emit_gt_n_iloc(ctx, inst);
+            } break;
+            // VMOP_NADD_ILOC
+            case VMOP_EQ_ILOC: {
+                emit_eq_iloc(ctx, inst);
             } break;
             case VMOP_LT_ILOC: {
                 emit_lt_iloc(ctx, inst);
             } break;
-            case VMOP_EQ_ILOC: {
-                emit_eq_iloc(ctx, inst);
+            // VMOP_LE_ILOC
+            case VMOP_GT_ILOC: {
+                emit_gt_iloc(ctx, inst);
             } break;
-            case VMOP_CDR_ILOC: {
-                emit_cdr_iloc(ctx, inst);
+            // VMOP_GE_ILOC
+            // VMOP_PUSH_VECTREF_ILOC
+            // VMOP_VECTREF_ILOC
+            case VMOP_NATIVE: {
+                fatal("codegen.cpp: unexpected opcode VMOP_NATIVE");
             } break;
-            case VMOP_PUSH_CONS: {
-                emit_push_cons(ctx, inst);
+            case VMOP_TOUCH_GLOC: {
+                fatal("codegen.cpp: unexpected opcode VMOP_TOUCH_GLOC");
             } break;
-            case VMOP_PUSH_CLOSE: {
-                emit_push_close(ctx, inst);
-                ctx.m_argc++;
+            case VMOP_SUBR_GLOC_OF: {
+                fatal("codegen.cpp: unexpected opcode VMOP_SUBR_GLOC_OF");
             } break;
-            case VMOP_SET_GLOC: {
-                emit_set_gloc(ctx, inst);
+            case VMOP_PUSH_SUBR_GLOC_OF: {
+                fatal("codegen.cpp: unexpected opcode VMOP_PUSH_SUBR_GLOC_OF");
             } break;
-            case VMOP_TOUCH_GLOC:
-                break;
+            case VMOP_RET_SUBR_GLOC_OF: {
+                fatal("codegen.cpp: unexpected opcode VMOP_RET_SUBR_GLOC_OF");
+            } break;
+            // VMOP_VM_ESCAPE
             default:
                 printf("##### unsupported instruction %s ######\n", ((scm_symbol_t)CAAR(inst))->name);
                 break;

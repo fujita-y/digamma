@@ -106,6 +106,7 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+/*
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
@@ -115,6 +116,7 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_push_gloc));
     // valid
     IRB.SetInsertPoint(undef_false);
+*/
     CREATE_PUSH_VM_STACK(val);
 }
 
