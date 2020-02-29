@@ -226,21 +226,7 @@ extern "C" {
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
         return 1;
     }
-/*
-    void c_error_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-        //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
-        if (obj == scm_undef) letrec_violation(vm);
-        scm_obj_t argv[2] = { obj, operands };
-        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-    }
 
-    void c_error_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-        //printf("- c_error_lt_n_iloc(%p, %p, %p)\n", vm, obj, operands);
-        if (obj == scm_undef) letrec_violation(vm);
-        scm_obj_t argv[2] = { obj, operands };
-        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-    }
-*/
     void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (obj == scm_undef) letrec_violation(vm);
         scm_obj_t argv[2] = { obj, operands };
@@ -413,55 +399,6 @@ codegen_t::define_prepare_call()
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
 
 //  m_jit->getMainJITDylib().dump(llvm::outs());
-}
-
-Value*
-codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-
-    // [TODO] optimize
-    if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    } else if (depth == 1) {
-        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    }
-    auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
-    return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
-}
-
-Value*
-codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-
-    if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
-    } else if (depth == 1) {
-        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
-    }
-    auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
-}
-
-Value*
-codegen_t::emit_lookup_iloc(context_t& ctx, scm_obj_t loc)
-{
-    return emit_lookup_iloc(ctx, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
 }
 
 bool

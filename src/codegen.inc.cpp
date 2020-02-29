@@ -1,3 +1,51 @@
+Value*
+codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    // [TODO] optimize
+    if (depth == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        return env;
+    } else if (depth == 1) {
+        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        return env;
+    }
+    auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
+    return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
+}
+
+Value*
+codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    if (depth == 0) {
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+    } else if (depth == 1) {
+        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+    }
+    auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+    return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
+}
+
+Value*
+codegen_t::emit_lookup_iloc(context_t& ctx, scm_obj_t loc)
+{
+    return emit_lookup_iloc(ctx, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
+}
 
 void
 codegen_t::emit_push(context_t& ctx, scm_obj_t inst)
@@ -424,88 +472,6 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
 
     IRB.SetInsertPoint(CONTINUE);
 }
-/*
-void
-codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    intptr_t argc = FIXNUM(CADR(operands));
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
-
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst)); //[TODO] SUBR call need this
-    scm_subr_t subr = (scm_subr_t)CAR(operands);
-    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
-    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
-
-    CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
-}
-*/
-
-/*
-void
-codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    BasicBlock* FALLBACK = BasicBlock::Create(C, "fallback", F);
-
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
-    auto argc = IRB.CreateAShr(IRB.CreateSub(sp, fp), VALUE_INTPTR(log2_of_intptr_size()));
-    scm_subr_t subr = (scm_subr_t)CAR(operands);
-
-    if (ctx.m_argc == 2 && subr->adrs == subr_num_add) {
-        puts("shortcut");
-        auto fp_0 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(fp, IntptrPtrTy), VALUE_INTPTR(0)));
-        auto fp_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(fp, IntptrPtrTy), VALUE_INTPTR(1)));
-        auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateAnd(IRB.CreateAnd(fp_0, fp_1), VALUE_INTPTR(1)), VALUE_INTPTR(0));
-        BasicBlock* fallback_false = BasicBlock::Create(C, "fixnum_true", F);
-        IRB.CreateCondBr(fallback_cond, FALLBACK, fallback_false);
-        IRB.SetInsertPoint(fallback_false);
-        auto intr = Intrinsic::getDeclaration(ctx.m_module, llvm::Intrinsic::ID(Intrinsic::sadd_with_overflow), { IntptrTy });
-        auto rs = IRB.CreateCall(intr, { fp_0, IRB.CreateSub(fp_1, VALUE_INTPTR(1)) });
-        auto ans = IRB.CreateExtractValue(rs, { 0 });
-        auto overflow = IRB.CreateExtractValue(rs, { 1 });
-        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
-        BasicBlock* ans_valid_true = BasicBlock::Create(C, "ans_valid_true", F);
-        IRB.CreateCondBr(ans_valid_cond, ans_valid_true, FALLBACK);
-        IRB.SetInsertPoint(ans_valid_true);
-        CREATE_STORE_VM_REG(vm, m_value, ans);
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-    } else {
-        IRB.CreateBr(FALLBACK);
-    }
-
-    IRB.SetInsertPoint(FALLBACK);
-
-    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
-    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, argc, fp});
-
-    CREATE_STORE_VM_REG(vm, m_value, val);
-
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // valid
-    IRB.SetInsertPoint(undef_false);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-}
-*/
 
 void
 codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
@@ -767,123 +733,6 @@ codegen_t::emit_if_true_ret_const(context_t& ctx, scm_obj_t inst)
     // loop
     IRB.SetInsertPoint(value_false);
 }
-/*
-void
-codegen_t::emit_lt_n_iloc(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
-    BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
-    auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
-    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
-    // fixnum
-    IRB.SetInsertPoint(nonfixnum_false);
-        BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
-        BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-        auto cond = IRB.CreateICmpSLT(val, VALUE_INTPTR(CADR(operands)));
-        IRB.CreateCondBr(cond, cond_true, cond_false);
-        // taken
-        IRB.SetInsertPoint(cond_true);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
-        IRB.CreateBr(CONTINUE);
-        // not taken
-        IRB.SetInsertPoint(cond_false);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-        IRB.CreateBr(CONTINUE);
-    // others
-    IRB.SetInsertPoint(nonfixnum_true);
-        auto c_real_pred = M->getOrInsertFunction("c_real_pred", IntptrTy, IntptrTy);
-        BasicBlock* nonreal_true = BasicBlock::Create(C, "nonreal_true", F);
-        BasicBlock* nonreal_false = BasicBlock::Create(C, "nonreal_false", F);
-        auto nonreal_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_real_pred, {val}), VALUE_INTPTR(0));
-        IRB.CreateCondBr(nonreal_cond, nonreal_true, nonreal_false);
-        // not real
-        IRB.SetInsertPoint(nonreal_true);
-            auto c_error_lt_n_iloc = M->getOrInsertFunction("c_error_lt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            IRB.CreateCall(c_error_lt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-        // real
-        IRB.SetInsertPoint(nonreal_false);
-            auto c_n_compare = M->getOrInsertFunction("c_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            auto taken_cond = IRB.CreateICmpSLT(IRB.CreateCall(c_n_compare, {vm, val, VALUE_INTPTR(CADR(operands))}), VALUE_INTPTR(0));
-            BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
-            BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
-            IRB.CreateCondBr(taken_cond, taken_true, taken_false);
-            // taken
-            IRB.SetInsertPoint(taken_true);
-                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
-                IRB.CreateBr(CONTINUE);
-            // not taken
-            IRB.SetInsertPoint(taken_false);
-                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-                IRB.CreateBr(CONTINUE);
-    IRB.SetInsertPoint(CONTINUE);
-}
-
-void
-codegen_t::emit_gt_n_iloc(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
-    BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
-    auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
-    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
-    // fixnum
-    IRB.SetInsertPoint(nonfixnum_false);
-        BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
-        BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-        auto cond = IRB.CreateICmpSGT(val, VALUE_INTPTR(CADR(operands)));
-        IRB.CreateCondBr(cond, cond_true, cond_false);
-        // taken
-        IRB.SetInsertPoint(cond_true);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
-        IRB.CreateBr(CONTINUE);
-        // not taken
-        IRB.SetInsertPoint(cond_false);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-        IRB.CreateBr(CONTINUE);
-    // others
-    IRB.SetInsertPoint(nonfixnum_true);
-        auto c_real_pred = M->getOrInsertFunction("c_real_pred", IntptrTy, IntptrTy);
-        BasicBlock* nonreal_true = BasicBlock::Create(C, "nonreal_true", F);
-        BasicBlock* nonreal_false = BasicBlock::Create(C, "nonreal_false", F);
-        auto nonreal_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_real_pred, {val}), VALUE_INTPTR(0));
-        IRB.CreateCondBr(nonreal_cond, nonreal_true, nonreal_false);
-        // not real
-        IRB.SetInsertPoint(nonreal_true);
-            auto c_error_gt_n_iloc = M->getOrInsertFunction("c_error_gt_n_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            IRB.CreateCall(c_error_gt_n_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
-            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-        // real
-        IRB.SetInsertPoint(nonreal_false);
-            auto c_n_compare = M->getOrInsertFunction("c_n_compare", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-            auto taken_cond = IRB.CreateICmpSLT(IRB.CreateCall(c_n_compare, {vm, val, VALUE_INTPTR(CADR(operands))}), VALUE_INTPTR(0));
-            BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
-            BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
-            IRB.CreateCondBr(taken_cond, taken_true, taken_false);
-            // taken
-            IRB.SetInsertPoint(taken_true);
-                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
-                IRB.CreateBr(CONTINUE);
-            // not taken
-            IRB.SetInsertPoint(taken_false);
-                CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-                IRB.CreateBr(CONTINUE);
-    IRB.SetInsertPoint(CONTINUE);
-}
-*/
 
 Value*
 codegen_t::emit_cmp_inst(context_t& ctx, cc_t cc, Value* lhs, Value* rhs)
@@ -957,48 +806,7 @@ codegen_t::emit_eq_n_iloc(context_t& ctx, scm_obj_t inst)
 {
   emit_cc_n_iloc(ctx, inst, EQ, "c_eq_n_iloc");
 }
-/*
-void
-codegen_t::emit_gt_iloc(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
 
-    auto rhs = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
-    auto lhs = CREATE_LOAD_VM_REG(vm, m_value);
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-    BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
-    BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
-    auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(lhs, IRB.CreateAnd(rhs, VALUE_INTPTR(1))), VALUE_INTPTR(0));
-    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
-    // fixnum
-    IRB.SetInsertPoint(nonfixnum_false);
-        BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
-        BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
-        auto cond = IRB.CreateICmpSGT(lhs, rhs);
-        IRB.CreateCondBr(cond, cond_true, cond_false);
-        // taken
-        IRB.SetInsertPoint(cond_true);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
-        IRB.CreateBr(CONTINUE);
-        // not taken
-        IRB.SetInsertPoint(cond_false);
-        CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
-        IRB.CreateBr(CONTINUE);
-    // others
-    IRB.SetInsertPoint(nonfixnum_true);
-    // [TODO]
-        auto c_function = M->getOrInsertFunction("c_gt_iloc", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-        auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
-        BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
-        IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
-        IRB.SetInsertPoint(fallback_fail);
-        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-    IRB.SetInsertPoint(CONTINUE);
-}
-*/
 void
 codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc)
 {
