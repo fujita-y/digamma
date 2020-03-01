@@ -901,7 +901,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     // vm_cont_t cont = (vm_cont_t)m_sp;
     auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
 
-    auto prepare_call = M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
+    auto prepare_call = ctx.m_intrinsics.prepare_call; // M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
     auto call = IRB.CreateCall(prepare_call, { vm, cont });
     call->setCallingConv(CallingConv::Fast);
 #if USE_LLVM_ATTRIBUTES
