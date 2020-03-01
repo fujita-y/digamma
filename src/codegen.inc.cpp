@@ -1333,6 +1333,65 @@ codegen_t::emit_ret_pairp(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 }
 
+void
+codegen_t::emit_ret_gloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
+    CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_GLOC_REC(gloc, value));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+}
+
+void
+codegen_t::emit_ret_eqp(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
+    auto val1 = IRB.CreateLoad(ea);
+    auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
+
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+    auto taken_cond = IRB.CreateICmpEQ(val1, val2);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // not taken
+    IRB.SetInsertPoint(taken_false);
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+}
+
+void
+codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    BasicBlock* success_false = BasicBlock::Create(C, "success_false", F);
+    BasicBlock* success_true = BasicBlock::Create(C, "success_true", F);
+    auto c_set_iloc = M->getOrInsertFunction("c_set_iloc", IntptrTy, IntptrPtrTy, IntptrTy);
+    auto success_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_set_iloc, { vm, VALUE_INTPTR(operands) }), VALUE_INTPTR(0));
+    IRB.CreateCondBr(success_cond, success_true, success_false);
+    IRB.SetInsertPoint(success_false);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+    IRB.SetInsertPoint(success_true);
+}
+
 /*
 
 browse

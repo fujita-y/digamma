@@ -290,12 +290,12 @@ extern "C" {
         scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
         assert(GLOCP(gloc));
 #if USE_PARALLEL_VM
-#if UNSPECIFIED_GLOC_IS_SPECIAL
+  #if UNSPECIFIED_GLOC_IS_SPECIAL
         if (m_interp->live_thread_count() > 1 && gloc->value != scm_unspecified) {
             if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
             m_interp->remember(gloc->value, m_value);
         }
-#else
+  #else
         if (vm->m_interp->live_thread_count() > 1) {
             if (!vm->m_heap->in_heap(gloc)) {
                 thread_global_access_violation(vm, ((scm_gloc_t)CAR(operands))->variable, vm->m_value);
@@ -303,13 +303,36 @@ extern "C" {
             }
             vm->m_interp->remember(gloc->value, vm->m_value);
         }
-#endif
+  #endif
 #endif
         vm->m_heap->write_barrier(vm->m_value);
         gloc->value = vm->m_value;
         return 0;
     }
 
+    intptr_t c_set_iloc(VM* vm, scm_closure_t operands) {
+        scm_obj_t loc = CAR(operands);
+        scm_obj_t* slot = c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
+        if (!STACKP(slot)) {
+#if USE_PARALLEL_VM
+            if (vm->m_interp->live_thread_count() > 1) {
+                if (!vm->m_heap->in_heap(slot)) {
+                  scm_obj_t doc = CDR(operands);
+                  if (PAIRP(doc)) {
+                      thread_lexical_access_violation(vm, CADAR(doc), vm->m_value);
+                  } else {
+                      thread_lexical_access_violation(vm, NULL, vm->m_value);
+                  }
+                  return 1;
+                }
+                if (vm->m_heap->m_child > 0) vm->m_interp->remember(*slot, vm->m_value);
+            }
+#endif
+            vm->m_heap->write_barrier(vm->m_value);
+        }
+        *slot = vm->m_value;
+        return 0;
+    }
 }
 
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
@@ -541,7 +564,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_CALL: {
                 ctx.m_function = emit_call(ctx, inst);
             } break;
-            // VMOP_RET_GLOC
+            case VMOP_RET_GLOC: {
+                emit_ret_gloc(ctx, inst);
+            } break;
             case VMOP_RET_CONST: {
                 emit_ret_const(ctx, inst);
             } break;
@@ -689,14 +714,18 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_SET_GLOC: {
                 emit_set_gloc(ctx, inst);
             } break;
-            // VMOP_SET_ILOC
+            case VMOP_SET_ILOC: {
+                emit_set_iloc(ctx, inst);
+            } break;
             case VMOP_PUSH_CONS: {
                 emit_push_cons(ctx, inst);
             } break;
             case VMOP_RET_CONS: {
                 emit_ret_cons(ctx, inst);
             } break;
-            // VMOP_RET_EQP
+            case VMOP_RET_EQP: {
+                emit_ret_eqp(ctx, inst);
+            } break;
             case VMOP_RET_NULLP: {
                 emit_ret_nullp(ctx, inst);
             } break;
