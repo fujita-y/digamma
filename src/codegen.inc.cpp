@@ -1335,44 +1335,27 @@ codegen_t::emit_ret_pairp(context_t& ctx, scm_obj_t inst)
 
 /*
 
-boyer
+browse
+> (cc init)
+generating native code: init
+##### unsupported instruction set.iloc ######
++ uninterned gloc found: .L15`58*
+ + generating native code for lifted function
+##### unsupported instruction set.iloc ######
++ self recursive
 
-cadr.iloc
-car.iloc
-if.not.pair?.ret.const
-if.not.eq?.ret.const
-if.false.ret.const
-ret.null?
-ret.pair?
+> (cc browse-random)
+generating native code: browse-random
+##### unsupported instruction ret.gloc ######
 
-> (cc add-lemma)
-##### unsupported instruction if.not.pair?.ret.const ######
-##### unsupported instruction if.not.eq?.ret.const ######
- unsupported instruction cadr.iloc ######
-##### unsupported instruction ret.pair? ######
-(define (add-lemma term)
-  (cond ((and (pair? term)
-              (eq? (car term)
-                   (quote equal))
-              (pair? (cadr term)))
-         (put (car (cadr term))
-              (quote lemmas)
-              (cons term (get (car (cadr term)) (quote lemmas)))))
-        (else (fatal-error "ADD-LEMMA did not like term:  " term))))
+> (cc randomize)
+generating native code: randomize
+##### unsupported instruction set.iloc ######
+##### unsupported instruction set.iloc ######
+##### unsupported instruction set.iloc ######
 
-> (cc one-way-unify1)
-generating native code: one-way-unify1
-##### unsupported instruction if.not.pair?.ret.const ######
-##### unsupported instruction car.iloc ######
-##### unsupported instruction if.not.eq?.ret.const ######
+> (cc match)
+generating native code: match
+##### unsupported instruction ret.eq? ######
 
-> (cc rewrite-with-lemmas)
-generating native code: rewrite-with-lemmas
-##### unsupported instruction if.false.ret.const ######
-##### unsupported instruction ret.null? ######
-
-> (cc tautologyp)
-generating native code: tautologyp
-##### unsupported instruction if.not.pair?.ret.const ######
-##### unsupported instruction if.not.eq?.ret.const ######
 */
