@@ -11,7 +11,7 @@
 #include "llvm/IR/Module.h"
 
 #define USE_LLVM_ATTRIBUTES  1
-//for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+#define USE_LLVM_OPTIMIZE    1
 
 #if __clang_major__ > 9
 using namespace std;
@@ -116,6 +116,8 @@ private:
 };
 
 /*
+for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+
 (backtrace #f)
 (import (digamma time))
 

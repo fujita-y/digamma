@@ -155,6 +155,20 @@ extern "C" {
         wrong_type_argument_violation(vm, "cadr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
+    void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (obj == scm_undef) letrec_violation(vm);
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
+    }
+
+    scm_obj_t c_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
+        return make_pair(vm->m_heap, car, cdr);
+    }
+
+    scm_obj_t c_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        return arith_add(vm->m_heap, obj, operands);
+    }
+
     intptr_t c_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
             vm->m_value = n_compare(vm->m_heap, obj, operands) < 0 ? scm_true : scm_false;
@@ -227,38 +241,18 @@ extern "C" {
         return 1;
     }
 
-    void c_error_push_nadd_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-        if (obj == scm_undef) letrec_violation(vm);
-        scm_obj_t argv[2] = { obj, operands };
-        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
-    }
-
-    scm_obj_t c_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
-        return make_pair(vm->m_heap, car, cdr);
-    }
-
     intptr_t c_number_pred(scm_obj_t obj)
     {
-        //printf("- c_number_pred(%p) => %d\n", obj, number_pred(obj));
         return (intptr_t)number_pred(obj);
     }
 
     intptr_t c_real_pred(scm_obj_t obj)
     {
-        //printf("- c_real_pred(%p) => %d\n", obj, real_pred(obj));
         return (intptr_t)real_pred(obj);
     }
 
     intptr_t c_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-    //    printer_t prt(vm, vm->m_current_output);
-    //    prt.format("- c_n_compare ~s ~s => %d ~%~!", obj, operands, n_compare(vm->m_heap, obj, operands));
         return n_compare(vm->m_heap, obj, operands);
-    }
-
-    scm_obj_t c_arith_add(VM* vm, scm_obj_t obj, scm_obj_t operands) {
-    //    printer_t prt(vm, vm->m_current_output);
-    //    prt.format("- c_arith_add ~s ~s => ~s ~%~!", obj, operands, arith_add(vm->m_heap, obj, operands));
-        return arith_add(vm->m_heap, obj, operands);
     }
 
     void c_prepare_apply(VM* vm, scm_closure_t closure) {
@@ -370,7 +364,6 @@ codegen_t::define_prepare_call()
     F->addParamAttr(1, Attribute::NoAlias);
     F->addParamAttr(1, Attribute::NoCapture);
 #endif
-//  for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
 
     IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
     auto vm = F->arg_begin();
@@ -396,7 +389,11 @@ codegen_t::define_prepare_call()
 
 //  M.get()->print(outs(), nullptr);
 
+#if USE_LLVM_OPTIMIZE
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
+#else
+    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+#endif
 
 //  m_jit->getMainJITDylib().dump(llvm::outs());
 }
@@ -451,8 +448,11 @@ codegen_t::compile(scm_closure_t closure)
 
     verifyModule(*M, &outs());
 
+#if USE_LLVM_OPTIMIZE
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
-//  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+#else
+    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+#endif
 
 //  m_jit->getMainJITDylib().dump(llvm::outs());
 
