@@ -98,6 +98,7 @@ private:
     void emit_iloc(context_t& ctx, scm_obj_t inst);
     void emit_iloc0(context_t& ctx, scm_obj_t inst);
     void emit_iloc1(context_t& ctx, scm_obj_t inst);
+    void emit_car_iloc(context_t& ctx, scm_obj_t inst);
     void emit_cdr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_lt_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_gt_n_iloc(context_t& ctx, scm_obj_t inst);
@@ -113,6 +114,12 @@ private:
     void emit_set_gloc(context_t& ctx, scm_obj_t inst);
     void emit_const(context_t& ctx, scm_obj_t inst);
     void emit_if_pairp(context_t& ctx, scm_obj_t inst);
+    void emit_cadr_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_if_not_pairp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_false_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_ret_nullp(context_t& ctx, scm_obj_t inst);
+    void emit_ret_pairp(context_t& ctx, scm_obj_t inst);
 };
 
 /*

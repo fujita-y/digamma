@@ -140,9 +140,19 @@ extern "C" {
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
     }
 
+    void c_error_car_iloc(VM* vm, scm_obj_t obj) {
+        //if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
+    }
+
     void c_error_cdr_iloc(VM* vm, scm_obj_t obj) {
         //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
+    }
+
+    void c_error_cadr_iloc(VM* vm, scm_obj_t obj) {
+        //if (obj == scm_undef) letrec_violation(vm);
+        wrong_type_argument_violation(vm, "cadr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
     void c_error_push_cddr_iloc(VM* vm, scm_obj_t obj) {
@@ -611,7 +621,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_ILOC: {
                 emit_iloc(ctx, inst);
             } break;
-            // VMOP_CAR_ILOC
+            case VMOP_CAR_ILOC: {
+                emit_car_iloc(ctx, inst);
+            } break;
             case VMOP_CDR_ILOC: {
                 emit_cdr_iloc(ctx, inst);
             } break;
@@ -655,16 +667,23 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_TRUE_RET_CONST: {
                 emit_if_true_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_FALSE_RET_CONST
+            case VMOP_IF_FALSE_RET_CONST: {
+                emit_if_false_ret_const(ctx, inst);
+            } break;
             case VMOP_IF_EQP_RET_CONST: {
                 ctx.m_argc--;
                 emit_if_eqp_ret_const(ctx, inst);
             } break;
             // VMOP_IF_PAIRP_RET_CONST
             // VMOP_IF_SYMBOLP_RET_CONST
-            // VMOP_IF_NOT_PAIRP_RET_CONST
+            case VMOP_IF_NOT_PAIRP_RET_CONST: {
+                emit_if_not_pairp_ret_const(ctx, inst);
+            } break;
             // VMOP_IF_NOT_NULLP_RET_CONST
-            // VMOP_IF_NOT_EQP_RET_CONST
+            case VMOP_IF_NOT_EQP_RET_CONST: {
+                ctx.m_argc--;
+                emit_if_not_eqp_ret_const(ctx, inst);
+            } break;
             // VMOP_IF_NOT_SYMBOLP_RET_CONST
             // VMOP_CLOSE
             case VMOP_SET_GLOC: {
@@ -678,8 +697,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_ret_cons(ctx, inst);
             } break;
             // VMOP_RET_EQP
-            // VMOP_RET_NULLP
-            // VMOP_RET_PAIRP
+            case VMOP_RET_NULLP: {
+                emit_ret_nullp(ctx, inst);
+            } break;
+            case VMOP_RET_PAIRP: {
+                emit_ret_pairp(ctx, inst);
+            } break;
             // VMOP_RET_CLOSE
             case VMOP_PUSH_NADD_ILOC: {
                 emit_push_nadd_iloc(ctx, inst);
@@ -693,7 +716,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_cddr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
-            // VMOP_CADR_ILOC
+            case VMOP_CADR_ILOC: {
+                emit_cadr_iloc(ctx, inst);
+            } break;
             // VMOP_CDDR_ILOC
             case VMOP_EQ_N_ILOC: {
                 emit_eq_n_iloc(ctx, inst);
