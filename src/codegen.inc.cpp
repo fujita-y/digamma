@@ -1394,27 +1394,45 @@ codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
 
 /*
 
-browse
-> (cc init)
-generating native code: init
-##### unsupported instruction set.iloc ######
-+ uninterned gloc found: .L15`58*
- + generating native code for lifted function
-##### unsupported instruction set.iloc ######
-+ self recursive
+generating native code: record-accessor
+##### unsupported instruction if.false.call ######
 
-> (cc browse-random)
-generating native code: browse-random
-##### unsupported instruction ret.gloc ######
+> generating native code: |core.sorting'list-sort|
+##### unsupported instruction extend.unbound ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction enclose ######
 
-> (cc randomize)
-generating native code: randomize
-##### unsupported instruction set.iloc ######
-##### unsupported instruction set.iloc ######
-##### unsupported instruction set.iloc ######
+> generating native code: |core.sorting'vector-sort!|
+##### unsupported instruction extend.unbound ######
+##### unsupported instruction enclose ######
 
-> (cc match)
-generating native code: match
-##### unsupported instruction ret.eq? ######
+> (closure-compile bytevector-uint-set!)
+generating native code: |core.bytevectors'bytevector-uint-set!|
+##### unsupported instruction >=.iloc ######
+##### unsupported instruction >=.iloc ######
 
+> (closure-compile break)
+generating native code: |core.lists'break|
+##### unsupported instruction extend.enclose ######
+
+(define m)
+(define (n) (set! m (lambda () 1)))
+(closure-compile n)
+##### unsupported instruction gloc ######
+
+(define m)
+(define (n a) (set! m (lambda () (list a 1))))
+(closure-compile n)
+generating native code: n
+##### unsupported instruction close ######
+
+(define (m n) (lambda (s) (+ s n)))
+(closure-compile m)
+##### unsupported instruction ret.close ######
+
+(define (m n) (set! n (+ 1 n)) (display n))
+(closure-compile m)
+##### unsupported instruction n+.iloc ######
 */

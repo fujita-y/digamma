@@ -606,7 +606,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
-            // VMOP_IF_FALSE_CALL
+            // VMOP_IF_FALSE_CALL []
             case VMOP_CALL: {
                 ctx.m_function = emit_call(ctx, inst);
             } break;
@@ -676,19 +676,19 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_extend(ctx, inst);
                 ctx.m_argc = 0;
             } break;
-            // VMOP_EXTEND_ENCLOSE
+            // VMOP_EXTEND_ENCLOSE []
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
             } break;
-            // VMOP_EXTEND_UNBOUND
+            // VMOP_EXTEND_UNBOUND []
             case VMOP_PUSH_CLOSE: {
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
-            // VMOP_PUSH_CLOSE_LOCAL
-            // VMOP_ENCLOSE
-            // VMOP_GLOC
+            // VMOP_PUSH_CLOSE_LOCAL []
+            // VMOP_ENCLOSE []
+            // VMOP_GLOC []
             case VMOP_ILOC: {
                 emit_iloc(ctx, inst);
             } break;
@@ -756,7 +756,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
             // VMOP_IF_NOT_SYMBOLP_RET_CONST
-            // VMOP_CLOSE
+            // VMOP_CLOSE []
             case VMOP_SET_GLOC: {
                 emit_set_gloc(ctx, inst);
             } break;
@@ -778,7 +778,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_RET_PAIRP: {
                 emit_ret_pairp(ctx, inst);
             } break;
-            // VMOP_RET_CLOSE
+            // VMOP_RET_CLOSE []
             case VMOP_PUSH_NADD_ILOC: {
                 emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;
@@ -806,7 +806,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
             } break;
-            // VMOP_NADD_ILOC
+            // VMOP_NADD_ILOC []
             case VMOP_EQ_ILOC: {
                 emit_eq_iloc(ctx, inst);
             } break;
