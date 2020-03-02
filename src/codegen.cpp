@@ -563,7 +563,7 @@ codegen_t::compile(scm_closure_t closure)
 }
 
 Function*
-codegen_t::emit_lifted_function(context_t& ctx, scm_closure_t closure)
+codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
 

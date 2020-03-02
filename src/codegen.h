@@ -59,7 +59,7 @@ public:
 private:
     Function* emit_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false);
-    Function* emit_lifted_function(context_t& ctx, scm_closure_t closure);
+    Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
