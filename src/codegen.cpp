@@ -333,6 +333,21 @@ extern "C" {
         *slot = vm->m_value;
         return 0;
     }
+
+    void c_enclose(VM* vm, intptr_t argc) {
+        vm_env_t env = (vm_env_t)((intptr_t)vm->m_env - offsetof(vm_env_rec_t, up));
+        scm_obj_t* dst = (scm_obj_t*)env - env->count;
+        if (STACKP(env)) {
+            for (intptr_t i = 0; i < argc; i++) dst[i] = vm->m_fp[i];
+        } else {
+            for (intptr_t i = 0; i < argc; i++) {
+                dst[i] = vm->m_fp[i];
+                vm->m_heap->write_barrier(vm->m_fp[i]);
+            }
+        }
+        vm->m_sp = vm->m_fp;
+    }
+
 }
 
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
@@ -692,7 +707,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 ctx.m_argc++;
             } break;
             // VMOP_PUSH_CLOSE_LOCAL []
-            // VMOP_ENCLOSE []
+            case VMOP_ENCLOSE: {
+                emit_enclose(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
             // VMOP_GLOC []
             case VMOP_ILOC: {
                 emit_iloc(ctx, inst);
@@ -994,6 +1012,10 @@ generating native code: rationalize
 > generating native code: |core.sorting'vector-sort!|
 ##### unsupported instruction extend.unbound ######
 ##### unsupported instruction enclose ######
+
+(define v (vector 3 5 2 1))
+(vector-sort! < v)
+
 
 > generating native code: |core.sorting'list-sort|
 ##### unsupported instruction extend.unbound ######

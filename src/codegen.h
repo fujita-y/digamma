@@ -131,6 +131,7 @@ private:
     void emit_ret_eqp(context_t& ctx, scm_obj_t inst);
     void emit_set_iloc(context_t& ctx, scm_obj_t inst);
     void emit_extend_unbound(context_t& ctx, scm_obj_t inst);
+    void emit_enclose(context_t& ctx, scm_obj_t inst);
 };
 
 /*

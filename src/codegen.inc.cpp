@@ -1435,3 +1435,17 @@ codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 }
+
+void
+codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    int argc = FIXNUM(operands);
+    auto c_enclose = M->getOrInsertFunction("c_enclose", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_enclose, { vm, VALUE_INTPTR(argc) });
+
+}
