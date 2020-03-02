@@ -1001,8 +1001,9 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
     // L->setCallingConv(CallingConv::Fast);
-    ctx.m_local_functions.resize(ctx.m_depth + 1);
-    ctx.m_local_functions.at(ctx.m_depth) = L;
+    //ctx.m_local_functions.resize(ctx.m_depth + 1);
+    //ctx.m_local_functions.at(ctx.m_depth) = L;
+    ctx.m_local_functions[ctx.m_depth + (0 << 16)] = L;
     // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
     context_t ctx2 = ctx;
     ctx2.m_function = L;
@@ -1023,13 +1024,13 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     int level = FIXNUM(CAAR(operands));
-    int function_index = ctx.m_depth - level;
+    int index = FIXNUM(CDAR(operands));
+    int function_index = (ctx.m_depth - level) + (index << 16);
     // printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto env2 = emit_lookup_env(ctx, level);
     auto count = CREATE_LOAD_ENV_REC(env2, count);
-    int index = FIXNUM(CDAR(operands));
     auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
     auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
@@ -1465,5 +1466,8 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 
     // map loc(level,offset) -> Function*
     // [TODO] Function* L = ctx.m_local_functions[function_index];
+
+    ctx.m_local_functions[ctx.m_depth + (ctx.m_argc << 16)] = L;
+
 }
 */

@@ -31,7 +31,8 @@ class codegen_t {
         IRBuilder<>& m_irb;
         scm_closure_t m_top_level_closure;
         Function* m_top_level_function;
-        std::vector<Function*> m_local_functions;
+        //std::vector<Function*> m_local_functions;
+        std::map<int, Function*> m_local_functions;
         int m_argc;
         int m_depth;
         intrinsics_t m_intrinsics;
