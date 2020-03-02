@@ -1000,6 +1000,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 #endif
 
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
+    printf("emit_extend_enclose_local level = %d index = %d\n", ctx.m_depth, 0);
     // L->setCallingConv(CallingConv::Fast);
     //ctx.m_local_functions.resize(ctx.m_depth + 1);
     //ctx.m_local_functions.at(ctx.m_depth) = L;
@@ -1026,7 +1027,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
     int function_index = (ctx.m_depth - level) + (index << 16);
-    // printf("emit_apply_iloc_local ctx.m_depth = %d level = %d function_index = %d\n", ctx.m_depth, level, function_index);
+    printf("emit_apply_iloc_local level = %d index = %d function_index = %d\n", ctx.m_depth - level, index, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto env2 = emit_lookup_env(ctx, level);
@@ -1041,7 +1042,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
     Function* L = ctx.m_local_functions[function_index];
-printf("emit_apply_iloc_local: L = %p, function_index %d, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
+//printf("emit_apply_iloc_local: L = %p, function_index %d, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
     assert(L != nullptr);
     auto call = IRB.CreateCall(L, { vm });
     call->setTailCallKind(CallInst::TCK_MustTail);
@@ -1451,7 +1452,6 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
 }
 
-/*
 void
 codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 {
@@ -1464,10 +1464,28 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
 
-    // map loc(level,offset) -> Function*
-    // [TODO] Function* L = ctx.m_local_functions[function_index];
 
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    IRB.CreateBr(CONTINUE);
+
+    // continue emit code in operands
+    char local_id[40];
+    uuid_v4(local_id, sizeof(local_id));
+    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
+#if USE_LLVM_ATTRIBUTES
+    L->addFnAttr(Attribute::NoUnwind);
+    L->addParamAttr(0, Attribute::NoAlias);
+    L->addParamAttr(0, Attribute::NoCapture);
+#endif
+    BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
+    printf("emit_push_close_local level = %d index = %d\n", ctx.m_depth, ctx.m_argc);
     ctx.m_local_functions[ctx.m_depth + (ctx.m_argc << 16)] = L;
+    context_t ctx2 = ctx;
+    ctx2.m_function = L;
+    ctx2.m_depth++;
+    ctx2.m_argc = 0;
+    IRB.SetInsertPoint(LOCAL);
+    transform(ctx2, operands);
 
+    IRB.SetInsertPoint(CONTINUE);
 }
-*/

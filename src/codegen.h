@@ -31,7 +31,6 @@ class codegen_t {
         IRBuilder<>& m_irb;
         scm_closure_t m_top_level_closure;
         Function* m_top_level_function;
-        //std::vector<Function*> m_local_functions;
         std::map<int, Function*> m_local_functions;
         int m_argc;
         int m_depth;
@@ -133,7 +132,7 @@ private:
     void emit_set_iloc(context_t& ctx, scm_obj_t inst);
     void emit_extend_unbound(context_t& ctx, scm_obj_t inst);
     void emit_enclose(context_t& ctx, scm_obj_t inst);
-//    void emit_push_close_local(context_t& ctx, scm_obj_t inst);
+    void emit_push_close_local(context_t& ctx, scm_obj_t inst);
 };
 
 /*

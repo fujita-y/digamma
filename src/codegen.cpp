@@ -693,6 +693,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND: {
                 emit_extend(ctx, inst);
                 ctx.m_argc = 0;
+                ctx.m_depth++;
             } break;
             // VMOP_EXTEND_ENCLOSE []
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
@@ -702,15 +703,16 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND_UNBOUND: {
                 emit_extend_unbound(ctx, inst);
                 ctx.m_argc = 0;
+                ctx.m_depth++;
             } break;
             case VMOP_PUSH_CLOSE: {
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
-            //case VMOP_PUSH_CLOSE_LOCAL: {
-            //    emit_push_close_local(ctx, inst);
-            //    ctx.m_argc++;
-            //} break;
+            case VMOP_PUSH_CLOSE_LOCAL: {
+                emit_push_close_local(ctx, inst);
+                ctx.m_argc++;
+            } break;
             case VMOP_ENCLOSE: {
                 emit_enclose(ctx, inst);
                 ctx.m_argc = 0;
@@ -1103,8 +1105,8 @@ generating native code: n
                         (merge (list-head lst n)
                                (sort rest (- len n)))))))))))
 
+(closure-compile list-sort)
 
 (list-sort < '(3 5 2 1))
-(closure-compile list-sort)
 
 */
