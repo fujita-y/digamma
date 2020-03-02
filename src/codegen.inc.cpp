@@ -1441,7 +1441,7 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] compile closure
+    // [TODO] defer compile closure
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1463,7 +1463,6 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
-
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     IRB.CreateBr(CONTINUE);
