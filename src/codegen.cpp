@@ -606,7 +606,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
-            // VMOP_IF_FALSE_CALL []
+            case VMOP_IF_FALSE_CALL: {
+                fatal("codegen.cpp: unexpected opcode VMOP_IF_FALSE_CALL");
+            } break;
             case VMOP_CALL: {
                 ctx.m_function = emit_call(ctx, inst);
             } break;
@@ -976,3 +978,109 @@ codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, Ba
         (t n)
         (loop (+ n 1))))))
 */
+
+/*
+
+> (closure-compile rationalize)
+generating native code: rationalize
+##### unsupported instruction if.false.call ######
+##### unsupported instruction if.false.call ######
+
+(rationalize (exact .3) 1/10)
+
+> generating native code: |core.sorting'list-sort|
+##### unsupported instruction extend.unbound ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction push.close+ ######
+##### unsupported instruction enclose ######
+
+> generating native code: |core.sorting'vector-sort!|
+##### unsupported instruction extend.unbound ######
+##### unsupported instruction enclose ######
+
+> (closure-compile bytevector-uint-set!)
+generating native code: |core.bytevectors'bytevector-uint-set!|
+##### unsupported instruction >=.iloc ######
+##### unsupported instruction >=.iloc ######
+
+> (closure-compile break)
+generating native code: |core.lists'break|
+##### unsupported instruction extend.enclose ######
+
+(define m)
+(define (n) (set! m (lambda () 1)))
+(closure-compile n)
+##### unsupported instruction gloc ######
+
+(define m)
+(define (n a) (set! m (lambda () (list a 1))))
+(closure-compile n)
+generating native code: n
+##### unsupported instruction close ######
+
+(define (m n) (lambda (s) (+ s n)))
+(closure-compile m)
+##### unsupported instruction ret.close ######
+
+(define (m n) (set! n (+ 1 n)) (display n))
+(closure-compile m)
+##### unsupported instruction n+.iloc ######
+*/
+/*
+> (closure-code rationalize)
+((push.iloc.0 . 0)
+ (subr #<subr real?> 1)
+ (if.false.call
+   (push.const . rationalize)
+   (push.const . "expected real, but got ~s as argument 1")
+   (push.iloc.0 . 0)
+   (push.subr #<subr format> 2)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (push.subr #<subr list> 2)
+   (apply.gloc #<gloc assertion-violation>))
+ (push.iloc.0 . 1)
+ (subr #<subr real?> 1)
+ (if.false.call
+   (push.const . rationalize)
+   (push.const . "expected real, but got ~s as argument 2")
+   (push.iloc.0 . 1)
+   (push.subr #<subr format> 2)
+   (push.iloc.0 . 0)
+   (push.iloc.0 . 1)
+   (push.subr #<subr list> 2)
+   (apply.gloc #<gloc assertion-violation>))
+ (push.iloc.0 . 1)
+ (subr #<subr infinite?> 1)
+ (if.true
+   (push.iloc.0 . 0)
+   (subr #<subr infinite?> 1)
+   (if.true.ret.const . +nan.0)
+   (ret.const . 0.0))
+ (=n.iloc (0 . 0) 0)
+ (if.true (ret.iloc 0 . 0))
+ (iloc.0 . 0)
+ (=.iloc (0 . 1))
+ (if.true (push.iloc.0 . 0) (push.iloc.0 . 1) (ret.subr #<subr ->))
+ (push.iloc.0 . 0)
+ (subr #<subr negative?> 1)
+ (if.true
+   (call
+     (push.iloc.0 . 0)
+     (push.subr #<subr -> 1)
+     (push.iloc.0 . 1)
+     (apply.gloc #<gloc rationalize>))
+   (push)
+   (ret.subr #<subr ->))
+ (push.iloc.0 . 1)
+ (push.subr #<subr abs> 1)
+ (extend . 1)
+ (push.iloc.1 . 0)
+ (push.iloc.0 . 0)
+ (push.subr #<subr -> 2)
+ (push.iloc.1 . 0)
+ (push.iloc.0 . 0)
+ (push.subr #<subr +> 2)
+ (apply.gloc #<gloc loop`147*>))
+ */
