@@ -209,44 +209,44 @@ extern "C" {
         return 1;
     }
 
-    intptr_t c_gt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    intptr_t c_gt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
-        if (real_pred(vm->m_value)) {
-            if (real_pred(obj)) {
-                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) > 0) ? scm_true : scm_false;
+        if (real_pred(lhs)) {
+            if (real_pred(rhs)) {
+                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) > 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
         }
-        scm_obj_t argv[2] = { vm->m_value, obj };
+        scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
         return 1;
     }
 
-    intptr_t c_lt_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    intptr_t c_lt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
-        if (real_pred(vm->m_value)) {
-            if (real_pred(obj)) {
-                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) < 0) ? scm_true : scm_false;
+        if (real_pred(lhs)) {
+            if (real_pred(rhs)) {
+                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) < 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
         }
-        scm_obj_t argv[2] = { vm->m_value, obj };
+        scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
         return 1;
     }
 
-    intptr_t c_eq_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    intptr_t c_eq_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
-        if (real_pred(vm->m_value)) {
-            if (real_pred(obj)) {
-                vm->m_value = (n_compare(vm->m_heap, vm->m_value, obj) == 0) ? scm_true : scm_false;
+        if (real_pred(lhs)) {
+            if (real_pred(rhs)) {
+                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) == 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
         }
-        scm_obj_t argv[2] = { vm->m_value, obj };
+        scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
         return 1;
     }
@@ -607,7 +607,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
-                fatal("codegen.cpp: unexpected opcode VMOP_IF_FALSE_CALL");
+                emit_if_false_call(ctx, inst);
             } break;
             case VMOP_CALL: {
                 ctx.m_function = emit_call(ctx, inst);
@@ -1028,59 +1028,32 @@ generating native code: n
 ##### unsupported instruction n+.iloc ######
 */
 /*
-> (closure-code rationalize)
-((push.iloc.0 . 0)
- (subr #<subr real?> 1)
- (if.false.call
-   (push.const . rationalize)
-   (push.const . "expected real, but got ~s as argument 1")
-   (push.iloc.0 . 0)
-   (push.subr #<subr format> 2)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.subr #<subr list> 2)
-   (apply.gloc #<gloc assertion-violation>))
- (push.iloc.0 . 1)
- (subr #<subr real?> 1)
- (if.false.call
-   (push.const . rationalize)
-   (push.const . "expected real, but got ~s as argument 2")
-   (push.iloc.0 . 1)
-   (push.subr #<subr format> 2)
-   (push.iloc.0 . 0)
-   (push.iloc.0 . 1)
-   (push.subr #<subr list> 2)
-   (apply.gloc #<gloc assertion-violation>))
- (push.iloc.0 . 1)
- (subr #<subr infinite?> 1)
- (if.true
-   (push.iloc.0 . 0)
-   (subr #<subr infinite?> 1)
-   (if.true.ret.const . +nan.0)
-   (ret.const . 0.0))
- (=n.iloc (0 . 0) 0)
- (if.true (ret.iloc 0 . 0))
- (iloc.0 . 0)
- (=.iloc (0 . 1))
- (if.true (push.iloc.0 . 0) (push.iloc.0 . 1) (ret.subr #<subr ->))
- (push.iloc.0 . 0)
- (subr #<subr negative?> 1)
- (if.true
-   (call
-     (push.iloc.0 . 0)
-     (push.subr #<subr -> 1)
-     (push.iloc.0 . 1)
-     (apply.gloc #<gloc rationalize>))
-   (push)
-   (ret.subr #<subr ->))
- (push.iloc.0 . 1)
- (push.subr #<subr abs> 1)
- (extend . 1)
- (push.iloc.1 . 0)
- (push.iloc.0 . 0)
- (push.subr #<subr -> 2)
- (push.iloc.1 . 0)
- (push.iloc.0 . 0)
- (push.subr #<subr +> 2)
- (apply.gloc #<gloc loop`147*>))
+
+(define rationalize
+  (lambda (x e)
+    (format #t "x ~s ~%~!" x)
+    (cond ((infinite? e)
+           (if (infinite? x) +nan.0 0.0))
+          ((= x 0)
+           (format #t "(= x 0) ~s ~%~!" x)
+           x)
+          ((= x e)
+           (format #t "(= x e) ~s ~s ~%~!" x e)
+           (- x e))
+          ((negative? x)
+           (- (rationalize (- x) e)))
+          (else
+           (let ((e (abs e)))
+             (let loop ((bottom (- x e)) (top (+ x e)))
+               (format #t "bottom ~s top ~s ~%~!" bottom top)
+               (cond ((= bottom top) bottom)
+                     (else
+                      (let ((x (ceiling bottom)))
+                        (cond ((< x top) x)
+                              (else
+                               (let ((a (- x 1)))
+                                 (+ a (/ 1 (loop (/ 1 (- top a)) (/ 1 (- bottom a)))))))))))))))))
+
+(rationalize (exact .3) 1/10)
+(closure-compile rationalize)
  */

@@ -928,6 +928,28 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 }
 
 void
+codegen_t::emit_if_false_call(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
+    BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
+    auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    // taken
+    IRB.SetInsertPoint(value_false);
+    context_t ctx2 = ctx;
+    ctx2.m_argc = 0;
+    transform(ctx2, operands);
+    // no taken
+    IRB.SetInsertPoint(value_nonfalse);
+}
+
+void
 codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
 {
     DECLEAR_CONTEXT_VARS;

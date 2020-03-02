@@ -68,6 +68,7 @@ private:
     void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
 
     Function* emit_call(context_t& ctx, scm_obj_t inst);
+    void emit_if_false_call(context_t& ctx, scm_obj_t inst);
     void emit_subr(context_t& ctx, scm_obj_t inst);
     void emit_push(context_t& ctx, scm_obj_t inst);
     void emit_push_const(context_t& ctx, scm_obj_t inst);
