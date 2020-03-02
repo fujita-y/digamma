@@ -1394,8 +1394,12 @@ codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
 
 /*
 
-generating native code: record-accessor
+> (closure-compile rationalize)
+generating native code: rationalize
 ##### unsupported instruction if.false.call ######
+##### unsupported instruction if.false.call ######
+
+(rationalize (exact .3) 1/10)
 
 > generating native code: |core.sorting'list-sort|
 ##### unsupported instruction extend.unbound ######
