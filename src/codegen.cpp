@@ -620,6 +620,7 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
+        printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);
@@ -706,7 +707,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
-            // VMOP_PUSH_CLOSE_LOCAL []
+            //case VMOP_PUSH_CLOSE_LOCAL: {
+            //    emit_push_close_local(ctx, inst);
+            //    ctx.m_argc++;
+            //} break;
             case VMOP_ENCLOSE: {
                 emit_enclose(ctx, inst);
                 ctx.m_argc = 0;
@@ -1024,6 +1028,7 @@ generating native code: rationalize
 ##### unsupported instruction push.close+ ######
 ##### unsupported instruction enclose ######
 
+(list-sort < '(3 5 2 1))
 
 > (closure-compile bytevector-uint-set!)
 generating native code: |core.bytevectors'bytevector-uint-set!|
@@ -1052,4 +1057,54 @@ generating native code: n
 (define (m n) (set! n (+ 1 n)) (display n))
 (closure-compile m)
 ##### unsupported instruction n+.iloc ######
+*/
+/*
+  (define list-sort
+    (lambda (proc lst)
+
+      (define merge
+        (lambda (lst1 lst2)
+          (cond
+           ((null? lst1) lst2)
+           ((null? lst2) lst1)
+           (else
+            (if (proc (car lst2) (car lst1))
+                (cons (car lst2) (merge lst1 (cdr lst2)))
+                (cons (car lst1) (merge (cdr lst1) lst2)))))))
+
+      (define sort
+        (lambda (lst n)
+          (cond ((= n 1)
+                 (list (car lst)))
+                ((= n 2)
+                 (if (proc (cadr lst) (car lst))
+                     (list (cadr lst) (car lst))
+                     (list (car lst) (cadr lst))))
+                (else
+                 (let ((n/2 (div n 2)))
+                   (merge (sort lst n/2)
+                          (sort (list-tail lst n/2) (- n n/2))))))))
+
+      (define divide
+        (lambda (lst)
+          (let loop ((acc 1) (lst lst))
+            (cond ((null? (cdr lst)) (values acc '()))
+                  (else
+                   (if (proc (car lst) (cadr lst))
+                       (loop (+ acc 1) (cdr lst))
+                       (values acc (cdr lst))))))))
+
+      (cond ((null? lst) '())
+            (else
+             (let ((len (length lst)))
+               (let-values (((n rest) (divide lst)))
+                 (cond ((null? rest) lst)
+                       (else
+                        (merge (list-head lst n)
+                               (sort rest (- len n)))))))))))
+
+
+(list-sort < '(3 5 2 1))
+(closure-compile list-sort)
+
 */

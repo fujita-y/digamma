@@ -1039,8 +1039,8 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
-    // printf("emit_apply_iloc_local ctx.m_local_functions.size() = %lu\n", ctx.m_local_functions.size());
     Function* L = ctx.m_local_functions[function_index];
+printf("emit_apply_iloc_local: L = %p, function_index %d, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
     assert(L != nullptr);
     auto call = IRB.CreateCall(L, { vm });
     call->setTailCallKind(CallInst::TCK_MustTail);
@@ -1073,19 +1073,6 @@ codegen_t::emit_push_cons(context_t& ctx, scm_obj_t inst)
     auto sp_minus_1 = IRB.CreateLoad(ea);
     auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     IRB.CreateStore(IRB.CreateCall(c_make_pair, {vm, sp_minus_1, val}), ea);
-}
-
-void
-codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
-    IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
 }
 
 void
@@ -1447,5 +1434,36 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
     int argc = FIXNUM(operands);
     auto c_enclose = M->getOrInsertFunction("c_enclose", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_enclose, { vm, VALUE_INTPTR(argc) });
-
 }
+
+void
+codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
+{
+    // [TODO] compile closure
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
+}
+
+/*
+void
+codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
+{
+    // [TODO] compile local closure
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
+
+    // map loc(level,offset) -> Function*
+    // [TODO] Function* L = ctx.m_local_functions[function_index];
+}
+*/
