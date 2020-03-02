@@ -683,7 +683,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
             } break;
-            // VMOP_EXTEND_UNBOUND []
+            case VMOP_EXTEND_UNBOUND: {
+                emit_extend_unbound(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
             case VMOP_PUSH_CLOSE: {
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
@@ -988,6 +991,10 @@ generating native code: rationalize
 
 (rationalize (exact .3) 1/10)
 
+> generating native code: |core.sorting'vector-sort!|
+##### unsupported instruction extend.unbound ######
+##### unsupported instruction enclose ######
+
 > generating native code: |core.sorting'list-sort|
 ##### unsupported instruction extend.unbound ######
 ##### unsupported instruction push.close+ ######
@@ -995,9 +1002,6 @@ generating native code: rationalize
 ##### unsupported instruction push.close+ ######
 ##### unsupported instruction enclose ######
 
-> generating native code: |core.sorting'vector-sort!|
-##### unsupported instruction extend.unbound ######
-##### unsupported instruction enclose ######
 
 > (closure-compile bytevector-uint-set!)
 generating native code: |core.bytevectors'bytevector-uint-set!|
@@ -1027,33 +1031,3 @@ generating native code: n
 (closure-compile m)
 ##### unsupported instruction n+.iloc ######
 */
-/*
-
-(define rationalize
-  (lambda (x e)
-    (format #t "x ~s ~%~!" x)
-    (cond ((infinite? e)
-           (if (infinite? x) +nan.0 0.0))
-          ((= x 0)
-           (format #t "(= x 0) ~s ~%~!" x)
-           x)
-          ((= x e)
-           (format #t "(= x e) ~s ~s ~%~!" x e)
-           (- x e))
-          ((negative? x)
-           (- (rationalize (- x) e)))
-          (else
-           (let ((e (abs e)))
-             (let loop ((bottom (- x e)) (top (+ x e)))
-               (format #t "bottom ~s top ~s ~%~!" bottom top)
-               (cond ((= bottom top) bottom)
-                     (else
-                      (let ((x (ceiling bottom)))
-                        (cond ((< x top) x)
-                              (else
-                               (let ((a (- x 1)))
-                                 (+ a (/ 1 (loop (/ 1 (- top a)) (/ 1 (- bottom a)))))))))))))))))
-
-(rationalize (exact .3) 1/10)
-(closure-compile rationalize)
- */

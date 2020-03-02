@@ -1413,3 +1413,25 @@ codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
     IRB.SetInsertPoint(success_true);
 }
+
+void
+codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    int argc = FIXNUM(operands);
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t*) * argc);
+    for (intptr_t i = 0; i < argc; i++) {
+      CREATE_PUSH_VM_STACK(VALUE_INTPTR(scm_undef));
+    }
+    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
+    CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+}
