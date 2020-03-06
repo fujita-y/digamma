@@ -286,15 +286,20 @@ extern "C" {
         vm->m_sp++;
     }
 
-    void c_close(VM* vm, scm_obj_t operands) {
+    void c_close(VM* vm, scm_closure_t operands) {
         if (STACKP(vm->m_env)) {
             vm->m_env = vm->save_env(vm->m_env);
             vm->update_cont(vm->m_cont);
         }
-        scm_obj_t spec = CAR(operands);
-        scm_obj_t code = CDR(operands);
-        scm_obj_t doc = CDDR(spec);
-        vm->m_value = make_closure(vm->m_heap, FIXNUM(CAR(spec)), FIXNUM(CADR(spec)), vm->m_env, code, doc);
+        vm->m_value = make_closure(vm->m_heap, operands, vm->m_env);
+    }
+
+    void c_ret_close(VM* vm, scm_closure_t operands) {
+        if (STACKP(vm->m_env)) {
+            vm->m_env = vm->save_env(vm->m_env);
+            vm->update_cont(vm->m_cont);
+        }
+        vm->m_value = make_closure(vm->m_heap, operands, vm->m_env);
     }
 
     intptr_t c_set_gloc(VM* vm, scm_closure_t operands) {
@@ -821,7 +826,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_RET_PAIRP: {
                 emit_ret_pairp(ctx, inst);
             } break;
-            // VMOP_RET_CLOSE []
+            case VMOP_RET_CLOSE: {
+                emit_ret_close(ctx, inst);
+            } break;
             case VMOP_PUSH_NADD_ILOC: {
                 emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;

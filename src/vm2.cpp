@@ -259,8 +259,8 @@ VM::prebind_list(scm_obj_t code)
                 break;
 
             case VMOP_CLOSE:
-                prebind_list(CDR(operands));
-                break;
+                //prebind_list(CDR(operands));
+                //break;
 
             case VMOP_RET_CLOSE:
             case VMOP_PUSH_CLOSE:

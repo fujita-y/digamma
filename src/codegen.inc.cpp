@@ -1441,7 +1441,7 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] compile closure code
+    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1453,15 +1453,28 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 }
 
 void
-codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
+codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] compile closure code
+    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    auto c_ret_close = M->getOrInsertFunction("c_ret_close", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_ret_close, { vm, VALUE_INTPTR(operands) });
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+}
+
+void
+codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
+{
+    // [TODO] defer compile closure code in operand ??
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
     auto c_close = M->getOrInsertFunction("c_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_close, { vm, VALUE_INTPTR(operands) });
 }
@@ -1502,7 +1515,6 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(CONTINUE);
 }
 
-
 void
 codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
 {
@@ -1517,11 +1529,11 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
 
 /*
 
-(define m)
-(define (n a) (set! m (lambda () (list a 1))))
-(closure-compile n)
-generating native code: n
-##### unsupported instruction close ######
+(define (m n) (lambda (s) (+ s n)))
+(closure-compile m)
+((m 100) 20) => 120
+##### unsupported instruction ret.close ######
+
 
 > (closure-compile bytevector-uint-set!)
 generating native code: |core.bytevectors'bytevector-uint-set!|
@@ -1532,9 +1544,6 @@ generating native code: |core.bytevectors'bytevector-uint-set!|
 generating native code: |core.lists'break|
 ##### unsupported instruction extend.enclose ######
 
-(define (m n) (lambda (s) (+ s n)))
-(closure-compile m)
-##### unsupported instruction ret.close ######
 
 (define (m n) (set! n (+ 1 n)) (display n))
 (closure-compile m)

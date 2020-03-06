@@ -1095,10 +1095,14 @@ VM::loop(bool init, bool resume)
                     m_env = save_env(m_env);
                     update_cont(m_cont);
                 }
+#if PREBIND_CLOSE
+                m_value = make_closure(m_heap, (scm_closure_t)OPERANDS, m_env);
+#else
                 scm_obj_t spec = CAR(OPERANDS);
                 scm_obj_t code = CDR(OPERANDS);
                 scm_obj_t doc = CDDR(spec);
                 m_value = make_closure(m_heap, FIXNUM(CAR(spec)), FIXNUM(CADR(spec)), m_env, code, doc);
+#endif
                 m_pc = CDR(m_pc);
 #if STDEBUG
                 check_vm_state();
