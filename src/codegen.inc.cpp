@@ -1529,17 +1529,6 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
 
 /*
 
-(define (m n) (lambda (s) (+ s n)))
-(closure-compile m)
-((m 100) 20) => 120
-##### unsupported instruction ret.close ######
-
-
-> (closure-compile bytevector-uint-set!)
-generating native code: |core.bytevectors'bytevector-uint-set!|
-##### unsupported instruction >=.iloc ######
-##### unsupported instruction >=.iloc ######
-
 > (closure-compile break)
 generating native code: |core.lists'break|
 ##### unsupported instruction extend.enclose ######
@@ -1549,10 +1538,30 @@ generating native code: |core.lists'break|
 (closure-compile m)
 ##### unsupported instruction n+.iloc ######
 
-(define c 3)
-(define s 4)
-(define (p)
-  (set! c s))
-(p)
-c
+
+(define s)
+(define (m n) (set! s (cddr n)))
+(closure-compile m)
+##### unsupported instruction cddr.iloc ######
+
+(define s)
+(define (m n) (set! s (>= n 10)))
+(closure-compile m)
+##### unsupported instruction >=n.iloc ######
+
+(define s)
+(define t)
+(define (m n) (set! s (<= t n)))
+(closure-compile m)
+##### unsupported instruction <=.iloc ######
+
+(define s)
+(define t)
+(define (m n) (set! s (>= t n)))
+(closure-compile m)
+##### unsupported instruction >=.iloc ######
+
+(define (m n) (if (pair? n) 10))
+(closure-compile m)
+##### unsupported instruction if.pair?.ret.const ######
 */

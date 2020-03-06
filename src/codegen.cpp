@@ -844,15 +844,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_CADR_ILOC: {
                 emit_cadr_iloc(ctx, inst);
             } break;
-            // VMOP_CDDR_ILOC
+            // VMOP_CDDR_ILOC []
             case VMOP_EQ_N_ILOC: {
                 emit_eq_n_iloc(ctx, inst);
             } break;
             case VMOP_LT_N_ILOC: {
                 emit_lt_n_iloc(ctx, inst);
             } break;
-            // VMOP_GE_N_ILOC
-            // VMOP_LE_N_ILOC
+            // VMOP_GE_N_ILOC []
+            // VMOP_LE_N_ILOC []
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
             } break;
@@ -863,13 +863,13 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_LT_ILOC: {
                 emit_lt_iloc(ctx, inst);
             } break;
-            // VMOP_LE_ILOC
+            // VMOP_LE_ILOC []
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
             } break;
-            // VMOP_GE_ILOC
-            // VMOP_PUSH_VECTREF_ILOC
-            // VMOP_VECTREF_ILOC
+            // VMOP_GE_ILOC []
+            // VMOP_PUSH_VECTREF_ILOC  remove
+            // VMOP_VECTREF_ILOC       remove
             case VMOP_NATIVE: {
                 fatal("codegen.cpp: unexpected opcode VMOP_NATIVE");
             } break;
