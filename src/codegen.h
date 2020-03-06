@@ -101,6 +101,7 @@ private:
     void emit_if_false_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_eqp(context_t& ctx, scm_obj_t inst);
 
+    void emit_gloc(context_t& ctx, scm_obj_t inst);
     void emit_iloc(context_t& ctx, scm_obj_t inst);
     void emit_iloc0(context_t& ctx, scm_obj_t inst);
     void emit_iloc1(context_t& ctx, scm_obj_t inst);

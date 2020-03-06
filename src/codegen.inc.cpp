@@ -1455,7 +1455,6 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] compile local closure
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1488,3 +1487,49 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 
     IRB.SetInsertPoint(CONTINUE);
 }
+
+
+void
+codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
+    CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_GLOC_REC(gloc, value));
+}
+
+/*
+
+(define m)
+(define (n a) (set! m (lambda () (list a 1))))
+(closure-compile n)
+generating native code: n
+##### unsupported instruction close ######
+
+> (closure-compile bytevector-uint-set!)
+generating native code: |core.bytevectors'bytevector-uint-set!|
+##### unsupported instruction >=.iloc ######
+##### unsupported instruction >=.iloc ######
+
+> (closure-compile break)
+generating native code: |core.lists'break|
+##### unsupported instruction extend.enclose ######
+
+(define (m n) (lambda (s) (+ s n)))
+(closure-compile m)
+##### unsupported instruction ret.close ######
+
+(define (m n) (set! n (+ 1 n)) (display n))
+(closure-compile m)
+##### unsupported instruction n+.iloc ######
+
+(define c 3)
+(define s 4)
+(define (p)
+  (set! c s))
+(p)
+c
+*/
