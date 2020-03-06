@@ -259,6 +259,18 @@
   (p) => 100)
 (test-end)
 
+(test-begin "close")
+(test-eval!
+  (begin
+    (define m)
+    (define (n a) (set! m (lambda () (list a 1))))
+    (closure-compile n)))
+(test-eval!
+  (n 100))
+(test-equal "eval"
+  (m) => (100 1))
+(test-end)
+
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
 (backtrace #f)

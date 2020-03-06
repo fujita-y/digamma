@@ -1441,7 +1441,7 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] defer compile closure
+    // [TODO] compile closure code
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1450,6 +1450,20 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
+}
+
+void
+codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
+{
+    // [TODO] compile closure code
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    auto c_close = M->getOrInsertFunction("c_close", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_close, { vm, VALUE_INTPTR(operands) });
 }
 
 void

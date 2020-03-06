@@ -286,6 +286,17 @@ extern "C" {
         vm->m_sp++;
     }
 
+    void c_close(VM* vm, scm_obj_t operands) {
+        if (STACKP(vm->m_env)) {
+            vm->m_env = vm->save_env(vm->m_env);
+            vm->update_cont(vm->m_cont);
+        }
+        scm_obj_t spec = CAR(operands);
+        scm_obj_t code = CDR(operands);
+        scm_obj_t doc = CDDR(spec);
+        vm->m_value = make_closure(vm->m_heap, FIXNUM(CAR(spec)), FIXNUM(CADR(spec)), vm->m_env, code, doc);
+    }
+
     intptr_t c_set_gloc(VM* vm, scm_closure_t operands) {
         scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
         assert(GLOCP(gloc));
@@ -786,7 +797,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
             // VMOP_IF_NOT_SYMBOLP_RET_CONST
-            // VMOP_CLOSE []
+            case VMOP_CLOSE: {
+                emit_close(ctx, inst);
+            } break;
             case VMOP_SET_GLOC: {
                 emit_set_gloc(ctx, inst);
             } break;
