@@ -1232,6 +1232,36 @@ codegen_t::emit_cadr_iloc(context_t& ctx, scm_obj_t inst)
 }
 
 void
+codegen_t::emit_cddr_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    // check if pair
+    BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+    BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+
+    emit_cond_pairp(ctx, pair, pair_true, pair_false);
+    // nonpair
+    IRB.SetInsertPoint(pair_false);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+        auto c_error_cadr_iloc = M->getOrInsertFunction("c_error_cadr_iloc", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_error_cadr_iloc, {vm, pair});
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+    // pair
+    IRB.SetInsertPoint(pair_true);
+        auto pair2 = CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr);
+        BasicBlock* pair2_true = BasicBlock::Create(C, "pair2_true", F);
+        emit_cond_pairp(ctx, pair2, pair2_true, pair_false);
+    // pair + pair
+    IRB.SetInsertPoint(pair2_true);
+      CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
+}
+
+void
 codegen_t::emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst)
 {
     DECLEAR_CONTEXT_VARS;
@@ -1608,6 +1638,57 @@ codegen_t::emit_if_not_symbolp_ret_const(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(symbol_true);
 }
 
+void
+codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
+    BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
+    // fixnum
+    IRB.SetInsertPoint(nonfixnum_false);
+        auto intr = Intrinsic::getDeclaration(ctx.m_module, llvm::Intrinsic::ID(Intrinsic::sadd_with_overflow), { IntptrTy });
+        auto rs = IRB.CreateCall(intr, { val, VALUE_INTPTR((uintptr_t)CADR(operands) - 1) });
+        auto ans = IRB.CreateExtractValue(rs, { 0 });
+        auto overflow = IRB.CreateExtractValue(rs, { 1 });
+        auto ans_valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
+        BasicBlock* ans_valid_true = BasicBlock::Create(C, "ans_valid_true", F);
+        BasicBlock* ans_valid_false = BasicBlock::Create(C, "ans_valid_false", F);
+        IRB.CreateCondBr(ans_valid_cond, ans_valid_true, ans_valid_false);
+        IRB.SetInsertPoint(ans_valid_true);
+        CREATE_STORE_VM_REG(vm, m_value, ans);
+        IRB.CreateBr(CONTINUE);
+    // others
+    IRB.SetInsertPoint(nonfixnum_true);
+        auto c_number_pred = M->getOrInsertFunction("c_number_pred", IntptrTy, IntptrTy);
+        auto nonnum_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_number_pred, {val}), VALUE_INTPTR(0));
+        BasicBlock* nonnum_true = BasicBlock::Create(C, "nonnum_true", F);
+        BasicBlock* nonnum_false = BasicBlock::Create(C, "nonnum_false", F);
+        IRB.CreateCondBr(nonnum_cond, nonnum_true, nonnum_false);
+        // not number
+        IRB.SetInsertPoint(nonnum_true);
+            CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+            auto c_error_push_nadd_iloc = M->getOrInsertFunction("c_error_push_nadd_iloc", VoidTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            IRB.CreateCall(c_error_push_nadd_iloc, {vm, val, VALUE_INTPTR(CADR(operands))});
+            IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+        // number
+        IRB.SetInsertPoint(nonnum_false);
+            auto c_arith_add = M->getOrInsertFunction("c_arith_add", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
+            CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(c_arith_add, {vm, val, VALUE_INTPTR(CADR(operands))}));
+            IRB.CreateBr(CONTINUE);
+    IRB.SetInsertPoint(ans_valid_false);
+    IRB.CreateBr(nonnum_false);
+
+    IRB.SetInsertPoint(CONTINUE);
+}
+
 /*
 
 > (closure-compile break)
@@ -1615,15 +1696,15 @@ generating native code: |core.lists'break|
 ##### unsupported instruction extend.enclose ######
 
 
-(define (m n) (set! n (+ 1 n)) (display n))
+(define (m n) (set! n (+ 1 n)) n)
 (closure-compile m)
-##### unsupported instruction n+.iloc ######
-
+(m 10)
 
 (define s)
 (define (m n) (set! s (cddr n)))
 (closure-compile m)
-##### unsupported instruction cddr.iloc ######
+(m '(1 2 3 4))
+s ;=> (3 4)
 
 (define s)
 (define (m n) (set! s (>= n 10)))

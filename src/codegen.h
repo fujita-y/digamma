@@ -127,6 +127,7 @@ private:
     void emit_const(context_t& ctx, scm_obj_t inst);
     void emit_if_pairp(context_t& ctx, scm_obj_t inst);
     void emit_cadr_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_cddr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_if_not_pairp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_false_ret_const(context_t& ctx, scm_obj_t inst);
@@ -141,6 +142,7 @@ private:
     void emit_push_close_local(context_t& ctx, scm_obj_t inst);
     void emit_close(context_t& ctx, scm_obj_t inst);
     void emit_ret_close(context_t& ctx, scm_obj_t inst);
+    void emit_nadd_iloc(context_t& ctx, scm_obj_t inst);
 };
 
 /*

@@ -852,7 +852,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_CADR_ILOC: {
                 emit_cadr_iloc(ctx, inst);
             } break;
-            // VMOP_CDDR_ILOC []
+            case VMOP_CDDR_ILOC: {
+                emit_cddr_iloc(ctx, inst);
+            } break;
             case VMOP_EQ_N_ILOC: {
                 emit_eq_n_iloc(ctx, inst);
             } break;
@@ -864,7 +866,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
             } break;
-            // VMOP_NADD_ILOC []
+            case VMOP_NADD_ILOC: {
+                emit_nadd_iloc(ctx, inst);
+            } break;
             case VMOP_EQ_ILOC: {
                 emit_eq_iloc(ctx, inst);
             } break;
