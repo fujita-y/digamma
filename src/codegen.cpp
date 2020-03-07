@@ -199,6 +199,26 @@ extern "C" {
         return 1;
     }
 
+    intptr_t c_le_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (real_pred(obj)) {
+            vm->m_value = n_compare(vm->m_heap, obj, operands) <= 0 ? scm_true : scm_false;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_ge_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+        if (real_pred(obj)) {
+            vm->m_value = n_compare(vm->m_heap, obj, operands) >= 0 ? scm_true : scm_false;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, operands };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
+        return 1;
+    }
+
     intptr_t c_eq_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
             vm->m_value = n_compare(vm->m_heap, obj, operands) == 0 ? scm_true : scm_false;
@@ -228,6 +248,34 @@ extern "C" {
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
                 vm->m_value = (n_compare(vm->m_heap, lhs, rhs) < 0) ? scm_true : scm_false;
+                return 0;
+            }
+            bad = 1;
+        }
+        scm_obj_t argv[2] = { lhs, rhs };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_ge_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+        int bad = 0;
+        if (real_pred(lhs)) {
+            if (real_pred(rhs)) {
+                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) >= 0) ? scm_true : scm_false;
+                return 0;
+            }
+            bad = 1;
+        }
+        scm_obj_t argv[2] = { lhs, rhs };
+        wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_le_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+        int bad = 0;
+        if (real_pred(lhs)) {
+            if (real_pred(rhs)) {
+                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) <= 0) ? scm_true : scm_false;
                 return 0;
             }
             bad = 1;
@@ -861,8 +909,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_LT_N_ILOC: {
                 emit_lt_n_iloc(ctx, inst);
             } break;
-            // VMOP_GE_N_ILOC []
-            // VMOP_LE_N_ILOC []
+            case VMOP_GE_N_ILOC: {
+                emit_ge_n_iloc(ctx, inst);
+            } break;
+            case VMOP_LE_N_ILOC: {
+                emit_le_n_iloc(ctx, inst);
+            } break;
             case VMOP_GT_N_ILOC: {
                 emit_gt_n_iloc(ctx, inst);
             } break;
@@ -875,11 +927,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_LT_ILOC: {
                 emit_lt_iloc(ctx, inst);
             } break;
-            // VMOP_LE_ILOC []
+            case VMOP_LE_ILOC: {
+                emit_le_iloc(ctx, inst);
+            } break;
             case VMOP_GT_ILOC: {
                 emit_gt_iloc(ctx, inst);
             } break;
-            // VMOP_GE_ILOC []
+            case VMOP_GE_ILOC: {
+                emit_ge_iloc(ctx, inst);
+            } break;
             // VMOP_PUSH_VECTREF_ILOC  remove
             // VMOP_VECTREF_ILOC       remove
             case VMOP_NATIVE: {

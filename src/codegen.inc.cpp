@@ -812,10 +812,23 @@ codegen_t::emit_gt_n_iloc(context_t& ctx, scm_obj_t inst)
 }
 
 void
+codegen_t::emit_ge_n_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_n_iloc(ctx, inst, GE, "c_ge_n_iloc");
+}
+
+void
+codegen_t::emit_le_n_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_n_iloc(ctx, inst, LE, "c_le_n_iloc");
+}
+
+void
 codegen_t::emit_eq_n_iloc(context_t& ctx, scm_obj_t inst)
 {
   emit_cc_n_iloc(ctx, inst, EQ, "c_eq_n_iloc");
 }
+
 
 void
 codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc)
@@ -868,6 +881,18 @@ void
 codegen_t::emit_lt_iloc(context_t& ctx, scm_obj_t inst)
 {
   emit_cc_iloc(ctx, inst, LT, "c_lt_iloc");
+}
+
+void
+codegen_t::emit_ge_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_iloc(ctx, inst, GE, "c_ge_iloc");
+}
+
+void
+codegen_t::emit_le_iloc(context_t& ctx, scm_obj_t inst)
+{
+  emit_cc_iloc(ctx, inst, LE, "c_le_iloc");
 }
 
 void
@@ -1709,19 +1734,48 @@ s ;=> (3 4)
 (define s)
 (define (m n) (set! s (>= n 10)))
 (closure-compile m)
-##### unsupported instruction >=n.iloc ######
+(m 100)
+s ;=> #t
+(m 1)
+s ;=> #f
+(m 100.0)
+s ;=> #t
+(m 1.0)
+s ;=> #f
+
+(define s)
+(define (m n) (set! s (<= n 10)))
+(closure-compile m)
+(m 100)
+s ;=> #f
+(m 1)
+s ;=> #t
+(m 100.0)
+s ;=> #f
+(m 1.0)
+s ;=> #t
+
 
 (define s)
 (define t)
 (define (m n) (set! s (<= t n)))
 (closure-compile m)
-##### unsupported instruction <=.iloc ######
+(set! t 10)
+(m 100)
+s ;=> #t
+(m 1)
+s ;=> #f
+
 
 (define s)
 (define t)
 (define (m n) (set! s (>= t n)))
 (closure-compile m)
-##### unsupported instruction >=.iloc ######
+(set! t 10)
+(m 100)
+s ;=> #f
+(m 1)
+s ;=> #t
 
 (define (m n) (if (symbol? n) (list 10) (list -10)))
 (closure-compile m)

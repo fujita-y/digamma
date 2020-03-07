@@ -114,13 +114,18 @@ private:
     void emit_cdr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_lt_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_gt_n_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_ge_n_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_le_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_eq_n_iloc(context_t& ctx, scm_obj_t inst);
+
     void emit_extend(context_t& ctx, scm_obj_t inst);
     void emit_extend_enclose_local(context_t& ctx, scm_obj_t inst);
     void emit_apply_iloc_local(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_lt_iloc(context_t& ctx, scm_obj_t inst);
     void emit_gt_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_le_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_ge_iloc(context_t& ctx, scm_obj_t inst);
     void emit_eq_iloc(context_t& ctx, scm_obj_t inst);
 
     void emit_set_gloc(context_t& ctx, scm_obj_t inst);
