@@ -699,7 +699,7 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
-        //printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
+        printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);
@@ -781,6 +781,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
+                ctx.m_depth++;
             } break;
             case VMOP_EXTEND_UNBOUND: {
                 emit_extend_unbound(ctx, inst);
@@ -1016,3 +1017,30 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 }
 
 #include "codegen.inc.cpp"
+
+/*
+
+(define (p obj pred)
+
+  (define (loop l)
+    (if (and (pair? l) (pair? (cdr l)))
+        (split-list l '() '())
+        l))
+
+  (define (split-list l one two)
+    (if (pair? l)
+        (split-list (cdr l) two (cons (car l) one))
+        (merge (loop one) (loop two))))
+
+  (define (merge one two)
+    (cond ((null? one) two)
+          ((pred (car two) (car one))
+           (cons (car two)
+                 (merge (cdr two) one)))
+          (else
+           (cons (car one)
+                 (merge (cdr one) two)))))
+
+  (loop obj))
+
+*/

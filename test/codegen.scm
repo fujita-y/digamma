@@ -280,6 +280,94 @@
   ((m 100) 20) => 120)
 (test-end)
 
+#|
+> (closure-compile break)
+generating native code: |core.lists'break|
+
+(break (lambda (n) (= n 1)) '(0 0 0 0 1 1 1 2 2 2)) ;=> #<values (0 0 0 0) (1 1 1 2 2 2)>
+
+(define (m n) (set! n (+ 1 n)) n)
+(closure-compile m)
+(m 10)
+
+(define s)
+(define (m n) (set! s (cddr n)))
+(closure-compile m)
+(m '(1 2 3 4))
+s ;=> (3 4)
+
+(define s)
+(define (m n) (set! s (>= n 10)))
+(closure-compile m)
+(m 100)
+s ;=> #t
+(m 1)
+s ;=> #f
+(m 100.0)
+s ;=> #t
+(m 1.0)
+s ;=> #f
+
+(define s)
+(define (m n) (set! s (<= n 10)))
+(closure-compile m)
+(m 100)
+s ;=> #f
+(m 1)
+s ;=> #t
+(m 100.0)
+s ;=> #f
+(m 1.0)
+s ;=> #t
+
+
+(define s)
+(define t)
+(define (m n) (set! s (<= t n)))
+(closure-compile m)
+(set! t 10)
+(m 100)
+s ;=> #t
+(m 1)
+s ;=> #f
+
+
+(define s)
+(define t)
+(define (m n) (set! s (>= t n)))
+(closure-compile m)
+(set! t 10)
+(m 100)
+s ;=> #f
+(m 1)
+s ;=> #t
+
+(define (m n) (if (symbol? n) (list 10) (list -10)))
+(closure-compile m)
+(m 'foo) => (10)
+
+(define (m n) (if (pair? n) 10 -10))
+(closure-compile m)
+(m '(1 2)) ;=> 10
+(m 2) ;=> -10
+
+(define (m n) (if (symbol? n) 10 -10))
+(closure-compile m)
+(m 'foo) ;=> 10
+(m 2) ;=> -10
+
+(define (m n) (and (null? n) 10))
+(closure-compile m)
+(m '()) ;=> 10
+(m 3) ;=> #f
+
+(define (m n) (and (symbol? n) 10))
+(closure-compile m)
+(m 'foo) ;=> 10
+(m 3) ;=> #f
+
+|#
+
 ;; ./digamma --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/codegen.scm
 #|
 (backtrace #f)

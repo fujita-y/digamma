@@ -1050,9 +1050,10 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
-    int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
+    //int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
+    int function_index = ctx.m_depth - level - 1 + (index << 16);
 
-    //printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %d \n", level, index, ctx.m_depth, function_index);
+    printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto env2 = emit_lookup_env(ctx, level);
@@ -1067,23 +1068,11 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
     Function* L = ctx.m_local_functions[function_index];
-    //printf("emit_apply_iloc_local: L = %p, function_index %d, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
+    printf("emit_apply_iloc_local: L = %p, function_index %x, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
     assert(L != nullptr);
     auto call = IRB.CreateCall(L, { vm });
     call->setTailCallKind(CallInst::TCK_MustTail);
     IRB.CreateRet(call);
-    /*
-    if (L == nullptr) {
-      printf("emit_apply_iloc_local ctx.m_local_functions[function_index] = nullptr\n");
-      CREATE_STORE_VM_REG(vm, m_pc, obj);
-      IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
-    } else {
-      printf("emit_apply_iloc_local ctx.m_local_functions[function_index] = %p\n", L);
-      auto call = IRB.CreateCall(L, { vm });
-      call->setTailCallKind(CallInst::TCK_MustTail);
-      IRB.CreateRet(call);
-    }
-    */
 }
 
 void
@@ -1558,11 +1547,13 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     L->addParamAttr(0, Attribute::NoCapture);
 #endif
     BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
-    printf("emit_push_close_local level = %d index = %d\n", ctx.m_depth, ctx.m_argc);
-    ctx.m_local_functions[ctx.m_depth + (ctx.m_argc << 16)] = L;
+    int function_index = ctx.m_depth + (ctx.m_argc << 16);
+    printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
+    ctx.m_local_functions[function_index] = L;
     context_t ctx2 = ctx;
     ctx2.m_function = L;
-    ctx2.m_depth++;
+//    ctx2.m_depth++;
+    ctx2.m_depth = ctx2.m_depth + 2;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
     transform(ctx2, operands);
@@ -1757,92 +1748,3 @@ codegen_t::emit_apply(context_t& ctx, scm_obj_t inst)
 
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
 }
-
-/*
-
-> (closure-compile break)
-generating native code: |core.lists'break|
-
-(break (lambda (n) (= n 1)) '(0 0 0 0 1 1 1 2 2 2)) ;=> #<values (0 0 0 0) (1 1 1 2 2 2)>
-
-(define (m n) (set! n (+ 1 n)) n)
-(closure-compile m)
-(m 10)
-
-(define s)
-(define (m n) (set! s (cddr n)))
-(closure-compile m)
-(m '(1 2 3 4))
-s ;=> (3 4)
-
-(define s)
-(define (m n) (set! s (>= n 10)))
-(closure-compile m)
-(m 100)
-s ;=> #t
-(m 1)
-s ;=> #f
-(m 100.0)
-s ;=> #t
-(m 1.0)
-s ;=> #f
-
-(define s)
-(define (m n) (set! s (<= n 10)))
-(closure-compile m)
-(m 100)
-s ;=> #f
-(m 1)
-s ;=> #t
-(m 100.0)
-s ;=> #f
-(m 1.0)
-s ;=> #t
-
-
-(define s)
-(define t)
-(define (m n) (set! s (<= t n)))
-(closure-compile m)
-(set! t 10)
-(m 100)
-s ;=> #t
-(m 1)
-s ;=> #f
-
-
-(define s)
-(define t)
-(define (m n) (set! s (>= t n)))
-(closure-compile m)
-(set! t 10)
-(m 100)
-s ;=> #f
-(m 1)
-s ;=> #t
-
-(define (m n) (if (symbol? n) (list 10) (list -10)))
-(closure-compile m)
-(m 'foo) => (10)
-
-(define (m n) (if (pair? n) 10 -10))
-(closure-compile m)
-(m '(1 2)) ;=> 10
-(m 2) ;=> -10
-
-(define (m n) (if (symbol? n) 10 -10))
-(closure-compile m)
-(m 'foo) ;=> 10
-(m 2) ;=> -10
-
-(define (m n) (and (null? n) 10))
-(closure-compile m)
-(m '()) ;=> 10
-(m 3) ;=> #f
-
-(define (m n) (and (symbol? n) 10))
-(closure-compile m)
-(m 'foo) ;=> 10
-(m 3) ;=> #f
-
-*/
