@@ -800,12 +800,16 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_NOT_PAIRP_RET_CONST: {
                 emit_if_not_pairp_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_NOT_NULLP_RET_CONST []
+            case VMOP_IF_NOT_NULLP_RET_CONST: {
+                emit_if_not_nullp_ret_const(ctx, inst);
+            } break;
             case VMOP_IF_NOT_EQP_RET_CONST: {
                 ctx.m_argc--;
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_NOT_SYMBOLP_RET_CONST []
+            case VMOP_IF_NOT_SYMBOLP_RET_CONST: {
+                emit_if_not_symbolp_ret_const(ctx, inst);
+            } break;
             case VMOP_CLOSE: {
                 emit_close(ctx, inst);
             } break;

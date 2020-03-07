@@ -97,7 +97,9 @@ private:
     void emit_if_true(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_not_nullp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_symbolp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_not_symbolp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_pairp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret(context_t& ctx, scm_obj_t inst);
