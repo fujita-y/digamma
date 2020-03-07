@@ -119,9 +119,6 @@
 (closure-compile run-bench)
 ;(closure-compile run-benchmark)
 
-(time-bench mbrot 10)
-(exit)
-
 (format #t "\n\n;;  GABRIEL\n")
 (time-bench ack 3)
 (time-bench boyer 3)
@@ -138,11 +135,11 @@
 (time-bench triangl 1)
 
 (format #t "\n\n;;  ARITHMETIC\n")
-;;(time-bench fft 200)
+(time-bench fft 200)
 (time-bench fib 1)
 ;(time-bench fibc 50)
 ;(time-bench fibfp 1)
-(time-bench mbrot 10)
+;(time-bench mbrot 10)
 ;(time-bench nucleic 1)
 ;(time-bench pnpoly 10000)
 ;(time-bench sum 1000)
@@ -158,10 +155,10 @@
 ;(time-bench paraffins 100)
 ;(time-bench peval 20)
 ;(time-bench ray 1)
-;;(time-bench scheme 3000)
+(time-bench scheme 3000)
 
 (newline)
-
+(exit)
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma-jit.scm
 ; ./digamma --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma.scm
 
@@ -247,6 +244,7 @@
  (apply.iloc+ (0 . 0)))
 
 
+====
 
 (backtrace #f)
 (define (p n)
@@ -259,4 +257,90 @@
                 (loop0 (- x 1)))))))))
 (closure-code p)
 
-loop0 : 5
+((extend.enclose+
+   (>=n.iloc (0 . 0) 0)
+   (if.true
+     (extend.enclose+
+       (>=n.iloc (0 . 0) 0)
+       (if.true
+         (extend.enclose+
+           (>=n.iloc (0 . 0) 0)
+           (if.true
+              (push.n+.iloc (0 . 0) -1)
+              (apply.iloc+ (5 . 0)))
+           (ret.const . #<unspecified>))
+         (push.n+.iloc (5 . 0) -1)
+         (apply.iloc+ (0 . 0)))
+       (ret.const . #<unspecified>))
+     (push.n+.iloc (3 . 0) -1)
+     (apply.iloc+ (0 . 0)))
+   (ret.const . #<unspecified>))
+ (push.n+.iloc (1 . 0) -1)
+ (apply.iloc+ (0 . 0)))
+
+=====
+(backtrace #f)
+(define (p n)
+  (let loop0 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop1 ((y (- n 1)))
+        (if (>= y 0)
+          (let loop2 ((x (- n 1)))
+            (if (>= x 0)
+                (loop1 (- x 1)))))))))
+(closure-code p)
+
+((extend.enclose+
+   (>=n.iloc (0 . 0) 0)
+   (if.true
+     (extend.enclose+
+       (>=n.iloc (0 . 0) 0)
+       (if.true
+         (extend.enclose+
+           (>=n.iloc (0 . 0) 0)
+           (if.true (push.n+.iloc (0 . 0) -1) (apply.iloc+ (3 . 0)))
+           (ret.const . #<unspecified>))
+         (push.n+.iloc (5 . 0) -1)
+         (apply.iloc+ (0 . 0)))
+       (ret.const . #<unspecified>))
+     (push.n+.iloc (3 . 0) -1)
+     (apply.iloc+ (0 . 0)))
+   (ret.const . #<unspecified>))
+ (push.n+.iloc (1 . 0) -1)
+ (apply.iloc+ (0 . 0)))
+
+
+(backtrace #f)
+(define (p n)
+  (let loop0 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop1 ((y (- n 1)))
+        (if (>= y 0)
+          (let loop2 ((x (- n 1)))
+            (if (>= x 0)
+                (loop2 (- x 1)))))))))
+(closure-code p)
+
+vector at 0 1 2
+depth     0 1 2
+index     5 3 1
+
+2 5 -> 0
+2 3 -> 1
+2 1 -> 2
+
+(level - 1) / 2
+
+====
+
+(backtrace #f)
+(define (p n)
+  (let loop0 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop1 ()
+        (if (>= y 0)
+          (let loop2 ((x (- n 1)))
+            (if (>= x 0)
+                (loop0 (- x 1))
+                (loop2 (- x 1)))))))))
+(closure-code p)

@@ -1032,7 +1032,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
     context_t ctx2 = ctx;
     ctx2.m_function = L;
-    ctx2.m_depth++;
+    ctx2.m_depth = ctx2.m_depth + 2;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOOP);
     transform(ctx2, operands);
@@ -1050,8 +1050,8 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
-    int function_index = (ctx.m_depth - level) + (index << 16);
-//    int function_index = (ctx.m_depth - (level - 1) / 2) + (index << 16);
+    int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
+
     printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %d \n", level, index, ctx.m_depth, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
