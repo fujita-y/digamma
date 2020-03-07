@@ -119,6 +119,7 @@ private:
     void emit_eq_n_iloc(context_t& ctx, scm_obj_t inst);
 
     void emit_extend(context_t& ctx, scm_obj_t inst);
+    void emit_extend_enclose(context_t& ctx, scm_obj_t inst);
     void emit_extend_enclose_local(context_t& ctx, scm_obj_t inst);
     void emit_apply_iloc_local(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret_const(context_t& ctx, scm_obj_t inst);

@@ -1714,12 +1714,26 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(CONTINUE);
 }
 
+void
+codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
+{
+    // [TODO] defer compile closure code in operand ??
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t) + sizeof(vm_env_rec_t));
+    auto c_extend_enclose = M->getOrInsertFunction("c_extend_enclose", IntptrTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_extend_enclose, { vm, VALUE_INTPTR(operands) });
+}
+
 /*
 
 > (closure-compile break)
 generating native code: |core.lists'break|
-##### unsupported instruction extend.enclose ######
 
+(break (lambda (n) (= n 1)) '(0 0 0 0 1 1 1 2 2 2)) ;=> #<values (0 0 0 0) (1 1 1 2 2 2)>
 
 (define (m n) (set! n (+ 1 n)) n)
 (closure-compile m)

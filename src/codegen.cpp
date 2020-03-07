@@ -412,6 +412,21 @@ extern "C" {
         vm->m_sp = vm->m_fp;
     }
 
+    void c_extend_enclose(VM* vm, scm_obj_t operands) {
+        vm->m_sp[0] = scm_undef;
+        vm->m_sp++;
+        vm_env_t env = (vm_env_t)vm->m_sp;
+        env->count = 1;
+        env->up = vm->m_env;
+        vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
+        vm->m_env = &env->up;
+        vm->m_env = vm->save_env(vm->m_env);
+        vm->update_cont(vm->m_cont);
+        env = (vm_env_t)((intptr_t)vm->m_env - offsetof(vm_env_rec_t, up));
+        scm_obj_t* slot = (scm_obj_t*)env - 1;
+        *slot = make_closure(vm->m_heap, (scm_closure_t)operands, vm->m_env);
+    }
+
 }
 
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
@@ -758,7 +773,10 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 ctx.m_argc = 0;
                 ctx.m_depth++;
             } break;
-            // VMOP_EXTEND_ENCLOSE []
+            case VMOP_EXTEND_ENCLOSE: {
+                emit_extend_enclose(ctx, inst);
+                ctx.m_argc = 0;
+            } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
