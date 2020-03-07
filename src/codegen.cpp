@@ -840,7 +840,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_PAIRP: {
                 emit_if_pairp(ctx, inst);
             } break;
-            // VMOP_IF_SYMBOLP []
+            case VMOP_IF_SYMBOLP: {
+                emit_if_symbolp(ctx, inst);
+            } break;
             case VMOP_IF_TRUE_RET: {
                 emit_if_true_ret(ctx, inst);
             } break;

@@ -1728,6 +1728,25 @@ codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
     IRB.CreateCall(c_extend_enclose, { vm, VALUE_INTPTR(operands) });
 }
 
+void
+codegen_t::emit_if_symbolp(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
+    BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
+
+    emit_cond_symbolp(ctx, CREATE_LOAD_VM_REG(vm, m_value), taken_true, taken_false);
+    // taken
+    IRB.SetInsertPoint(taken_true);
+    transform(ctx, operands);
+    // not taken
+    IRB.SetInsertPoint(taken_false);
+}
+
 /*
 
 > (closure-compile break)

@@ -132,6 +132,7 @@ private:
     void emit_set_gloc(context_t& ctx, scm_obj_t inst);
     void emit_const(context_t& ctx, scm_obj_t inst);
     void emit_if_pairp(context_t& ctx, scm_obj_t inst);
+    void emit_if_symbolp(context_t& ctx, scm_obj_t inst);
     void emit_cadr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_cddr_iloc(context_t& ctx, scm_obj_t inst);
     void emit_if_not_pairp_ret_const(context_t& ctx, scm_obj_t inst);
