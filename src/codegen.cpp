@@ -774,7 +774,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_IF_PAIRP: {
                 emit_if_pairp(ctx, inst);
             } break;
-            // VMOP_IF_SYMBOLP
+            // VMOP_IF_SYMBOLP []
             case VMOP_IF_TRUE_RET: {
                 emit_if_true_ret(ctx, inst);
             } break;
@@ -791,17 +791,21 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 ctx.m_argc--;
                 emit_if_eqp_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_PAIRP_RET_CONST
-            // VMOP_IF_SYMBOLP_RET_CONST
+            case VMOP_IF_PAIRP_RET_CONST: {
+                emit_if_pairp_ret_const(ctx, inst);
+            } break;
+            case VMOP_IF_SYMBOLP_RET_CONST: {
+                emit_if_symbolp_ret_const(ctx, inst);
+            } break;
             case VMOP_IF_NOT_PAIRP_RET_CONST: {
                 emit_if_not_pairp_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_NOT_NULLP_RET_CONST
+            // VMOP_IF_NOT_NULLP_RET_CONST []
             case VMOP_IF_NOT_EQP_RET_CONST: {
                 ctx.m_argc--;
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
-            // VMOP_IF_NOT_SYMBOLP_RET_CONST
+            // VMOP_IF_NOT_SYMBOLP_RET_CONST []
             case VMOP_CLOSE: {
                 emit_close(ctx, inst);
             } break;
@@ -908,6 +912,22 @@ codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, Ba
     auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
     auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(0xf)), VALUE_INTPTR(0xa));
     IRB.CreateCondBr(cond2, pair_true, pair_false);
+}
+
+void
+codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
+    IRB.CreateCondBr(cond1, cond1_true, symbol_false);
+    IRB.SetInsertPoint(cond1_true);
+    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
+    IRB.CreateCondBr(cond2, symbol_true, symbol_false);
 }
 
 #include "codegen.inc.cpp"

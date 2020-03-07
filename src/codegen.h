@@ -59,6 +59,7 @@ public:
 private:
     Function* emit_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false);
+    void emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false);
     Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
     Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
@@ -96,6 +97,8 @@ private:
     void emit_if_true(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_symbolp_ret_const(context_t& ctx, scm_obj_t inst);
+    void emit_if_pairp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_if_true_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_false_ret(context_t& ctx, scm_obj_t inst);

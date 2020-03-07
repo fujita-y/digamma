@@ -1527,6 +1527,46 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_GLOC_REC(gloc, value));
 }
 
+void
+codegen_t::emit_if_symbolp_ret_const(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* symbol_true = BasicBlock::Create(C, "symbol_true", F);
+    BasicBlock* symbol_false = BasicBlock::Create(C, "symbol_false", F);
+    emit_cond_symbolp(ctx, value, symbol_true, symbol_false);
+    // taken
+    IRB.SetInsertPoint(symbol_true);
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // not taken
+    IRB.SetInsertPoint(symbol_false);
+}
+
+void
+codegen_t::emit_if_pairp_ret_const(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
+    BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
+    emit_cond_pairp(ctx, value, pair_true, pair_false);
+    // taken
+    IRB.SetInsertPoint(pair_true);
+    CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // not taken
+    IRB.SetInsertPoint(pair_false);
+}
+
 /*
 
 > (closure-compile break)
@@ -1561,7 +1601,31 @@ generating native code: |core.lists'break|
 (closure-compile m)
 ##### unsupported instruction >=.iloc ######
 
-(define (m n) (if (pair? n) 10))
+(define (m n) (if (symbol? n) (list 10) (list -10)))
 (closure-compile m)
-##### unsupported instruction if.pair?.ret.const ######
+(m 'foo) => (10)
+
+(define (m n) (if (pair? n) 10 -10))
+(closure-compile m)
+(m '(1 2)) ;=> 10
+(m 2) ;=> -10
+
+(define (m n) (if (symbol? n) 10 -10))
+(closure-compile m)
+##### unsupported instruction if.symbol?.ret.const ######
+(m 'foo) ;=> 10
+(m 2) ;=> -10
+
+(define (m n) (and (null? n) 10))
+(closure-compile m)
+##### unsupported instruction if.not.null?.ret.const ######
+(m '()) ;=> 10
+(m 3) ;=> #f
+
+(define (m n) (and (symbol? n) 10))
+(closure-compile m)
+##### unsupported instruction if.not.symbol?.ret.const ######
+(m 'foo) ;=> 10
+(m 3) ;=> #f
+
 */
