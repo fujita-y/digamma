@@ -1426,8 +1426,8 @@ object_heap_t::init_inherents()
     make_symbol_inherent(this, "<=.iloc", VMOP_LE_ILOC);
     make_symbol_inherent(this, ">.iloc", VMOP_GT_ILOC);
     make_symbol_inherent(this, ">=.iloc", VMOP_GE_ILOC);
-    make_symbol_inherent(this, "push.vector-ref.iloc", VMOP_PUSH_VECTREF_ILOC);
-    make_symbol_inherent(this, "vector-ref.iloc", VMOP_VECTREF_ILOC);
+    //make_symbol_inherent(this, "push.vector-ref.iloc", VMOP_PUSH_VECTREF_ILOC);
+    //make_symbol_inherent(this, "vector-ref.iloc", VMOP_VECTREF_ILOC);
     make_symbol_inherent(this, "native", VMOP_NATIVE);
     make_symbol_inherent(this, "little", S_CODE_LITTLE);
     make_symbol_inherent(this, "big", S_CODE_BIG);

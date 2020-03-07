@@ -215,7 +215,7 @@
                                 (if (and (fixnum? opd2) (symbol? opd1) (iloc? opd1 cte))
                                     `((n+.iloc ,(make-iloc-operand opd1 cte) ,(- opd2) . ,comment))
                                     (compile-anonymous form cte tail comment))))
-                             ((eq? subr vector-ref)
+                             #;((eq? subr vector-ref)
                               (let ((opd1 (cadr form)) (opd2 (caddr form)))
                                 (if (iloc? opd1 cte)
                                     `(,@(compile-expression opd2 cte #f #f) (vector-ref.iloc ,(make-iloc-operand opd1 cte) . ,comment))
@@ -271,7 +271,7 @@
                                 `((push.n+.iloc ,(make-iloc-operand opd1 cte) ,(- opd2) . ,comment))
                                 (compile-anonymous form cte comment))))
 
-                         ((eq? subr vector-ref)
+                         #;((eq? subr vector-ref)
                           (let ((opd1 (cadr form)) (opd2 (caddr form)))
                             (if (iloc? opd1 cte)
                                 `(,@(compile-argument opd2 cte) (push.vector-ref.iloc ,(make-iloc-operand opd1 cte) . ,comment))

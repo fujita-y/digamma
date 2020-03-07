@@ -1385,7 +1385,7 @@ VM::loop(bool init, bool resume)
                 }
                 goto FALLBACK_GE_ILOC;
             }
-
+            /*
             CASE(VMOP_PUSH_VECTREF_ILOC) {
                 obj = *lookup_iloc(CAR(OPERANDS));
                 if (VECTORP(obj)) {
@@ -1417,7 +1417,7 @@ VM::loop(bool init, bool resume)
                 }
                 goto ERROR_VECTREF_ILOC;
             }
-
+            */
             CASE(VMOP_NATIVE) {
                 m_trace = m_trace_tail = scm_unspecified;
                 operand_trace = scm_nil;
