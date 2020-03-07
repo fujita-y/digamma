@@ -150,6 +150,7 @@ private:
     void emit_close(context_t& ctx, scm_obj_t inst);
     void emit_ret_close(context_t& ctx, scm_obj_t inst);
     void emit_nadd_iloc(context_t& ctx, scm_obj_t inst);
+    void emit_apply(context_t& ctx, scm_obj_t inst);
 };
 
 /*

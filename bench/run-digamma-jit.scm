@@ -119,6 +119,9 @@
 (closure-compile run-bench)
 ;(closure-compile run-benchmark)
 
+(time-bench mbrot 10)
+(exit)
+
 (format #t "\n\n;;  GABRIEL\n")
 (time-bench ack 3)
 (time-bench boyer 3)
@@ -126,20 +129,20 @@
 (time-bench cpstak 80)
 (time-bench ctak 25)
 (time-bench dderiv 160000)
-;(time-bench deriv 320000)
-;(time-bench destruc 100)
+(time-bench deriv 320000)
+(time-bench destruc 100)
 (time-bench diviter 200000)
 (time-bench divrec 140000)
-;(time-bench puzzle 12)
+(time-bench puzzle 12)
 (time-bench takl 35)
-;(time-bench triangl 1)
+(time-bench triangl 1)
 
 (format #t "\n\n;;  ARITHMETIC\n")
-;(time-bench fft 200)
+;;(time-bench fft 200)
 (time-bench fib 1)
 ;(time-bench fibc 50)
 ;(time-bench fibfp 1)
-;(time-bench mbrot 10)
+(time-bench mbrot 10)
 ;(time-bench nucleic 1)
 ;(time-bench pnpoly 10000)
 ;(time-bench sum 1000)
@@ -155,7 +158,7 @@
 ;(time-bench paraffins 100)
 ;(time-bench peval 20)
 ;(time-bench ray 1)
-;(time-bench scheme 3000)
+;;(time-bench scheme 3000)
 
 (newline)
 
@@ -197,3 +200,63 @@
 ;;  dderiv  (x160000)
 ;;  0.785017 real    0.939485 user    0.004217 sys
 ;;  ----------------------------------------------------------------generating native code: create-n
+
+(level - 1) / 2
+
+(backtrace #f)
+(define (p n)
+  (let loop1 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop2 ((x (- n 1)))
+        (if (>= x 0)
+            (loop2 (- x 1))
+            (loop1 (- y 1)))))))
+
+((extend.enclose+
+   (>=n.iloc (0 . 0) 0)
+   (if.true
+     (extend.enclose+
+       (>=n.iloc (0 . 0) 0)
+       (if.true
+         (push.n+.iloc (0 . 0) -1) x -1
+         (apply.iloc+ (1 . 0))) loop 2
+       (push.n+.iloc (2 . 0) -1)
+       (apply.iloc+ (3 . 0))) loop 1
+     (push.n+.iloc (3 . 0) -1)
+     (apply.iloc+ (0 . 0)))
+   (ret.const . #<unspecified>))
+ (push.n+.iloc (1 . 0) -1)
+ (apply.iloc+ (0 . 0)))
+
+ (backtrace #f)
+(define (p n)
+  (let loop1 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop2 ((x (- n 1)))
+            (loop2 (- x 1))
+            (loop1 (- y 1))))))
+
+((extend.enclose+
+   (>=n.iloc (0 . 0) 0)
+   (if.true
+    (extend.enclose . #<closure loop2>)
+    (push.n+.iloc (3 . 0) -1)
+    (apply.iloc (0 . 0)))
+   (ret.const . #<unspecified>))
+ (push.n+.iloc (1 . 0) -1)
+ (apply.iloc+ (0 . 0)))
+
+
+
+(backtrace #f)
+(define (p n)
+  (let loop0 ((y (- n 1)))
+    (if (>= y 0)
+      (let loop1 ((y (- n 1)))
+        (if (>= y 0)
+          (let loop2 ((x (- n 1)))
+            (if (>= x 0)
+                (loop0 (- x 1)))))))))
+(closure-code p)
+
+loop0 : 5
