@@ -581,15 +581,17 @@ codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
     printer_t prt(vm, vm->m_current_output);
-    prt.format("generating native code: ~s~&", closure->doc);
     if (is_compiled(closure)) {
-        puts("- already compiled");
+        //prt.format("generating native code: ~s~&", closure->doc);
+        //puts("- already compiled");
         return;
     }
     if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
-        puts("- already visit");
+        //prt.format("generating native code: ~s~&", closure->doc);
+        //puts("- already visit");
         return;
     }
+    prt.format("generating native code: ~s~&", closure->doc);
 
     m_visit.push_back(closure);
 
@@ -699,7 +701,7 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
-        printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
+        // printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);
@@ -1022,36 +1024,39 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 
 (backtrace #f)
 (define p
-  (lambda (form source)
-    (let ((ht-comments (current-source-comments)))
+  (lambda (tmpl ranks vars)
 
-      (define put-note!
-        (lambda (form note)
-          (and note
-               (let loop ((lst form))
-                 (and (list? lst)
-                      (or (core-hashtable-ref ht-comments lst #f)
-                          (begin
-                            (core-hashtable-set! ht-comments lst note)
-                            (for-each loop lst))))))))
+    (define traverse-escaped
+      (lambda (lst depth)
+        (let loop ((lst lst) (depth depth))
+          (cond ((symbol? lst)
+                 (< 0 (rank-of lst ranks) depth))
+                ((pair? lst)
+                 (or (loop (car lst) depth)
+                     (loop (cdr lst) depth)))
+                ((vector? lst)
+                 (loop (vector->list lst) depth))
+                (else #f)))))
 
-      (define get-note
-        (lambda (source)
-          (let loop ((lst source))
-            (and (pair? lst)
-                 (or (core-hashtable-ref ht-comments lst #f)
-                     (loop (car lst))
-                     (loop (cdr lst)))))))
+    (let loop ((lst tmpl) (depth 0))
+      (cond ((symbol? lst)
+             (< 0 (rank-of lst ranks) depth))
+            ((ellipsis-quote? lst)
+             (traverse-escaped (cadr lst) depth))
+            ((ellipsis-splicing-pair? lst)
+             (let-values (((body tail len) (parse-ellipsis-splicing lst)))
+               (or (loop body (+ depth 1))
+                   (loop tail depth))))
+            ((ellipsis-pair? lst)
+             (or (loop (car lst) (+ depth 1))
+                 (loop (cddr lst) depth)))
+            ((pair? lst)
+             (or (loop (car lst) depth)
+                 (loop (cdr lst) depth)))
+            ((vector? lst)
+             (loop (vector->list lst) depth))
+            (else #f)))))
 
-      (and ht-comments
-           (pair? form)
-           (pair? source)
-           (not (eq? form source))
-           (cond ((core-hashtable-ref ht-comments source #f)
-                  => (lambda (e) (core-hashtable-set! ht-comments form e)))
-                 ((get-note source)
-                  => (lambda (e) (put-note! form e))))))
-    form))
 (closure-compile p)
 
 */

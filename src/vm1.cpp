@@ -402,11 +402,13 @@ VM::loop(bool init, bool resume)
 
     apply:
         if (CLOSUREP(m_value)) {
-/*
+
             if (!s_codegen) s_codegen = new codegen_t(this);
             scm_closure_t closure = (scm_closure_t)m_value;
-            s_codegen->compile(closure);
-*/
+            if (closure->env == NULL) {
+                s_codegen->compile(closure);
+            }
+
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
                 scm_closure_t closure = (scm_closure_t)m_value;
