@@ -153,6 +153,8 @@ private:
     void emit_apply(context_t& ctx, scm_obj_t inst);
 };
 
+extern codegen_t* s_codegen;
+
 /*
 for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
 

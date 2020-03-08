@@ -7,6 +7,7 @@
 #include "printer.h"
 #include "violation.h"
 #include "interpreter.h"
+#include "codegen.h"
 
 #define FOLD_TAIL_CALL_TRACE            1
 #define UNWRAP_BACKTRACE                1
@@ -401,6 +402,11 @@ VM::loop(bool init, bool resume)
 
     apply:
         if (CLOSUREP(m_value)) {
+/*
+            if (!s_codegen) s_codegen = new codegen_t(this);
+            scm_closure_t closure = (scm_closure_t)m_value;
+            s_codegen->compile(closure);
+*/
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
                 scm_closure_t closure = (scm_closure_t)m_value;

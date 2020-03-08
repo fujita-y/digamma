@@ -8,6 +8,8 @@
 
 #include "codegen.h"
 
+codegen_t* s_codegen;
+
 /*
  (current-environment (system-environment)) (native-compile)
 */
@@ -23,8 +25,6 @@ subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
 /*
  (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
 */
-
-static codegen_t* s_codegen;
 
 // closure-compile
 scm_obj_t

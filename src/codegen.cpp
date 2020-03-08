@@ -699,7 +699,7 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
-        //printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
+        // printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);
@@ -776,7 +776,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
             case VMOP_EXTEND_ENCLOSE: {
                 emit_extend_enclose(ctx, inst);
                 ctx.m_argc = 0;
-                ctx.m_depth++;
+//                ctx.m_depth++;
             } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
                 emit_extend_enclose_local(ctx, inst);
@@ -1020,27 +1020,38 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 
 /*
 
-(define (p obj pred)
+(backtrace #f)
+(define p
+  (lambda (form source)
+    (let ((ht-comments (current-source-comments)))
 
-  (define (loop l)
-    (if (and (pair? l) (pair? (cdr l)))
-        (split-list l '() '())
-        l))
+      (define put-note!
+        (lambda (form note)
+          (and note
+               (let loop ((lst form))
+                 (and (list? lst)
+                      (or (core-hashtable-ref ht-comments lst #f)
+                          (begin
+                            (core-hashtable-set! ht-comments lst note)
+                            (for-each loop lst))))))))
 
-  (define (split-list l one two)
-    (if (pair? l)
-        (split-list (cdr l) two (cons (car l) one))
-        (merge (loop one) (loop two))))
+      (define get-note
+        (lambda (source)
+          (let loop ((lst source))
+            (and (pair? lst)
+                 (or (core-hashtable-ref ht-comments lst #f)
+                     (loop (car lst))
+                     (loop (cdr lst)))))))
 
-  (define (merge one two)
-    (cond ((null? one) two)
-          ((pred (car two) (car one))
-           (cons (car two)
-                 (merge (cdr two) one)))
-          (else
-           (cons (car one)
-                 (merge (cdr one) two)))))
-
-  (loop obj))
+      (and ht-comments
+           (pair? form)
+           (pair? source)
+           (not (eq? form source))
+           (cond ((core-hashtable-ref ht-comments source #f)
+                  => (lambda (e) (core-hashtable-set! ht-comments form e)))
+                 ((get-note source)
+                  => (lambda (e) (put-note! form e))))))
+    form))
+(closure-compile p)
 
 */
