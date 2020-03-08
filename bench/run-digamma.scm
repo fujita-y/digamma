@@ -21,6 +21,7 @@
 (define (run-benchmark name count ok? run-maker . args)
   (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
   (let* ((run (apply run-maker args))
+         (warmup (run-bench name 1 ok? run))
          (result (time (run-bench name count ok? run))))
     (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
   (format #t ";;  ----------------------------------------------------------------~!")

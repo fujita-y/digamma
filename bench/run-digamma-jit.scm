@@ -20,11 +20,13 @@
 
 (define (run-benchmark name count ok? run-maker . args)
   (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
-  (let* ((run (apply run-maker args))
-         (result (time (run-bench name count ok? run))))
-    (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
-  (format #t ";;  ----------------------------------------------------------------~!")
-  (unspecified))
+  (let* ((run (apply run-maker args)))
+         (run-bench name 1 ok? run) ; warm up
+    (let* ((run (apply run-maker args))
+          (result (time (run-bench name count ok? run))))
+      (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
+    (format #t ";;  ----------------------------------------------------------------~!")
+    (unspecified)))
 
 (define call-with-output-file/truncate
   (lambda (file-name proc)
