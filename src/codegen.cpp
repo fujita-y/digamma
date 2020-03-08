@@ -1020,43 +1020,12 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 
 #include "codegen.inc.cpp"
 
+
 /*
-
 (backtrace #f)
-(define p
-  (lambda (tmpl ranks vars)
-
-    (define traverse-escaped
-      (lambda (lst depth)
-        (let loop ((lst lst) (depth depth))
-          (cond ((symbol? lst)
-                 (< 0 (rank-of lst ranks) depth))
-                ((pair? lst)
-                 (or (loop (car lst) depth)
-                     (loop (cdr lst) depth)))
-                ((vector? lst)
-                 (loop (vector->list lst) depth))
-                (else #f)))))
-
-    (let loop ((lst tmpl) (depth 0))
-      (cond ((symbol? lst)
-             (< 0 (rank-of lst ranks) depth))
-            ((ellipsis-quote? lst)
-             (traverse-escaped (cadr lst) depth))
-            ((ellipsis-splicing-pair? lst)
-             (let-values (((body tail len) (parse-ellipsis-splicing lst)))
-               (or (loop body (+ depth 1))
-                   (loop tail depth))))
-            ((ellipsis-pair? lst)
-             (or (loop (car lst) (+ depth 1))
-                 (loop (cddr lst) depth)))
-            ((pair? lst)
-             (or (loop (car lst) depth)
-                 (loop (cdr lst) depth)))
-            ((vector? lst)
-             (loop (vector->list lst) depth))
-            (else #f)))))
-
-(closure-compile p)
-
+(define even? (lambda (n) (if (zero? n) #t (odd? (- n 1)))))
+(closure-compile even?)
+(define odd? (lambda (n) (if (zero? n) #f (even? (- n 1)))))
+(closure-compile odd?)
+(even? 88)
 */
