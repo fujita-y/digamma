@@ -699,7 +699,7 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst)
 {
     while (inst != scm_nil) {
-        printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
+        //printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);

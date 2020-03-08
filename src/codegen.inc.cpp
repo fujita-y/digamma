@@ -1053,7 +1053,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     //int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
     int function_index = ctx.m_depth - level - 1 + (index << 16);
 
-    printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
+    //printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto env2 = emit_lookup_env(ctx, level);
@@ -1068,7 +1068,9 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
     Function* L = ctx.m_local_functions[function_index];
-    printf("emit_apply_iloc_local: L = %p, function_index %x, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
+
+    //printf("emit_apply_iloc_local: L = %p, function_index %x, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
+
     assert(L != nullptr);
     auto call = IRB.CreateCall(L, { vm });
     call->setTailCallKind(CallInst::TCK_MustTail);
