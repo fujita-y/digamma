@@ -402,13 +402,6 @@ VM::loop(bool init, bool resume)
 
     apply:
         if (CLOSUREP(m_value)) {
-
-            if (!s_codegen) s_codegen = new codegen_t(this);
-            scm_closure_t closure = (scm_closure_t)m_value;
-            if (closure->env == NULL) {
-                s_codegen->compile(closure);
-            }
-
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
                 scm_closure_t closure = (scm_closure_t)m_value;
@@ -684,6 +677,20 @@ VM::loop(bool init, bool resume)
                 assert(GLOCP(CAR(OPERANDS)));
                 m_value = ((scm_gloc_t)CAR(OPERANDS))->value;
                 if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
+
+                scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
+                scm_obj_t obj = (scm_closure_t)gloc->value;
+                if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
+                  scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+                  scm_closure_t closure = (scm_closure_t)gloc->value;
+                  if (closure->env == NULL) {
+                    if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+                      if (!s_codegen) s_codegen = new codegen_t(this);
+                      s_codegen->compile(closure);
+                    }
+                  }
+                }
+
                 goto apply;
             }
 
