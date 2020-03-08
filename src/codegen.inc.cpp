@@ -1025,11 +1025,14 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
 
-    printf("emit_extend_enclose_local ctx.m_depth = %d index = %d\n", ctx.m_depth, 0);
+    int function_index = ctx.m_depth + (0 << 16);
 
-    ctx.m_local_functions[ctx.m_depth + (0 << 16)] = L;
+    ctx.m_local_functions[function_index] = L;
 
-    printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
+    printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
+
+
+//    printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
 
     context_t ctx2 = ctx;
     ctx2.m_function = L;
