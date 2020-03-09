@@ -676,21 +676,25 @@ VM::loop(bool init, bool resume)
             CASE(VMOP_APPLY_GLOC) {
                 operand_trace = CDR(OPERANDS);
                 assert(GLOCP(CAR(OPERANDS)));
-                m_value = ((scm_gloc_t)CAR(OPERANDS))->value;
+                scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
+                m_value = gloc->value;
                 if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
 #if 1
-                scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
-                scm_obj_t obj = (scm_closure_t)gloc->value;
-                if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
-                  scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+                if (CLOSUREP(gloc->value)) {
                   scm_closure_t closure = (scm_closure_t)gloc->value;
-                  if (closure->env == NULL) {
-                    if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
-                      printer_t prt(this, m_current_output);
-                      prt.format("codegen: ~s~&", symbol);
-                      if (!s_codegen) s_codegen = new codegen_t(this);
-                      s_codegen->compile(closure);
+                  if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
+                    if (SYMBOLP(gloc->variable)) {
+                      scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+                      if (closure->env == NULL) {
+                        if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+                          printer_t prt(this, m_current_output);
+                          prt.format("codegen: ~s~&", symbol);
+                          if (!s_codegen) s_codegen = new codegen_t(this);
+                          s_codegen->compile(closure);
+                        }
+                      }
                     }
+                    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
                   }
                 }
 #endif

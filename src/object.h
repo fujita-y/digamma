@@ -39,7 +39,7 @@
     nnnn nnnn nnnn nnnn .... NZ-- ---- 1010 : scm_hdr_bignum        NZ: (01 positive) (11 negative) (00 zero)
     .... .... .... .... .... P.-- ---- 1010 : scm_hdr_flonum        P: precision (0 64bit) (1 32bit)
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_cont
-    nnnn nnnn nnnn nnnn .... ..-- ---- 1010 : scm_hdr_closure       if has rest arguments then n == (- 1 - <required argc>)
+    nnnn nnnn nnnn nnnn .... I.-- ---- 1010 : scm_hdr_closure       I: inspected, n == (- 1 - <required argc>) if there are rest arguments
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_subr
     .... .... .... .... .... L.-- ---- 1010 : scm_hdr_vector        L: literal
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_port
@@ -502,9 +502,11 @@ struct vm_env_rec_t {           // record size is variable
 #define HDR_VECTOR_LITERAL_SHIFT            11
 #define HDR_BVECTOR_LITERAL_SHIFT           11
 #define HDR_GLOC_UNINTERNED_SHIFT           10
+#define HDR_CLOSURE_INSPECTED_SHIFT         11
 
 #define HDR_TC(hdr)                         (((hdr) >> 4) & TC_MASKBITS)
 #define HDR_CLOSURE_ARGS(hdr)               (((intptr_t)(hdr)) >> HDR_CLOSURE_ARGS_SHIFT)
+#define HDR_CLOSURE_INSPECTED(hdr)          (((hdr) >> HDR_CLOSURE_INSPECTED_SHIFT) & 1)
 #define HDR_STRING_LITERAL(hdr)             (((hdr) >> HDR_STRING_LITERAL_SHIFT) & 1)
 #define HDR_STRING_TYPE(hdr)                (((hdr) >> HDR_STRING_TYPE_SHIFT) & 1)
 #define HDR_VALUES_COUNT(hdr)               (((uintptr_t)(hdr)) >> HDR_VALUES_COUNT_SHIFT)
