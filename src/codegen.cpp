@@ -717,8 +717,10 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     }
 
     if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
-        puts(" ? found in m_visit, return NULL (this should not happen?)");
-        return NULL;
+#if DEBUG_CODEGEN
+        printf(" + info: %p found in m_visit\n", closure);
+#endif
+        //return NULL;
     } else {
         m_visit.push_back(closure);
     }
