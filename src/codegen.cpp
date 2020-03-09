@@ -429,6 +429,43 @@ extern "C" {
 
 }
 
+/*
+    THUNK_SUBR_GLOC_OF: {
+            assert(GLOCP(CAR(OPERANDS)));
+            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+            if (SUBRP(subr)) {
+                m_heap->write_barrier(subr);
+                CAAR(m_pc) = opcode_to_instruction(VMOP_SUBR);
+                CAR(OPERANDS) = subr;
+                goto loop;
+            }
+            system_error("system error: inconsistent code in auto compile cache");
+        }
+
+    THUNK_PUSH_SUBR_GLOC_OF: {
+            assert(GLOCP(CAR(OPERANDS)));
+            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+            if (SUBRP(subr)) {
+                m_heap->write_barrier(subr);
+                CAAR(m_pc) = opcode_to_instruction(VMOP_PUSH_SUBR);
+                CAR(OPERANDS) = subr;
+                goto loop;
+            }
+            system_error("system error: inconsistent code in auto compile cache");
+        }
+
+    THUNK_RET_SUBR_GLOC_OF: {
+            assert(GLOCP(CAR(OPERANDS)));
+            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+            if (SUBRP(subr)) {
+                m_heap->write_barrier(subr);
+                CAAR(m_pc) = opcode_to_instruction(VMOP_RET_SUBR);
+                CAR(OPERANDS) = subr;
+                goto loop;
+            }
+            system_error("system error: inconsistent code in auto compile cache");
+        }*/
+
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -972,7 +1009,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 fatal("codegen.cpp: unexpected opcode VMOP_SUBR_GLOC_OF");
             } break;
             case VMOP_PUSH_SUBR_GLOC_OF: {
-                fatal("codegen.cpp: unexpected opcode VMOP_PUSH_SUBR_GLOC_OF");
+                emit_push_subr_gloc_of(ctx, inst);
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+                ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_RET_SUBR_GLOC_OF: {
                 fatal("codegen.cpp: unexpected opcode VMOP_RET_SUBR_GLOC_OF");
