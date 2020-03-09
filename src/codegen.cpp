@@ -680,6 +680,17 @@ codegen_t::compile(scm_closure_t closure)
 //    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
     m_visit.clear();
     m_lifted_functions.clear();
+
+#if ENABLE_COMPILE_DEFERRED
+    if (m_deferred_compile.size()) {
+        scm_closure_t closure = m_deferred_compile.back();
+        m_deferred_compile.pop_back();
+        printer_t prt(m_vm, m_vm->m_current_output);
+        prt.format("deferred compile closure: ~s~&~!", closure->doc);
+        compile(closure);
+    }
+#endif
+
 }
 
 Function*

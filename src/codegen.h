@@ -50,7 +50,9 @@ class codegen_t {
     std::unique_ptr<LLJIT> m_jit;
     std::vector<scm_closure_t> m_visit; // for debugging use only
     std::map<scm_closure_t,Function*> m_lifted_functions;
-
+#if ENABLE_COMPILE_DEFERRED
+    std::vector<scm_closure_t> m_deferred_compile;
+#endif
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst);

@@ -1414,6 +1414,10 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if ENABLE_COMPILE_DEFERRED
+    m_deferred_compile.push_back((scm_closure_t)operands);
+#endif
+
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
@@ -1428,6 +1432,10 @@ codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if ENABLE_COMPILE_DEFERRED
+    m_deferred_compile.push_back((scm_closure_t)operands);
+#endif
+
     auto c_ret_close = M->getOrInsertFunction("c_ret_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_ret_close, { vm, VALUE_INTPTR(operands) });
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
@@ -1441,6 +1449,10 @@ codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+
+#if ENABLE_COMPILE_DEFERRED
+    m_deferred_compile.push_back((scm_closure_t)operands);
+#endif
 
     auto c_close = M->getOrInsertFunction("c_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_close, { vm, VALUE_INTPTR(operands) });
