@@ -622,11 +622,11 @@ codegen_t::compile(scm_closure_t closure)
         //puts("- already compiled");
         return;
     }
-    if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
+    //if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
         //prt.format("generating native code: ~s~&", closure->doc);
         //puts("- already visit");
-        return;
-    }
+    //    return;
+    //}
 #if DEBUG_CODEGEN
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
@@ -677,7 +677,8 @@ codegen_t::compile(scm_closure_t closure)
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
 
-    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
+//    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
+    m_visit.clear();
     m_lifted_functions.clear();
 }
 
@@ -718,12 +719,13 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
         puts(" ? found in m_visit, return NULL (this should not happen?)");
         return NULL;
+    } else {
+        m_visit.push_back(closure);
     }
 #if DEBUG_CODEGEN
     puts(" + generating native code for lifted function");
 #endif
 
-    m_visit.push_back(closure);
 
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));

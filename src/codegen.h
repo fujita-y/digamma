@@ -48,7 +48,7 @@ class codegen_t {
     };
     VM* m_vm;
     std::unique_ptr<LLJIT> m_jit;
-    std::vector<scm_closure_t> m_visit;
+    std::vector<scm_closure_t> m_visit; // for debugging use only
     std::map<scm_closure_t,Function*> m_lifted_functions;
 
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
