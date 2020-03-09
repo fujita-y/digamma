@@ -32,8 +32,6 @@
             } \
         }
 
-
-
 static void
 object_copy(void* dst, const void* src, intptr_t bsize)
 {
@@ -414,6 +412,17 @@ VM::loop(bool init, bool resume)
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
                 m_pc = closure->code;
                 m_env = &env->up;
+
+#if ENABLE_COMPILE_APPLY
+                if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
+                    printer_t prt(this, m_current_output);
+                    prt.format("codegen closure: ~s~&", closure->doc);
+                    if (!s_codegen) s_codegen = new codegen_t(this);
+                    s_codegen->compile(closure);
+                    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+                }
+#endif
+
                 goto trace_n_loop;
             }
             goto COLLECT_STACK_ENV_REC_N_APPLY;
@@ -679,7 +688,8 @@ VM::loop(bool init, bool resume)
                 scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
                 m_value = gloc->value;
                 if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
-#if 1
+
+#if ENABLE_COMPILE_GLOC
                 if (CLOSUREP(gloc->value)) {
                   scm_closure_t closure = (scm_closure_t)gloc->value;
                   if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
@@ -698,6 +708,7 @@ VM::loop(bool init, bool resume)
                   }
                 }
 #endif
+
                 goto apply;
             }
 
