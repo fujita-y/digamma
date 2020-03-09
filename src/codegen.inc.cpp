@@ -354,31 +354,22 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 #endif
                 scm_closure_t closure = (scm_closure_t)obj;
                 Function* F2 = emit_inner_function(ctx, closure);
-                CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-
-                auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-                auto call = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
-#if USE_LLVM_ATTRIBUTES
-                auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-                attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
-                attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
-                call->setAttributes(attrs);
-#endif
-                if (F2 == nullptr) {
-                    puts("*** F2 is null");
-                    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
-                    intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
-                    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
-                    auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
-                    auto call = IRB.CreateCall(func, {vm});
-                    call->setTailCallKind(CallInst::TCK_MustTail);
-                    IRB.CreateRet(call);
+                if (F2 != NULL) {
+                    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+                    auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
+                    auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
+    #if USE_LLVM_ATTRIBUTES
+                    auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+                    attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
+                    attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
+                    call1->setAttributes(attrs);
+    #endif
+                    auto call2 = IRB.CreateCall(F2, {vm});
+                    call2->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call2);
                     return;
                 } else {
-                    auto call = IRB.CreateCall(F2, {vm});
-                    call->setTailCallKind(CallInst::TCK_MustTail);
-                    IRB.CreateRet(call);
-                    return;
+                  puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: F2 is NULL");
                 }
             }
         }
@@ -961,31 +952,50 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
-    //int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
+//    int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
     int function_index = ctx.m_depth - level - 1 + (index << 16);
 
-    //printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
+    if (ctx.m_depth - level - 1 < 0 || ctx.m_local_functions[function_index] == NULL) {
+        printf("OUT OF LOCAL CONTEXT ## emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d ctx.m_depth - level - 1 = %x \n", level, index, ctx.m_depth, ctx.m_depth - level - 1);
+        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+        CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(emit_lookup_iloc(ctx, level, index)));
+        auto env2 = emit_lookup_env(ctx, level);
+        auto count = CREATE_LOAD_ENV_REC(env2, count);
+        auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
+        auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+        CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
+        CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
+        auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+        CREATE_STORE_VM_REG(vm, m_sp, ea1);
+        CREATE_STORE_VM_REG(vm, m_fp, ea1);
+        CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
+    } else {
+        //printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
+        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+        auto env2 = emit_lookup_env(ctx, level);
+        auto count = CREATE_LOAD_ENV_REC(env2, count);
+        auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
+        auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+        CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
+        CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
+        auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+        CREATE_STORE_VM_REG(vm, m_sp, ea1);
+        CREATE_STORE_VM_REG(vm, m_fp, ea1);
+        CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-    auto env2 = emit_lookup_env(ctx, level);
-    auto count = CREATE_LOAD_ENV_REC(env2, count);
-    auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
-    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
-    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
-    CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
-    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-    CREATE_STORE_VM_REG(vm, m_sp, ea1);
-    CREATE_STORE_VM_REG(vm, m_fp, ea1);
-    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+        //int function_index = ctx.m_depth - level - 1 + (index << 16);
+        Function* L = ctx.m_local_functions[function_index];
 
-    Function* L = ctx.m_local_functions[function_index];
+        if (L == NULL) {
+            printf("emit_apply_iloc_local L = %p, level = %d index = %d ctx.m_depth = %d function_index = %x \n", L, level, index, ctx.m_depth, function_index);
+        }
 
-    //printf("emit_apply_iloc_local: L = %p, function_index %x, ctx.m_local_functions.size() = %lu\n", L, function_index, ctx.m_local_functions.size());
-
-    assert(L != nullptr);
-    auto call = IRB.CreateCall(L, { vm });
-    call->setTailCallKind(CallInst::TCK_MustTail);
-    IRB.CreateRet(call);
+        assert(L != nullptr);
+        auto call = IRB.CreateCall(L, { vm });
+        call->setTailCallKind(CallInst::TCK_MustTail);
+        IRB.CreateRet(call);
+    }
 }
 
 void

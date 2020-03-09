@@ -22,6 +22,7 @@
             switch (n) { \
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
+                case native_thunk_loop: goto loop; \
                 case native_thunk_resume_loop: goto RESUME_LOOP; \
                 case native_thunk_escape: return; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
@@ -404,14 +405,6 @@ VM::loop(bool init, bool resume)
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
                 scm_closure_t closure = (scm_closure_t)m_value;
-                intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
-                if (m_sp - m_fp != args) goto APPLY_VARIADIC;
-                vm_env_t env = (vm_env_t)m_sp;
-                env->count = args;
-                env->up = closure->env;
-                m_sp = m_fp = (scm_obj_t*)(env + 1);
-                m_pc = closure->code;
-                m_env = &env->up;
 
 #if ENABLE_COMPILE_APPLY
                 if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
@@ -423,6 +416,14 @@ VM::loop(bool init, bool resume)
                 }
 #endif
 
+                intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
+                if (m_sp - m_fp != args) goto APPLY_VARIADIC;
+                vm_env_t env = (vm_env_t)m_sp;
+                env->count = args;
+                env->up = closure->env;
+                m_sp = m_fp = (scm_obj_t*)(env + 1);
+                m_pc = closure->code;
+                m_env = &env->up;
                 goto trace_n_loop;
             }
             goto COLLECT_STACK_ENV_REC_N_APPLY;

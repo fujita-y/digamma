@@ -64,6 +64,7 @@ public:
     enum {
         native_thunk_apply = 0,
         native_thunk_pop_cont,
+        native_thunk_loop,
         native_thunk_resume_loop,
         native_thunk_escape,
         native_thunk_error_apply_iloc,
