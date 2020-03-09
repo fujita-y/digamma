@@ -55,6 +55,7 @@ class codegen_t {
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst);
     bool is_compiled(scm_closure_t closure);
+    Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);

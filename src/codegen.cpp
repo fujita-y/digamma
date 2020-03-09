@@ -682,6 +682,20 @@ codegen_t::compile(scm_closure_t closure)
 }
 
 Function*
+codegen_t::get_function(context_t& ctx, scm_closure_t closure)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+
+    assert(is_compiled(closure));
+    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
+    intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
+    Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
+    return func;
+}
+
+Function*
 codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
@@ -694,9 +708,16 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
       return search->second;
     }
 
+    if (is_compiled(closure)) {
+#if DEBUG_CODEGEN
+        puts(" + emit_inner_function: already compiled");
+#endif
+        return get_function(ctx, closure);
+    }
+
     if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
         puts(" ? found in m_visit, return NULL (this should not happen?)");
-        return nullptr;
+        return NULL;
     }
 #if DEBUG_CODEGEN
     puts(" + generating native code for lifted function");

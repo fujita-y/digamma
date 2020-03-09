@@ -405,17 +405,6 @@ VM::loop(bool init, bool resume)
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
                 scm_closure_t closure = (scm_closure_t)m_value;
-
-#if ENABLE_COMPILE_APPLY
-                if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
-                    printer_t prt(this, m_current_output);
-                    prt.format("codegen closure: ~s~&", closure->doc);
-                    if (!s_codegen) s_codegen = new codegen_t(this);
-                    s_codegen->compile(closure);
-                    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
-                }
-#endif
-
                 intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
                 if (m_sp - m_fp != args) goto APPLY_VARIADIC;
                 vm_env_t env = (vm_env_t)m_sp;
@@ -694,18 +683,18 @@ VM::loop(bool init, bool resume)
                 if (CLOSUREP(gloc->value)) {
                   scm_closure_t closure = (scm_closure_t)gloc->value;
                   if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
+                    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
                     if (SYMBOLP(gloc->variable)) {
                       scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
                       if (closure->env == NULL) {
-                        if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+//                      if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
                           printer_t prt(this, m_current_output);
                           prt.format("codegen: ~s~&", symbol);
                           if (!s_codegen) s_codegen = new codegen_t(this);
                           s_codegen->compile(closure);
-                        }
+//                      }
                       }
                     }
-                    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
                   }
                 }
 #endif
