@@ -330,7 +330,9 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
     scm_obj_t obj = gloc->value;
     if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
+#if DEBUG_CODEGEN
         puts("+ self recursive");
+#endif
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         // printf("argc = %d\n", ctx.m_argc);
         auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
@@ -347,7 +349,9 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             //printf("ctx.m_argc %d\n", ctx.m_argc);
             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
             if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+#if DEBUG_CODEGEN
                 printf("+ uninterned gloc found: %s\n", symbol->name);
+#endif
                 scm_closure_t closure = (scm_closure_t)obj;
                 Function* F2 = emit_inner_function(ctx, closure); // [TODO] return non null even if two call site exists
                 CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
@@ -448,105 +452,6 @@ codegen_t::emit_ret_cons(context_t& ctx, scm_obj_t inst)
     auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     CREATE_STORE_VM_REG(vm, m_value, IRB.CreateCall(c_make_pair, {vm, sp_minus_1, val}));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-}
-
-void
-codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-
-    intptr_t argc = FIXNUM(CADR(operands));
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
-
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    scm_subr_t subr = (scm_subr_t)CAR(operands);
-    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
-    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
-
-    CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
-
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-
-    IRB.SetInsertPoint(CONTINUE);
-}
-
-void
-codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
-    auto argc = VALUE_INTPTR(ctx.m_argc);
-
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    scm_subr_t subr = (scm_subr_t)CAR(operands);
-    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
-    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, argc, fp});
-
-    CREATE_STORE_VM_REG(vm, m_value, val);
-
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // valid
-    IRB.SetInsertPoint(undef_false);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-}
-
-void
-codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    scm_obj_t operands = CDAR(inst);
-    auto vm = F->arg_begin();
-
-    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
-
-    intptr_t argc = FIXNUM(CADR(operands));
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
-    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
-
-    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    scm_subr_t subr = (scm_subr_t)CAR(operands);
-    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
-    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
-
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
-    CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_PUSH_VM_STACK(val);
-
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
-
-    IRB.SetInsertPoint(CONTINUE);
 }
 
 void
@@ -1759,7 +1664,18 @@ codegen_t::emit_apply(context_t& ctx, scm_obj_t inst)
 }
 
 void
-codegen_t::emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst)
+codegen_t::emit_escape(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_escape));
+}
+
+void
+codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 {
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
@@ -1773,7 +1689,6 @@ codegen_t::emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst)
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(operands))->value);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
@@ -1789,4 +1704,133 @@ codegen_t::emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(undef_true);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
-    IRB.SetInsertPoint(CONTINUE);}
+    IRB.SetInsertPoint(CONTINUE);
+}
+
+void
+codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_push_subr(ctx, inst, (scm_subr_t)CAR(operands));
+}
+
+void
+codegen_t::emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_push_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}
+
+void
+codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+
+    intptr_t argc = FIXNUM(CADR(operands));
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
+    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+
+    CREATE_STORE_VM_REG(vm, m_value, val);
+    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+
+    IRB.SetInsertPoint(CONTINUE);
+}
+
+void
+codegen_t::emit_subr(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_subr(ctx, inst, (scm_subr_t)CAR(operands));
+}
+
+void
+codegen_t::emit_subr_gloc_of(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}
+
+void
+codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
+    auto argc = VALUE_INTPTR(ctx.m_argc);
+
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
+    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    auto val = IRB.CreateCall(ptr, {vm, argc, fp});
+
+    CREATE_STORE_VM_REG(vm, m_value, val);
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    // valid
+    IRB.SetInsertPoint(undef_false);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));}
+
+void
+codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_ret_subr(ctx, inst, (scm_subr_t)CAR(operands));
+}
+
+void
+codegen_t::emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    emit_ret_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}

@@ -23,6 +23,7 @@
                 case native_thunk_pop_cont: goto pop_cont; \
                 case native_thunk_apply: goto apply; \
                 case native_thunk_resume_loop: goto RESUME_LOOP; \
+                case native_thunk_escape: return; \
                 case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
                 case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
                 case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC; \

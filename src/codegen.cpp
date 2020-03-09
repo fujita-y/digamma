@@ -687,7 +687,9 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 
     auto search = m_lifted_functions.find(closure);
     if (search != m_lifted_functions.end()) {
+#if DEBUG_CODEGEN
       puts(" + found in m_lifted_functions, return Function*");
+#endif
       return search->second;
     }
 
@@ -695,8 +697,9 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
         puts(" ? found in m_visit, return NULL (this should not happen?)");
         return nullptr;
     }
-
+#if DEBUG_CODEGEN
     puts(" + generating native code for lifted function");
+#endif
 
     m_visit.push_back(closure);
 
@@ -1006,7 +1009,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 // nop
             } break;
             case VMOP_SUBR_GLOC_OF: {
-                fatal("codegen.cpp: unexpected opcode VMOP_SUBR_GLOC_OF");
+                emit_subr_gloc_of(ctx, inst);
+                intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+                ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_PUSH_SUBR_GLOC_OF: {
                 emit_push_subr_gloc_of(ctx, inst);
@@ -1014,9 +1019,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst)
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_RET_SUBR_GLOC_OF: {
-                fatal("codegen.cpp: unexpected opcode VMOP_RET_SUBR_GLOC_OF");
+                emit_ret_subr_gloc_of(ctx, inst);
             } break;
-            // VMOP_VM_ESCAPE
+            case VMOP_VM_ESCAPE: {
+                emit_escape(ctx, inst);
+            } break;
             default:
                 printf("##### unsupported instruction %s ######\n", ((scm_symbol_t)CAAR(inst))->name);
                 break;

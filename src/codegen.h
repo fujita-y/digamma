@@ -13,6 +13,8 @@
 #define USE_LLVM_ATTRIBUTES  1
 #define USE_LLVM_OPTIMIZE    1
 
+#define DEBUG_CODEGEN        0
+
 #if __clang_major__ > 9
 using namespace std;
 #endif
@@ -67,6 +69,9 @@ private:
     Value* emit_cmp_inst(context_t& ctx, cc_t cc, Value* lhs, Value* rhs);
     void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
     void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
+    void emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
+    void emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
+    void emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
 
     Function* emit_call(context_t& ctx, scm_obj_t inst);
     void emit_if_false_call(context_t& ctx, scm_obj_t inst);
@@ -151,8 +156,11 @@ private:
     void emit_ret_close(context_t& ctx, scm_obj_t inst);
     void emit_nadd_iloc(context_t& ctx, scm_obj_t inst);
     void emit_apply(context_t& ctx, scm_obj_t inst);
+    void emit_escape(context_t& ctx, scm_obj_t inst);
 
     void emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst);
+    void emit_subr_gloc_of(context_t& ctx, scm_obj_t inst);
+    void emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst);
 
 };
 
