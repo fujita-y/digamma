@@ -678,7 +678,7 @@ VM::loop(bool init, bool resume)
                 assert(GLOCP(CAR(OPERANDS)));
                 m_value = ((scm_gloc_t)CAR(OPERANDS))->value;
                 if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
-
+#if 1
                 scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
                 scm_obj_t obj = (scm_closure_t)gloc->value;
                 if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
@@ -691,7 +691,7 @@ VM::loop(bool init, bool resume)
                     }
                   }
                 }
-
+#endif
                 goto apply;
             }
 

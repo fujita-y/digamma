@@ -1462,7 +1462,9 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
     // int function_index = ctx.m_depth + (ctx.m_argc << 16);
     int function_index = ctx.m_depth - 1 + (ctx.m_argc << 16);
+#if DEBUG_CODEGEN
     printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
+#endif
     ctx.m_local_functions[function_index] = L;
     context_t ctx2 = ctx;
     ctx2.m_function = L;
