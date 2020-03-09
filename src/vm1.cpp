@@ -686,6 +686,8 @@ VM::loop(bool init, bool resume)
                   scm_closure_t closure = (scm_closure_t)gloc->value;
                   if (closure->env == NULL) {
                     if (!strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+                      printer_t prt(this, m_current_output);
+                      prt.format("codegen: ~s~&", symbol);
                       if (!s_codegen) s_codegen = new codegen_t(this);
                       s_codegen->compile(closure);
                     }

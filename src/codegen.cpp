@@ -617,7 +617,6 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
-    printer_t prt(vm, vm->m_current_output);
     if (is_compiled(closure)) {
         //prt.format("generating native code: ~s~&", closure->doc);
         //puts("- already compiled");
@@ -628,8 +627,10 @@ codegen_t::compile(scm_closure_t closure)
         //puts("- already visit");
         return;
     }
+#if DEBUG_CODEGEN
+    printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
-
+#endif
     m_visit.push_back(closure);
 
     char module_id[40];
