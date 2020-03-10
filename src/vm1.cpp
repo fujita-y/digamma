@@ -682,16 +682,14 @@ VM::loop(bool init, bool resume)
 #if ENABLE_COMPILE_GLOC
                 if (CLOSUREP(gloc->value)) {
                     scm_closure_t closure = (scm_closure_t)gloc->value;
-                    if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
-                        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+                    if (!HDR_CLOSURE_COMPILED(closure->hdr)) {
+                        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
                         if (SYMBOLP(gloc->variable)) {
                             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
-                            //if (closure->env == NULL) {
-                                printer_t prt(this, m_current_output);
-                                prt.format("codegen: ~s~&", symbol);
-                                if (!s_codegen) s_codegen = new codegen_t(this);
-                                s_codegen->compile(closure);
-                            //}
+                            printer_t prt(this, m_current_output);
+                            prt.format("codegen: ~s~&", symbol);
+                            if (!s_codegen) s_codegen = new codegen_t(this);
+                            s_codegen->compile(closure);
                         }
                     }
                 }

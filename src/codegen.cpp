@@ -617,6 +617,9 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
+    if (HDR_CLOSURE_COMPILED(closure->hdr)) {
+      return;
+    }
     if (is_compiled(closure)) {
         //prt.format("generating native code: ~s~&", closure->doc);
         //puts("- already compiled");
@@ -676,6 +679,7 @@ codegen_t::compile(scm_closure_t closure)
     scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->code);
     vm->m_heap->write_barrier(n_code);
     closure->code = n_code;
+    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
 
 //    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
     m_visit.clear();
