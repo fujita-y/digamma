@@ -617,6 +617,10 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
+//    if (closure->doc == scm_nil) {
+//      puts("doc == scm_nil");
+//      return;
+//    }
     if (is_compiled(closure)) {
         //prt.format("generating native code: ~s~&", closure->doc);
         //puts("- already compiled");
@@ -1107,10 +1111,55 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 
 
 /*
-(backtrace #f)
-(define even? (lambda (n) (if (zero? n) #t (odd? (- n 1)))))
-(closure-compile even?)
-(define odd? (lambda (n) (if (zero? n) #f (even? (- n 1)))))
-(closure-compile odd?)
-(even? 88)
+(import (digamma pregexp))
+
+(pregexp "^([A-F0-9]{4,6});[^;]*;([a-zA-Z]{2});[^;]*;[^;]*;[^;]*;[^;]*;[^;]*;(.*);[^;]*;[^;]*;[^;]*;([A-F0-9]{0,6});([A-F0-9]{0,6});([A-F0-9]{0,6})$")
+(pregexp "^a")
+
+define-thread-variable have issue
+
+(import (digamma concurrent))
+(define-thread-variable foo #t)
+foo
+
+  (define-syntax define-thread-variable
+    (syntax-rules ()
+      ((_ var init)
+       (begin
+         (define param (make-parameter (list init)))
+         (define mutator
+           (lambda (val)
+             (format #t "val ~s~%~!" val)
+             (param (list val))))
+         (define accessor
+           (lambda ()
+             (let ((p (param)))
+               (format #t "p ~s~%~!" p)
+               (if (local-heap-object? p)
+                   (car p)
+                   (let ((val init)) (param (list val)) val)))))
+         (define-syntax var (identifier-syntax (_ (accessor)) ((set! _ x) (mutator x))))))))
+
+  (define-thread-variable foo #t)
+  foo
+
 */
+/*
+(begin
+  (define param (make-parameter (list #t)))
+  (define mutator
+    (lambda (val)
+      (format #t "val ~s~%~!" val)
+      (param (list val))))
+  (define accessor
+    (lambda ()
+      (let ((p (param)))
+        (format #t "p ~s~%~!" p)
+        (if (local-heap-object? p)
+            (car p)
+            (let ((val #t)) (param (list val)) val)))))
+  (define-syntax foo (identifier-syntax (_ (accessor)) ((set! _ x) (mutator x))))
+)
+*/
+
+
