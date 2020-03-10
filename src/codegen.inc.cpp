@@ -353,23 +353,27 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                 printf("+ uninterned gloc found: %s\n", symbol->name);
 #endif
                 scm_closure_t closure = (scm_closure_t)obj;
-                Function* F2 = emit_inner_function(ctx, closure);
-                if (F2 != NULL) {
-                    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-                    auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-                    auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
-    #if USE_LLVM_ATTRIBUTES
-                    auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-                    attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
-                    attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
-                    call1->setAttributes(attrs);
-    #endif
-                    auto call2 = IRB.CreateCall(F2, {vm});
-                    call2->setTailCallKind(CallInst::TCK_MustTail);
-                    IRB.CreateRet(call2);
-                    return;
+                if (closure->env == NULL) {
+                    Function* F2 = emit_inner_function(ctx, closure);
+                    if (F2 != NULL) {
+                        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+                        auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
+                        auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
+        #if USE_LLVM_ATTRIBUTES
+                        auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+                        attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
+                        attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
+                        call1->setAttributes(attrs);
+        #endif
+                        auto call2 = IRB.CreateCall(F2, {vm});
+                        call2->setTailCallKind(CallInst::TCK_MustTail);
+                        IRB.CreateRet(call2);
+                        return;
+                    } else {
+                      puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: F2 == NULL");
+                    }
                 } else {
-                  puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: F2 is NULL");
+                    puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: closure->env != NULL");
                 }
             }
         }
