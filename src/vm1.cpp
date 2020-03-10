@@ -683,7 +683,7 @@ VM::loop(bool init, bool resume)
                 if (CLOSUREP(gloc->value)) {
                     scm_closure_t closure = (scm_closure_t)gloc->value;
                     if (!HDR_CLOSURE_COMPILED(closure->hdr)) {
-                        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
+                        //closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
                         if (SYMBOLP(gloc->variable)) {
                             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
                             printer_t prt(this, m_current_output);

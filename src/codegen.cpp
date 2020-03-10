@@ -617,9 +617,6 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
-    if (HDR_CLOSURE_COMPILED(closure->hdr)) {
-      return;
-    }
     if (is_compiled(closure)) {
         //prt.format("generating native code: ~s~&", closure->doc);
         //puts("- already compiled");
@@ -692,6 +689,7 @@ codegen_t::compile(scm_closure_t closure)
         printer_t prt(m_vm, m_vm->m_current_output);
         prt.format("deferred compile closure: ~s~&~!", closure->doc);
         compile(closure);
+        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
     }
 #endif
 
