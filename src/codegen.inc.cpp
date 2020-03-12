@@ -106,17 +106,7 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-/*
-    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
-    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
-    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
-    // invalid
-    IRB.SetInsertPoint(undef_true);
-    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_push_gloc));
-    // valid
-    IRB.SetInsertPoint(undef_false);
-*/
+
     CREATE_PUSH_VM_STACK(val);
 }
 
@@ -135,8 +125,6 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
 
     emit_cond_pairp(ctx, pair, pair_true, pair_false);
-//    auto pair_cond = CREATE_PAIRP(pair);
-//    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
@@ -163,8 +151,6 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* pair_false = BasicBlock::Create(C, "pair_false", F);
 
     emit_cond_pairp(ctx, pair, pair_true, pair_false);
-//    auto pair_cond = CREATE_PAIRP(pair);
-//    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
@@ -223,8 +209,6 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
 
 
     emit_cond_pairp(ctx, pair, pair_true, pair_false);
-//    auto pair_cond = CREATE_PAIRP(pair);
-//    IRB.CreateCondBr(pair_cond, pair_true, pair_false);
     // nonpair
     IRB.SetInsertPoint(pair_false);
         CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
@@ -237,8 +221,6 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
 
         BasicBlock* pair2_true = BasicBlock::Create(C, "pair2_true", F);
         emit_cond_pairp(ctx, pair2, pair2_true, pair_false);
-//        auto pair2_cond = CREATE_PAIRP(pair2);
-//        IRB.CreateCondBr(pair2_cond, pair2_true, pair_false);
     // pair + pair
     IRB.SetInsertPoint(pair2_true);
       CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), car));
@@ -930,9 +912,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     ctx.m_local_functions[function_index] = L;
 
     // printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
-
-
-//    printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
+    // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
 
     context_t ctx2 = ctx;
     ctx2.m_function = L;
@@ -956,7 +936,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
-//    int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
+    // int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
     int function_index = ctx.m_depth - level - 1 + (index << 16);
 
     if (ctx.m_depth - level - 1 < 0 || ctx.m_local_functions[function_index] == NULL) {
@@ -975,7 +955,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
     } else {
-        //printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
+        // printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
@@ -988,7 +968,7 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         CREATE_STORE_VM_REG(vm, m_fp, ea1);
         CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
 
-        //int function_index = ctx.m_depth - level - 1 + (index << 16);
+        // int function_index = ctx.m_depth - level - 1 + (index << 16);
         Function* L = ctx.m_local_functions[function_index];
 
         if (L == NULL) {
@@ -1486,7 +1466,6 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     L->addParamAttr(0, Attribute::NoCapture);
 #endif
     BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
-    // int function_index = ctx.m_depth + (ctx.m_argc << 16);
     int function_index = ctx.m_depth - 1 + (ctx.m_argc << 16);
 #if DEBUG_CODEGEN
     printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
@@ -1494,7 +1473,6 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx.m_local_functions[function_index] = L;
     context_t ctx2 = ctx;
     ctx2.m_function = L;
-//  ctx2.m_depth = ctx2.m_depth + 2
     ctx2.m_depth = ctx2.m_depth + 1;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
@@ -1650,7 +1628,6 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);

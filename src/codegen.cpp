@@ -103,13 +103,10 @@ static ExitOnError ExitOnErr;
 extern "C" {
 
     void c_collect_stack(VM* vm, intptr_t acquire) {
-        //printf("- c_collect_stack(%p, %d)\n", vm, (int)acquire);
         vm->collect_stack(acquire);
-        // [TODO] m_heap->m_stop_the_world check here ?
     }
 
     scm_obj_t* c_lookup_iloc(VM* vm, intptr_t depth, intptr_t index) {
-        //printf("- c_lookup_iloc(%p, %d, %d)\n", vm, (int)depth, (int)index);
         void* lnk = vm->m_env;
         intptr_t level = depth;
         while (level) { lnk = *(void**)lnk; level = level - 1; }
@@ -126,42 +123,34 @@ extern "C" {
     }
 
     void c_letrec_violation(VM* vm) {
-    //    printf("- c_letrec_violation(%p)\n", vm);
         letrec_violation(vm);
     }
 
     void c_error_push_car_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
     }
 
     void c_error_push_cdr_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
     }
 
     void c_error_car_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "car", 0, "pair", obj, 1, &obj);
     }
 
     void c_error_cdr_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cdr", 0, "pair", obj, 1, &obj);
     }
 
     void c_error_cadr_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cadr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
     void c_error_push_cddr_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cddr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
     void c_error_push_cadr_iloc(VM* vm, scm_obj_t obj) {
-        //if (obj == scm_undef) letrec_violation(vm);
         wrong_type_argument_violation(vm, "cadr", 0, "appropriate list structure", obj, 1, &obj);
     }
 
@@ -315,7 +304,6 @@ extern "C" {
 
     void c_prepare_apply(VM* vm, scm_closure_t closure) {
         // assume vm->m_sp - vm->m_fp == args
-        //if (m_heap->m_stop_the_world) stop();
         intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
         vm_env_t env = (vm_env_t)vm->m_sp;
         env->count = args;
@@ -429,43 +417,6 @@ extern "C" {
 
 }
 
-/*
-    THUNK_SUBR_GLOC_OF: {
-            assert(GLOCP(CAR(OPERANDS)));
-            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-            if (SUBRP(subr)) {
-                m_heap->write_barrier(subr);
-                CAAR(m_pc) = opcode_to_instruction(VMOP_SUBR);
-                CAR(OPERANDS) = subr;
-                goto loop;
-            }
-            system_error("system error: inconsistent code in auto compile cache");
-        }
-
-    THUNK_PUSH_SUBR_GLOC_OF: {
-            assert(GLOCP(CAR(OPERANDS)));
-            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-            if (SUBRP(subr)) {
-                m_heap->write_barrier(subr);
-                CAAR(m_pc) = opcode_to_instruction(VMOP_PUSH_SUBR);
-                CAR(OPERANDS) = subr;
-                goto loop;
-            }
-            system_error("system error: inconsistent code in auto compile cache");
-        }
-
-    THUNK_RET_SUBR_GLOC_OF: {
-            assert(GLOCP(CAR(OPERANDS)));
-            scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-            if (SUBRP(subr)) {
-                m_heap->write_barrier(subr);
-                CAAR(m_pc) = opcode_to_instruction(VMOP_RET_SUBR);
-                CAR(OPERANDS) = subr;
-                goto loop;
-            }
-            system_error("system error: inconsistent code in auto compile cache");
-        }*/
-
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
 {
     auto J = ExitOnErr(LLJITBuilder().create());
@@ -477,7 +428,6 @@ codegen_t::codegen_t(VM* vm) : m_vm(vm)
     J->getMainJITDylib().addGenerator(std::move(G));
 #endif
     m_jit = std::move(J);
-//  define_prepare_call();
 }
 
 ThreadSafeModule
@@ -509,60 +459,6 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
 
     return std::move(TSM);
 }
-
-/*
-void
-codegen_t::define_prepare_call()
-{
-    auto Context = make_unique<LLVMContext>();
-    LLVMContext& C = *Context;
-
-    DECLEAR_COMMON_TYPES;
-
-    auto M = make_unique<Module>("intrinsics", C);
-    Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::ExternalLinkage, "prepare_call", M.get());
-    F->setCallingConv(CallingConv::Fast);
-#if USE_LLVM_ATTRIBUTES
-    F->addFnAttr(Attribute::NoUnwind);
-    F->addParamAttr(0, Attribute::NoAlias);
-    F->addParamAttr(0, Attribute::NoCapture);
-    F->addParamAttr(1, Attribute::NoAlias);
-    F->addParamAttr(1, Attribute::NoCapture);
-#endif
-
-    IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
-    auto vm = F->arg_begin();
-    auto cont = F->arg_begin() + 1;
-
-    CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
-    // cont->fp = m_fp;
-    CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
-    // cont->env = m_env;
-    CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
-    // cont->up = m_cont;
-    CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
-    // m_sp = m_fp = (scm_obj_t*)(cont + 1);
-    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_sp, ea1);
-    CREATE_STORE_VM_REG(vm, m_fp, ea1);
-    // m_cont = &cont->up;
-    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_cont, ea2);
-    IRB.CreateRetVoid();
-
-    verifyModule(*M, &outs());
-
-//  M.get()->print(outs(), nullptr);
-
-#if USE_LLVM_OPTIMIZE
-    ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
-#else
-    ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
-#endif
-
-//  m_jit->getMainJITDylib().dump(llvm::outs());
-}
-*/
 
 Function*
 codegen_t::emit_prepare_call(context_t& ctx)
@@ -617,25 +513,11 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
     VM* vm = m_vm;
-//    if (closure->doc == scm_nil) {
-//      puts("doc == scm_nil");
-//      return;
-//    }
-    if (is_compiled(closure)) {
-        //prt.format("generating native code: ~s~&", closure->doc);
-        //puts("- already compiled");
-        return;
-    }
-    //if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
-        //prt.format("generating native code: ~s~&", closure->doc);
-        //puts("- already visit");
-    //    return;
-    //}
+    if (is_compiled(closure)) return;
 #if DEBUG_CODEGEN
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
 #endif
-    m_visit.push_back(closure);
 
     char module_id[40];
     uuid_v4(module_id, sizeof(module_id));
@@ -682,8 +564,6 @@ codegen_t::compile(scm_closure_t closure)
     closure->code = n_code;
     closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
 
-//    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
-    m_visit.clear();
     m_lifted_functions.clear();
 
 #if ENABLE_COMPILE_DEFERRED
@@ -733,18 +613,9 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
         return get_function(ctx, closure);
     }
 
-    if (std::find(m_visit.begin(), m_visit.end(), closure) != m_visit.end()) {
-#if DEBUG_CODEGEN
-        printf(" + info: %p found in m_visit\n", closure);
-#endif
-        //return NULL;
-    } else {
-        m_visit.push_back(closure);
-    }
 #if DEBUG_CODEGEN
     puts(" + generating native code for lifted function");
 #endif
-
 
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));
@@ -774,8 +645,6 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     context.m_intrinsics = ctx.m_intrinsics;
 
     transform(context, closure->code);
-
-    m_visit.erase(std::remove(m_visit.begin(), m_visit.end(), closure), m_visit.end());
 
     return F;
 }
@@ -1161,5 +1030,3 @@ foo
   (define-syntax foo (identifier-syntax (_ (accessor)) ((set! _ x) (mutator x))))
 )
 */
-
-
