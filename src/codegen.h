@@ -15,6 +15,7 @@
 
 #define USE_UNIFIED_STACK_CHECK   1
 #define DEBUG_CODEGEN             0
+#define VERBOSE_CODEGEN           0
 
 #if __clang_major__ > 9
 using namespace std;

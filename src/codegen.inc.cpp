@@ -352,10 +352,14 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                         IRB.CreateRet(call2);
                         return;
                     } else {
-                      puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: F2 == NULL");
+#if VERBOSE_CODEGEN
+                      puts("emit_apply_gloc: out of top level context, F2 == NULL");
+#endif
                     }
                 } else {
-                    puts("OUT OF TOP LEVEL CONTEXT ## emit_apply_gloc: closure->env != NULL");
+#if VERBOSE_CODEGEN
+                    puts("emit_apply_gloc: out of top level context, closure->env != NULL");
+#endif
                 }
             }
         }
@@ -940,7 +944,9 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     int function_index = ctx.m_depth - level - 1 + (index << 16);
 
     if (ctx.m_depth - level - 1 < 0 || ctx.m_local_functions[function_index] == NULL) {
-        printf("OUT OF LOCAL CONTEXT ## emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d ctx.m_depth - level - 1 = %x \n", level, index, ctx.m_depth, ctx.m_depth - level - 1);
+#if VERBOSE_CODEGEN
+        printf("emit_apply_iloc_local: out of local context, level = %d index = %d ctx.m_depth = %d ctx.m_depth - level - 1 = %x \n", level, index, ctx.m_depth, ctx.m_depth - level - 1);
+#endif
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(emit_lookup_iloc(ctx, level, index)));
         auto env2 = emit_lookup_env(ctx, level);
