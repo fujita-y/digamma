@@ -70,20 +70,23 @@ extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
             IRB.CreateStore(_VAL_, sp0); \
             CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t)))); \
         }
-
-#define CREATE_STACK_OVERFLOW_HANDLER(_BYTES_REQUIRED_) { \
-            auto sp = CREATE_LOAD_VM_REG(vm, m_sp); \
-            auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit); \
-            BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F); \
-            BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F); \
-            Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(_BYTES_REQUIRED_)), stack_limit); \
-            IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow); \
-            IRB.SetInsertPoint(stack_overflow); \
-            auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy); \
-            IRB.CreateCall(c_collect_stack, {vm, VALUE_INTPTR(_BYTES_REQUIRED_)}); \
-            IRB.CreateBr(stack_ok); \
-            IRB.SetInsertPoint(stack_ok); \
-        }
+#if USE_UNIFIED_STACK_CHECK
+    #define CREATE_STACK_OVERFLOW_HANDLER(_BYTES_REQUIRED_) {}
+#else
+    #define CREATE_STACK_OVERFLOW_HANDLER(_BYTES_REQUIRED_) { \
+                auto sp = CREATE_LOAD_VM_REG(vm, m_sp); \
+                auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit); \
+                BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F); \
+                BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F); \
+                Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(_BYTES_REQUIRED_)), stack_limit); \
+                IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow); \
+                IRB.SetInsertPoint(stack_overflow); \
+                auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy); \
+                IRB.CreateCall(c_collect_stack, {vm, VALUE_INTPTR(_BYTES_REQUIRED_)}); \
+                IRB.CreateBr(stack_ok); \
+                IRB.SetInsertPoint(stack_ok); \
+            }
+#endif
 
 #define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
@@ -542,7 +545,7 @@ codegen_t::compile(scm_closure_t closure)
 
     context.m_intrinsics.prepare_call = emit_prepare_call(context);
 
-    transform(context, closure->code);
+    transform(context, closure->code, true);
 
     verifyModule(*M, &outs());
 
@@ -570,8 +573,8 @@ codegen_t::compile(scm_closure_t closure)
     if (m_deferred_compile.size()) {
         scm_closure_t closure = m_deferred_compile.back();
         m_deferred_compile.pop_back();
-        printer_t prt(m_vm, m_vm->m_current_output);
-        prt.format("deferred compile closure: ~s~&~!", closure->doc);
+        //printer_t prt(m_vm, m_vm->m_current_output);
+        //prt.format("deferred compile closure: ~s~&~!", closure->doc);
         compile(closure);
         closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
     }
@@ -644,14 +647,125 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     context.m_top_level_function = F;
     context.m_intrinsics = ctx.m_intrinsics;
 
-    transform(context, closure->code);
+    transform(context, closure->code, true);
 
     return F;
 }
 
 void
-codegen_t::transform(context_t ctx, scm_obj_t inst)
+codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
 {
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    if (nbytes) {
+        //printf("emit_stack_overflow_check: %d\n", nbytes);
+        auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+        auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+        BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
+        BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F);
+        Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(nbytes)), stack_limit);
+        IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow);
+        IRB.SetInsertPoint(stack_overflow);
+        auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+        IRB.CreateCall(c_collect_stack, {vm, VALUE_INTPTR(nbytes)});
+        IRB.CreateBr(stack_ok);
+        IRB.SetInsertPoint(stack_ok);
+    }
+}
+
+int
+codegen_t::calc_stack_size(scm_obj_t inst)
+{
+    int require = 0;
+    int n = 0;
+    while (inst != scm_nil) {
+        switch (VM::instruction_to_opcode(CAAR(inst))) {
+            case VMOP_IF_FALSE_CALL: {
+              scm_obj_t operands = CDAR(inst);
+              int n2 = calc_stack_size(operands);
+              if (n + n2 > require) require = n + n2;
+            } break;
+            case VMOP_CALL: {
+              n += sizeof(vm_cont_rec_t);
+            } break;
+            case VMOP_PUSH_GLOC:
+            case VMOP_PUSH_SUBR:
+            case VMOP_PUSH_CAR_ILOC:
+            case VMOP_PUSH_CDR_ILOC:
+            case VMOP_PUSH_ILOC0:
+            case VMOP_PUSH_ILOC:
+            case VMOP_PUSH:
+            case VMOP_PUSH_CONST:
+            case VMOP_PUSH_ILOC1: {
+              n += sizeof(scm_obj_t);
+            } break;
+            case VMOP_APPLY_GLOC: {
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_APPLY_ILOC: {
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_APPLY_ILOC_LOCAL: {
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_APPLY: {
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_EXTEND: {
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_EXTEND_ENCLOSE: {
+              n += sizeof(scm_obj_t);
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_EXTEND_ENCLOSE_LOCAL: {
+              n += sizeof(scm_obj_t);
+              n += sizeof(vm_env_rec_t);
+            } break;
+            case VMOP_EXTEND_UNBOUND: {
+              scm_obj_t operands = CDAR(inst);
+              int argc = FIXNUM(operands);
+              n += sizeof(vm_env_rec_t);
+              n += sizeof(scm_obj_t) * argc;
+            } break;
+            case VMOP_PUSH_CLOSE: {
+              n += sizeof(scm_obj_t);
+            } break;
+            case VMOP_PUSH_CLOSE_LOCAL: {
+              n += sizeof(scm_obj_t);
+            } break;
+            case VMOP_IF_TRUE:
+            case VMOP_IF_EQP:
+            case VMOP_IF_NULLP:
+            case VMOP_IF_PAIRP:
+            case VMOP_IF_SYMBOLP: {
+              scm_obj_t operands = CDAR(inst);
+              int n2 = calc_stack_size(operands);
+              if (n + n2 > require) require = n + n2;
+            } break;
+            case VMOP_PUSH_NADD_ILOC:
+            case VMOP_PUSH_CADR_ILOC:
+            case VMOP_PUSH_CDDR_ILOC: {
+              n += sizeof(scm_obj_t);
+            } break;
+            default:
+                break;
+        }
+        if (n > require) require = n;
+        inst = CDR(inst);
+    }
+    return require;
+}
+
+void
+codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
+{
+  #if USE_UNIFIED_STACK_CHECK
+    if (insert_stack_check) emit_stack_overflow_check(ctx, calc_stack_size(inst));
+  #endif
+    //printf("stack calc: %d\n", calc_stack_size(inst));
     while (inst != scm_nil) {
         // printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {

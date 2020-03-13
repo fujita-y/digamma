@@ -446,7 +446,7 @@ codegen_t::emit_if_true(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(f9h_cond, f9h_true, f9h_false);
     // taken
     IRB.SetInsertPoint(f9h_false);
-    transform(ctx, operands);
+    transform(ctx, operands, false);
     // not taken
     IRB.SetInsertPoint(f9h_true);
 }
@@ -466,7 +466,7 @@ codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(taken_cond, taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
-    transform(ctx, operands);
+    transform(ctx, operands, false);
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
@@ -491,7 +491,7 @@ codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
     IRB.CreateCondBr(taken_cond, taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
-    transform(ctx, operands);
+    transform(ctx, operands, false);
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
@@ -828,7 +828,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     // continue emit code in operands
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
-    transform(ctx2, operands);
+    transform(ctx2, operands, true);
 
     IRB.SetInsertPoint(RETURN);
     return K;
@@ -851,7 +851,7 @@ codegen_t::emit_if_false_call(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(value_false);
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
-    transform(ctx2, operands);
+    transform(ctx2, operands, false);
     // no taken
     IRB.SetInsertPoint(value_nonfalse);
 }
@@ -921,7 +921,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOOP);
-    transform(ctx2, operands);
+    transform(ctx2, operands, true);
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -1091,7 +1091,7 @@ codegen_t::emit_if_pairp(context_t& ctx, scm_obj_t inst)
     emit_cond_pairp(ctx, CREATE_LOAD_VM_REG(vm, m_value), taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
-    transform(ctx, operands);
+    transform(ctx, operands, false);
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
@@ -1476,7 +1476,7 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx2.m_depth = ctx2.m_depth + 1;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
-    transform(ctx2, operands);
+    transform(ctx2, operands, true);
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -1652,7 +1652,7 @@ codegen_t::emit_if_symbolp(context_t& ctx, scm_obj_t inst)
     emit_cond_symbolp(ctx, CREATE_LOAD_VM_REG(vm, m_value), taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
-    transform(ctx, operands);
+    transform(ctx, operands, false);
     // not taken
     IRB.SetInsertPoint(taken_false);
 }

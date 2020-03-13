@@ -10,10 +10,11 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
-#define USE_LLVM_ATTRIBUTES  1
-#define USE_LLVM_OPTIMIZE    1
+#define USE_LLVM_ATTRIBUTES       1
+#define USE_LLVM_OPTIMIZE         1
 
-#define DEBUG_CODEGEN        0
+#define USE_UNIFIED_STACK_CHECK   1
+#define DEBUG_CODEGEN             0
 
 #if __clang_major__ > 9
 using namespace std;
@@ -54,13 +55,15 @@ class codegen_t {
 #endif
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
-    void transform(context_t ctx, scm_obj_t inst);
+    void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
     bool is_compiled(scm_closure_t closure);
     Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);
 private:
+    int calc_stack_size(scm_obj_t inst);
+    void emit_stack_overflow_check(context_t& ctx, int nbytes);
     Function* emit_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false);
