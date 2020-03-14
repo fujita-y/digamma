@@ -6,7 +6,7 @@
 #include "printer.h"
 #include "violation.h"
 #include "uuid.h"
-#include "interpreter.h"
+#include "vmm.h"
 
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -346,17 +346,17 @@ extern "C" {
         assert(GLOCP(gloc));
 #if USE_PARALLEL_VM
   #if UNSPECIFIED_GLOC_IS_SPECIAL
-        if (m_interp->live_thread_count() > 1 && gloc->value != scm_unspecified) {
+        if (m_vmm->live_thread_count() > 1 && gloc->value != scm_unspecified) {
             if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
-            m_interp->remember(gloc->value, m_value);
+            m_vmm->remember(gloc->value, m_value);
         }
   #else
-        if (vm->m_interp->live_thread_count() > 1) {
+        if (vm->m_vmm->live_thread_count() > 1) {
             if (!vm->m_heap->in_heap(gloc)) {
                 thread_global_access_violation(vm, ((scm_gloc_t)CAR(operands))->variable, vm->m_value);
                 return 1;
             }
-            vm->m_interp->remember(gloc->value, vm->m_value);
+            vm->m_vmm->remember(gloc->value, vm->m_value);
         }
   #endif
 #endif
@@ -370,7 +370,7 @@ extern "C" {
         scm_obj_t* slot = c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
         if (!STACKP(slot)) {
 #if USE_PARALLEL_VM
-            if (vm->m_interp->live_thread_count() > 1) {
+            if (vm->m_vmm->live_thread_count() > 1) {
                 if (!vm->m_heap->in_heap(slot)) {
                   scm_obj_t doc = CDR(operands);
                   if (PAIRP(doc)) {
@@ -380,7 +380,7 @@ extern "C" {
                   }
                   return 1;
                 }
-                if (vm->m_heap->m_child > 0) vm->m_interp->remember(*slot, vm->m_value);
+                if (vm->m_heap->m_child > 0) vm->m_vmm->remember(*slot, vm->m_value);
             }
 #endif
             vm->m_heap->write_barrier(vm->m_value);
@@ -515,13 +515,30 @@ codegen_t::is_compiled(scm_closure_t closure)
 void
 codegen_t::compile(scm_closure_t closure)
 {
+#if ENABLE_COMPILE_DEFERRED
+    m_compile_queue.push_back(closure);
+    if (m_compile_queue.size()) {
+        scm_closure_t closure = m_compile_queue.back();
+        m_compile_queue.pop_back();
+        //printer_t prt(m_vm, m_vm->m_current_output);
+        //prt.format("deferred compile closure: ~s~&~!", closure->doc);
+        compile_each(closure);
+    }
+#else
+    compile_each(closure);
+#endif
+    m_lifted_functions.clear();
+}
+
+void
+codegen_t::compile_each(scm_closure_t closure)
+{
     VM* vm = m_vm;
     if (is_compiled(closure)) return;
 #if DEBUG_CODEGEN
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
 #endif
-
     char module_id[40];
     uuid_v4(module_id, sizeof(module_id));
     char function_id[40];
@@ -566,20 +583,6 @@ codegen_t::compile(scm_closure_t closure)
     vm->m_heap->write_barrier(n_code);
     closure->pc = n_code;
     closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
-
-    m_lifted_functions.clear();
-
-#if ENABLE_COMPILE_DEFERRED
-    if (m_deferred_compile.size()) {
-        scm_closure_t closure = m_deferred_compile.back();
-        m_deferred_compile.pop_back();
-        //printer_t prt(m_vm, m_vm->m_current_output);
-        //prt.format("deferred compile closure: ~s~&~!", closure->doc);
-        compile(closure);
-        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
-    }
-#endif
-
 }
 
 Function*

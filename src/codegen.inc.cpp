@@ -1405,7 +1405,7 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
 #if ENABLE_COMPILE_DEFERRED
-    m_deferred_compile.push_back((scm_closure_t)operands);
+    m_compile_queue.push_back((scm_closure_t)operands);
 #endif
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
@@ -1423,7 +1423,7 @@ codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
 #if ENABLE_COMPILE_DEFERRED
-    m_deferred_compile.push_back((scm_closure_t)operands);
+    m_compile_queue.push_back((scm_closure_t)operands);
 #endif
 
     auto c_ret_close = M->getOrInsertFunction("c_ret_close", IntptrTy, IntptrPtrTy, IntptrTy);
@@ -1441,7 +1441,7 @@ codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
 #if ENABLE_COMPILE_DEFERRED
-    m_deferred_compile.push_back((scm_closure_t)operands);
+    m_compile_queue.push_back((scm_closure_t)operands);
 #endif
 
     auto c_close = M->getOrInsertFunction("c_close", IntptrTy, IntptrPtrTy, IntptrTy);

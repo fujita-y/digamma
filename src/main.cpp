@@ -3,7 +3,7 @@
 
 #include "core.h"
 #include "vm.h"
-#include "interpreter.h"
+#include "vmm.h"
 
 #if ENABLE_LLVM_JIT
   #include "llvm/Support/InitLLVM.h"
@@ -181,8 +181,8 @@ int main(int argc, const char** argv)
     s_current_vm = &rootVM;
 #endif
 #if USE_PARALLEL_VM
-    Interpreter interp;
-    interp.init(&rootVM, 128);
+    VMM vmm;
+    vmm.init(&rootVM, 128);
     rootVM.boot();
     rootVM.standalone();
 #else

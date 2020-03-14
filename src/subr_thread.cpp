@@ -8,7 +8,7 @@
 #if USE_PARALLEL_VM
 #include "bag.h"
 #include "list.h"
-#include "interpreter.h"
+#include "vmm.h"
 #endif
 
 #define USE_SHARED_QUEUE_QUICK_ENCODE    1
@@ -21,9 +21,9 @@ subr_spawn(VM* vm, int argc, scm_obj_t argv[])
 #if USE_PARALLEL_VM
     if (argc >= 1) {
         if (CLOSUREP(argv[0])) {
-            vm->m_interp->update(vm, VM_STATE_BLOCK);
-            int n = vm->m_interp->spawn(vm, (scm_closure_t)argv[0], argc - 1, argv + 1);
-            vm->m_interp->update(vm, VM_STATE_ACTIVE);
+            vm->m_vmm->update(vm, VM_STATE_BLOCK);
+            int n = vm->m_vmm->spawn(vm, (scm_closure_t)argv[0], argc - 1, argv + 1);
+            vm->m_vmm->update(vm, VM_STATE_ACTIVE);
             if (n < 0) return scm_timeout;
             return MAKEFIXNUM(n);
         }
@@ -102,7 +102,7 @@ subr_display_thread_status(VM* vm, int argc, scm_obj_t argv[])
 {
 #if USE_PARALLEL_VM
     if (argc == 0) {
-        vm->m_interp->display_status(vm);
+        vm->m_vmm->display_status(vm);
         return scm_unspecified;
     }
     wrong_number_of_arguments_violation(vm, "display-thread-status", 0, 0, argc, argv);
@@ -197,16 +197,16 @@ subr_shared_queue_push(VM* vm, int argc, scm_obj_t argv[])
             }
             if (queue->queue.wait_lock_try_put(id)) return scm_true;
             if (argc == 3) {
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 bool succ = queue->queue.put(id, timeout);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 if (succ) return scm_true;
                 if (queue->queue.no_more_put()) return scm_shutdown;
                 return scm_timeout;
             } else {
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 bool succ = queue->queue.put(id);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 return succ ? scm_true : scm_shutdown;
             }
         }
@@ -241,14 +241,14 @@ scm_obj_t subr_shared_queue_pop(VM* vm, int argc, scm_obj_t argv[])
             if (queue->queue.wait_lock_try_get(&id)) goto receive;
             if (argc == 2) {
                 if (timeout == 0) goto timeout;
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 succ = queue->queue.get(&id, timeout);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 if (!succ) goto timeout;
             } else {
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 succ = queue->queue.get(&id);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 if (!succ) return scm_shutdown;
             }
 
@@ -369,16 +369,16 @@ subr_shared_bag_put(VM* vm, int argc, scm_obj_t argv[])
                     int id = slot->buf.put(bvector->elts, bvector->count);
                     if (slot->queue.wait_lock_try_put(id)) return scm_true;
                     if (argc == 4) {
-                        vm->m_interp->update(vm, VM_STATE_BLOCK);
+                        vm->m_vmm->update(vm, VM_STATE_BLOCK);
                         bool succ = slot->queue.put(id, timeout);
-                        vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                        vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                         if (succ) return scm_true;
                         if (slot->queue.no_more_put()) return scm_shutdown;
                         return scm_timeout;
                     } else {
-                        vm->m_interp->update(vm, VM_STATE_BLOCK);
+                        vm->m_vmm->update(vm, VM_STATE_BLOCK);
                         bool succ = slot->queue.put(id);
-                        vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                        vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                         return succ ? scm_true : scm_shutdown;
                     }
                 }
@@ -422,14 +422,14 @@ subr_shared_bag_get(VM* vm, int argc, scm_obj_t argv[])
             if (slot->queue.wait_lock_try_get(&id)) goto receive;
             if (argc == 3) {
                 if (timeout == 0) goto timeout;
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 succ = slot->queue.get(&id, timeout);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 if (!succ) goto timeout;
             } else {
-                vm->m_interp->update(vm, VM_STATE_BLOCK);
+                vm->m_vmm->update(vm, VM_STATE_BLOCK);
                 succ = slot->queue.get(&id);
-                vm->m_interp->update(vm, VM_STATE_ACTIVE);
+                vm->m_vmm->update(vm, VM_STATE_ACTIVE);
                 if (!succ) return scm_shutdown;
             }
 

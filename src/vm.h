@@ -6,11 +6,13 @@
 
 #include "core.h"
 #include "heap.h"
+#include "heap.h"
 
 class printer_t;
+class codegen_t;
 
 #if USE_PARALLEL_VM
-class Interpreter;
+class VMM;
 #endif
 
 class VM {
@@ -87,11 +89,12 @@ public:
     int                 m_recursion_level;
     int                 m_shared_object_errno;
 #if USE_PARALLEL_VM
-    Interpreter*        m_interp;
-    VM*                 m_parent;
     int                 m_id;
+    VM*                 m_parent;
+    codegen_t*          m_codegen;
     scm_obj_t           m_spawn_timeout; // #f or fixnum, no gc protect
     size_t              m_spawn_heap_limit;
+    VMM*                m_vmm;
 #endif
 
     scm_closure_t       lookup_system_closure(const char* name);

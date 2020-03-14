@@ -1,8 +1,8 @@
 // Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
-#ifndef INTERPRETER_H_INCLUDED
-#define INTERPRETER_H_INCLUDED
+#ifndef VMM_H_INCLUDED
+#define VMM_H_INCLUDED
 
 #include "core.h"
 #include "heap.h"
@@ -38,10 +38,10 @@ public:
     void    display_status(VM* vm);
 };
 
-class Interpreter {
+class VMM {
     enum { VM_PARENT_NONE = -1 };
     struct vm_table_rec_t {
-        Interpreter*    interp;
+        VMM*            vmm;
         cond_t          notify;
         VM*             vm;
         int             id;
@@ -60,7 +60,7 @@ class Interpreter {
     static thread_main_t mutator_thread(void* param);
 
 public:
-            Interpreter() { m_table = NULL; }
+            VMM() { m_table = NULL; }
     void    init(VM* root, int n);
     void    destroy();
     int     spawn(VM* parent, scm_closure_t func, int argc, scm_obj_t argv[]);

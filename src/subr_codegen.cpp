@@ -5,10 +5,7 @@
 #include "vm.h"
 #include "printer.h"
 #include "violation.h"
-
 #include "codegen.h"
-
-codegen_t* s_codegen;
 
 /*
  (current-environment (system-environment)) (native-compile)
@@ -32,10 +29,14 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
-            if (!s_codegen) s_codegen = new codegen_t(vm);
             scm_closure_t closure = (scm_closure_t)argv[0];
-            s_codegen->compile(closure);
-            return scm_unspecified;
+            if (vm->m_codegen) {
+                vm->m_codegen->compile(closure);
+                return scm_unspecified;
+            } else {
+                implementation_restriction_violation(vm, "closure-compile", "not available on vm", MAKEFIXNUM(vm->m_id), argc, argv);
+                return scm_undef;
+            }
         }
         wrong_type_argument_violation(vm, "closure-compile", 0, "closure", argv[0], argc, argv);
         return scm_undef;

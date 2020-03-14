@@ -7,8 +7,9 @@
 #include "port.h"
 #include "reader.h"
 #include "printer.h"
+#include "codegen.h"
 #if USE_PARALLEL_VM
-#include "interpreter.h"
+#include "vmm.h"
 #endif
 
 scm_obj_t
@@ -40,9 +41,9 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
     if (obj != scm_undef) {
         assert(GLOCP(obj));
 #if USE_PARALLEL_VM
-        if (m_interp->live_thread_count() > 1) {
+        if (m_vmm->live_thread_count() > 1) {
             assert(m_heap->in_heap(obj));
-            m_interp->remember(((scm_gloc_t)obj)->value, value);
+            m_vmm->remember(((scm_gloc_t)obj)->value, value);
         }
 #endif
         m_heap->write_barrier(value);
@@ -110,6 +111,9 @@ VM::init(object_heap_t* heap)
         m_flags.restricted_print_line_length = MAKEFIXNUM(40);
         m_flags.record_print_nesting_limit = MAKEFIXNUM(2);
         m_flags.warning_level = scm_false;
+
+        m_codegen = new codegen_t(this);
+
         run(true);
         return true;
     } catch (io_exception_t& e) {
@@ -723,9 +727,9 @@ VM::stop()
         }
     }
 #if USE_PARALLEL_VM
-    if (m_interp->live_thread_count() > 1) {
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_EVERYTHING) m_interp->snapshot(this, false);
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_interp->snapshot(this, true);
+    if (m_vmm->live_thread_count() > 1) {
+        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_EVERYTHING) m_vmm->snapshot(this, false);
+        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_vmm->snapshot(this, true);
     }
 #endif
     m_heap->m_collector_lock.lock();

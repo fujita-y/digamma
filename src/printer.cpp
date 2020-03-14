@@ -1097,10 +1097,10 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
 #else
             vm_env_t env = (vm_env_t)closure->env;
             if (env == NULL) {
-                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->code);
+                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->pc);
                 else format("#<closure ~s>", closure->doc);
             } else {
-                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->code);
+                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->pc);
                 else format("#<closure ~s env:0x%x count:%d up:0x%x>", closure->doc, env, env->count, env->up);
             }
 #endif

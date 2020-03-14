@@ -52,7 +52,7 @@ class codegen_t {
     std::unique_ptr<LLJIT> m_jit;
     std::map<scm_closure_t,Function*> m_lifted_functions;
 #if ENABLE_COMPILE_DEFERRED
-    std::vector<scm_closure_t> m_deferred_compile;
+    std::vector<scm_closure_t> m_compile_queue;
 #endif
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
@@ -63,6 +63,7 @@ public:
     codegen_t(VM* vm);
     void compile(scm_closure_t closure);
 private:
+    void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
     Function* emit_prepare_call(context_t& ctx);

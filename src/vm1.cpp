@@ -6,7 +6,7 @@
 #include "arith.h"
 #include "printer.h"
 #include "violation.h"
-#include "interpreter.h"
+#include "vmm.h"
 #include "codegen.h"
 
 #define FOLD_TAIL_CALL_TRACE            1
@@ -680,14 +680,13 @@ VM::loop(bool init, bool resume)
                 if (m_value == scm_undef) goto ERROR_APPLY_GLOC;
 
 #if ENABLE_COMPILE_GLOC
-                if (CLOSUREP(gloc->value)) {
+                if (m_codegen && CLOSUREP(gloc->value)) {
                     scm_closure_t closure = (scm_closure_t)gloc->value;
                     if (!HDR_CLOSURE_COMPILED(closure->hdr) /*&& closure->env != NULL */&& SYMBOLP(gloc->variable)) {
                         scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
                         //printer_t prt(this, m_current_output);
                         //prt.format("codegen: ~s~&", symbol);
-                        if (!s_codegen) s_codegen = new codegen_t(this);
-                        s_codegen->compile(closure);
+                        m_codegen->compile(closure);
                     } else {
                         // [TODO] not compiled but cannot compile, assign another bit
                         closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
@@ -1139,9 +1138,9 @@ VM::loop(bool init, bool resume)
                     m_interp->remember(gloc->value, m_value);
                 }
   #else
-                if (m_interp->live_thread_count() > 1) {
+                if (m_vmm->live_thread_count() > 1) {
                     if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
-                    m_interp->remember(gloc->value, m_value);
+                    m_vmm->remember(gloc->value, m_value);
                 }
   #endif
 #endif
@@ -1155,9 +1154,9 @@ VM::loop(bool init, bool resume)
                 scm_obj_t* slot = lookup_iloc(CAR(OPERANDS));
                 if (!STACKP(slot)) {
 #if USE_PARALLEL_VM
-                    if (m_interp->live_thread_count() > 1) {
+                    if (m_vmm->live_thread_count() > 1) {
                         if (!m_heap->in_heap(slot)) goto ERROR_SET_ILOC_BAD_CONTEXT;
-                        if (m_heap->m_child > 0) m_interp->remember(*slot, m_value);
+                        if (m_heap->m_child > 0) m_vmm->remember(*slot, m_value);
                     }
 #endif
                     m_heap->write_barrier(m_value);

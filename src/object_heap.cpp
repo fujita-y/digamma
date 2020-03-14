@@ -1614,7 +1614,7 @@ check_collectible(void* obj, int size, void* refcon)
         } return;
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            VERIFY_OBJ(closure, code);
+            VERIFY_OBJ(closure, pc);
             VERIFY_OBJ(closure, doc);
             VERIFY_INTERIOR_OBJ(closure, env);
         } return;

@@ -5,11 +5,12 @@
 #include "hash.h"
 #include "list.h"
 #include "arith.h"
-#include "interpreter.h"
+#include "vmm.h"
 #include "vm.h"
 #include "port.h"
 #include "printer.h"
 #include "uuid.h"
+#include "codegen.h"
 
 #define REPORT_REMEMBER_SET     1
 
@@ -20,7 +21,7 @@
 #define SPAWN_WARNING_MSEC      10000   // 10 s
 
 void
-Interpreter::init(VM* root, int n)
+VMM::init(VM* root, int n)
 {
     if (n > MAX_VIRTUAL_MACHINE) n = MAX_VIRTUAL_MACHINE;
     m_lock.init();
@@ -30,17 +31,17 @@ Interpreter::init(VM* root, int n)
     m_table = new vm_table_rec_t* [m_capacity];
     for (int i = 0; i < m_capacity; i++) {
         m_table[i] = new vm_table_rec_t;
-        m_table[i]->interp = this;
+        m_table[i]->vmm = this;
         m_table[i]->notify.init();
         m_table[i]->state = VM_STATE_FREE;
         m_table[i]->name[0] = 0;
     }
-    root->m_interp = this;
+    root->m_vmm = this;
     root->m_parent = NULL;
     root->m_id = 0;
     root->m_spawn_timeout = scm_false;
     root->m_spawn_heap_limit = DEFAULT_HEAP_LIMIT * 1024 * 1024;
-    m_table[0]->interp = this;
+    m_table[0]->vmm = this;
     m_table[0]->state = VM_STATE_ACTIVE;
     m_table[0]->vm = root;
     m_table[0]->parent = VM_PARENT_NONE;
@@ -50,7 +51,7 @@ Interpreter::init(VM* root, int n)
 }
 
 void
-Interpreter::destroy()
+VMM::destroy()
 {
     m_lock.destroy();
     m_uuid_lock.destroy();
@@ -58,7 +59,7 @@ Interpreter::destroy()
 }
 
 int
-Interpreter::spawn(VM* parent, scm_closure_t func, int argc, scm_obj_t argv[])
+VMM::spawn(VM* parent, scm_closure_t func, int argc, scm_obj_t argv[])
 {
     double start = msec();
     double warning = start + SPAWN_WARNING_MSEC;
@@ -82,8 +83,9 @@ again:
                 vm->m_to_stack_top = (scm_obj_t*)vm->m_heap->allocate(vm->m_stack_size, false, false);
                 vm->m_to_stack_limit = (scm_obj_t*)((intptr_t)vm->m_to_stack_top + vm->m_stack_size);
                 memset(vm->m_to_stack_top, 0, vm->m_stack_size);
-                vm->m_interp = parent->m_interp;
+                vm->m_vmm = parent->m_vmm;
                 vm->m_parent = parent;
+                vm->m_codegen = NULL;
                 vm->m_id = i;
                 vm->m_spawn_timeout = parent->m_spawn_timeout;
                 vm->m_spawn_heap_limit = parent->m_spawn_heap_limit;
@@ -156,10 +158,10 @@ again:
 }
 
 thread_main_t
-Interpreter::mutator_thread(void* param)
+VMM::mutator_thread(void* param)
 {
     vm_table_rec_t* table_rec = (vm_table_rec_t*)param;
-    Interpreter* interp = table_rec->interp;
+    VMM* vmm = table_rec->vmm;
     VM* vm = table_rec->vm;
     set_current_vm(vm);
 
@@ -208,21 +210,21 @@ loop:
         thread_yield();
     }
     {
-        scoped_lock lock(interp->m_lock);
-        interp->m_table[table_rec->parent]->vm->m_heap->m_child--;
-        interp->m_remember_set.clear(1 << vm->m_id);
+        scoped_lock lock(vmm->m_lock);
+        vmm->m_table[table_rec->parent]->vm->m_heap->m_child--;
+        vmm->m_remember_set.clear(1 << vm->m_id);
 
     wait_again:
-        for (int i = 0; i < interp->m_capacity; i++) {
-            switch (interp->m_table[i]->state) {
+        for (int i = 0; i < vmm->m_capacity; i++) {
+            switch (vmm->m_table[i]->state) {
             case VM_STATE_FREE:
                 break;
             case VM_STATE_ACTIVE:
             case VM_STATE_BLOCK:
             case VM_STATE_SYNC:
-                if (interp->m_table[i]->parent == table_rec->id) {
+                if (vmm->m_table[i]->parent == table_rec->id) {
                     table_rec->state = VM_STATE_SYNC;
-                    table_rec->notify.wait(interp->m_lock);
+                    table_rec->notify.wait(vmm->m_lock);
                     goto wait_again;
                 }
                 break;
@@ -232,21 +234,21 @@ loop:
     vm->m_heap->destroy();
     delete vm->m_heap;
     delete vm;
-    interp->m_lock.lock();
+    vmm->m_lock.lock();
     table_rec->state = VM_STATE_FREE;
-    interp->m_live = interp->m_live - 1;
-    interp->m_table[table_rec->parent]->notify.signal();
-    interp->m_lock.unlock();
+    vmm->m_live = vmm->m_live - 1;
+    vmm->m_table[table_rec->parent]->notify.signal();
+    vmm->m_lock.unlock();
     return NULL;
 }
 
 void
-Interpreter::update(VM* vm, int state)
+VMM::update(VM* vm, int state)
 {
-    Interpreter* interp = vm->m_interp;
-    scoped_lock lock(interp->m_lock);
-    vm_table_rec_t** table = interp->m_table;
-    for (int i = 0; i < interp->m_capacity; i++) {
+    VMM* vmm = vm->m_vmm;
+    scoped_lock lock(vmm->m_lock);
+    vm_table_rec_t** table = vmm->m_table;
+    for (int i = 0; i < vmm->m_capacity; i++) {
         vm_table_rec_t* rec = table[i];
         if (rec->vm == vm) {
             rec->state = state;
@@ -256,15 +258,15 @@ Interpreter::update(VM* vm, int state)
 }
 
 void
-Interpreter::display_status(VM* vm)
+VMM::display_status(VM* vm)
 {
     scm_port_t port = vm->m_current_output;
     scoped_lock lock1(port->lock);
-    Interpreter* interp = vm->m_interp;
-    scoped_lock lock2(interp->m_lock);
-    vm_table_rec_t** table = interp->m_table;
+    VMM* vmm = vm->m_vmm;
+    scoped_lock lock2(vmm->m_lock);
+    vm_table_rec_t** table = vmm->m_table;
     int name_pad = 8;
-    for (int i = 0; i < interp->m_capacity; i++) {
+    for (int i = 0; i < vmm->m_capacity; i++) {
         vm_table_rec_t* rec = table[i];
         int n = strlen(rec->name);
         if (n > name_pad) name_pad = n;
@@ -276,7 +278,7 @@ Interpreter::display_status(VM* vm)
 #endif
     for (int c = 0; c < name_pad - 2; c++) port_puts(port, " ");
     port_puts(port, "  MEM\n");
-    for (int i = 0; i < interp->m_capacity; i++) {
+    for (int i = 0; i < vmm->m_capacity; i++) {
         vm_table_rec_t* rec = table[i];
         const char* stat = "unknown";
         scm_obj_t param = scm_nil;
@@ -315,7 +317,7 @@ Interpreter::display_status(VM* vm)
     }
 
 void
-Interpreter::snapshot(VM* vm, bool retry)
+VMM::snapshot(VM* vm, bool retry)
 {
     scoped_lock lock(m_lock);
     int id = vm->m_id;
@@ -337,21 +339,21 @@ Interpreter::snapshot(VM* vm, bool retry)
 }
 
 bool
-Interpreter::primordial(int id)
+VMM::primordial(int id)
 {
     scoped_lock lock(m_lock);
     return (m_table[id]->parent == VM_PARENT_NONE);
 }
 
 void
-Interpreter::set_thread_name(int id, const char* name)
+VMM::set_thread_name(int id, const char* name)
 {
     scoped_lock lock(m_lock);
     strncpy(m_table[id]->name, name, sizeof(m_table[id]->name));
 }
 
 void
-Interpreter::get_thread_name(int id, char* name, int len)
+VMM::get_thread_name(int id, char* name, int len)
 {
     scoped_lock lock(m_lock);
     strncpy(name, m_table[id]->name, len);
@@ -379,7 +381,7 @@ subset_of_list(scm_obj_t lst, scm_obj_t elt)
 }
 
 void
-Interpreter::remember(scm_obj_t obj)
+VMM::remember(scm_obj_t obj)
 {
     scoped_lock lock(m_lock);
     uint32_t bits = 0;
@@ -395,7 +397,7 @@ Interpreter::remember(scm_obj_t obj)
 }
 
 void
-Interpreter::remember(scm_obj_t lhs, scm_obj_t rhs)
+VMM::remember(scm_obj_t lhs, scm_obj_t rhs)
 {
     assert(lhs);
     if (CELLP(lhs)) {
@@ -542,7 +544,7 @@ remember_set_t::display_status(VM* vm)
 }
 
 void
-Interpreter::generate_uuid(char* buf, int bufsize) // version 4
+VMM::generate_uuid(char* buf, int bufsize) // version 4
 {
     assert(bufsize > 36);
     scoped_lock lock(m_uuid_lock);

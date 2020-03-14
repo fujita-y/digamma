@@ -9,7 +9,7 @@
 #include "port.h"
 #include "socket.h"
 #if USE_PARALLEL_VM
-#include "interpreter.h"
+#include "vmm.h"
 #include "vm.h"
 #endif
 
