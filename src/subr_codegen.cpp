@@ -12,13 +12,14 @@
 */
 
 // native-compile
+/*
 scm_obj_t
 subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
 {
 //    orcjit_compile();
     return scm_unspecified;
 }
-
+*/
 /*
  (current-environment (system-environment)) (define (foo) 120) (closure-compile foo)
 */
@@ -50,6 +51,6 @@ init_subr_codegen(object_heap_t* heap)
 {
 #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
 
-    DEFSUBR("native-compile", subr_native_compile);
+//    DEFSUBR("native-compile", subr_native_compile);
     DEFSUBR("closure-compile", subr_closure_compile);
 }
