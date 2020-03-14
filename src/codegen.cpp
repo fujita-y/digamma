@@ -312,7 +312,7 @@ extern "C" {
         env->count = args;
         env->up = closure->env;
         vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
-        vm->m_pc = closure->code;
+        vm->m_pc = closure->pc;
         vm->m_env = &env->up;
     }
 
@@ -508,7 +508,7 @@ bool
 codegen_t::is_compiled(scm_closure_t closure)
 {
     VM* vm = m_vm;
-    return CAAR(closure->code) == INST_NATIVE;
+    return CAAR(closure->pc) == INST_NATIVE;
 }
 
 // compile one top-level function
@@ -545,7 +545,7 @@ codegen_t::compile(scm_closure_t closure)
 
     context.m_intrinsics.prepare_call = emit_prepare_call(context);
 
-    transform(context, closure->code, true);
+    transform(context, closure->pc, true);
 
     verifyModule(*M, &outs());
 
@@ -562,9 +562,9 @@ codegen_t::compile(scm_closure_t closure)
 
     scm_bvector_t bv = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)bv->elts = (intptr_t)thunk;
-    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->code);
+    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->pc);
     vm->m_heap->write_barrier(n_code);
-    closure->code = n_code;
+    closure->pc = n_code;
     closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
 
     m_lifted_functions.clear();
@@ -589,7 +589,7 @@ codegen_t::get_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     assert(is_compiled(closure));
-    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->code));
+    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->pc));
     intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
     Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
@@ -647,7 +647,7 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     context.m_top_level_function = F;
     context.m_intrinsics = ctx.m_intrinsics;
 
-    transform(context, closure->code, true);
+    transform(context, closure->pc, true);
 
     return F;
 }

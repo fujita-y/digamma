@@ -293,7 +293,7 @@ VM::apply_apply_closure(scm_obj_t lastarg)
             env->count = args + 1;
             env->up = closure->env;
             m_sp = m_fp = (scm_obj_t*)(env + 1);
-            m_pc = closure->code;
+            m_pc = closure->pc;
             m_env = &env->up;
             return apply_apply_trace_n_loop;
         }
@@ -314,7 +314,7 @@ VM::apply_apply_closure(scm_obj_t lastarg)
         env->count = args;
         env->up = closure->env;
         m_sp = m_fp = (scm_obj_t*)(env + 1);
-        m_pc = closure->code;
+        m_pc = closure->pc;
         m_env = &env->up;
         return apply_apply_trace_n_loop;
     }
@@ -411,7 +411,7 @@ VM::loop(bool init, bool resume)
                 env->count = args;
                 env->up = closure->env;
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
-                m_pc = closure->code;
+                m_pc = closure->pc;
                 m_env = &env->up;
                 goto trace_n_loop;
             }
@@ -1607,7 +1607,7 @@ VM::loop(bool init, bool resume)
                 env->count = args;
                 env->up = closure->env;
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
-                m_pc = closure->code;
+                m_pc = closure->pc;
                 m_env = &env->up;
                 goto trace_n_loop;
             }

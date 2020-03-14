@@ -107,7 +107,7 @@ again:
                 env->count = argc;
                 env->up = func->env;
                 vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
-                vm->m_pc = func->code;
+                vm->m_pc = func->pc;
                 vm->m_env = &env->up;
                 scm_obj_t context = scm_nil;
                 if (argc > 0) {

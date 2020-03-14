@@ -174,7 +174,7 @@ loop:
             }
             case TC_CLOSURE: {
                 scm_closure_t closure = (scm_closure_t)obj;
-                if (closure->env == NULL && test(closure->code) && test(closure->doc)) return true;
+                if (closure->env == NULL && test(closure->pc) && test(closure->doc)) return true;
                 return false;
             }
             case TC_TUPLE: {
@@ -266,7 +266,7 @@ loop:
             case TC_CLOSURE: {
                 scm_closure_t closure = (scm_closure_t)obj;
                 if (closure->env == NULL) {
-                    scan(closure->code);
+                    scan(closure->pc);
                     scan(closure->doc);
                     return;
                 }
@@ -499,7 +499,7 @@ serializer_t::put_datum(scm_obj_t obj)
             scm_closure_t closure = (scm_closure_t)obj;
             emit_u8(BVO_TAG_CLOSURE);
             emit_uintptr(closure->hdr);
-            put_datum(closure->code);
+            put_datum(closure->pc);
             put_datum(closure->doc);
             return;
         }

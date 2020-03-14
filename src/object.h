@@ -244,7 +244,7 @@ OBJECT_ALIGNED(scm_closure_rec_t) {
     scm_hdr_t   hdr;
     scm_obj_t   doc;
     void*       env;
-    void*       code;
+    scm_obj_t   pc;
 } END;
 
 OBJECT_ALIGNED(scm_subr_rec_t) {

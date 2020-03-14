@@ -639,7 +639,7 @@ loop:
     try {
         reset();
         scm_closure_t closure = lookup_system_closure(".@start-scheme-session");
-        m_pc = closure->code;
+        m_pc = closure->pc;
         prebind(m_pc);
         run(false);
     } catch (vm_exit_t& e) {

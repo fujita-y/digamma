@@ -237,7 +237,7 @@ resolve_collectible(void* obj, int size, void* desc)
 
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            closure->code = heap->forward(closure->code);
+            closure->pc = heap->forward(closure->pc);
             closure->doc = heap->forward(closure->doc);
             closure->env = heap->interior_forward(closure->env);
         } break;

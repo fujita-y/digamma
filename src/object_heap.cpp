@@ -1113,7 +1113,7 @@ object_heap_t::trace(scm_obj_t obj)
         }
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            shade(closure->code);
+            shade(closure->pc);
             shade(closure->doc);
             interior_shade(closure->env);
             break;

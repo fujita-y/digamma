@@ -845,7 +845,7 @@ subr_closure_code(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
             scm_closure_t closure = (scm_closure_t)argv[0];
-            return (scm_obj_t)closure->code;
+            return (scm_obj_t)closure->pc;
         }
         wrong_type_argument_violation(vm, "closure-code", 0, "closure", argv[0], argc, argv);
         return scm_undef;
