@@ -832,7 +832,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     // continue emit code in operands
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
-    transform(ctx2, operands, true);
+    transform(ctx2, operands, false);
 
     IRB.SetInsertPoint(RETURN);
     return K;

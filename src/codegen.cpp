@@ -660,7 +660,8 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     auto vm = F->arg_begin();
 
     if (nbytes) {
-        //printf("emit_stack_overflow_check: %d\n", nbytes);
+        if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
+        // printf("emit_stack_overflow_check: %d\n", nbytes);
         auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
         auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
         BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
@@ -689,6 +690,9 @@ codegen_t::calc_stack_size(scm_obj_t inst)
             } break;
             case VMOP_CALL: {
               n += sizeof(vm_cont_rec_t);
+              scm_obj_t operands = CDAR(inst);
+              int n2 = calc_stack_size(operands);
+              if (n + n2 > require) require = n + n2;
             } break;
             case VMOP_PUSH_GLOC:
             case VMOP_PUSH_SUBR:
