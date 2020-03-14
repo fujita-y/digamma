@@ -10,8 +10,26 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         return env;
     } else if (depth == 1) {
-        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk1, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        return env;
+    } else if (depth == 2) {
+        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk2, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        return env;
+    } else if (depth == 3) {
+        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
+        auto lnk3 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk2, IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk3, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+        return env;
+    } else if (depth == 4) {
+        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
+        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
+        auto lnk3 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk2, IntptrPtrTy));
+        auto lnk4 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk3, IntptrPtrTy));
+        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk4, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         return env;
     }
     auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
@@ -25,14 +43,8 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
 
-    if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_env), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        auto count = CREATE_LOAD_ENV_REC(env, count);
-        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
-    } else if (depth == 1) {
-        auto lnk = IRB.CreateLoad(IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_env), IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
+    if (depth <= 4) {
+        auto env = emit_lookup_env(ctx, depth);
         auto count = CREATE_LOAD_ENV_REC(env, count);
         if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
         return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
