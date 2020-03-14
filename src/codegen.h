@@ -12,8 +12,8 @@
 
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
-
 #define USE_UNIFIED_STACK_CHECK   1
+
 #define DEBUG_CODEGEN             0
 #define VERBOSE_CODEGEN           0
 
