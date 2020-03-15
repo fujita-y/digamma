@@ -682,14 +682,11 @@ VM::loop(bool init, bool resume)
 #if ENABLE_COMPILE_GLOC
                 if (m_codegen && CLOSUREP(gloc->value)) {
                     scm_closure_t closure = (scm_closure_t)gloc->value;
-                    if (!HDR_CLOSURE_COMPILED(closure->hdr) /*&& closure->env != NULL */&& SYMBOLP(gloc->variable)) {
-                        scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+                    if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
                         //printer_t prt(this, m_current_output);
                         //prt.format("codegen: ~s~&", symbol);
+                        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
                         m_codegen->compile(closure);
-                    } else {
-                        // [TODO] not compiled but cannot compile, assign another bit
-                        closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
                     }
                 }
 #endif

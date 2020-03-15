@@ -541,13 +541,16 @@ void
 codegen_t::compile(scm_closure_t closure)
 {
 #if ENABLE_COMPILE_DEFERRED
-    m_compile_queue.push_back(closure);
-    while (m_compile_queue.size()) {
-        scm_closure_t closure = m_compile_queue.back();
-        m_compile_queue.pop_back();
-        //printer_t prt(m_vm, m_vm->m_current_output);
-        //prt.format("deferred compile closure: ~s~&~!", closure->doc);
-        compile_each(closure);
+    if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) == m_compile_queue.end()) {
+        m_compile_queue.push_back(closure);
+
+        while (m_compile_queue.size()) {
+            scm_closure_t closure = m_compile_queue.back();
+            //printer_t prt(m_vm, m_vm->m_current_output);
+            //prt.format("deferred compile closure: ~s~&~!", closure->doc);
+            compile_each(closure);
+            m_compile_queue.erase(std::remove(m_compile_queue.begin(), m_compile_queue.end(), closure), m_compile_queue.end());
+        }
     }
 #else
     compile_each(closure);
@@ -606,7 +609,6 @@ codegen_t::compile_each(scm_closure_t closure)
     scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->pc);
     vm->m_heap->write_barrier(n_code);
     closure->pc = n_code;
-    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_COMPILED_SHIFT);
     m_lifted_functions.clear();
 }
 
