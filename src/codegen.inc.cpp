@@ -317,8 +317,8 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
         BasicBlock* valid_true = BasicBlock::Create(C, "valid_true", F);
         IRB.CreateCondBr(valid_cond, valid_true, fallback);
         IRB.SetInsertPoint(valid_true);
-          CREATE_PUSH_VM_STACK(ans);
-          IRB.CreateBr(CONTINUE);
+        CREATE_PUSH_VM_STACK(ans);
+        IRB.CreateBr(CONTINUE);
     // fallback
     IRB.SetInsertPoint(fallback);
         auto c_push_nadd_iloc = M->getOrInsertFunction("c_push_nadd_iloc", IntptrTy, IntptrPtrTy, IntptrTy);
@@ -1632,7 +1632,7 @@ codegen_t::emit_if_not_symbolp_ret_const(context_t& ctx, scm_obj_t inst)
     // not taken
     IRB.SetInsertPoint(symbol_true);
 }
-
+/*
 void
 codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
 {
@@ -1680,6 +1680,45 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
             IRB.CreateBr(CONTINUE);
     IRB.SetInsertPoint(ans_valid_false);
     IRB.CreateBr(nonnum_false);
+
+    IRB.SetInsertPoint(CONTINUE);
+}
+*/
+void
+codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+    BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+    BasicBlock* fixnum_true = BasicBlock::Create(C, "fixnum_true", F);
+    BasicBlock* fallback = BasicBlock::Create(C, "fallback", F);
+    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto fixnum_cond = IRB.CreateICmpNE(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
+    IRB.CreateCondBr(fixnum_cond, fixnum_true, fallback);
+    // fixnum
+    IRB.SetInsertPoint(fixnum_true);
+        auto intr = Intrinsic::getDeclaration(ctx.m_module, llvm::Intrinsic::ID(Intrinsic::sadd_with_overflow), { IntptrTy });
+        auto rs = IRB.CreateCall(intr, { val, VALUE_INTPTR((uintptr_t)CADR(operands) - 1) });
+        auto ans = IRB.CreateExtractValue(rs, { 0 });
+        auto overflow = IRB.CreateExtractValue(rs, { 1 });
+        auto valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
+        BasicBlock* valid_true = BasicBlock::Create(C, "valid_true", F);
+        IRB.CreateCondBr(valid_cond, valid_true, fallback);
+        IRB.SetInsertPoint(valid_true);
+        CREATE_STORE_VM_REG(vm, m_value, ans);
+        IRB.CreateBr(CONTINUE);
+    // fallback
+    IRB.SetInsertPoint(fallback);
+        auto c_nadd_iloc = M->getOrInsertFunction("c_nadd_iloc", IntptrTy, IntptrPtrTy, IntptrTy);
+        auto success_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_nadd_iloc, { vm, VALUE_INTPTR(operands) }), VALUE_INTPTR(0));
+        BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
+        IRB.CreateCondBr(success_cond, CONTINUE, fallback_fail);
+        IRB.SetInsertPoint(fallback_fail);
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
 }
