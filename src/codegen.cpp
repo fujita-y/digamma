@@ -485,25 +485,23 @@ codegen_t::compile_thread(void* param)
         codegen.m_compile_thread_wake.wait(codegen.m_compile_thread_lock);
         codegen.m_compile_thread_ready = false;
         int n_more = 0;
-
         do {
+            if (codegen.m_compile_thread_terminating) break;
             scm_closure_t closure = NULL;
             {
                 scoped_lock lock(codegen.m_compile_queue_lock);
-                n_more = codegen.m_compile_queue.size();
-                if (n_more) {
+                if (codegen.m_compile_queue.size()) {
                     closure = codegen.m_compile_queue.back();
                 }
             }
-           // printf("compile thread: closure %p\n", closure);
+            //printf("compile thread: closure %p\n", closure);
             if (closure) codegen.compile_each(closure);
             {
                 scoped_lock lock(codegen.m_compile_queue_lock);
                 codegen.m_compile_queue.erase(std::remove(codegen.m_compile_queue.begin(), codegen.m_compile_queue.end(), closure), codegen.m_compile_queue.end());
                 n_more = codegen.m_compile_queue.size();
             }
-        } while (!codegen.m_compile_thread_terminating && n_more > 0);
-
+        } while (n_more > 0);
     }
     codegen.m_compile_thread_lock.unlock();
     return NULL;

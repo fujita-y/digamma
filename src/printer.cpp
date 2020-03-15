@@ -1100,7 +1100,7 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
                 if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->pc);
                 else format("#<closure ~s>", closure->doc);
             } else {
-                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->pc);
+                if (closure->doc == scm_nil) format("#<closure 0x%x env:0x%x count:%d up:0x%x>", closure->pc, env, env->count, env->up);
                 else format("#<closure ~s env:0x%x count:%d up:0x%x>", closure->doc, env, env->count, env->up);
             }
 #endif
