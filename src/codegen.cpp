@@ -88,7 +88,7 @@ extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
             }
 #endif
 
-#define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
+//#define INST_NATIVE     (vm->opcode_to_instruction(VMOP_NATIVE))
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
 #define LIST2(e1, e2)   CONS((e1), LIST1((e2)))
@@ -607,11 +607,13 @@ codegen_t::compile_each(scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
+/*
     scm_bvector_t bv = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)bv->elts = (intptr_t)thunk;
     scm_obj_t n_code = CONS(CONS(INST_NATIVE, bv), closure->pc);
     vm->m_heap->write_barrier(n_code);
     closure->pc = n_code;
+*/
     closure->code = (void*)thunk;
     m_lifted_functions.clear();
 }
@@ -1072,9 +1074,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
             } break;
             // VMOP_PUSH_VECTREF_ILOC  remove
             // VMOP_VECTREF_ILOC       remove
-            case VMOP_NATIVE: {
-                fatal("codegen.cpp: unexpected opcode VMOP_NATIVE");
-            } break;
+            //case VMOP_NATIVE: {
+            //    fatal("codegen.cpp: unexpected opcode VMOP_NATIVE");
+            //} break;
             case VMOP_TOUCH_GLOC: {
                 // nop
             } break;

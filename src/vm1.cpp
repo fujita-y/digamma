@@ -1440,7 +1440,9 @@ VM::loop(bool init, bool resume)
                 goto ERROR_VECTREF_ILOC;
             }
             */
+            /*
             CASE(VMOP_NATIVE) {
+                fatal("%s:%u VMOP_NATIVE deprecated", __FILE__, __LINE__);
                 m_trace = m_trace_tail = scm_unspecified;
                 operand_trace = scm_nil;
                 scm_bvector_t bv = (scm_bvector_t)OPERANDS;
@@ -1455,6 +1457,7 @@ VM::loop(bool init, bool resume)
                     goto loop;
                 }
             }
+            */
 
             CASE(VMOP_TOUCH_GLOC) {
                 goto THUNK_TOUCH_GLOC_OF;
