@@ -418,6 +418,31 @@ extern "C" {
         *slot = make_closure(vm->m_heap, (scm_closure_t)operands, vm->m_env);
     }
 
+    intptr_t c_push_nadd_iloc(VM* vm, scm_obj_t operands) {
+        scm_obj_t loc = CAR(operands);
+        scm_obj_t obj = *c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
+        if (number_pred(obj)) {
+            vm->m_sp[0] = arith_add(vm->m_heap, obj, CADR(operands));
+            vm->m_sp++;
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, CADR(operands) };
+        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
+        return 1;
+    }
+
+    intptr_t c_nadd_iloc(VM* vm, scm_obj_t operands) {
+        scm_obj_t loc = CAR(operands);
+        scm_obj_t obj = *c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
+        if (number_pred(obj)) {
+            vm->m_value = arith_add(vm->m_heap, obj, CADR(operands));
+            return 0;
+        }
+        scm_obj_t argv[2] = { obj, CADR(operands) };
+        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
+        return 1;
+    }
+
 }
 
 codegen_t::codegen_t(VM* vm) : m_vm(vm)
