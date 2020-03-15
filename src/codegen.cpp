@@ -577,7 +577,9 @@ codegen_t::compile_each(scm_closure_t closure)
 
     auto M = make_unique<Module>(module_id, C);
     Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M.get());
+#if USE_LLVM_ATTRIBUTES
     for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+#endif
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
 
@@ -606,7 +608,7 @@ codegen_t::compile_each(scm_closure_t closure)
 
     scm_bvector_t bv = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)bv->elts = (intptr_t)thunk;
-    scm_obj_t n_code = CONS(LIST2(INST_NATIVE, bv), closure->pc);
+    scm_obj_t n_code = CONS(CONS(INST_NATIVE, bv), closure->pc);
     vm->m_heap->write_barrier(n_code);
     closure->pc = n_code;
     m_lifted_functions.clear();
@@ -619,7 +621,7 @@ codegen_t::get_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     assert(is_compiled(closure));
-    scm_bvector_t bv = (scm_bvector_t)CADR(CAR(closure->pc));
+    scm_bvector_t bv = (scm_bvector_t)CDR(CAR(closure->pc));
     intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
     Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());

@@ -1436,10 +1436,15 @@ VM::loop(bool init, bool resume)
             CASE(VMOP_NATIVE) {
                 m_trace = m_trace_tail = scm_unspecified;
                 operand_trace = scm_nil;
-                scm_bvector_t bv = (scm_bvector_t)CAR(OPERANDS);
+                scm_bvector_t bv = (scm_bvector_t)OPERANDS;
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
-                intptr_t n = (*thunk)((intptr_t)this);
-                NATIVE_THUNK_POST_DISPATCH(n);
+                if (thunk) {
+                    intptr_t n = (*thunk)((intptr_t)this);
+                    NATIVE_THUNK_POST_DISPATCH(n);
+                } else {
+                    m_pc = CDR(m_pc);
+                    goto loop;
+                }
             }
 
             CASE(VMOP_TOUCH_GLOC) {
