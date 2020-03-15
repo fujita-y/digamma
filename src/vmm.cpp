@@ -85,7 +85,9 @@ again:
                 memset(vm->m_to_stack_top, 0, vm->m_stack_size);
                 vm->m_vmm = parent->m_vmm;
                 vm->m_parent = parent;
+#if ENABLE_LLVM_JIT
                 vm->m_codegen = NULL;
+#endif
                 vm->m_id = i;
                 vm->m_spawn_timeout = parent->m_spawn_timeout;
                 vm->m_spawn_heap_limit = parent->m_spawn_heap_limit;

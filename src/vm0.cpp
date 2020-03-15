@@ -111,9 +111,9 @@ VM::init(object_heap_t* heap)
         m_flags.restricted_print_line_length = MAKEFIXNUM(40);
         m_flags.record_print_nesting_limit = MAKEFIXNUM(2);
         m_flags.warning_level = scm_false;
-
+#if ENABLE_LLVM_JIT
         m_codegen = new codegen_t(this);
-
+#endif
         run(true);
         return true;
     } catch (io_exception_t& e) {

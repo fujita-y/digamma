@@ -28,6 +28,7 @@ subr_native_compile(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
 {
+#if ENABLE_LLVM_JIT
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
             scm_closure_t closure = (scm_closure_t)argv[0];
@@ -35,7 +36,7 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
                 vm->m_codegen->compile(closure);
                 return scm_unspecified;
             } else {
-                implementation_restriction_violation(vm, "closure-compile", "not available on vm", MAKEFIXNUM(vm->m_id), argc, argv);
+                implementation_restriction_violation(vm, "closure-compile", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
                 return scm_undef;
             }
         }
@@ -44,6 +45,10 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
     }
     wrong_number_of_arguments_violation(vm, "closure-compile", 1, 1, argc, argv);
     return scm_undef;
+#else
+    implementation_restriction_violation(vm, "closure-compile", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+    return scm_undef;
+#endif
 }
 
 void

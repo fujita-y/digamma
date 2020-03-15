@@ -91,7 +91,9 @@ public:
 #if USE_PARALLEL_VM
     int                 m_id;
     VM*                 m_parent;
+#if ENABLE_LLVM_JIT
     codegen_t*          m_codegen;
+#endif
     scm_obj_t           m_spawn_timeout; // #f or fixnum, no gc protect
     size_t              m_spawn_heap_limit;
     VMM*                m_vmm;
