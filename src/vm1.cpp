@@ -235,16 +235,6 @@ VM::lookup_iloc(scm_obj_t operands)
 #define SWITCH()        switch (instruction_to_opcode(CAAR(m_pc)))
 #define OPERANDS        (CDAR(m_pc))
 
-/*
-C-SUBR return state
-
-m_value    CAR(m_pc)*1       special function
----------------------------------------------------
-scm_undef  scm_unspecified   call-scheme-proc
-...        scm_false         call-scheme-modal-proc
-           [*1 debug info]
-*/
-
 enum {
     apply_apply_trace_n_loop = 0,   // goto trace_n_loop;
     apply_apply_pop_cont,           // goto pop_cont;
@@ -370,6 +360,15 @@ VM::apply_apply_subr(scm_obj_t lastarg)
     }
     return apply_apply_bad_last_args;
 }
+
+/*
+C-SUBR return state
+
+m_value    CAR(m_pc)         special function
+---------------------------------------------------
+scm_undef  scm_unspecified   apply_scheme
+scm_undef  scm_false         call_scheme
+*/
 
 void
 VM::run(bool init)
