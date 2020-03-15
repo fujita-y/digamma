@@ -523,6 +523,7 @@ make_closure(object_heap_t* heap, int argc, int rest, void* env, scm_obj_t pc, s
     scm_closure_t obj = (scm_closure_t)heap->allocate_collectible(sizeof(scm_closure_rec_t));
     obj->hdr = scm_hdr_closure | MAKEBITS(args, HDR_CLOSURE_ARGS_SHIFT);
     obj->env = env;
+    obj->code = NULL;
     obj->pc = pc;
     obj->doc = doc;
     return obj;
@@ -535,6 +536,7 @@ make_closure(object_heap_t* heap, scm_closure_t tmpl, void* env)
         scm_closure_t obj = (scm_closure_t)heap->allocate_collectible(sizeof(scm_closure_rec_t));
         obj->hdr = tmpl->hdr;
         obj->env = env;
+        obj->code = tmpl->code;
         obj->pc = tmpl->pc;
         obj->doc = tmpl->doc;
         return obj;
@@ -548,6 +550,7 @@ make_closure(object_heap_t* heap, scm_hdr_t hdr, void* env, scm_obj_t pc, scm_ob
     scm_closure_t obj = (scm_closure_t)heap->allocate_collectible(sizeof(scm_closure_rec_t));
     obj->hdr = hdr;
     obj->env = env;
+    obj->code = NULL;
     obj->pc = pc;
     obj->doc = doc;
     return obj;

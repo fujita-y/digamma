@@ -413,6 +413,13 @@ VM::loop(bool init, bool resume)
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
                 m_pc = closure->pc;
                 m_env = &env->up;
+
+                if (closure->code) {
+                    intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
+                    intptr_t n = (*thunk)((intptr_t)this);
+                    NATIVE_THUNK_POST_DISPATCH(n);
+                }
+
                 goto trace_n_loop;
             }
             goto COLLECT_STACK_ENV_REC_N_APPLY;
@@ -1439,6 +1446,8 @@ VM::loop(bool init, bool resume)
                 scm_bvector_t bv = (scm_bvector_t)OPERANDS;
                 intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
                 if (thunk) {
+                  static int c1;
+                    printf(" # 1> %d\n", c1++);
                     intptr_t n = (*thunk)((intptr_t)this);
                     NATIVE_THUNK_POST_DISPATCH(n);
                 } else {
@@ -1478,7 +1487,17 @@ VM::loop(bool init, bool resume)
             m_sp--;
             if (CLOSUREP(m_value)) {
                 int x = apply_apply_closure(obj);
-                if (x == apply_apply_trace_n_loop) goto trace_n_loop;
+                if (x == apply_apply_trace_n_loop) {
+
+                    scm_closure_t closure = (scm_closure_t)m_value;
+                    if (closure->code) {
+                        intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
+                        intptr_t n = (*thunk)((intptr_t)this);
+                        NATIVE_THUNK_POST_DISPATCH(n);
+                    }
+
+                    goto trace_n_loop;
+                }
                 if (x == apply_apply_wrong_number_args) goto ERROR_APPLY_WRONG_NUMBER_ARGS;
                 assert(x != apply_apply_pop_cont);
                 goto ERROR_PROC_APPLY_BAD_LAST_ARGS;
@@ -1610,6 +1629,13 @@ VM::loop(bool init, bool resume)
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
                 m_pc = closure->pc;
                 m_env = &env->up;
+
+                if (closure->code) {
+                    intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
+                    intptr_t n = (*thunk)((intptr_t)this);
+                    NATIVE_THUNK_POST_DISPATCH(n);
+                }
+
                 goto trace_n_loop;
             }
             goto ERROR_APPLY_WRONG_NUMBER_ARGS;

@@ -32,7 +32,7 @@
 #define ENABLE_LLVM_JIT             1
 #if ENABLE_LLVM_JIT
   #define ENABLE_COMPILE_GLOC       1
-  #define ENABLE_COMPILE_DEFERRED   1
+  #define ENABLE_COMPILE_DEFERRED   0
 #else
   #define ENABLE_COMPILE_GLOC       0
   #define ENABLE_COMPILE_DEFERRED   0

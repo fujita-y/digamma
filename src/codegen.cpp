@@ -533,7 +533,8 @@ bool
 codegen_t::is_compiled(scm_closure_t closure)
 {
     VM* vm = m_vm;
-    return CAAR(closure->pc) == INST_NATIVE;
+    //return CAAR(closure->pc) == INST_NATIVE;
+    return closure->code != NULL;
 }
 
 // compile one top-level function
@@ -611,6 +612,7 @@ codegen_t::compile_each(scm_closure_t closure)
     scm_obj_t n_code = CONS(CONS(INST_NATIVE, bv), closure->pc);
     vm->m_heap->write_barrier(n_code);
     closure->pc = n_code;
+    closure->code = (void*)thunk;
     m_lifted_functions.clear();
 }
 
@@ -621,8 +623,14 @@ codegen_t::get_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     assert(is_compiled(closure));
+/*
     scm_bvector_t bv = (scm_bvector_t)CDR(CAR(closure->pc));
     intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
+    auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
+    Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
+    return func;
+*/
+    intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(closure->code);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
     Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
     return func;
