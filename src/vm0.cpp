@@ -732,6 +732,14 @@ VM::stop()
         if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_vmm->snapshot(this, true);
     }
 #endif
+#if ENABLE_COMPILE_THREAD
+    if (m_codegen) {
+        scoped_lock lock(m_codegen->m_compile_queue_lock);
+        for(scm_closure_t closure: m_codegen->m_compile_queue) {
+            m_heap->enqueue_root(closure);
+        }
+    }
+#endif
     m_heap->m_collector_lock.lock();
     while (m_heap->m_stop_the_world) {
         m_heap->m_mutator_stopped = true;

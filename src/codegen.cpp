@@ -456,7 +456,59 @@ codegen_t::codegen_t(VM* vm) : m_vm(vm)
     J->getMainJITDylib().addGenerator(std::move(G));
 #endif
     m_jit = std::move(J);
+#if ENABLE_COMPILE_THREAD
+    m_compile_thread_terminating = false;
+    m_compile_thread_lock.init();
+    m_compile_thread_wake.init();
+    m_compile_queue_lock.init();
+    thread_start(compile_thread, this);
+#endif
 }
+
+codegen_t::~codegen_t()
+{
+#if ENABLE_COMPILE_THREAD
+    m_compile_thread_terminating = true;
+    scoped_lock lock(m_compile_thread_lock);
+    m_compile_thread_wake.signal();
+#endif
+}
+
+#if ENABLE_COMPILE_THREAD
+thread_main_t
+codegen_t::compile_thread(void* param)
+{
+    codegen_t& codegen = *(codegen_t*)param;
+    codegen.m_compile_thread_lock.lock();
+    while (!codegen.m_compile_thread_terminating) {
+        codegen.m_compile_thread_ready = true;
+        codegen.m_compile_thread_wake.wait(codegen.m_compile_thread_lock);
+        codegen.m_compile_thread_ready = false;
+        int n_more = 0;
+
+        do {
+            scm_closure_t closure = NULL;
+            {
+                scoped_lock lock(codegen.m_compile_queue_lock);
+                n_more = codegen.m_compile_queue.size();
+                if (n_more) {
+                    closure = codegen.m_compile_queue.back();
+                }
+            }
+           // printf("compile thread: closure %p\n", closure);
+            if (closure) codegen.compile_each(closure);
+            {
+                scoped_lock lock(codegen.m_compile_queue_lock);
+                codegen.m_compile_queue.erase(std::remove(codegen.m_compile_queue.begin(), codegen.m_compile_queue.end(), closure), codegen.m_compile_queue.end());
+                n_more = codegen.m_compile_queue.size();
+            }
+        } while (!codegen.m_compile_thread_terminating && n_more > 0);
+
+    }
+    codegen.m_compile_thread_lock.unlock();
+    return NULL;
+}
+#endif
 
 ThreadSafeModule
 codegen_t::optimizeModule(ThreadSafeModule TSM) {
@@ -541,7 +593,20 @@ codegen_t::is_compiled(scm_closure_t closure)
 void
 codegen_t::compile(scm_closure_t closure)
 {
-#if ENABLE_COMPILE_DEFERRED
+#if ENABLE_COMPILE_THREAD
+    if (m_compile_thread_terminating) return;
+    {
+        scoped_lock lock(m_compile_queue_lock);
+        if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) != m_compile_queue.end()) return;
+        m_compile_queue.push_back(closure);
+    }
+    if (m_compile_thread_ready) {
+        scoped_lock lock(m_compile_thread_lock);
+        m_compile_thread_wake.signal();
+    }
+
+#else
+  #if ENABLE_COMPILE_DEFERRED
     if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) == m_compile_queue.end()) {
         m_compile_queue.push_back(closure);
 
@@ -553,8 +618,9 @@ codegen_t::compile(scm_closure_t closure)
             m_compile_queue.erase(std::remove(m_compile_queue.begin(), m_compile_queue.end(), closure), m_compile_queue.end());
         }
     }
-#else
+  #else
     compile_each(closure);
+  #endif
 #endif
 }
 

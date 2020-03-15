@@ -33,9 +33,11 @@
 #if ENABLE_LLVM_JIT
   #define ENABLE_COMPILE_GLOC       1
   #define ENABLE_COMPILE_DEFERRED   1
+  #define ENABLE_COMPILE_THREAD     1
 #else
   #define ENABLE_COMPILE_GLOC       0
   #define ENABLE_COMPILE_DEFERRED   0
+  #define ENABLE_COMPILE_THREAD     0
 #endif
 
 #ifdef NDEBUG
@@ -47,7 +49,7 @@
     #define HPDEBUG                 0
     #define ASDEBUG                 0
 #else
-    #define MTDEBUG                 0
+    #define MTDEBUG                 1
     #define GCDEBUG                 1
     #define SCDEBUG                 1
     #define STDEBUG                 1

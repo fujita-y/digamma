@@ -51,8 +51,12 @@ class codegen_t {
     VM* m_vm;
     std::unique_ptr<LLJIT> m_jit;
     std::map<scm_closure_t,Function*> m_lifted_functions;
-#if ENABLE_COMPILE_DEFERRED
-    std::vector<scm_closure_t> m_compile_queue;
+#if ENABLE_COMPILE_THREAD
+    mutex_t m_compile_thread_lock;
+    cond_t m_compile_thread_wake;
+    bool m_compile_thread_ready;
+    bool m_compile_thread_terminating;
+    static thread_main_t compile_thread(void* param);
 #endif
     ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
     void define_prepare_call();
@@ -61,7 +65,12 @@ class codegen_t {
     Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
+    ~codegen_t();
     void compile(scm_closure_t closure);
+#if ENABLE_COMPILE_DEFERRED
+    std::vector<scm_closure_t> m_compile_queue;
+    mutex_t m_compile_queue_lock;
+#endif
 private:
     void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
@@ -171,7 +180,7 @@ private:
 
 };
 
-extern codegen_t* s_codegen;
+//extern codegen_t* s_codegen;
 
 /*
 for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
