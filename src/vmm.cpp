@@ -55,6 +55,7 @@ void
 VMM::destroy()
 {
     m_lock.lock();
+#if ENABLE_LLVM_JIT
     for (int i = 0; i < m_capacity; i++) {
         VM* vm = m_table[i]->vm;
         if (vm && vm->m_codegen) {
@@ -62,6 +63,7 @@ VMM::destroy()
             delete vm->m_codegen;
         }
     }
+#endif
     m_lock.unlock();
     m_lock.destroy();
     m_uuid_lock.destroy();
