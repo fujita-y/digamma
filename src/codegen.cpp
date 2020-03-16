@@ -445,7 +445,10 @@ extern "C" {
 
 }
 
-codegen_t::codegen_t(VM* vm) : m_vm(vm)
+codegen_t::codegen_t(VM* vm) : m_vm(vm) { }
+
+void
+codegen_t::init()
 {
     auto J = ExitOnErr(LLJITBuilder().create());
     auto D = J->getDataLayout();
@@ -465,12 +468,18 @@ codegen_t::codegen_t(VM* vm) : m_vm(vm)
 #endif
 }
 
-codegen_t::~codegen_t()
+void
+codegen_t::destroy()
 {
 #if ENABLE_COMPILE_THREAD
     m_compile_thread_terminating = true;
-    scoped_lock lock(m_compile_thread_lock);
-    m_compile_thread_wake.signal();
+    {
+        scoped_lock lock(m_compile_thread_lock);
+        m_compile_thread_wake.signal();
+    }
+    m_compile_thread_lock.destroy();
+    m_compile_thread_wake.destroy();
+    m_compile_queue_lock.destroy();
 #endif
 }
 
@@ -505,6 +514,7 @@ codegen_t::compile_thread(void* param)
             }
         } while (!codegen.m_compile_thread_ready);
     }
+    codegen.m_compile_thread_terminating = false;
     codegen.m_compile_thread_lock.unlock();
     return NULL;
 }

@@ -233,6 +233,12 @@ loop:
             }
         }
     }
+#if ENABLE_COMPILE_THREAD
+    if (vm->m_codegen) {
+        vm->m_codegen->destroy();
+        delete vm->m_codegen;
+    }
+#endif
     vm->m_heap->destroy();
     delete vm->m_heap;
     delete vm;

@@ -113,6 +113,7 @@ VM::init(object_heap_t* heap)
         m_flags.warning_level = scm_false;
 #if ENABLE_LLVM_JIT
         m_codegen = new codegen_t(this);
+        m_codegen->init();
 #endif
         run(true);
         return true;

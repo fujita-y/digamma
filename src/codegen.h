@@ -65,7 +65,8 @@ class codegen_t {
     Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
-    ~codegen_t();
+    void init();
+    void destroy();
     void compile(scm_closure_t closure);
 #if ENABLE_COMPILE_DEFERRED
     std::vector<scm_closure_t> m_compile_queue;
