@@ -185,6 +185,7 @@ int main(int argc, const char** argv)
     vmm.init(&rootVM, 128);
     rootVM.boot();
     rootVM.standalone();
+    vmm.destroy();
 #else
     rootVM.boot();
     rootVM.standalone();

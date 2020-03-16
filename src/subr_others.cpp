@@ -1067,23 +1067,22 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
     wrong_number_of_arguments_violation(vm, "exit", 0, 1, argc, argv);
     return scm_undef;
 }
-*/
 
-static void terminate_codegen(VM *vm) {
+static void terminate_codegen(VM* vm) {
     if (vm->m_codegen) {
       vm->m_codegen->destroy();
       delete vm->m_codegen;
       vm->m_codegen = NULL;
     }
 }
-
+*/
 
 // exit
 scm_obj_t
 subr_exit(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 0) {
-        terminate_codegen(vm);
+        vm->m_vmm->destroy();
         exit(EXIT_SUCCESS);
     }
     if (argc == 1) {
@@ -1092,11 +1091,11 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
             port_flush_output(vm->m_current_output);
         }
         if (argv[0] == scm_false) {
-            terminate_codegen(vm);
+            vm->m_vmm->destroy();
             exit(EXIT_FAILURE);
         }
         if (FIXNUMP(argv[0])) {
-            terminate_codegen(vm);
+            vm->m_vmm->destroy();
             exit(FIXNUM(argv[0]));
         }
         wrong_type_argument_violation(vm, "exit", 0, "fixnum", argv[0], argc, argv);

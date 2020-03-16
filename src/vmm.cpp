@@ -53,6 +53,15 @@ VMM::init(VM* root, int n)
 void
 VMM::destroy()
 {
+    m_lock.lock();
+    for (int i = 0; i < m_capacity; i++) {
+        VM* vm = m_table[i]->vm;
+        if (vm && vm->m_codegen) {
+            vm->m_codegen->destroy();
+            delete vm->m_codegen;
+        }
+    }
+    m_lock.unlock();
     m_lock.destroy();
     m_uuid_lock.destroy();
     delete [] m_table;
@@ -233,7 +242,8 @@ loop:
             }
         }
     }
-#if ENABLE_COMPILE_THREAD
+    vmm->m_lock.lock();
+#if ENABLE_LLVM_JIT
     if (vm->m_codegen) {
         vm->m_codegen->destroy();
         delete vm->m_codegen;
@@ -242,8 +252,8 @@ loop:
     vm->m_heap->destroy();
     delete vm->m_heap;
     delete vm;
-    vmm->m_lock.lock();
     table_rec->state = VM_STATE_FREE;
+    table_rec->vm = NULL;
     vmm->m_live = vmm->m_live - 1;
     vmm->m_table[table_rec->parent]->notify.signal();
     vmm->m_lock.unlock();
