@@ -260,8 +260,8 @@ class c_trampoline_t {
 
                 default: fatal("fatal: invalid callback return type %d\n", trampoline->m_ret_type);
             }
-        } catch (vm_exit_t& e) {
-            exit(e.m_code);
+//      } catch (vm_exit_t& e) {
+//          exit(e.m_code);
         } catch (...) {
             fatal("fatal: unhandled exception in callback\n[exit]\n");
         }
