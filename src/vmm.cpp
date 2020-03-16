@@ -32,8 +32,12 @@ VMM::init(VM* root, int n)
     for (int i = 0; i < m_capacity; i++) {
         m_table[i] = new vm_table_rec_t;
         m_table[i]->vmm = this;
+        m_table[i]->vm = NULL;
+        m_table[i]->id = i;
         m_table[i]->notify.init();
         m_table[i]->state = VM_STATE_FREE;
+        m_table[i]->parent = VM_PARENT_NONE;
+        m_table[i]->param = scm_nil;
         m_table[i]->name[0] = 0;
     }
     root->m_vmm = this;
@@ -41,11 +45,8 @@ VMM::init(VM* root, int n)
     root->m_id = 0;
     root->m_spawn_timeout = scm_false;
     root->m_spawn_heap_limit = DEFAULT_HEAP_LIMIT * 1024 * 1024;
-    m_table[0]->vmm = this;
-    m_table[0]->state = VM_STATE_ACTIVE;
     m_table[0]->vm = root;
-    m_table[0]->parent = VM_PARENT_NONE;
-    m_table[0]->param = scm_nil;
+    m_table[0]->state = VM_STATE_ACTIVE;
     snprintf(m_table[0]->name, sizeof(m_table[0]->name), "<root>");
     m_live = 1;
 }
