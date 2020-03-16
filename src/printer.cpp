@@ -1092,16 +1092,21 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
             scm_closure_t closure = (scm_closure_t)obj;
 #ifdef NDEBUG
             r6rs_param_t no_r6rs(this, false);
-            if (closure->doc == scm_nil) format("#<closure 0x%x>", closure);
-            else format("#<closure ~s>", closure->doc);
+            if (closure->code == NULL) {
+                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure);
+                else format("#<closure ~s>", closure->doc);
+            } else {
+                if (closure->doc == scm_nil) format("#<closure* 0x%x>", closure);
+                else format("#<closure* ~s>", closure->doc);
+            }
 #else
             vm_env_t env = (vm_env_t)closure->env;
             if (env == NULL) {
-                if (closure->doc == scm_nil) format("#<closure 0x%x>", closure->pc);
-                else format("#<closure ~s>", closure->doc);
+                if (closure->doc == scm_nil) format("#<closure 0x%x [0x%x]>", closure->pc, closure->code);
+                else format("#<closure ~s [0x%x]>", closure->doc, closure-code);
             } else {
-                if (closure->doc == scm_nil) format("#<closure 0x%x env:0x%x count:%d up:0x%x>", closure->pc, env, env->count, env->up);
-                else format("#<closure ~s env:0x%x count:%d up:0x%x>", closure->doc, env, env->count, env->up);
+                if (closure->doc == scm_nil) format("#<closure 0x%x [0x%x] env:0x%x count:%d up:0x%x>", closure->pc, closure->code, env, env->count, env->up);
+                else format("#<closure ~s [0x%x] env:0x%x count:%d up:0x%x>", closure->doc, closure->code, env, env->count, env->up);
             }
 #endif
             return;
