@@ -480,11 +480,10 @@ codegen_t::compile_thread(void* param)
 {
     codegen_t& codegen = *(codegen_t*)param;
     codegen.m_compile_thread_lock.lock();
+    codegen.m_compile_thread_ready = true;
     while (!codegen.m_compile_thread_terminating) {
-        codegen.m_compile_thread_ready = true;
         codegen.m_compile_thread_wake.wait(codegen.m_compile_thread_lock);
         codegen.m_compile_thread_ready = false;
-        int n_more = 0;
         do {
             if (codegen.m_compile_thread_terminating) break;
             scm_closure_t closure = NULL;
@@ -499,9 +498,12 @@ codegen_t::compile_thread(void* param)
             {
                 scoped_lock lock(codegen.m_compile_queue_lock);
                 codegen.m_compile_queue.erase(std::remove(codegen.m_compile_queue.begin(), codegen.m_compile_queue.end(), closure), codegen.m_compile_queue.end());
-                n_more = codegen.m_compile_queue.size();
+                int n_more = codegen.m_compile_queue.size();
+                if (n_more == 0) {
+                    codegen.m_compile_thread_ready = true;
+                }
             }
-        } while (n_more > 0);
+        } while (!codegen.m_compile_thread_ready);
     }
     codegen.m_compile_thread_lock.unlock();
     return NULL;
