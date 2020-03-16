@@ -647,14 +647,8 @@ loop:
         m_pc = closure->pc;
         prebind(m_pc);
         run(false);
-    } catch (vm_exit_t& e) {
-#if PROFILE_OPCODE
-        display_opcode_profile();
-#endif
-#if PROFILE_SUBR
-        display_subr_profile();
-#endif
-        exit(e.m_code);
+//  } catch (vm_exit_t& e) {
+//      exit(e.m_code);
     } catch (vm_exception_t& e) {
         backtrace(m_current_error);
         goto loop;

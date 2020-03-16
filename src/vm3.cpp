@@ -167,8 +167,8 @@ VM::call_scheme_argv(scm_obj_t proc, int argc, scm_obj_t argv[])
         fatal("fatal in apply: unexpected exception io_expecption_t(%d, %s)", e.m_err, e.m_message);
     } catch (io_codec_exception_t& e) {
         fatal("fatal in apply: unexpected exception io_codec_exception_t(%d, %s)", e.m_operation, e.m_message);
-    } catch (vm_exit_t& e) {
-        throw;
+//  } catch (vm_exit_t& e) {
+//      throw;
     } catch (int code) {
         fatal("fatal in apply: unexpected exception (errno %d, %s)", code, strerror(code));
     } catch (...) {
@@ -206,8 +206,8 @@ VM::call_scheme(scm_obj_t proc, int argc, ...)
         fatal("fatal in apply: unexpected exception io_expecption_t(%d, %s)", e.m_err, e.m_message);
     } catch (io_codec_exception_t& e) {
         fatal("fatal in apply: unexpected exception io_codec_exception_t(%d, %s)", e.m_operation, e.m_message);
-    } catch (vm_exit_t& e) {
-        throw;
+//  } catch (vm_exit_t& e) {
+//      throw;
     } catch (int code) {
         fatal("fatal in apply: unexpected exception (errno %d, %s)", code, strerror(code));
     } catch (...) {

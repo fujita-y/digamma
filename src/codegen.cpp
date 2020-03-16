@@ -483,7 +483,6 @@ codegen_t::destroy()
         m_compile_thread_wake.signal();
     }
     while (m_compile_thread_terminating) usleep(100);
-    delete m_jit.release();
     m_compile_thread_lock.destroy();
     m_compile_thread_wake.destroy();
     m_compile_queue_lock.destroy();
@@ -521,8 +520,8 @@ codegen_t::compile_thread(void* param)
             }
         } while (!codegen.m_compile_thread_ready);
     }
-    codegen.m_compile_thread_terminating = false;
     codegen.m_compile_thread_lock.unlock();
+    codegen.m_compile_thread_terminating = false;
     return NULL;
 }
 #endif

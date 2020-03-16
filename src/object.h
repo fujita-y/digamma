@@ -607,10 +607,12 @@ struct io_codec_exception_t {
     io_codec_exception_t(int opration, const char* message, scm_obj_t ch) { m_operation = opration; m_ch = ch; m_message = message; }
 };
 
+/*
 struct vm_exit_t {
     int m_code;
     vm_exit_t(int code) { m_code = code; }
 };
+*/
 
 struct vm_exception_t {
     vm_exception_t() {}
