@@ -16,7 +16,12 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
-extern scm_obj_t subr_num_add(VM* vm, int argc, scm_obj_t argv[]);
+#if __clang_major__ > 9
+using namespace std;
+#endif
+
+using namespace llvm;
+using namespace llvm::orc;
 
 #define DECLEAR_COMMON_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \

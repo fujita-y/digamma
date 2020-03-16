@@ -17,40 +17,27 @@
 #define DEBUG_CODEGEN             0
 #define VERBOSE_CODEGEN           0
 
-#if __clang_major__ > 9
-using namespace std;
-#endif
-
-using namespace llvm;
-using namespace llvm::orc;
-
 class codegen_t {
     struct intrinsics_t {
-        Function* prepare_call;
+        llvm::Function* prepare_call;
     };
     struct context_t {
-        LLVMContext& m_llvm_context;
-        Module* m_module;
-        Function* m_function;
-        IRBuilder<>& m_irb;
+        llvm::LLVMContext& m_llvm_context;
+        llvm::Module* m_module;
+        llvm::Function* m_function;
+        llvm::IRBuilder<>& m_irb;
+        llvm::Function* m_top_level_function;
         scm_closure_t m_top_level_closure;
-        Function* m_top_level_function;
-        std::map<int, Function*> m_local_functions;
+        std::map<int, llvm::Function*> m_local_functions;
         int m_argc;
         int m_depth;
         intrinsics_t m_intrinsics;
-        context_t(LLVMContext& llvm_context, IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
+        context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
     };
-    enum cc_t {
-        LT,
-        GT,
-        LE,
-        GE,
-        EQ,
-    };
+    enum cc_t { LT, GT, LE, GE, EQ, };
     VM* m_vm;
-    std::unique_ptr<LLJIT> m_jit;
-    std::map<scm_closure_t,Function*> m_lifted_functions;
+    std::unique_ptr<llvm::orc::LLJIT> m_jit;
+    std::map<scm_closure_t,llvm::Function*> m_lifted_functions;
 #if ENABLE_COMPILE_THREAD
     mutex_t m_compile_thread_lock;
     cond_t m_compile_thread_wake;
@@ -58,11 +45,11 @@ class codegen_t {
     bool m_compile_thread_terminating;
     static thread_main_t compile_thread(void* param);
 #endif
-    ThreadSafeModule optimizeModule(ThreadSafeModule TSM);
+    llvm::orc::ThreadSafeModule optimizeModule(llvm::orc::ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
     bool is_compiled(scm_closure_t closure);
-    Function* get_function(context_t& ctx, scm_closure_t closure);
+    llvm::Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
     void init();
@@ -76,21 +63,21 @@ private:
     void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
-    Function* emit_prepare_call(context_t& ctx);
-    void emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false);
-    void emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false);
-    Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
-    Value* emit_lookup_env(context_t& ctx, intptr_t depth);
-    Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
-    Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
-    Value* emit_cmp_inst(context_t& ctx, cc_t cc, Value* lhs, Value* rhs);
+    llvm::Function* emit_prepare_call(context_t& ctx);
+    void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
+    void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
+    llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
+    llvm::Value* emit_lookup_env(context_t& ctx, intptr_t depth);
+    llvm::Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
+    llvm::Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
+    llvm::Value* emit_cmp_inst(context_t& ctx, cc_t cc, llvm::Value* lhs, llvm::Value* rhs);
     void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
     void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
     void emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
 
-    Function* emit_call(context_t& ctx, scm_obj_t inst);
+    llvm::Function* emit_call(context_t& ctx, scm_obj_t inst);
     void emit_if_false_call(context_t& ctx, scm_obj_t inst);
     void emit_subr(context_t& ctx, scm_obj_t inst);
     void emit_push(context_t& ctx, scm_obj_t inst);
