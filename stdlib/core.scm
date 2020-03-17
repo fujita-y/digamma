@@ -241,7 +241,7 @@
     close-output-port
     close-port
     closure-code
-    closure-compile
+    closure-codegen
     cmwc-random-real
     cmwc-random-u32
     collect
@@ -322,6 +322,7 @@
     directory-list
     display
     display-backtrace
+    display-codegen-statistics
     display-heap-statistics
     display-object-statistics
     display-thread-status
