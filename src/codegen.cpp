@@ -1199,7 +1199,7 @@ codegen_t::display_codegen_statistics(scm_port_t port)
     port_format(port, "uninterned top-level function : %d\n", m_usage.inners);
     port_format(port, "local loop function           : %d\n", m_usage.locals);
     port_format(port, "closure template              : %d\n", m_usage.templates);
-    port_format(port, "symbol space                  : %.2fM\n\n", (m_usage.max_sym - m_usage.min_sym) / (1024.0 * 1024));
+    port_format(port, "symbol space (max - min)      : %.2fM\n\n", (m_usage.max_sym - m_usage.min_sym) / (1024.0 * 1024));
     port_flush_output(port);
 }
 
