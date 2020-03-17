@@ -64,7 +64,9 @@ public:
         int locals;
         int inners;
         int templates;
-        usage_t() : globals(0), locals(0), inners(0), templates(0) {}
+        uintptr_t min_sym;
+        uintptr_t max_sym;
+        usage_t() : globals(0), locals(0), inners(0), templates(0), min_sym(UINTPTR_MAX), max_sym(0) {}
     } m_usage;
     void display_codegen_statistics(scm_port_t port);
 private:

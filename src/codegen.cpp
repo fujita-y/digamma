@@ -690,6 +690,9 @@ codegen_t::compile_each(scm_closure_t closure)
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
 
+    if (m_usage.min_sym > (uintptr_t)thunk) m_usage.min_sym = (uintptr_t)thunk;
+    if (m_usage.max_sym < (uintptr_t)thunk) m_usage.max_sym = (uintptr_t)thunk;
+
 /*
     scm_bvector_t bv = make_bvector(vm->m_heap, sizeof(intptr_t));
     *(intptr_t*)bv->elts = (intptr_t)thunk;
@@ -1192,10 +1195,11 @@ codegen_t::display_codegen_statistics(scm_port_t port)
 {
     scoped_lock lock(port->lock);
     port_put_byte(port, '\n');
-    port_format(port, "interned top-level function  : %d\n", m_usage.globals);
-    port_format(port, "uninterned top-level function: %d\n", m_usage.inners);
-    port_format(port, "local loop like function     : %d\n", m_usage.locals);
-    port_format(port, "runtime closure template     : %d\n\n", m_usage.templates);
+    port_format(port, "interned top-level function   : %d\n", m_usage.globals);
+    port_format(port, "uninterned top-level function : %d\n", m_usage.inners);
+    port_format(port, "local loop like function      : %d\n", m_usage.locals);
+    port_format(port, "runtime closure template      : %d\n", m_usage.templates);
+    port_format(port, "symbol space                  : %.2fM\n\n", (m_usage.max_sym - m_usage.min_sym) / (1024.0 * 1024));
     port_flush_output(port);
 }
 
