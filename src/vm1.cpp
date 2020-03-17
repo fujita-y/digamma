@@ -692,6 +692,7 @@ VM::loop(bool init, bool resume)
                         //printer_t prt(this, m_current_output);
                         //prt.format("codegen: ~s~&", symbol);
                         closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+                        m_codegen->m_usage.globals++;
                         m_codegen->compile(closure);
                     }
                 }

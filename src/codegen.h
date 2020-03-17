@@ -59,6 +59,14 @@ public:
     std::vector<scm_closure_t> m_compile_queue;
     mutex_t m_compile_queue_lock;
 #endif
+    struct usage_t {
+        int globals;
+        int locals;
+        int inners;
+        int templates;
+        usage_t() : globals(0), locals(0), inners(0), templates(0) {}
+    } m_usage;
+    void display_codegen_statistics(scm_port_t port);
 private:
     void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
@@ -165,7 +173,6 @@ private:
     void emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst);
     void emit_subr_gloc_of(context_t& ctx, scm_obj_t inst);
     void emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst);
-
 };
 
 //extern codegen_t* s_codegen;

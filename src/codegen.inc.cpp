@@ -391,6 +391,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                 if (closure->env == NULL) {
                     Function* F2 = emit_inner_function(ctx, closure);
                     if (F2 != NULL) {
+                        m_usage.inners++;
                         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
                         auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
                         auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
@@ -967,6 +968,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     int function_index = ctx.m_depth + (0 << 16);
 
     ctx.m_local_functions[function_index] = L;
+    m_usage.locals++;
 
     // printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
     // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
@@ -1459,6 +1461,7 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 
 #if ENABLE_COMPILE_DEFERRED
     m_compile_queue.push_back((scm_closure_t)operands);
+    m_usage.templates++;
 #endif
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
@@ -1477,6 +1480,7 @@ codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
 
 #if ENABLE_COMPILE_DEFERRED
     m_compile_queue.push_back((scm_closure_t)operands);
+    m_usage.templates++;
 #endif
 
     auto c_ret_close = M->getOrInsertFunction("c_ret_close", IntptrTy, IntptrPtrTy, IntptrTy);
@@ -1495,6 +1499,7 @@ codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
 
 #if ENABLE_COMPILE_DEFERRED
     m_compile_queue.push_back((scm_closure_t)operands);
+    m_usage.templates++;
 #endif
 
     auto c_close = M->getOrInsertFunction("c_close", IntptrTy, IntptrPtrTy, IntptrTy);
@@ -1530,6 +1535,8 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
 #endif
     ctx.m_local_functions[function_index] = L;
+    m_usage.locals++;
+
     context_t ctx2 = ctx;
     ctx2.m_function = L;
     ctx2.m_depth = ctx2.m_depth + 1;
@@ -1936,4 +1943,36 @@ codegen_t::emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     emit_ret_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}
+
+void
+codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
+    IRB.CreateCondBr(cond1, cond1_true, pair_false);
+    IRB.SetInsertPoint(cond1_true);
+    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(0xf)), VALUE_INTPTR(0xa));
+    IRB.CreateCondBr(cond2, pair_true, pair_false);
+}
+
+void
+codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
+    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
+    IRB.CreateCondBr(cond1, cond1_true, symbol_false);
+    IRB.SetInsertPoint(cond1_true);
+    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
+    IRB.CreateCondBr(cond2, symbol_true, symbol_false);
 }

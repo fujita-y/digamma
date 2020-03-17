@@ -7,6 +7,7 @@
 #include "violation.h"
 #include "uuid.h"
 #include "vmm.h"
+#include "port.h"
 
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -1187,41 +1188,27 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
 }
 
 void
-codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false)
+codegen_t::display_codegen_statistics(scm_port_t port)
 {
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-
-    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
-    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
-    IRB.CreateCondBr(cond1, cond1_true, pair_false);
-    IRB.SetInsertPoint(cond1_true);
-    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
-    auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(0xf)), VALUE_INTPTR(0xa));
-    IRB.CreateCondBr(cond2, pair_true, pair_false);
-}
-
-void
-codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true, BasicBlock* symbol_false)
-{
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-
-    BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
-    auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
-    IRB.CreateCondBr(cond1, cond1_true, symbol_false);
-    IRB.SetInsertPoint(cond1_true);
-    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
-    auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
-    IRB.CreateCondBr(cond2, symbol_true, symbol_false);
+    scoped_lock lock(port->lock);
+    port_put_byte(port, '\n');
+    port_format(port, "interned top-level function  : %d\n", m_usage.globals);
+    port_format(port, "uninterned top-level function: %d\n", m_usage.inners);
+    port_format(port, "local loop like function     : %d\n", m_usage.locals);
+    port_format(port, "runtime closure template     : %d\n\n", m_usage.templates);
+    port_flush_output(port);
 }
 
 #include "codegen.inc.cpp"
 
 
 /*
+
+        int globals;
+        int locals;
+        int inners;
+        int templates;
+
 (import (digamma pregexp))
 
 (pregexp "^([A-F0-9]{4,6});[^;]*;([a-zA-Z]{2});[^;]*;[^;]*;[^;]*;[^;]*;[^;]*;(.*);[^;]*;[^;]*;[^;]*;([A-F0-9]{0,6});([A-F0-9]{0,6});([A-F0-9]{0,6})$")

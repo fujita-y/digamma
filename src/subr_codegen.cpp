@@ -51,11 +51,28 @@ subr_closure_compile(VM* vm, int argc, scm_obj_t argv[])
 #endif
 }
 
+// display-codegen-statistic
+scm_obj_t
+subr_display_codegen_statistics(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 0) {
+        if (vm->m_codegen) {
+            vm->m_codegen->display_codegen_statistics(vm->m_current_output);
+            return scm_unspecified;
+        } else {
+            implementation_restriction_violation(vm, "display-codegen-statistic", "codegen not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+            return scm_undef;
+        }
+    }
+    wrong_number_of_arguments_violation(vm, "display-codegen-statistic", 0, 0, argc, argv);
+    return scm_undef;
+}
+
 void
 init_subr_codegen(object_heap_t* heap)
 {
 #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
 
-//    DEFSUBR("native-compile", subr_native_compile);
+    DEFSUBR("display-codegen-statistic", subr_display_codegen_statistics);
     DEFSUBR("closure-compile", subr_closure_compile);
 }

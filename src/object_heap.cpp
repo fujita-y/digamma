@@ -1327,7 +1327,6 @@ object_heap_t::display_heap_statistics(scm_port_t port)
     port_flush_output(port);
 }
 
-
 void
 object_heap_t::init_inherents()
 {
