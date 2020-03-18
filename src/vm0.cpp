@@ -647,8 +647,6 @@ loop:
         m_pc = closure->pc;
         prebind(m_pc);
         run(false);
-//  } catch (vm_exit_t& e) {
-//      exit(e.m_code);
     } catch (vm_exception_t& e) {
         backtrace(m_current_error);
         goto loop;

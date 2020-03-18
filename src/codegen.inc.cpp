@@ -1453,7 +1453,6 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1472,7 +1471,6 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
@@ -1491,7 +1489,6 @@ codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst)
 void
 codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
 {
-    // [TODO] defer compile closure code in operand ??
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);

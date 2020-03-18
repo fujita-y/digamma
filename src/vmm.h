@@ -77,6 +77,6 @@ public:
     void    generate_uuid(char* buf, int bufsize);
 };
 
-#endif
+#endif // USE_PARALLEL_VM
 
 #endif

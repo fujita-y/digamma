@@ -27,7 +27,7 @@
   #define DEFAULT_HEAP_LIMIT        32 // MB
 #endif
 
-#define UNBOUND_GLOC_RETURN_UNSPEC  0  // default:0
+#define UNBOUND_GLOC_RETURN_UNSPEC  0  // default: 0
 
 #define ENABLE_LLVM_JIT             1
 #if ENABLE_LLVM_JIT
@@ -92,11 +92,11 @@
 #endif
 
 #ifndef SYSTEM_SHARE_PATH
-  #define SYSTEM_SHARE_PATH       "/usr/local/share/digamma"
+  #define SYSTEM_SHARE_PATH         "/usr/local/share/digamma"
 #endif
 
 #ifndef SYSTEM_EXTENSION_PATH
-  #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/digamma"
+  #define SYSTEM_EXTENSION_PATH     "/usr/local/lib/digamma"
 #endif
 
 #define MAX_VIRTUAL_MACHINE         32

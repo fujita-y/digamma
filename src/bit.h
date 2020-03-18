@@ -30,5 +30,4 @@ inline int nlz(intptr_t x) {
     return nlz((uint64_t)x);
 }
 
-
 #endif

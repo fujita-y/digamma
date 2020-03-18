@@ -182,8 +182,6 @@ VMM::mutator_thread(void* param)
 loop:
     try {
         vm->run(false);
-//  } catch (vm_exit_t& e) {
-//      exit(e.m_code);
     } catch (vm_exception_t& e) {
         vm->backtrace(vm->m_current_error);
     } catch (io_exception_t& e) {
