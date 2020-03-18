@@ -88,7 +88,7 @@ public:
 #if USE_CONST_LITERAL
     object_slab_cache_t     m_immutable_cons;
 #endif
-    sync_queue_t<scm_obj_t> m_shade_queue;
+    concurrent_queue_t<scm_obj_t> m_shade_queue;
     uint8_t*                m_sweep_wavefront;
     scm_obj_t*              m_mark_sp;
     scm_obj_t*              m_mark_stack;

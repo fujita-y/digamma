@@ -651,7 +651,6 @@
     make-record-type-descriptor
     make-rectangular
     make-serious-condition
-    make-shared-bag
     make-shared-core-hashtable
     make-shared-queue
     make-socket
@@ -823,9 +822,6 @@
     set-current-output-port!
     set-port-position!
     set-top-level-value!
-    shared-bag-get!
-    shared-bag-put!
-    shared-bag?
     shared-object-errno
     shared-queue-pop!
     shared-queue-push!

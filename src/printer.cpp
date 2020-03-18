@@ -907,16 +907,6 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
                         return;
                     }
 #endif
-                    if (strcmp(type_name, "mailbox") == 0) {
-                        scm_sharedqueue_t queue = (scm_sharedqueue_t)tuple->elts[1];
-                        format("#<mailbox %d/%d 0x%x>", queue->queue.count(), queue->queue.limit(), obj);
-                        return;
-                    }
-                    if (strcmp(type_name, "messenger-bag") == 0) {
-                        scm_sharedbag_t bag = (scm_sharedbag_t)tuple->elts[1];
-                        format("#<messenger-bag %d:%d 0x%x>", bag->capacity, bag->depth, obj);
-                        return;
-                    }
                     if (strcmp(type_name, "enum-set") == 0) {
                         port_puts(m_port, "#<enum-set ");
                         write(ht, tuple->elts[2]);
@@ -1046,14 +1036,6 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
         case TC_SHAREDQUEUE: {
             scm_sharedqueue_t queue = (scm_sharedqueue_t)obj;
             format("#<shared-queue %d/%d 0x%x>", queue->queue.count(), queue->queue.limit(), queue);
-            return;
-        }
-        case TC_SHAREDBAG: {
-            scm_sharedbag_t bag = (scm_sharedbag_t)obj;
-            scoped_lock lock(bag->lock);
-            int n = 0;
-            for (int i = 0; i < bag->capacity; i++) n += bag->datum[i]->queue.count();
-            format("#<shared-bag %d/%d:%d 0x%x>", n, bag->capacity, bag->depth, bag);
             return;
         }
         case TC_PORT: {

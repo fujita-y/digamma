@@ -767,25 +767,6 @@ make_sharedqueue(object_heap_t* heap, int n)
     return obj;
 }
 
-scm_sharedbag_t
-make_sharedbag(object_heap_t* heap, int depth)
-{
-    scm_sharedbag_t obj = (scm_sharedbag_t)heap->allocate_collectible(sizeof(scm_sharedbag_rec_t));
-    sharedbag_slot_t** datum = (sharedbag_slot_t**)malloc(sizeof(sharedbag_slot_t*) * MAX_VIRTUAL_MACHINE);
-    for (int i = 0; i < MAX_VIRTUAL_MACHINE; i++) {
-        datum[i] = (sharedbag_slot_t*)malloc(sizeof(sharedbag_slot_t));
-        datum[i]->key = NULL;
-        datum[i]->buf.init(depth + MAX_VIRTUAL_MACHINE);
-        datum[i]->queue.init(depth);
-    }
-    obj->hdr = scm_hdr_sharedbag;
-    obj->capacity = MAX_VIRTUAL_MACHINE;
-    obj->depth = depth;
-    obj->datum = datum;
-    obj->lock.init();
-    return obj;
-}
-
 scm_obj_t
 make_list(object_heap_t* heap, int len, ...)
 {
@@ -1085,18 +1066,6 @@ finalize(object_heap_t* heap, void* obj)
             queue->queue.destroy();
             break;
         }
-        case TC_SHAREDBAG: {
-            scm_sharedbag_t bag = (scm_sharedbag_t)obj;
-            for (int i = 0; i < bag->capacity; i++) {
-                bag->datum[i]->buf.destroy();
-                bag->datum[i]->queue.destroy();
-                free(bag->datum[i]->key);
-                free(bag->datum[i]);
-            }
-            free(bag->datum);
-            bag->lock.destroy();
-            break;
-        }
     }
 }
 
@@ -1136,18 +1105,6 @@ renounce(void* obj, int size, void* refcon)
             scm_sharedqueue_t queue = (scm_sharedqueue_t)obj;
             queue->buf.destroy();
             queue->queue.destroy();
-            break;
-        }
-        case TC_SHAREDBAG: {
-            scm_sharedbag_t bag = (scm_sharedbag_t)obj;
-            for (int i = 0; i < bag->capacity; i++) {
-                bag->datum[i]->buf.destroy();
-                bag->datum[i]->queue.destroy();
-                free(bag->datum[i]->key);
-                free(bag->datum[i]);
-            }
-            free(bag->datum);
-            bag->lock.destroy();
             break;
         }
     }

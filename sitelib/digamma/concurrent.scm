@@ -12,10 +12,6 @@
           shared-queue-push!
           shared-queue-pop!
           shared-queue-shutdown
-          make-shared-bag
-          shared-bag?
-          shared-bag-put!
-          shared-bag-get!
           serializable?
           timeout-object?
           shutdown-object?

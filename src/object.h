@@ -122,7 +122,6 @@ const scm_obj_t scm_proc_apply_values   = (scm_obj_t)0xd2;
 #define TC_ENVIRONMENT      0x14
 #define TC_SOCKET           0x15
 #define TC_SHAREDQUEUE      0x16
-#define TC_SHAREDBAG        0x17
 #define TC_MASKBITS         0x3f
 
 const scm_hdr_t scm_hdr_symbol          = 0x00a | (TC_SYMBOL << 4);
@@ -148,7 +147,6 @@ const scm_hdr_t scm_hdr_weakhashtable   = 0x00a | (TC_WEAKHASHTABLE << 4);
 const scm_hdr_t scm_hdr_bvector         = 0x00a | (TC_BVECTOR << 4);
 const scm_hdr_t scm_hdr_socket          = 0x00a | (TC_SOCKET << 4);
 const scm_hdr_t scm_hdr_sharedqueue     = 0x00a | (TC_SHAREDQUEUE << 4);
-const scm_hdr_t scm_hdr_sharedbag       = 0x00a | (TC_SHAREDBAG << 4);
 
 #define HDR_TYPE_MASKBITS    0x3ff
 
@@ -174,7 +172,6 @@ struct scm_weakhashtable_rec_t;
 struct scm_bvector_rec_t;
 struct scm_socket_rec_t;
 struct scm_sharedqueue_rec_t;
-struct scm_sharedbag_rec_t;
 
 typedef scm_pair_rec_t*             scm_pair_t;
 typedef scm_symbol_rec_t*           scm_symbol_t;
@@ -198,7 +195,6 @@ typedef scm_weakhashtable_rec_t*    scm_weakhashtable_t;
 typedef scm_bvector_rec_t*          scm_bvector_t;
 typedef scm_socket_rec_t*           scm_socket_t;
 typedef scm_sharedqueue_rec_t*      scm_sharedqueue_t;
-typedef scm_sharedbag_rec_t*        scm_sharedbag_t;
 
 struct vm_cont_rec_t;
 struct vm_env_rec_t;
@@ -394,21 +390,7 @@ OBJECT_ALIGNED(scm_socket_rec_t) {
 OBJECT_ALIGNED(scm_sharedqueue_rec_t) {
     scm_hdr_t               hdr;
     fifo_buffer_t           buf;
-    sync_queue_t<intptr_t>  queue;
-} END;
-
-struct sharedbag_slot_t {
-    char*                   key;
-    fifo_buffer_t           buf;
-    sync_queue_t<intptr_t>  queue;
-};
-
-OBJECT_ALIGNED(scm_sharedbag_rec_t) {
-    scm_hdr_t           hdr;
-    mutex_t             lock;
-    int                 capacity;
-    int                 depth;
-    sharedbag_slot_t**  datum;
+    concurrent_queue_t<intptr_t>  queue;
 } END;
 
 #undef OBJECT_ALIGNED

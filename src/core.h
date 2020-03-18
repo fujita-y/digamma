@@ -27,7 +27,7 @@
   #define DEFAULT_HEAP_LIMIT        32 // MB
 #endif
 
-#define UNBOUND_GLOC_RETURN_UNSPEC  0
+#define UNBOUND_GLOC_RETURN_UNSPEC  0  // default:0
 
 #define ENABLE_LLVM_JIT             1
 #if ENABLE_LLVM_JIT

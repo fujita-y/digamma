@@ -7,9 +7,9 @@
 #include "core.h"
 
 template< typename T >
-class sync_queue_t {
-    sync_queue_t(const sync_queue_t&);
-    sync_queue_t& operator=(const sync_queue_t&);
+class concurrent_queue_t {
+    concurrent_queue_t(const concurrent_queue_t&);
+    concurrent_queue_t& operator=(const concurrent_queue_t&);
 
     typedef T       element_t;
     pthread_mutex_t lock;
@@ -38,7 +38,7 @@ class sync_queue_t {
     }
 
 public:
-    sync_queue_t() { }
+    concurrent_queue_t() { }
 
     void init(int nelts)
     {
@@ -63,7 +63,7 @@ public:
     bool put(element_t datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::put after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::put after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (terminate) {
@@ -90,7 +90,7 @@ public:
     bool put(element_t datum, int msec)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::put after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::put after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (terminate) {
@@ -126,7 +126,7 @@ public:
     bool get(element_t* datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::get after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::get after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (n == 0 && terminate) {
@@ -153,7 +153,7 @@ public:
     bool get(element_t* datum, int msec)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::get after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::get after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (n == 0 && terminate) {
@@ -189,7 +189,7 @@ public:
     bool try_put(element_t datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::try_put after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::try_put after shutdown\n", __FILE__, __LINE__);
 #endif
         if (n == capacity || pthread_mutex_trylock(&lock)) return false;
         if (n == capacity || terminate) {
@@ -207,7 +207,7 @@ public:
     bool wait_lock_try_put(element_t datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::wait_lock_try_put after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::wait_lock_try_put after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (n == capacity || terminate) {
@@ -225,7 +225,7 @@ public:
     bool try_get(element_t* datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::try_get after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::try_get after shutdown\n", __FILE__, __LINE__);
 #endif
         if (n == 0 || pthread_mutex_trylock(&lock)) return false;
         if (n == 0 || terminate) {
@@ -243,7 +243,7 @@ public:
     bool wait_lock_try_get(element_t* datum)
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::wait_lock_try_get after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::wait_lock_try_get after shutdown\n", __FILE__, __LINE__);
 #endif
         MTVERIFY(pthread_mutex_lock(&lock));
         if (n == 0) {
@@ -261,7 +261,7 @@ public:
     void clear()
     {
 #ifndef NDEBUG
-        if (terminate) warning("warning:%s:%u sync_queue_t::clear after shutdown\n", __FILE__, __LINE__);
+        if (terminate) warning("warning:%s:%u concurrent_queue_t::clear after shutdown\n", __FILE__, __LINE__);
 #endif
         if (n == 0) return;
         MTVERIFY(pthread_mutex_lock(&lock));
