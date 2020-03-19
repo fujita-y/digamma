@@ -17,6 +17,8 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#define PRINT_IR    0
+
 #if __clang_major__ > 9
 using namespace std;
 #endif
@@ -551,8 +553,10 @@ codegen_t::optimizeModule(ThreadSafeModule TSM) {
     B.populateModulePassManager(MPM);
     MPM.run(M);
 
-    // puts("*** IR after optimize ***");
-    // M.print(outs(), nullptr);
+#if PRINT_IR
+    puts("*** IR after optimize ***");
+    M.print(outs(), nullptr);
+#endif
 
     return std::move(TSM);
 }
