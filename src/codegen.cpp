@@ -148,7 +148,6 @@ bool
 codegen_t::is_compiled(scm_closure_t closure)
 {
     VM* vm = m_vm;
-    //return CAAR(closure->pc) == INST_NATIVE;
     return closure->code != NULL;
 }
 
@@ -312,8 +311,8 @@ codegen_t::calc_stack_size(scm_obj_t inst)
             case VMOP_EXTEND_UNBOUND: {
               scm_obj_t operands = CDAR(inst);
               int argc = FIXNUM(operands);
-              n += sizeof(vm_env_rec_t);
               n += sizeof(scm_obj_t) * argc;
+              n += sizeof(vm_env_rec_t);
             } break;
             case VMOP_PUSH_CLOSE: {
               n += sizeof(scm_obj_t);
@@ -347,12 +346,10 @@ codegen_t::calc_stack_size(scm_obj_t inst)
 void
 codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
 {
-  #if USE_UNIFIED_STACK_CHECK
+#if USE_UNIFIED_STACK_CHECK
     if (insert_stack_check) emit_stack_overflow_check(ctx, calc_stack_size(inst));
-  #endif
-    //printf("stack calc: %d\n", calc_stack_size(inst));
+#endif
     while (inst != scm_nil) {
-        // printf("emit: %s\n", ((scm_symbol_t)CAAR(inst))->name);
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
                 emit_if_false_call(ctx, inst);
