@@ -17,8 +17,6 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
-#define PRINT_IR    0
-
 #if __clang_major__ > 9
 using namespace std;
 #endif
