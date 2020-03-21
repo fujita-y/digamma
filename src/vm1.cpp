@@ -371,16 +371,12 @@ scm_undef  scm_false         call_scheme
 */
 
 void
-VM::run(bool init)
+VM::run()
 {
-    if (init) {
-        loop(true, false);
-        return;
-    }
     bool resume = false;
 again:
     try {
-        loop(false, resume);
+        loop(resume);
     } catch (vm_continue_t& e) {
         resume = true;
         goto again;
@@ -390,9 +386,8 @@ again:
 }
 
 void
-VM::loop(bool init, bool resume)
+VM::loop(bool resume)
 {
-    if (init) return;
     scm_obj_t operand_trace;
     scm_obj_t obj;
     assert(PAIRP(m_pc));

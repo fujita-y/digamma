@@ -128,7 +128,7 @@ VM::call_scheme_stub(scm_obj_t proc, int argc, scm_obj_t argv[])
     m_sp[0] = cont_pc;
     m_sp++;
     m_pc = LIST2(CONS(INST_CALL, code), LIST1(INST_VM_ESCAPE));
-    run(false);
+    run();
     --m_sp;
     cont_pc = m_sp[0];
     if (cont_pc == scm_nil) {

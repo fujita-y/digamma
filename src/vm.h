@@ -43,8 +43,8 @@ public:
     void            boot();
     void            standalone();
     void            reset();
-    void            run(bool init);
-    void            loop(bool init, bool resume);
+    void            run();
+    void            loop(bool resume);
 
     void            scheme_warning(const char* fmt, ...);
     void            scheme_error(const char* fmt, ...) ATTRIBUTE(noreturn);

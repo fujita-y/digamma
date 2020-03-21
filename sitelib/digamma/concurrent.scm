@@ -116,11 +116,14 @@
     (+ (fib (- n 1))
        (fib (- n 2)))))
 
-(define (test-plain)
-   (map fib '(40 40 40 40 40 40 40 40))) ; x8
 
 (define (test-para)
   (pmap fib '(40 40 40 40 40 40 40 40))) ; x8
+
+(time (test-para))
+
+(define (test-plain)
+   (map fib '(40 40 40 40 40 40 40 40))) ; x8
 
 (time (fib 40))
 ;;  8.342836 real    8.339067 user    0.002708 sys
@@ -131,5 +134,12 @@
 (time (test-para))
 (time (let ((a (async (test-para)))) (await a)))
 ;; 15.660831 real  122.926724 user    0.069117 sys
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(pmap list '(1 2 3) '(4 5 6))
+(pmap exit '(1 2 3))
+(begin (async (fib 40)) (exit))
 
 |#

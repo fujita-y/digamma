@@ -58,12 +58,13 @@ VMM::destroy()
 #if ENABLE_LLVM_JIT
     for (int i = 0; i < m_capacity; i++) {
         VM* vm = m_table[i]->vm;
-        if (vm && vm->m_codegen) {
-            if (i == 0) {
+        if (vm) {
+            if (i == 0 && vm->m_codegen) {
                 vm->m_codegen->destroy();
                 delete vm->m_codegen;
             }
             vm->m_codegen = NULL;
+            terminate_collector(vm->m_heap);
         }
     }
 #endif
@@ -118,8 +119,8 @@ again:
                 vm->m_recursion_level = 0;
                 vm->m_shared_object_errno = 0;
                 memcpy(&vm->m_flags, &parent->m_flags, sizeof(parent->m_flags));
-                vm->run(true);
                 vm->reset();
+
                 for (int n = 0; n < argc; n++) vm->m_sp[n] = argv[n];
                 vm->m_sp += argc;
                 vm_env_t env = (vm_env_t)vm->m_sp;
@@ -128,6 +129,7 @@ again:
                 vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
                 vm->m_pc = func->pc;
                 vm->m_env = &env->up;
+
                 scm_obj_t context = scm_nil;
                 if (argc > 0) {
                     for (int n = argc - 1; n >= 0; n--) context = make_pair(parent->m_heap, argv[n], context);
@@ -135,8 +137,7 @@ again:
                 } else {
                     context = make_list(parent->m_heap, 1, func);
                 }
-                m_table[i]->param = make_list(parent->m_heap,
-                                              5,
+                m_table[i]->param = make_list(parent->m_heap, 5,
                                               context,
                                               parent->m_current_environment,
                                               parent->m_current_input,
@@ -154,6 +155,7 @@ again:
                     if (STRINGP(func->doc)) name = ((scm_string_t)func->doc)->name;
                     snprintf(m_table[i]->name, sizeof(m_table[i]->name), "%s", name);
                 }
+
                 m_live = m_live + 1;
                 parent->m_heap->m_child++;
                 thread_start(child_mutator, m_table[i]);
@@ -184,7 +186,7 @@ VMM::child_mutator(void* param)
 
 loop:
     try {
-        vm->run(false);
+        vm->run();
     } catch (vm_exception_t& e) {
         vm->backtrace(vm->m_current_error);
     } catch (io_exception_t& e) {
@@ -204,26 +206,7 @@ loop:
     } catch (...) {
         fatal("fatal in thread(0x%x): unknown exception", vm);
     }
-    vm->m_heap->m_collector_lock.lock();
-    vm->m_heap->m_collector_terminating = true;
-    vm->m_heap->m_collector_wake.signal();
-    vm->m_heap->m_collector_lock.unlock();
-    while (true) {
-        vm->m_heap->m_collector_lock.lock();
-        if (vm->m_heap->m_collector_terminating == false) {
-            vm->m_heap->m_collector_lock.unlock();
-            break;
-        }
-        while (vm->m_heap->m_stop_the_world) {
-            vm->m_heap->m_mutator_stopped = true;
-            vm->m_heap->m_collector_wake.signal();
-            vm->m_heap->m_mutator_wake.wait(vm->m_heap->m_collector_lock);
-            vm->m_heap->m_mutator_stopped = false;
-        }
-        vm->m_heap->m_collector_wake.signal();
-        vm->m_heap->m_collector_lock.unlock();
-        thread_yield();
-    }
+    terminate_collector(vm->m_heap);
     {
         scoped_lock lock(vmm->m_lock);
         vmm->m_table[table_rec->parent]->vm->m_heap->m_child--;
@@ -256,6 +239,31 @@ loop:
     vmm->m_table[table_rec->parent]->notify.signal();
     vmm->m_lock.unlock();
     return NULL;
+}
+
+void
+VMM::terminate_collector(object_heap_t* heap)
+{
+    heap->m_collector_lock.lock();
+    heap->m_collector_terminating = true;
+    heap->m_collector_wake.signal();
+    heap->m_collector_lock.unlock();
+    while (true) {
+        heap->m_collector_lock.lock();
+        if (heap->m_collector_terminating == false) {
+            heap->m_collector_lock.unlock();
+            break;
+        }
+        while (heap->m_stop_the_world) {
+            heap->m_mutator_stopped = true;
+            heap->m_collector_wake.signal();
+            heap->m_mutator_wake.wait(heap->m_collector_lock);
+            heap->m_mutator_stopped = false;
+        }
+        heap->m_collector_wake.signal();
+        heap->m_collector_lock.unlock();
+        thread_yield();
+    }
 }
 
 void

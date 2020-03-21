@@ -58,6 +58,7 @@ class VMM {
     mutex_t             m_uuid_lock;
 
     static thread_main_t child_mutator(void* param);
+    static void terminate_collector(object_heap_t* heap);
 
 public:
             VMM() { m_table = NULL; }

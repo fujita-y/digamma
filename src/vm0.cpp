@@ -115,7 +115,6 @@ VM::init_root(object_heap_t* heap)
         m_codegen = new codegen_t(this);
         m_codegen->init();
 #endif
-        run(true);
         return true;
     } catch (io_exception_t& e) {
         fatal("fatal in init-vm: unexpected io_expecption_t(%d, %s)", e.m_err, e.m_message);
@@ -574,7 +573,7 @@ VM::boot()
                 if (obj == scm_eof) break;
                 m_pc = obj;
                 prebind(m_pc);
-                run(false);
+                run();
             }
             port_close(m_bootport);
         }
@@ -609,7 +608,7 @@ VM::boot()
                 if (obj == scm_eof) break;
                 m_pc = obj;
                 prebind(m_pc);
-                run(false);
+                run();
             }
             port_close(m_bootport);
         }
@@ -646,7 +645,7 @@ loop:
         scm_closure_t closure = lookup_system_closure(".@start-scheme-session");
         m_pc = closure->pc;
         prebind(m_pc);
-        run(false);
+        run();
     } catch (vm_exception_t& e) {
         backtrace(m_current_error);
         goto loop;
