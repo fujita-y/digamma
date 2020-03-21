@@ -173,7 +173,7 @@ int main(int argc, const char** argv)
 #endif
     heap->init_primordial(heap_limit, heap_init);
     VM rootVM;
-    rootVM.init(heap);
+    rootVM.init_root(heap);
 #if defined(NO_TLS)
     MTVERIFY(pthread_key_create(&s_current_vm, NULL));
     MTVERIFY(pthread_setspecific(s_current_vm, &rootVM));

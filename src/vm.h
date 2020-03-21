@@ -39,7 +39,7 @@ public:
     int             m_stack_size;
     int             m_stack_busy;
 
-    bool            init(object_heap_t* heap);
+    bool            init_root(object_heap_t* heap);
     void            boot();
     void            standalone();
     void            reset();

@@ -57,7 +57,7 @@ class VMM {
     remember_set_t      m_remember_set;
     mutex_t             m_uuid_lock;
 
-    static thread_main_t mutator_thread(void* param);
+    static thread_main_t child_mutator(void* param);
 
 public:
             VMM() { m_table = NULL; }

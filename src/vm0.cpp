@@ -59,7 +59,7 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
 }
 
 bool
-VM::init(object_heap_t* heap)
+VM::init_root(object_heap_t* heap)
 {
     try {
         m_heap = heap;

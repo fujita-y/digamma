@@ -59,8 +59,11 @@ VMM::destroy()
     for (int i = 0; i < m_capacity; i++) {
         VM* vm = m_table[i]->vm;
         if (vm && vm->m_codegen) {
-            vm->m_codegen->destroy();
-            delete vm->m_codegen;
+            if (i == 0) {
+                vm->m_codegen->destroy();
+                delete vm->m_codegen;
+            }
+            vm->m_codegen = NULL;
         }
     }
 #endif
@@ -98,7 +101,7 @@ again:
                 vm->m_vmm = parent->m_vmm;
                 vm->m_parent = parent;
 #if ENABLE_LLVM_JIT
-                vm->m_codegen = NULL;
+                vm->m_codegen = parent->m_codegen;
 #endif
                 vm->m_id = i;
                 vm->m_spawn_timeout = parent->m_spawn_timeout;
@@ -153,7 +156,7 @@ again:
                 }
                 m_live = m_live + 1;
                 parent->m_heap->m_child++;
-                thread_start(mutator_thread, m_table[i]);
+                thread_start(child_mutator, m_table[i]);
                 return i;
             }
         }
@@ -172,7 +175,7 @@ again:
 }
 
 thread_main_t
-VMM::mutator_thread(void* param)
+VMM::child_mutator(void* param)
 {
     vm_table_rec_t* table_rec = (vm_table_rec_t*)param;
     VMM* vmm = table_rec->vmm;
@@ -244,12 +247,6 @@ loop:
         }
     }
     vmm->m_lock.lock();
-#if ENABLE_LLVM_JIT
-    if (vm->m_codegen) {
-        vm->m_codegen->destroy();
-        delete vm->m_codegen;
-    }
-#endif
     vm->m_heap->destroy();
     delete vm->m_heap;
     delete vm;
