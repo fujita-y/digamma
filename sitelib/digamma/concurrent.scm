@@ -5,9 +5,10 @@
 (library (digamma concurrent)
   (export define-thread-variable
           define-autoload-variable
-          make-uuid
           async
           await
+          pmap
+          make-uuid
           make-shared-queue
           shared-queue?
           shared-queue-push!
@@ -72,6 +73,26 @@
 
   (define await (lambda (x . timeout) (apply x timeout)))
 
+  (define pmap
+    (lambda (proc lst1 . lst2)
+
+      (define pmap-1
+        (lambda (proc lst)
+          (map await
+            (map (lambda (arg) (async (proc arg))) lst))))
+
+      (define pmap-n
+        (lambda (proc lst)
+          (map await
+            (map (lambda (args) (async (apply proc args))) lst))))
+
+      (if (null? lst2)
+          (if (list? lst1)
+              (pmap-1 proc lst1)
+              (assertion-violation 'pmap "expected proper lists" (cons* proc lst1 lst2)))
+          (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (pmap-n proc lst)))
+                (else (assertion-violation 'pmap "expected same length proper lists" (cons* proc lst1 lst2)))))))
+
   (define spawn*
     (lambda (body finally)
       (spawn
@@ -81,26 +102,10 @@
               (lambda (escape)
                 (with-exception-handler (lambda (c) (escape c)) (lambda () (body))))))))))
 
+
   ) ;[end]
 
 #|
-(import (digamma concurrent))
-(define f (async (list 1 2 3)))
-(f)
-(define f (async (list 1 2 3) (usleep 10000) #t))
-(f 1)
-(display-thread-status)
-(define f2 (async (list 1 a 3)))
-(f2)
-
-(import (digamma time) (digamma concurrent))
-(time ((lambda () #f)))
-(time (async (lambda () #f)))
-
-(define pp
-  (lambda (expr)
-      (pretty-print `(begin ,expr))))
-
 
 (import (digamma concurrent))
 (import (digamma time))
@@ -111,16 +116,20 @@
     (+ (fib (- n 1))
        (fib (- n 2)))))
 
-(define (test1 . timeout)
-  (map await
-    (map (lambda (n) (async (fib n)))
-         '(40 40 40 40 40 40 40 40))))
+(define (test-plain)
+   (map fib '(40 40 40 40 40 40 40 40))) ; x8
 
-(define (test2)
-  (map (lambda (n) (fib n))
-       '(40 40 40 40 40 40 40 40)))
+(define (test-para)
+  (pmap fib '(40 40 40 40 40 40 40 40))) ; x8
 
-(time (test1))
-(time (test2))
+(time (fib 40))
+;;  8.342836 real    8.339067 user    0.002708 sys
+
+(time (test-plain))
+;; 65.820770 real   65.808054 user    0.014191 sys
+
+(time (test-para))
+(time (let ((a (async (test-para)))) (await a)))
+;; 15.660831 real  122.926724 user    0.069117 sys
 
 |#
