@@ -7,6 +7,7 @@
           define-autoload-variable
           make-uuid
           async
+          await
           make-shared-queue
           shared-queue?
           shared-queue-push!
@@ -69,6 +70,8 @@
                            (set! completed #t)
                            (if (condition? result) (raise result) result))))))))))
 
+  (define await (lambda (x . timeout) (apply x timeout)))
+
   (define spawn*
     (lambda (body finally)
       (spawn
@@ -77,6 +80,7 @@
             (call/cc
               (lambda (escape)
                 (with-exception-handler (lambda (c) (escape c)) (lambda () (body))))))))))
+
   ) ;[end]
 
 #|
@@ -96,4 +100,27 @@
 (define pp
   (lambda (expr)
       (pretty-print `(begin ,expr))))
+
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+
+(define (test1 . timeout)
+  (map await
+    (map (lambda (n) (async (fib n)))
+         '(40 40 40 40 40 40 40 40))))
+
+(define (test2)
+  (map (lambda (n) (fib n))
+       '(40 40 40 40 40 40 40 40)))
+
+(time (test1))
+(time (test2))
+
 |#
