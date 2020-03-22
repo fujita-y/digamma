@@ -287,6 +287,7 @@ VM::check_vm_cont(void* lnk)
 void
 VM::check_vm_state()
 {
+    // [TODO] Fix this work with multi vm build
     void* lnk;
     lnk = m_env;
     while (lnk) {

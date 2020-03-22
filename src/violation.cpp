@@ -328,7 +328,7 @@ void thread_unsupported_operation_violation(VM* vm, const char* subr, int argc, 
     while (--last >= 0) irritants = make_pair(vm->m_heap, argv[last], irritants);
     raise_assertion_violation(vm,
                               make_string(vm->m_heap, subr),
-                              make_string(vm->m_heap, "operation is not allowed in child thread"),
+                              make_string(vm->m_heap, "invalid use in child thread"),
                               make_pair(vm->m_heap, vm->m_heap->lookup_system_environment(make_symbol(vm->m_heap, subr)), irritants));
 }
 

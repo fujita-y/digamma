@@ -68,7 +68,7 @@
 
 (define eval
   (lambda (expr env)
-    (or (on-primordial-thread?) (assertion-violation 'thread "invalid use of eval" expr env))
+    (or (on-primordial-thread?) (assertion-violation 'eval "invalid use in child thread" expr env))
     (cond ((environment? env)
            (parameterize ((current-environment env))
              (interpret expr)))
@@ -138,7 +138,7 @@
 
 (define load
   (lambda (path)
-    (or (on-primordial-thread?) (assertion-violation 'thread "invalid use of load" path))
+    (or (on-primordial-thread?) (assertion-violation 'load "invalid use in child thread" path))
     (cond ((list? path)
            (auto-compile-cache-update)
            (load-scheme-library path))

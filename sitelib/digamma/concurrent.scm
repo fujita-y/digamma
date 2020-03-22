@@ -116,7 +116,6 @@
     (+ (fib (- n 1))
        (fib (- n 2)))))
 
-
 (define (test-para)
   (pmap fib '(40 40 40 40 40 40 40 40))) ; x8
 
@@ -142,5 +141,21 @@
 
 (pmap exit '(1 2 3))
 (begin (async (fib 40)) (exit))
+
+////
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (ack m n)
+  (cond ((= m 0) (+ n 1))
+        ((= n 0) (ack (- m 1) 1))
+        (else (ack (- m 1) (ack m (- n 1))))))
+
+
+(define (test-para)
+  (pmap ack '(3 3 3 3 3 3 3 3) '(9 9 9 9 9 9 9 9)))
+
+(time (test-para))
 
 |#
