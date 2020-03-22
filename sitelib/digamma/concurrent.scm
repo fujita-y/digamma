@@ -139,6 +139,7 @@
 (import (digamma time))
 
 (pmap list '(1 2 3) '(4 5 6))
+
 (pmap exit '(1 2 3))
 (begin (async (fib 40)) (exit))
 

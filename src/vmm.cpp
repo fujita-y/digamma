@@ -114,7 +114,10 @@ again:
                 vm->m_current_error = parent->m_current_error;
                 vm->m_current_source_comments = scm_false;
                 vm->m_current_exception_handler = scm_false;
-                vm->m_current_dynamic_environment = clone_weakhashtable(vm->m_heap, parent->m_current_dynamic_environment, false);
+                {
+                    scoped_lock lock(parent->m_current_dynamic_environment->lock);
+                    vm->m_current_dynamic_environment = clone_weakhashtable(vm->m_heap, parent->m_current_dynamic_environment, false);
+                }
                 vm->m_current_dynamic_wind_record = scm_nil;
                 vm->m_recursion_level = 0;
                 vm->m_shared_object_errno = 0;
