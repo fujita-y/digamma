@@ -61,6 +61,8 @@ class VMM {
     static void terminate_collector(object_heap_t* heap);
 
 public:
+    static const int VM_ID_PRIMORDIAL = 0;
+
             VMM() { m_table = NULL; }
     void    init(VM* root, int n);
     void    destroy();
@@ -69,7 +71,6 @@ public:
     void    snapshot(VM* vm, bool retry);
     void    remember(scm_obj_t obj);
     void    remember(scm_obj_t lhs, scm_obj_t rhs);
-    bool    primordial(int id);
     void    display_status(VM* vm);
     int     live_thread_count() { return m_live; }
     int     max_thread_count() { return m_capacity; }

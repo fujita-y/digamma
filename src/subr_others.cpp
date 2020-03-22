@@ -1081,7 +1081,7 @@ static void terminate_codegen(VM* vm) {
 scm_obj_t
 subr_exit(VM* vm, int argc, scm_obj_t argv[])
 {
-    if (vm->m_id != 0) {
+    if (vm->m_id != VMM::VM_ID_PRIMORDIAL) {
         thread_unsupported_operation_violation(vm, "exit", argc, argv);
         return scm_undef;
     }

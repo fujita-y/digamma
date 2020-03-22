@@ -42,7 +42,7 @@ VMM::init(VM* root, int n)
     }
     root->m_vmm = this;
     root->m_parent = NULL;
-    root->m_id = 0;
+    root->m_id = VM_ID_PRIMORDIAL;
     root->m_spawn_timeout = scm_false;
     root->m_spawn_heap_limit = DEFAULT_HEAP_LIMIT * 1024 * 1024;
     m_table[0]->vm = root;
@@ -59,7 +59,7 @@ VMM::destroy()
     for (int i = 0; i < m_capacity; i++) {
         VM* vm = m_table[i]->vm;
         if (vm) {
-            if (i == 0 && vm->m_codegen) {
+            if (i == VM_ID_PRIMORDIAL && vm->m_codegen) {
                 vm->m_codegen->destroy();
                 delete vm->m_codegen;
             }
@@ -360,13 +360,6 @@ VMM::snapshot(VM* vm, bool retry)
             return;
         }
     }
-}
-
-bool
-VMM::primordial(int id)
-{
-    scoped_lock lock(m_lock);
-    return (m_table[id]->parent == VM_PARENT_NONE);
 }
 
 void

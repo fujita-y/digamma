@@ -85,7 +85,7 @@ scm_obj_t
 subr_on_primordial_thread_pred(VM* vm, int argc, scm_obj_t argv[])
 {
 #if USE_PARALLEL_VM
-    if (argc == 0) return (vm->m_id == 0) ? scm_true : scm_false;
+    if (argc == 0) return (vm->m_id == VMM::VM_ID_PRIMORDIAL) ? scm_true : scm_false;
     wrong_number_of_arguments_violation(vm, "on-primordial-thread?", 0, 0, argc, argv);
     return scm_undef;
 #else
