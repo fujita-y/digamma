@@ -47,7 +47,7 @@ class VMM {
         int             id;
         int             state;
         int             parent;
-        scm_obj_t       param;
+        scm_obj_t       protect;
         char            name[64];
     };
     mutex_t             m_lock;
@@ -57,8 +57,10 @@ class VMM {
     remember_set_t      m_remember_set;
     mutex_t             m_uuid_lock;
 
-    static thread_main_t child_mutator(void* param);
-    static void terminate_collector(object_heap_t* heap);
+    static thread_main_t  child_mutator(void* param);
+    static void           terminate_collector(object_heap_t* heap);
+
+    void    init_child_vm(VM* vm, VM* parent, int id);
 
 public:
     static const int VM_ID_PRIMORDIAL = 0;

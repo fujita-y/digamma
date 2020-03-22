@@ -37,7 +37,7 @@ VMM::init(VM* root, int n)
         m_table[i]->notify.init();
         m_table[i]->state = VM_STATE_FREE;
         m_table[i]->parent = VM_PARENT_NONE;
-        m_table[i]->param = scm_nil;
+        m_table[i]->protect = scm_nil;
         m_table[i]->name[0] = 0;
     }
     root->m_vmm = this;
@@ -74,6 +74,48 @@ VMM::destroy()
     delete [] m_table;
 }
 
+void
+VMM::init_child_vm(VM* vm, VM* parent, int id)
+{
+    object_heap_t* heap = new object_heap_t;
+    int heap_init = SPAWN_INITIAL_HEAP_SIZE;
+    int heap_limit = parent->m_spawn_heap_limit;
+    if (heap_limit <= heap_init + heap_init) heap_limit = heap_init + heap_init;
+    heap->init_child(heap_limit, heap_init, parent->m_heap);
+    vm->m_heap = heap;
+    vm->m_stack_size = VM_STACK_BYTESIZE;
+    vm->m_stack_top = (scm_obj_t*)vm->m_heap->allocate(vm->m_stack_size, false, false);
+    vm->m_stack_limit = (scm_obj_t*)((intptr_t)vm->m_stack_top + vm->m_stack_size);
+    memset(vm->m_stack_top, 0, vm->m_stack_size);
+    vm->m_to_stack_top = (scm_obj_t*)vm->m_heap->allocate(vm->m_stack_size, false, false);
+    vm->m_to_stack_limit = (scm_obj_t*)((intptr_t)vm->m_to_stack_top + vm->m_stack_size);
+    memset(vm->m_to_stack_top, 0, vm->m_stack_size);
+    vm->m_vmm = parent->m_vmm;
+    vm->m_parent = parent;
+#if ENABLE_LLVM_JIT
+    vm->m_codegen = parent->m_codegen;
+#endif
+    vm->m_id = id;
+    vm->m_spawn_timeout = parent->m_spawn_timeout;
+    vm->m_spawn_heap_limit = parent->m_spawn_heap_limit;
+    vm->m_bootport = (scm_port_t)scm_unspecified;
+    vm->m_current_environment = parent->m_current_environment;
+    vm->m_current_input = parent->m_current_input;
+    vm->m_current_output = parent->m_current_output;
+    vm->m_current_error = parent->m_current_error;
+    vm->m_current_source_comments = scm_false;
+    vm->m_current_exception_handler = scm_false;
+    {
+        scoped_lock lock(parent->m_current_dynamic_environment->lock);
+        vm->m_current_dynamic_environment = clone_weakhashtable(vm->m_heap, parent->m_current_dynamic_environment, false);
+    }
+    vm->m_current_dynamic_wind_record = scm_nil;
+    vm->m_recursion_level = 0;
+    vm->m_shared_object_errno = 0;
+    memcpy(&vm->m_flags, &parent->m_flags, sizeof(parent->m_flags));
+    vm->reset();
+}
+
 int
 VMM::spawn(VM* parent, scm_closure_t func, int argc, scm_obj_t argv[])
 {
@@ -85,44 +127,8 @@ again:
         scoped_lock lock(m_lock);
         for (int i = 0; i < m_capacity; i++) {
             if (m_table[i]->state == VM_STATE_FREE) {
-                object_heap_t* heap = new object_heap_t;
-                int heap_init = SPAWN_INITIAL_HEAP_SIZE;
-                int heap_limit = parent->m_spawn_heap_limit;
-                if (heap_limit <= heap_init + heap_init) heap_limit = heap_init + heap_init;
-                heap->init_child(heap_limit, heap_init, parent->m_heap);
                 VM* vm = new VM;
-                vm->m_heap = heap;
-                vm->m_stack_size = VM_STACK_BYTESIZE;
-                vm->m_stack_top = (scm_obj_t*)vm->m_heap->allocate(vm->m_stack_size, false, false);
-                vm->m_stack_limit = (scm_obj_t*)((intptr_t)vm->m_stack_top + vm->m_stack_size);
-                memset(vm->m_stack_top, 0, vm->m_stack_size);
-                vm->m_to_stack_top = (scm_obj_t*)vm->m_heap->allocate(vm->m_stack_size, false, false);
-                vm->m_to_stack_limit = (scm_obj_t*)((intptr_t)vm->m_to_stack_top + vm->m_stack_size);
-                memset(vm->m_to_stack_top, 0, vm->m_stack_size);
-                vm->m_vmm = parent->m_vmm;
-                vm->m_parent = parent;
-#if ENABLE_LLVM_JIT
-                vm->m_codegen = parent->m_codegen;
-#endif
-                vm->m_id = i;
-                vm->m_spawn_timeout = parent->m_spawn_timeout;
-                vm->m_spawn_heap_limit = parent->m_spawn_heap_limit;
-                vm->m_bootport = (scm_port_t)scm_unspecified;
-                vm->m_current_environment = parent->m_current_environment;
-                vm->m_current_input = parent->m_current_input;
-                vm->m_current_output = parent->m_current_output;
-                vm->m_current_error = parent->m_current_error;
-                vm->m_current_source_comments = scm_false;
-                vm->m_current_exception_handler = scm_false;
-                {
-                    scoped_lock lock(parent->m_current_dynamic_environment->lock);
-                    vm->m_current_dynamic_environment = clone_weakhashtable(vm->m_heap, parent->m_current_dynamic_environment, false);
-                }
-                vm->m_current_dynamic_wind_record = scm_nil;
-                vm->m_recursion_level = 0;
-                vm->m_shared_object_errno = 0;
-                memcpy(&vm->m_flags, &parent->m_flags, sizeof(parent->m_flags));
-                vm->reset();
+                init_child_vm(vm, parent, i);
 
                 for (int n = 0; n < argc; n++) vm->m_sp[n] = argv[n];
                 vm->m_sp += argc;
@@ -133,19 +139,14 @@ again:
                 vm->m_pc = func->pc;
                 vm->m_env = &env->up;
 
-                scm_obj_t context = scm_nil;
-                if (argc > 0) {
-                    for (int n = argc - 1; n >= 0; n--) context = make_pair(parent->m_heap, argv[n], context);
-                    context = make_pair(parent->m_heap, func, context);
-                } else {
-                    context = make_list(parent->m_heap, 1, func);
-                }
-                m_table[i]->param = make_list(parent->m_heap, 5,
-                                              context,
-                                              parent->m_current_environment,
-                                              parent->m_current_input,
-                                              parent->m_current_output,
-                                              parent->m_current_error);
+                scm_obj_t obj = scm_nil;
+                for (int n = argc - 1; n >= 0; n--) obj = make_pair(parent->m_heap, argv[n], obj);
+                obj = make_pair(parent->m_heap, func, obj);
+                obj = make_pair(parent->m_heap, parent->m_current_environment, obj);
+                obj = make_pair(parent->m_heap, parent->m_current_input, obj);
+                obj = make_pair(parent->m_heap, parent->m_current_output, obj);
+                obj = make_pair(parent->m_heap, parent->m_current_error, obj);
+                m_table[i]->protect = obj;
                 m_table[i]->parent = parent->m_id;
                 m_table[i]->vm = vm;
                 m_table[i]->id = i;
@@ -308,21 +309,17 @@ VMM::display_status(VM* vm)
     for (int i = 0; i < vmm->m_capacity; i++) {
         vm_table_rec_t* rec = table[i];
         const char* stat = "unknown";
-        scm_obj_t param = scm_nil;
         switch (rec->state) {
             case VM_STATE_FREE:
                 continue;
             case VM_STATE_ACTIVE:
                 stat = "active";
-                param = rec->param;
                 break;
             case VM_STATE_BLOCK:
                 stat = "block";
-                param = rec->param;
                 break;
             case VM_STATE_SYNC:
                 stat = "wait";
-                param = rec->param;
                 break;
             default: break;
         }
@@ -352,7 +349,7 @@ VMM::snapshot(VM* vm, bool retry)
         switch (m_table[i]->state) {
             case VM_STATE_ACTIVE:
             case VM_STATE_BLOCK:
-            if (m_table[i]->parent == id) vm->m_heap->enqueue_root(m_table[i]->param);
+            if (m_table[i]->parent == id) vm->m_heap->enqueue_root(m_table[i]->protect);
             break;
         }
     }
