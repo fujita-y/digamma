@@ -62,7 +62,9 @@
     (syntax-rules ()
       ((_ e0 e1 ...)
        (let ((promise (make-shared-queue)) (completed #f) (result #f))
-         (spawn* (lambda () e0 e1 ...) (lambda (ans) (shared-queue-push! promise ans)))
+         (spawn*
+           (lambda () e0 e1 ...)
+           (lambda (ans) (shared-queue-push! promise ans)))
          (tuple
           'type:awaitable
            (lambda timeout
@@ -86,17 +88,14 @@
 
   (define pmap
     (lambda (proc lst1 . lst2)
-
       (define pmap-1
         (lambda (proc lst)
           (map await
             (map (lambda (arg) (async (proc arg))) lst))))
-
       (define pmap-n
         (lambda (proc lst)
           (map await
             (map (lambda (args) (async (apply proc args))) lst))))
-
       (if (null? lst2)
           (if (list? lst1)
               (pmap-1 proc lst1)
