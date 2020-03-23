@@ -58,7 +58,7 @@
                 (format "attempt to modify autoload variable ~u" 'var)
                 '(set! var x)))))))))
 
-  (define-syntax async
+  #;(define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
        (let ((promise (make-shared-queue)) (completed #f) (result #f))
@@ -75,6 +75,22 @@
                            (else
                              (set! completed #t)
                              (if (condition? result) (raise result) result)))))))))))
+
+(define-syntax async
+    (syntax-rules ()
+      ((_ e0 e1 ...)
+       (let ((promise (make-shared-queue)))
+         (spawn*
+           (lambda () e0 e1 ...)
+           (lambda (ans) (shared-queue-push! promise ans)))
+         (tuple
+          'type:awaitable
+           (lambda timeout
+              (let ((result (apply shared-queue-pop! promise timeout)))
+                (shared-queue-push! promise result)
+                (cond ((timeout-object? result) result)
+                      (else
+                        (if (condition? result) (raise result) result))))))))))
 
   (define awaitable?
     (lambda (obj)
@@ -159,10 +175,34 @@
         ((= n 0) (ack (- m 1) 1))
         (else (ack (- m 1) (ack m (- n 1))))))
 
-
 (define (test-para)
   (pmap ack '(3 3 3 3 3 3 3 3) '(9 9 9 9 9 9 9 9)))
 
 (time (test-para))
+
+(define s (aync (fib (await (aync (ack 2 9))))))
+
+////
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (ack m n)
+  (cond ((= m 0) (+ n 1))
+        ((= n 0) (ack (- m 1) 1))
+        (else (ack (- m 1) (ack m (- n 1))))))
+
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+
+; this doesn't work
+(let* ((arg1 (async 2))
+       (arg2 (async 9))
+       (n (async (ack (await arg1) (await arg2))))
+       (a (async (fib (await n)))))
+  (await a))
 
 |#
