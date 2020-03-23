@@ -90,12 +90,10 @@
     (lambda (proc lst1 . lst2)
       (define pmap-1
         (lambda (proc lst)
-          (map await
-            (map (lambda (arg) (async (proc arg))) lst))))
+          (map await (map (lambda (arg) (async (proc arg))) lst))))
       (define pmap-n
         (lambda (proc lst)
-          (map await
-            (map (lambda (args) (async (apply proc args))) lst))))
+          (map await (map (lambda (args) (async (apply proc args))) lst))))
       (if (null? lst2)
           (if (list? lst1)
               (pmap-1 proc lst1)
@@ -111,7 +109,6 @@
             (call/cc
               (lambda (escape)
                 (with-exception-handler (lambda (c) (escape c)) (lambda () (body))))))))))
-
 
   ) ;[end]
 
