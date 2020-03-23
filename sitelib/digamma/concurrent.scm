@@ -5,19 +5,19 @@
 (library (digamma concurrent)
   (export define-thread-variable
           define-autoload-variable
+          pmap
           async
           awaitable?
           await
-          pmap
           make-uuid
           make-shared-queue
           shared-queue?
           shared-queue-push!
           shared-queue-pop!
           shared-queue-shutdown
-          serializable?
           timeout-object?
           shutdown-object?
+          serializable?
           spawn
           spawn*
           spawn-timeout
@@ -58,25 +58,7 @@
                 (format "attempt to modify autoload variable ~u" 'var)
                 '(set! var x)))))))))
 
-  #;(define-syntax async
-    (syntax-rules ()
-      ((_ e0 e1 ...)
-       (let ((promise (make-shared-queue)) (completed #f) (result #f))
-         (spawn*
-           (lambda () e0 e1 ...)
-           (lambda (ans) (shared-queue-push! promise ans)))
-         (tuple
-          'type:awaitable
-           (lambda timeout
-             (cond (completed (if (condition? result) (raise result) result))
-                   (else
-                     (set! result (apply shared-queue-pop! promise timeout))
-                     (cond ((timeout-object? result) result)
-                           (else
-                             (set! completed #t)
-                             (if (condition? result) (raise result) result)))))))))))
-
-(define-syntax async
+  (define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
        (let ((promise (make-shared-queue)))
@@ -86,11 +68,11 @@
          (tuple
           'type:awaitable
            (lambda timeout
-              (let ((result (apply shared-queue-pop! promise timeout)))
-                (shared-queue-push! promise result)
-                (cond ((timeout-object? result) result)
+              (let ((ans (apply shared-queue-pop! promise timeout)))
+                (cond ((timeout-object? ans) ans)
                       (else
-                        (if (condition? result) (raise result) result))))))))))
+                        (shared-queue-shutdown promise)
+                        (if (condition? ans) (raise ans) ans))))))))))
 
   (define awaitable?
     (lambda (obj)
@@ -198,11 +180,15 @@
     (+ (fib (- n 1))
        (fib (- n 2)))))
 
-; this doesn't work
 (let* ((arg1 (async 2))
        (arg2 (async 9))
        (n (async (ack (await arg1) (await arg2))))
        (a (async (fib (await n)))))
   (await a))
 
+(let* ((arg1 (async 2))
+       (arg2 (async 9))
+       (n (async (ack (await arg1) (await arg2))))
+       (a (async (fib (await arg2)))))
+  (await a))
 |#
