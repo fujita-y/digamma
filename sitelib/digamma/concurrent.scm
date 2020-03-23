@@ -6,6 +6,7 @@
   (export define-thread-variable
           define-autoload-variable
           async
+          awaitable?
           await
           pmap
           make-uuid
@@ -60,18 +61,28 @@
   (define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
-       (let ((queue (make-shared-queue)) (completed #f) (result #f))
-         (spawn* (lambda () e0 e1 ...) (lambda (ans) (shared-queue-push! queue ans)))
-         (lambda timeout
-           (cond (completed (if (condition? result) (raise result) result))
-                 (else
-                   (set! result (apply shared-queue-pop! queue timeout))
-                   (cond ((timeout-object? result) result)
-                         (else
-                           (set! completed #t)
-                           (if (condition? result) (raise result) result))))))))))
+       (let ((promise (make-shared-queue)) (completed #f) (result #f))
+         (spawn* (lambda () e0 e1 ...) (lambda (ans) (shared-queue-push! promise ans)))
+         (tuple
+          'type:awaitable
+           (lambda timeout
+             (cond (completed (if (condition? result) (raise result) result))
+                   (else
+                     (set! result (apply shared-queue-pop! promise timeout))
+                     (cond ((timeout-object? result) result)
+                           (else
+                             (set! completed #t)
+                             (if (condition? result) (raise result) result)))))))))))
 
-  (define await (lambda (x . timeout) (apply x timeout)))
+  (define awaitable?
+    (lambda (obj)
+      (and (tuple? obj) (eq? (tuple-ref obj 0) 'type:awaitable))))
+
+  (define await
+    (lambda (x . timeout)
+      (or (awaitable? x)
+          (assertion-violation 'await (format "expected awaitable, but got ~r, as argument 1" x) (cons x timeout)))
+      (apply (tuple-ref x 1) timeout)))
 
   (define pmap
     (lambda (proc lst1 . lst2)
