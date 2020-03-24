@@ -71,6 +71,7 @@ codegen_t::destroy()
     do {
       usleep(100);
     } while (m_compile_thread_terminating);
+    ExitOnErr(m_jit->runDestructors());
     m_compile_thread_lock.destroy();
     m_compile_thread_wake.destroy();
     m_compile_queue_lock.destroy();
