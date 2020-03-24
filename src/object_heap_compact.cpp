@@ -240,6 +240,9 @@ resolve_collectible(void* obj, int size, void* desc)
             closure->pc = heap->forward(closure->pc);
             closure->doc = heap->forward(closure->doc);
             closure->env = heap->interior_forward(closure->env);
+#if ENABLE_LLVM_JIT
+            closure->code = NULL;
+#endif
         } break;
 
         case TC_CONT: {

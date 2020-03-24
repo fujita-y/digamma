@@ -751,16 +751,6 @@ subr_collect_stack_notify(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_collect(VM* vm, int argc, scm_obj_t argv[])
 {
-#if USE_PARALLEL_VM
-    if (vm->m_heap->m_child > 0) {
-        if (argc == 0) {
-            vm->m_heap->collect();
-            return scm_unspecified;
-        }
-        wrong_number_of_arguments_violation(vm, "collect", 0, 0, argc, argv);
-        return scm_undef;
-    }
-#endif
     bool pack = false;
     if (argc == 0 || argc == 1) {
         if (argc == 1) {
@@ -772,6 +762,12 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
             }
         }
         if (pack) {
+#if USE_PARALLEL_VM
+            if (vm->m_vmm->live_thread_count() != 1) {
+                implementation_restriction_violation(vm, "collect", "compaction is not available when more than one thread active", MAKEFIXNUM(vm->m_vmm->live_thread_count()), argc, argv);
+                return scm_undef;
+            }
+#endif
             do {
                 vm->m_heap->collect();
                 usleep(100);
@@ -780,6 +776,13 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
                 if (vm->m_heap->m_stop_the_world) vm->stop();
                 usleep(100);
             } while (vm->m_heap->m_collector_kicked);
+#if ENABLE_LLVM_JIT
+            assert(vm->m_id == 0);
+            assert(vm->m_vmm->live_thread_count() == 1);
+            vm->m_codegen->destroy();
+            delete vm->m_codegen;
+            vm->m_codegen = NULL;
+#endif
             relocate_info_t* info = vm->m_heap->relocate(false);
             vm->resolve();
             vm->m_heap->resolve(info);
@@ -788,6 +791,10 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
             vm->resolve();
             vm->m_heap->resolve(info);
             vm->m_heap->compact_pool();
+#if ENABLE_LLVM_JIT
+            vm->m_codegen = new codegen_t(vm);
+            vm->m_codegen->init();
+#endif
             return scm_unspecified;
         } else {
             vm->m_heap->collect();
