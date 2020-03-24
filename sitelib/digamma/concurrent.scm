@@ -6,6 +6,7 @@
   (export define-thread-variable
           define-autoload-variable
           pmap
+          pbegin
           async
           awaitable?
           await
@@ -98,6 +99,15 @@
               (assertion-violation 'pmap "expected proper lists" (cons* proc lst1 lst2)))
           (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (pmap-n proc lst)))
                 (else (assertion-violation 'pmap "expected same length proper lists" (cons* proc lst1 lst2)))))))
+
+  (define-syntax pbegin
+    (lambda (x)
+      (syntax-case x ()
+        ((_ e ...)
+         (with-syntax (((p ...) (generate-temporaries (syntax (e ...)))))
+            (syntax
+              (let* ((p (async e)) ...)
+                (await p) ...)))))))
 
   (define spawn*
     (lambda (body finally)
