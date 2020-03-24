@@ -68,9 +68,7 @@ codegen_t::destroy()
         scoped_lock lock(m_compile_thread_lock);
         m_compile_thread_wake.signal();
     }
-    do {
-      usleep(100);
-    } while (m_compile_thread_terminating);
+    while (m_compile_thread_terminating) usleep(100);
     ExitOnErr(m_jit->runDestructors());
     m_compile_thread_lock.destroy();
     m_compile_thread_wake.destroy();
