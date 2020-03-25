@@ -61,7 +61,7 @@ endif
 ifneq (,$(findstring Darwin, $(UNAME)))
   CPPFLAGS += -DNO_FFI
   #CXXFLAGS += -O0 -glldb
-	CXXFLAGS += -O3 -fomit-frame-pointer -momit-leaf-frame-pointer
+	CXXFLAGS += -O3 -momit-leaf-frame-pointer
   LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
