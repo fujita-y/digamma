@@ -59,7 +59,6 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  CXX = /usr/bin/clang++
   CPPFLAGS += -DNO_FFI
   #CXXFLAGS += -O0 -glldb
 	CXXFLAGS += -O3 -momit-leaf-frame-pointer
