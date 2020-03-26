@@ -1,6 +1,9 @@
 // Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
+#ifndef CODEGEN_H_INCLUDED
+#define CODEGEN_H_INCLUDED
+
 #include "core.h"
 #include "object.h"
 #include "vm.h"
@@ -177,6 +180,8 @@ private:
     void emit_subr_gloc_of(context_t& ctx, scm_obj_t inst);
     void emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst);
 };
+
+#endif
 
 //extern codegen_t* s_codegen;
 
