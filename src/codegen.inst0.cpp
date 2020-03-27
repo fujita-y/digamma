@@ -89,6 +89,8 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     context.m_function = F;
     context.m_top_level_closure = closure;
     context.m_top_level_function = F;
+    context.set_local_var_count(0, closure);
+    context.m_depth = 1;
 
     transform(context, closure->pc, true);
 
@@ -165,10 +167,21 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
     auto vm = F->arg_begin();
 
     if (depth <= 4) {
+#if USE_ILOC_OPTIMIZE
+        int n = ctx.get_local_var_count(depth);
+        if (n) {
+            auto env = emit_lookup_env(ctx, depth);
+            return IRB.CreateGEP(env, VALUE_INTPTR(index - n));
+        }
+        auto env = emit_lookup_env(ctx, depth);
+        auto count = CREATE_LOAD_ENV_REC(env, count);
+        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+#else
         auto env = emit_lookup_env(ctx, depth);
         auto count = CREATE_LOAD_ENV_REC(env, count);
         if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
         return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+#endif
     }
     auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });

@@ -102,6 +102,30 @@ codegen_t::context_t::clear_all_reg_cache()
     reg_cont.clear();
 }
 
+void
+codegen_t::context_t::set_local_var_count(int depth, int count)
+{
+    m_local_var_count.resize(depth + 1);
+    m_local_var_count[depth] = count;
+}
+
+void
+codegen_t::context_t::set_local_var_count(int depth, scm_closure_t closure)
+{
+    int argc = HDR_CLOSURE_ARGS(closure->hdr);
+    if (argc < 0) argc = -argc;
+    m_local_var_count.resize(depth + 1);
+    m_local_var_count[depth] = argc;
+}
+
+int
+codegen_t::context_t::get_local_var_count(int depth)
+{
+    if (m_depth - depth - 1 >= 0) return m_local_var_count[m_depth - depth - 1];
+    return 0;
+}
+
+
 codegen_t::codegen_t(VM* vm) : m_vm(vm) { }
 
 void
@@ -284,6 +308,8 @@ codegen_t::compile_each(scm_closure_t closure)
     context.m_function = F;
     context.m_top_level_closure = closure;
     context.m_top_level_function = F;
+    context.set_local_var_count(0, closure);
+    context.m_depth = 1;
 
     transform(context, closure->pc, true);
 

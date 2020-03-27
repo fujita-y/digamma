@@ -819,6 +819,7 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+    ctx.set_local_var_count(ctx.m_depth, FIXNUM(operands));
 }
 
 void
@@ -861,10 +862,14 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     // printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
     // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
 
+    ctx.set_local_var_count(ctx.m_depth, 1);
+
     context_t ctx2 = ctx;
     ctx2.m_function = L;
 
-    ctx2.m_depth = ctx2.m_depth + 2;
+    ctx2.set_local_var_count(ctx2.m_depth, 1);
+    ctx2.set_local_var_count(ctx2.m_depth + 1, 0); // [TODO] set count of closure env
+    ctx2.m_depth += 2;
 
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOOP);
@@ -1322,6 +1327,8 @@ codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_sp, ea1);
     CREATE_STORE_VM_REG(vm, m_fp, ea1);
     CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+
+    ctx.set_local_var_count(ctx.m_depth, argc);
 }
 
 void
@@ -1423,7 +1430,8 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 
     context_t ctx2 = ctx;
     ctx2.m_function = L;
-    ctx2.m_depth = ctx2.m_depth + 1;
+    ctx2.set_local_var_count(ctx2.m_depth, 0); // [TODO] set count of closure env
+    ctx2.m_depth++;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
     transform(ctx2, operands, true);
@@ -1574,6 +1582,8 @@ codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t) + sizeof(vm_env_rec_t));
     auto c_extend_enclose = M->getOrInsertFunction("c_extend_enclose", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_extend_enclose, { vm, VALUE_INTPTR(operands) });
+
+    ctx.set_local_var_count(ctx.m_depth, 1);
 }
 
 void

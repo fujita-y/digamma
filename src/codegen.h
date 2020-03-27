@@ -16,6 +16,7 @@
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
 #define USE_UNIFIED_STACK_CHECK   1
+#define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             0
 
 #define PRINT_IR                  0
@@ -44,6 +45,7 @@ class codegen_t {
         llvm::Function* m_top_level_function;
         scm_closure_t m_top_level_closure;
         std::map<int, llvm::Function*> m_local_functions;
+        std::vector<int> m_local_var_count;
         int m_argc;
         int m_depth;
         reg_cache_t<offsetof(VM, m_sp)> reg_sp;
@@ -52,6 +54,9 @@ class codegen_t {
         reg_cache_t<offsetof(VM, m_cont)> reg_cont;
         void flush_all_reg_cache(llvm::Value* vm);
         void clear_all_reg_cache();
+        void set_local_var_count(int depth, int count);
+        void set_local_var_count(int depth, scm_closure_t closure);
+        int get_local_var_count(int depth);
         context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb)
           : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0),
             reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this) {}
