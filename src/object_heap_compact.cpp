@@ -269,6 +269,9 @@ resolve_collectible(void* obj, int size, void* desc)
             cont->pc = heap->forward(cont->pc);
             cont->trace = heap->forward(cont->trace);
             for (scm_obj_t* args = (scm_obj_t*)top; args < (scm_obj_t*)cont; args++) *args = heap->forward(*args);
+#if ENABLE_LLVM_JIT
+            cont->code = NULL;
+#endif
         } break;
 
         case TC_ENVIRONMENT: {
