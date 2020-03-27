@@ -254,8 +254,8 @@ VM::prebind_list(scm_obj_t code)
             case VMOP_EXTEND_ENCLOSE_LOCAL:
                 if (SYMBOLP(CAAR(operands))) break;
                 prebind_list(CDR(operands));
-                m_heap->write_barrier(CDR(operands));
-                CDAR(code) = CDR(operands);
+                //m_heap->write_barrier(CDR(operands));
+                //CDAR(code) = CDR(operands);
                 break;
 
             case VMOP_CLOSE:

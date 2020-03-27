@@ -792,7 +792,7 @@ VM::loop(bool resume)
 
             CASE(VMOP_EXTEND_ENCLOSE_LOCAL) {
                 if ((uintptr_t)m_sp + sizeof(scm_obj_t) + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
-                    m_sp[0] = OPERANDS;
+                    m_sp[0] = CDR(OPERANDS);
                     m_sp++;
                     vm_env_t env = (vm_env_t)m_sp;
                     env->count = 1;
@@ -853,7 +853,7 @@ VM::loop(bool resume)
 
             CASE(VMOP_PUSH_CLOSE_LOCAL) {
                 if (m_sp < m_stack_limit) {
-                    m_sp[0] = OPERANDS;
+                    m_sp[0] = CDR(OPERANDS);
                     m_sp++;
                     m_pc = CDR(m_pc);
                     goto loop;

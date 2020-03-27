@@ -831,7 +831,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
+    CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
     auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
     CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
@@ -873,7 +873,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
 
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOOP);
-    transform(ctx2, operands, true);
+    transform(ctx2, CDR(operands), true);
 
     IRB.SetInsertPoint(CONTINUE);
 }
@@ -1406,7 +1406,7 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
+    CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     IRB.CreateBr(CONTINUE);
@@ -1434,7 +1434,7 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx2.m_depth++;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
-    transform(ctx2, operands, true);
+    transform(ctx2, CDR(operands), true);
 
     IRB.SetInsertPoint(CONTINUE);
 }
