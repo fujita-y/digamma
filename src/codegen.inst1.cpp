@@ -867,8 +867,9 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     context_t ctx2 = ctx;
     ctx2.m_function = L;
 
+    int nargs = FIXNUM(CAR(CAR(operands))) + FIXNUM(CADR(CAR(operands)));
     ctx2.set_local_var_count(ctx2.m_depth, 1);
-    ctx2.set_local_var_count(ctx2.m_depth + 1, 0); // [TODO] set count of closure env
+    ctx2.set_local_var_count(ctx2.m_depth + 1, nargs);
     ctx2.m_depth += 2;
 
     ctx2.m_argc = 0;
@@ -1430,7 +1431,8 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 
     context_t ctx2 = ctx;
     ctx2.m_function = L;
-    ctx2.set_local_var_count(ctx2.m_depth, 0); // [TODO] set count of closure env
+    int nargs = FIXNUM(CAR(CAR(operands))) + FIXNUM(CADR(CAR(operands)));
+    ctx2.set_local_var_count(ctx2.m_depth, nargs);
     ctx2.m_depth++;
     ctx2.m_argc = 0;
     IRB.SetInsertPoint(LOCAL);
