@@ -55,6 +55,7 @@ subr_closure_codegen(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_display_codegen_statistics(VM* vm, int argc, scm_obj_t argv[])
 {
+#if ENABLE_LLVM_JIT
     if (argc == 0) {
         if (vm->m_codegen) {
             vm->m_codegen->display_codegen_statistics(vm->m_current_output);
@@ -66,6 +67,10 @@ subr_display_codegen_statistics(VM* vm, int argc, scm_obj_t argv[])
     }
     wrong_number_of_arguments_violation(vm, "display-codegen-statistics", 0, 0, argc, argv);
     return scm_undef;
+#else
+    implementation_restriction_violation(vm, "closure-codegen", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+    return scm_undef;
+#endif
 }
 
 void
