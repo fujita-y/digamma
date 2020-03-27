@@ -36,6 +36,54 @@ static int log2_of_intptr_size()
     return (int)log2(sizeof(intptr_t));
 }
 
+template<int byte_offset>
+llvm::Value* codegen_t::reg_cache_t<byte_offset>::load(llvm::Value* vm) {
+#if USE_REG_CACHE
+    if (val != NULL) return val;
+    val = IRB.CreateLoad(IntptrTy, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    return val;
+#else
+    return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+#endif
+}
+
+template<int byte_offset>
+void codegen_t::reg_cache_t<byte_offset>::store(llvm::Value* vm, llvm::Value* rhs) {
+#if USE_REG_CACHE
+    if (val == NULL) {
+        val = rhs;
+        return;
+    }
+    modified = (val != rhs);
+    val = rhs;
+#else
+    IRB.CreateStore(rhs, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+#endif
+}
+
+template<int byte_offset>
+void codegen_t::reg_cache_t<byte_offset>::clear() {
+#if USE_REG_CACHE
+    val = NULL;
+    modified = false;
+#endif
+}
+
+template<int byte_offset>
+void codegen_t::reg_cache_t<byte_offset>::flush(llvm::Value* vm) {
+#if USE_REG_CACHE
+    if (val != NULL && modified) {
+        IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    }
+#endif
+}
+
+template<int byte_offset>
+codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* ctx)
+  : val(NULL), modified(false), C(ctx->m_llvm_context), IRB(ctx->m_irb) {
+    IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
+}
+
 codegen_t::codegen_t(VM* vm) : m_vm(vm) { }
 
 void

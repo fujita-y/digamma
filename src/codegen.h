@@ -16,14 +16,28 @@
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
 #define USE_UNIFIED_STACK_CHECK   1
+#define USE_REG_CACHE             0
 
 #define PRINT_IR                  0
 #define DEBUG_CODEGEN             0
 #define VERBOSE_CODEGEN           0
 
 class codegen_t {
+    struct context_t;
     struct intrinsics_t {
         llvm::Function* prepare_call;
+    };
+    template<int byte_offset> struct reg_cache_t {
+        llvm::Value* val;
+        bool modified;
+        llvm::IntegerType* IntptrTy;
+        llvm::LLVMContext& C;
+        llvm::IRBuilder<>& IRB;
+        llvm::Value* load(llvm::Value* vm);
+        void store(llvm::Value* vm, llvm::Value* rhs);
+        void clear();
+        void flush(llvm::Value* vm);
+        reg_cache_t(codegen_t::context_t* ctx);
     };
     struct context_t {
         llvm::LLVMContext& m_llvm_context;
@@ -36,7 +50,10 @@ class codegen_t {
         int m_argc;
         int m_depth;
         intrinsics_t m_intrinsics;
-        context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb) : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0) {}
+        reg_cache_t<offsetof(VM, m_sp)> reg_sp;
+        reg_cache_t<offsetof(VM, m_env)> reg_env;
+        context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb)
+          : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0), reg_sp(this), reg_env(this) {}
     };
     enum cc_t { LT, GT, LE, GE, EQ, };
     VM* m_vm;
