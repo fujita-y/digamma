@@ -751,25 +751,27 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     // vm_cont_t cont = (vm_cont_t)m_sp;
     auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
-
-    auto prepare_call = ctx.m_intrinsics.prepare_call; // M->getOrInsertFunction("prepare_call", VoidTy, IntptrPtrTy, IntptrPtrTy);
-    auto call = IRB.CreateCall(prepare_call, { vm, cont });
-    call->setCallingConv(CallingConv::Fast);
-#if USE_LLVM_ATTRIBUTES
-    auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-    attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
-    attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
-    attrs = attrs.addParamAttribute(C, 1, Attribute::NoAlias);
-    attrs = attrs.addParamAttribute(C, 1, Attribute::NoCapture);
-    call->setAttributes(attrs);
-#endif
-
-    // cont->pc = CDR(m_pc);
+    // cont->pc
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
-    // cont->code = NULL;
+    // cont->trace
+    CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
+    // cont->fp
+    CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
+    // cont->env
+    CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
+    // cont->code
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
+    // cont->up
+    CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
+    // m_sp
+    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    // m_fp
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    // m_cont
+    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
+    CREATE_STORE_VM_REG(vm, m_cont, ea2);
 
-    // continue emit code in operands
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
     transform(ctx2, operands, false);

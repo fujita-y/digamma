@@ -24,9 +24,6 @@
 
 class codegen_t {
     struct context_t;
-    struct intrinsics_t {
-        llvm::Function* prepare_call;
-    };
     template<int byte_offset> struct reg_cache_t {
         llvm::Value* val;
         bool modified;
@@ -49,11 +46,15 @@ class codegen_t {
         std::map<int, llvm::Function*> m_local_functions;
         int m_argc;
         int m_depth;
-        intrinsics_t m_intrinsics;
         reg_cache_t<offsetof(VM, m_sp)> reg_sp;
+        reg_cache_t<offsetof(VM, m_fp)> reg_fp;
         reg_cache_t<offsetof(VM, m_env)> reg_env;
+        reg_cache_t<offsetof(VM, m_cont)> reg_cont;
+        void flush_all_reg_cache(llvm::Value* vm);
+        void clear_all_reg_cache();
         context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb)
-          : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0), reg_sp(this), reg_env(this) {}
+          : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0),
+            reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this) {}
     };
     enum cc_t { LT, GT, LE, GE, EQ, };
     VM* m_vm;
@@ -94,7 +95,7 @@ private:
     void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
-    llvm::Function* emit_prepare_call(context_t& ctx);
+    llvm::Function* emit_define_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
     llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);

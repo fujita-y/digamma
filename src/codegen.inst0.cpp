@@ -1,6 +1,6 @@
 
 Function*
-codegen_t::emit_prepare_call(context_t& ctx)
+codegen_t::emit_define_prepare_call(context_t& ctx)
 {
     LLVMContext& C = ctx.m_llvm_context;
     Module* M = ctx.m_module;
@@ -89,7 +89,6 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     context.m_function = F;
     context.m_top_level_closure = closure;
     context.m_top_level_function = F;
-    context.m_intrinsics = ctx.m_intrinsics;
 
     transform(context, closure->pc, true);
 

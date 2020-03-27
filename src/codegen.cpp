@@ -84,6 +84,24 @@ codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* ctx)
     IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
 }
 
+void
+codegen_t::context_t::flush_all_reg_cache(Value* vm)
+{
+    reg_sp.flush(vm);
+    reg_fp.flush(vm);
+    reg_env.flush(vm);
+    reg_cont.flush(vm);
+}
+
+void
+codegen_t::context_t::clear_all_reg_cache()
+{
+    reg_sp.clear();
+    reg_fp.clear();
+    reg_env.clear();
+    reg_cont.clear();
+}
+
 codegen_t::codegen_t(VM* vm) : m_vm(vm) { }
 
 void
@@ -266,8 +284,6 @@ codegen_t::compile_each(scm_closure_t closure)
     context.m_function = F;
     context.m_top_level_closure = closure;
     context.m_top_level_function = F;
-
-    context.m_intrinsics.prepare_call = emit_prepare_call(context);
 
     transform(context, closure->pc, true);
 
