@@ -756,33 +756,40 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
     // vm_cont_t cont = (vm_cont_t)m_sp;
-    auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+//  auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    auto cont = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     // cont->pc
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->trace
     CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
     // cont->fp
-    CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
+    CREATE_STORE_CONT_REC(cont, fp, ctx.reg_fp.load(vm)); // CREATE_LOAD_VM_REG(vm, m_fp));
     // cont->env
-    CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
+    CREATE_STORE_CONT_REC(cont, env, ctx.reg_env.load(vm)); // CREATE_LOAD_VM_REG(vm, m_env));
     // cont->code
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
     // cont->up
-    CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
+    CREATE_STORE_CONT_REC(cont, up, ctx.reg_cont.load(vm)); // CREATE_LOAD_VM_REG(vm, m_cont));
     // m_sp
     auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    ctx.reg_sp.store(vm, ea1);
     // m_fp
-    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    ctx.reg_fp.store(vm, ea1);
     // m_cont
     auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_cont, ea2);
+//  CREATE_STORE_VM_REG(vm, m_cont, ea2);
+    ctx.reg_cont.store(vm, ea2);
+
+    //ctx.reg_cache_writeback(vm);
 
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
     transform(ctx2, operands, false);
 
     IRB.SetInsertPoint(RETURN);
+    ctx.reg_cache_clear();
     return K;
 }
 

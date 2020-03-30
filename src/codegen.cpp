@@ -478,7 +478,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_false_call(ctx, inst);
             } break;
             case VMOP_CALL: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 ctx.m_function = emit_call(ctx, inst);
             } break;
             case VMOP_RET_GLOC: {
