@@ -514,12 +514,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_PUSH_CAR_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_car_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CDR_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_cdr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -534,12 +534,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_const(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -754,12 +754,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CADR_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_cadr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CDDR_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_cddr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
