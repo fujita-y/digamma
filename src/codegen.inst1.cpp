@@ -385,7 +385,8 @@ codegen_t::emit_if_true(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    auto value = ctx.reg_value.load(vm);
     BasicBlock* f9h_true = BasicBlock::Create(C, "f9h_true", F);
     BasicBlock* f9h_false = BasicBlock::Create(C, "f9h_false", F);
     auto f9h_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
@@ -405,7 +406,8 @@ codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    auto value = ctx.reg_value.load(vm);
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
@@ -801,7 +803,8 @@ codegen_t::emit_if_false_call(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
+    auto value = ctx.reg_value.load(vm);
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
@@ -1055,7 +1058,7 @@ codegen_t::emit_if_pairp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
 
-    emit_cond_pairp(ctx, CREATE_LOAD_VM_REG(vm, m_value), taken_true, taken_false);
+    emit_cond_pairp(ctx, ctx.reg_value.load(vm), taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
     transform(ctx, operands, false);
@@ -1612,7 +1615,7 @@ codegen_t::emit_if_symbolp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
 
-    emit_cond_symbolp(ctx, CREATE_LOAD_VM_REG(vm, m_value), taken_true, taken_false);
+    emit_cond_symbolp(ctx, ctx.reg_value.load(vm), taken_true, taken_false);
     // taken
     IRB.SetInsertPoint(taken_true);
     transform(ctx, operands, false);

@@ -474,7 +474,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_false_call(ctx, inst);
             } break;
             case VMOP_CALL: {
@@ -633,7 +633,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_iloc0(ctx, inst);
             } break;
             case VMOP_IF_TRUE: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_true(ctx, inst);
             } break;
             case VMOP_IF_NULLP_RET_CONST: {
@@ -646,15 +646,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_eqp(ctx, inst);
             } break;
             case VMOP_IF_NULLP: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_nullp(ctx, inst);
             } break;
             case VMOP_IF_PAIRP: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_pairp(ctx, inst);
             } break;
             case VMOP_IF_SYMBOLP: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_symbolp(ctx, inst);
             } break;
             case VMOP_IF_TRUE_RET: {
