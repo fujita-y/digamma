@@ -33,7 +33,10 @@ subr_closure_codegen(VM* vm, int argc, scm_obj_t argv[])
         if (CLOSUREP(argv[0])) {
             scm_closure_t closure = (scm_closure_t)argv[0];
             if (vm->m_codegen) {
+                vm->m_codegen->m_debug = true;
                 vm->m_codegen->compile(closure);
+                while (!vm->m_codegen->is_compiled(closure)) usleep(1000);
+                vm->m_codegen->m_debug = false;
                 return scm_unspecified;
             } else {
                 implementation_restriction_violation(vm, "closure-codegen", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);

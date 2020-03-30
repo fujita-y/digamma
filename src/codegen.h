@@ -17,7 +17,7 @@
 #define USE_LLVM_OPTIMIZE         1
 #define USE_UNIFIED_STACK_CHECK   1
 #define USE_ILOC_OPTIMIZE         1
-#define USE_REG_CACHE             0
+#define USE_REG_CACHE             1
 
 #define PRINT_IR                  0
 #define DEBUG_CODEGEN             0
@@ -26,16 +26,18 @@
 class codegen_t {
     struct context_t;
     template<int byte_offset> struct reg_cache_t {
+        codegen_t::context_t* ctx;
         llvm::Value* val;
-        bool modified;
+        bool need_write_back;
         llvm::IntegerType* IntptrTy;
         llvm::LLVMContext& C;
         llvm::IRBuilder<>& IRB;
         llvm::Value* load(llvm::Value* vm);
         void store(llvm::Value* vm, llvm::Value* rhs);
+        void writeback(llvm::Value* vm);
+        void copy(llvm::Value* vm);
         void clear();
-        void flush(llvm::Value* vm);
-        reg_cache_t(codegen_t::context_t* ctx);
+        reg_cache_t(codegen_t::context_t* context);
     };
     struct context_t {
         llvm::LLVMContext& m_llvm_context;
@@ -52,14 +54,31 @@ class codegen_t {
         reg_cache_t<offsetof(VM, m_fp)> reg_fp;
         reg_cache_t<offsetof(VM, m_env)> reg_env;
         reg_cache_t<offsetof(VM, m_cont)> reg_cont;
-        void flush_all_reg_cache(llvm::Value* vm);
-        void clear_all_reg_cache();
+        reg_cache_t<offsetof(VM, m_value)> reg_value;
+        bool m_disable_reg_cache;
+        void reg_cache_writeback(llvm::Value* vm);
+        void reg_cache_copy(llvm::Value* vm);
+        void reg_cache_clear();
         void set_local_var_count(int depth, int count);
         void set_local_var_count(int depth, scm_closure_t closure);
         int get_local_var_count(int depth);
         context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb)
-          : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0),
-            reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this) {}
+          : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0), m_disable_reg_cache(false),
+            reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this), reg_value(this) { }
+    };
+    class reg_cache_synchronize {
+      codegen_t::context_t& ctx;
+      bool previous;
+    public:
+      reg_cache_synchronize(codegen_t::context_t& context) : ctx(context), previous(ctx.m_disable_reg_cache) {
+          auto vm = ctx.m_function->arg_begin();
+          ctx.reg_cache_copy(vm);
+          ctx.reg_cache_clear();
+          ctx.m_disable_reg_cache = true;
+      }
+      ~reg_cache_synchronize() {
+          ctx.m_disable_reg_cache = previous;
+      }
     };
     enum cc_t { LT, GT, LE, GE, EQ, };
     VM* m_vm;
@@ -75,13 +94,14 @@ class codegen_t {
     llvm::orc::ThreadSafeModule optimizeModule(llvm::orc::ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
-    bool is_compiled(scm_closure_t closure);
     llvm::Function* get_function(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
     void init();
     void destroy();
     void compile(scm_closure_t closure);
+    bool is_compiled(scm_closure_t closure);
+    bool m_debug;
 #if ENABLE_COMPILE_DEFERRED
     std::vector<scm_closure_t> m_compile_queue;
     mutex_t m_compile_queue_lock;
