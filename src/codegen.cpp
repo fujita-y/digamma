@@ -129,6 +129,15 @@ codegen_t::context_t::reg_cache_copy(llvm::Value* vm)
 }
 
 void
+codegen_t::context_t::reg_cache_copy_except_value(llvm::Value* vm)
+{
+    reg_sp.copy(vm);
+    reg_fp.copy(vm);
+    reg_env.copy(vm);
+    reg_cont.copy(vm);
+}
+
+void
 codegen_t::context_t::set_local_var_count(int depth, int count)
 {
     m_local_var_count.resize(depth + 1);
@@ -637,11 +646,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_true(ctx, inst);
             } break;
             case VMOP_IF_NULLP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_nullp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_EQP: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_eqp(ctx, inst);
             } break;
@@ -658,49 +667,49 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_symbolp(ctx, inst);
             } break;
             case VMOP_IF_TRUE_RET: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_true_ret(ctx, inst);
             } break;
             case VMOP_IF_FALSE_RET: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_false_ret(ctx, inst);
             } break;
             case VMOP_IF_TRUE_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_true_ret_const(ctx, inst);
             } break;
             case VMOP_IF_FALSE_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_false_ret_const(ctx, inst);
             } break;
             case VMOP_IF_EQP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_eqp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_PAIRP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_pairp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_SYMBOLP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_PAIRP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_not_pairp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_NULLP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_not_nullp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_EQP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_SYMBOLP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_if_not_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_CLOSE: {

@@ -58,6 +58,7 @@ class codegen_t {
         bool m_disable_reg_cache;
         void reg_cache_writeback(llvm::Value* vm);
         void reg_cache_copy(llvm::Value* vm);
+        void reg_cache_copy_except_value(llvm::Value* vm);
         void reg_cache_clear();
         void set_local_var_count(int depth, int count);
         void set_local_var_count(int depth, scm_closure_t closure);
