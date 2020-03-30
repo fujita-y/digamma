@@ -120,6 +120,7 @@ private:
     void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
+    void emit_push_vm_stack(context_t& ctx, llvm::Value* val);
     llvm::Function* emit_define_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);

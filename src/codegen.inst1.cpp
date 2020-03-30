@@ -32,7 +32,8 @@ codegen_t::emit_push_iloc0(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
+//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
 }
 
 void
@@ -44,7 +45,8 @@ codegen_t::emit_push_iloc1(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
+//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
 }
 
 void
@@ -470,7 +472,8 @@ codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
-    CREATE_STORE_VM_REG(vm, m_value, val);
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+    ctx.reg_value.store(vm, val);
 }
 
 void
@@ -482,7 +485,8 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
-    CREATE_STORE_VM_REG(vm, m_value, val);
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+    ctx.reg_value.store(vm, val);
 }
 
 void
@@ -494,7 +498,8 @@ codegen_t::emit_iloc1(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
-    CREATE_STORE_VM_REG(vm, m_value, val);
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+    ctx.reg_value.store(vm, val);
 }
 
 void
@@ -506,7 +511,8 @@ codegen_t::emit_push_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
+//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
 }
 
 void
