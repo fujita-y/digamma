@@ -480,7 +480,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_const(ctx, inst);
             } break;
             case VMOP_RET_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ret_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_GLOC: {
@@ -534,7 +534,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply_gloc(ctx, inst);
             } break;
             case VMOP_RET_SUBR: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ret_subr(ctx, inst);
             } break;
             case VMOP_APPLY_ILOC: {
@@ -546,7 +546,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {
-                //reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize sync(ctx);
                 emit_apply(ctx, inst);
             } break;
             case VMOP_EXTEND: {
@@ -706,11 +706,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_set_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_CONS: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_cons(ctx, inst);
             } break;
             case VMOP_RET_CONS: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ret_cons(ctx, inst);
             } break;
             case VMOP_RET_EQP: {
@@ -812,11 +812,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_RET_SUBR_GLOC_OF: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ret_subr_gloc_of(ctx, inst);
             } break;
             case VMOP_VM_ESCAPE: {
-                //reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize sync(ctx);
                 emit_escape(ctx, inst);
             } break;
             default:
