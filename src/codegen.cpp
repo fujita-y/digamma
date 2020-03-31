@@ -92,30 +92,30 @@ codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
 void
 codegen_t::context_t::reg_cache_clear()
 {
-    reg_sp.clear();
     reg_fp.clear();
     reg_env.clear();
     reg_cont.clear();
+    reg_sp.clear();
     reg_value.clear();
 }
 
 void
 codegen_t::context_t::reg_cache_copy(llvm::Value* vm)
 {
-    reg_sp.copy(vm);
     reg_fp.copy(vm);
     reg_env.copy(vm);
     reg_cont.copy(vm);
+    reg_sp.copy(vm);
     reg_value.copy(vm);
 }
 
 void
 codegen_t::context_t::reg_cache_copy_except_value(llvm::Value* vm)
 {
-    reg_sp.copy(vm);
     reg_fp.copy(vm);
     reg_env.copy(vm);
     reg_cont.copy(vm);
+    reg_sp.copy(vm);
 }
 
 void
