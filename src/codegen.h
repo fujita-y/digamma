@@ -56,7 +56,6 @@ class codegen_t {
         reg_cache_t<offsetof(VM, m_cont)> reg_cont;
         reg_cache_t<offsetof(VM, m_value)> reg_value;
         bool m_disable_reg_cache;
-        void reg_cache_writeback(llvm::Value* vm);
         void reg_cache_copy(llvm::Value* vm);
         void reg_cache_copy_except_value(llvm::Value* vm);
         void reg_cache_clear();

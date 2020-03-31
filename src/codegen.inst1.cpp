@@ -856,8 +856,6 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 //  CREATE_STORE_VM_REG(vm, m_cont, ea2);
     ctx.reg_cont.store(vm, ea2);
 
-    //ctx.reg_cache_writeback(vm);
-
     context_t ctx2 = ctx;
     ctx2.m_argc = 0;
     transform(ctx2, operands, false);
@@ -1807,6 +1805,7 @@ codegen_t::emit_apply(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
 }
 
@@ -1818,6 +1817,7 @@ codegen_t::emit_escape(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_escape));
 }
 

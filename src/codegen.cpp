@@ -84,15 +84,6 @@ void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
 }
 
 template<int byte_offset>
-void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
-#if USE_REG_CACHE
-    if (ctx->m_disable_reg_cache) return;
-    copy(vm);
-    need_write_back = false;
-#endif
-}
-
-template<int byte_offset>
 codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
   : ctx(context), val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
     IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
@@ -106,16 +97,6 @@ codegen_t::context_t::reg_cache_clear()
     reg_env.clear();
     reg_cont.clear();
     reg_value.clear();
-}
-
-void
-codegen_t::context_t::reg_cache_writeback(llvm::Value* vm)
-{
-    reg_sp.writeback(vm);
-    reg_fp.writeback(vm);
-    reg_env.writeback(vm);
-    reg_cont.writeback(vm);
-    reg_value.writeback(vm);
 }
 
 void
@@ -565,7 +546,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_apply(ctx, inst);
             } break;
             case VMOP_EXTEND: {
@@ -835,7 +816,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_subr_gloc_of(ctx, inst);
             } break;
             case VMOP_VM_ESCAPE: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_escape(ctx, inst);
             } break;
             default:
