@@ -199,7 +199,7 @@ extern "C" {
     intptr_t c_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         return n_compare(vm->m_heap, obj, operands);
     }
-
+/*
     void c_prepare_apply(VM* vm, scm_closure_t closure) {
         // assume vm->m_sp - vm->m_fp == args
         intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
@@ -210,7 +210,7 @@ extern "C" {
         vm->m_pc = closure->pc;
         vm->m_env = &env->up;
     }
-
+*/
     void c_push_close(VM* vm, scm_closure_t operands) {
         if (STACKP(vm->m_env)) {
             vm->m_env = vm->save_env(vm->m_env);

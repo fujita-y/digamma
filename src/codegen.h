@@ -59,6 +59,7 @@ class codegen_t {
         void reg_cache_copy(llvm::Value* vm);
         void reg_cache_copy_except_value(llvm::Value* vm);
         void reg_cache_clear();
+        void update_reg_cache_context();
         void set_local_var_count(int depth, int count);
         void set_local_var_count(int depth, scm_closure_t closure);
         int get_local_var_count(int depth);
@@ -121,6 +122,7 @@ private:
     int calc_stack_size(scm_obj_t inst);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
     void emit_push_vm_stack(context_t& ctx, llvm::Value* val);
+    void emit_prepair_apply(context_t& ctx, scm_closure_t closure);
     llvm::Function* emit_define_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);

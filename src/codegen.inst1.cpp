@@ -292,11 +292,22 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 #endif
         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         // printf("argc = %d\n", ctx.m_argc);
+/*
         auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(c_prepare_apply, {vm, VALUE_INTPTR(ctx.m_top_level_closure)});
-        auto call = IRB.CreateCall(ctx.m_top_level_function, { vm });
-        call->setTailCallKind(CallInst::TCK_MustTail);
-        IRB.CreateRet(call);
+        auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(ctx.m_top_level_closure) });
+#if USE_LLVM_ATTRIBUTES
+        auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+        attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
+        attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
+        call1->setAttributes(attrs);
+#endif
+*/
+        emit_prepair_apply(ctx, ctx.m_top_level_closure);
+        ctx.reg_cache_copy(vm);
+
+        auto call2 = IRB.CreateCall(ctx.m_top_level_function, { vm });
+        call2->setTailCallKind(CallInst::TCK_MustTail);
+        IRB.CreateRet(call2);
         return;
     } else {
         if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
@@ -315,14 +326,18 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                     if (F2 != NULL) {
                         m_usage.inners++;
                         CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
+/*
                         auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
                         auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
-        #if USE_LLVM_ATTRIBUTES
+#if USE_LLVM_ATTRIBUTES
                         auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
                         attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
                         attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
                         call1->setAttributes(attrs);
-        #endif
+#endif
+*/
+                        emit_prepair_apply(ctx, closure);
+                        ctx.reg_cache_copy(vm);
                         auto call2 = IRB.CreateCall(F2, {vm});
                         call2->setTailCallKind(CallInst::TCK_MustTail);
                         IRB.CreateRet(call2);
@@ -344,7 +359,8 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 
         auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
         auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-        CREATE_STORE_VM_REG(vm, m_value, val);
+//      CREATE_STORE_VM_REG(vm, m_value, val);
+        ctx.reg_value.store(vm, val);
 
         BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
         BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
@@ -352,9 +368,11 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         IRB.CreateCondBr(undef_cond, undef_true, undef_false);
         // valid
         IRB.SetInsertPoint(undef_false);
+        ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
         // invalid
         IRB.SetInsertPoint(undef_true);
+        ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
     }
 }

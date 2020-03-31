@@ -90,6 +90,16 @@ codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
 }
 
 void
+codegen_t::context_t::update_reg_cache_context()
+{
+    reg_cont.ctx = this;
+    reg_fp.ctx = this;
+    reg_sp.ctx = this;
+    reg_value.ctx = this;
+    reg_env.ctx = this;
+}
+
+void
 codegen_t::context_t::reg_cache_clear()
 {
     reg_fp.clear();
@@ -458,9 +468,12 @@ codegen_t::calc_stack_size(scm_obj_t inst)
 void
 codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
 {
+    ctx.update_reg_cache_context();
+
 #if USE_UNIFIED_STACK_CHECK
     if (insert_stack_check) emit_stack_overflow_check(ctx, calc_stack_size(inst));
 #endif
+
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
@@ -530,7 +543,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_APPLY_GLOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_apply_gloc(ctx, inst);
             } break;
             case VMOP_RET_SUBR: {

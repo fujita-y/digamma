@@ -213,3 +213,47 @@ codegen_t::emit_push_vm_stack(context_t& ctx, Value* val)
     IRB.CreateStore(val, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
     ctx.reg_sp.store(vm, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
 }
+
+/*
+    void c_prepare_apply(VM* vm, scm_closure_t closure) {
+        // assume vm->m_sp - vm->m_fp == args
+        intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
+        vm_env_t env = (vm_env_t)vm->m_sp;
+        env->count = args;
+        env->up = closure->env;
+
+        vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
+        vm->m_pc = closure->pc;
+        vm->m_env = &env->up;
+    }
+*/
+
+void
+codegen_t::emit_prepair_apply(context_t& ctx, scm_closure_t closure)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+/*
+    intptr_t argc = HDR_CLOSURE_ARGS(closure->hdr);
+    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
+    CREATE_STORE_ENV_REC(env, up, VALUE_INTPTR(closure->env));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(closure->pc));
+*/
+
+    intptr_t argc = HDR_CLOSURE_ARGS(closure->hdr);
+    auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
+    CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
+    CREATE_STORE_ENV_REC(env, up, VALUE_INTPTR(closure->env));
+    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    ctx.reg_sp.store(vm, ea1);
+    ctx.reg_fp.store(vm, ea1);
+    ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
+    CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(closure->pc));
+}
