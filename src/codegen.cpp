@@ -562,7 +562,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;

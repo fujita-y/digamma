@@ -937,14 +937,21 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
-    auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+//  CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
+    emit_push_vm_stack(ctx, VALUE_INTPTR(CDR(operands)));
+//  auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+    auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
-    CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
+//  CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
+    CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
     auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-    CREATE_STORE_VM_REG(vm, m_sp, ea1);
-    CREATE_STORE_VM_REG(vm, m_fp, ea1);
-    CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
+    ctx.reg_sp.store(vm, ea1);
+//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
+    ctx.reg_fp.store(vm, ea1);
+//  CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+    ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
+
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     IRB.CreateBr(CONTINUE);
 
@@ -961,24 +968,23 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
 
     int function_index = ctx.m_depth + (0 << 16);
-
     ctx.m_local_functions[function_index] = L;
+    ctx.set_local_var_count(ctx.m_depth, 1);
     m_usage.locals++;
 
     // printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
     // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
 
-    ctx.set_local_var_count(ctx.m_depth, 1);
 
     context_t ctx2 = ctx; // [TODO] ctx2 goes new function so that it need new reg_cache
     ctx2.m_function = L;
-
     int nargs = FIXNUM(CAR(CAR(operands))) + FIXNUM(CADR(CAR(operands)));
     ctx2.set_local_var_count(ctx2.m_depth, 1);
     ctx2.set_local_var_count(ctx2.m_depth + 1, nargs);
     ctx2.m_depth += 2;
-
     ctx2.m_argc = 0;
+    ctx2.reg_cache_clear();
+
     IRB.SetInsertPoint(LOOP);
     transform(ctx2, CDR(operands), true);
 
