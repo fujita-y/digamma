@@ -484,7 +484,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_GLOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_gloc(ctx, inst);
                 ctx.m_argc++;
             } break;

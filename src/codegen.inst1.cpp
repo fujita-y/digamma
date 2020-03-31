@@ -60,10 +60,11 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
+
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-
-    CREATE_PUSH_VM_STACK(val);
+//  CREATE_PUSH_VM_STACK(val);
+    emit_push_vm_stack(ctx, val);
 }
 
 void
