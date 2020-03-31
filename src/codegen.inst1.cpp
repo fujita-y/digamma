@@ -491,7 +491,7 @@ codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
 
     // taken
     IRB.SetInsertPoint(taken_true);
-    ctx.reg_value.load(vm);
+    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 
