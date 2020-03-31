@@ -669,19 +669,17 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
 
     // taken
     IRB.SetInsertPoint(cond_true);
-    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
     IRB.CreateBr(CONTINUE);
 
     // not taken
     IRB.SetInsertPoint(cond_false);
-    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
     IRB.CreateBr(CONTINUE);
 
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-    ctx.reg_cache_copy(vm);
+    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
@@ -691,7 +689,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
-    ctx.reg_cache_clear();
+    ctx.reg_value.clear();
 }
 
 void
@@ -752,19 +750,17 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
 
     // taken
     IRB.SetInsertPoint(cond_true);
-    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_true));
     IRB.CreateBr(CONTINUE);
 
     // not taken
     IRB.SetInsertPoint(cond_false);
-    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(scm_false));
     IRB.CreateBr(CONTINUE);
 
     // others
     IRB.SetInsertPoint(nonfixnum_true);
-    ctx.reg_cache_copy(vm);
+    ctx.reg_cache_copy_except_value(vm);
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
@@ -774,7 +770,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
-    ctx.reg_cache_clear();
+    ctx.reg_value.clear();
 }
 
 void
