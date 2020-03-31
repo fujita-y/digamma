@@ -772,23 +772,23 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_cddr_iloc(ctx, inst);
             } break;
             case VMOP_EQ_N_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_eq_n_iloc(ctx, inst);
             } break;
             case VMOP_LT_N_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_lt_n_iloc(ctx, inst);
             } break;
             case VMOP_GE_N_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ge_n_iloc(ctx, inst);
             } break;
             case VMOP_LE_N_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_le_n_iloc(ctx, inst);
             } break;
             case VMOP_GT_N_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_gt_n_iloc(ctx, inst);
             } break;
             case VMOP_NADD_ILOC: {
@@ -796,23 +796,23 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_nadd_iloc(ctx, inst);
             } break;
             case VMOP_EQ_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_eq_iloc(ctx, inst);
             } break;
             case VMOP_LT_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_lt_iloc(ctx, inst);
             } break;
             case VMOP_LE_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_le_iloc(ctx, inst);
             } break;
             case VMOP_GT_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_gt_iloc(ctx, inst);
             } break;
             case VMOP_GE_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_ge_iloc(ctx, inst);
             } break;
             case VMOP_TOUCH_GLOC: {
