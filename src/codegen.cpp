@@ -557,11 +557,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_subr(ctx, inst);
             } break;
             case VMOP_APPLY_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_apply_iloc(ctx, inst);
             } break;
             case VMOP_APPLY_ILOC_LOCAL: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {

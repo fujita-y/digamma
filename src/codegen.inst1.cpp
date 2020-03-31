@@ -246,17 +246,23 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
-    CREATE_STORE_VM_REG(vm, m_value, val);
+
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+    ctx.reg_value.store(vm, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+
     // valid
     IRB.SetInsertPoint(undef_false);
+    ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
+
     // invalid
     IRB.SetInsertPoint(undef_true);
+    ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_iloc));
 }
 
@@ -970,13 +976,18 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
         auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
-        auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+//      auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+        auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
         auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-        CREATE_STORE_VM_REG(vm, m_sp, ea1);
-        CREATE_STORE_VM_REG(vm, m_fp, ea1);
-        CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+//      CREATE_STORE_VM_REG(vm, m_sp, ea1);
+        ctx.reg_sp.store(vm, ea1);
+//      CREATE_STORE_VM_REG(vm, m_fp, ea1);
+        ctx.reg_fp.store(vm, ea1);
+//      CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+        ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
+        ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
     } else {
         // printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
@@ -984,21 +995,22 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
         auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
-        auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+//      auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
+        auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
         auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-        CREATE_STORE_VM_REG(vm, m_sp, ea1);
-        CREATE_STORE_VM_REG(vm, m_fp, ea1);
-        CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
-
-        // int function_index = ctx.m_depth - level - 1 + (index << 16);
+//      CREATE_STORE_VM_REG(vm, m_sp, ea1);
+        ctx.reg_sp.store(vm, ea1);
+//      CREATE_STORE_VM_REG(vm, m_fp, ea1);
+        ctx.reg_fp.store(vm, ea1);
+//      CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
+        ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
+        ctx.reg_cache_copy(vm);
         Function* L = ctx.m_local_functions[function_index];
-
         if (L == NULL) {
             fatal("%s:%u emit_apply_iloc_local L = %p, level = %d index = %d ctx.m_depth = %d function_index = %x \n", __FILE__, __LINE__, L, level, index, ctx.m_depth, function_index);
         }
-
         auto call = IRB.CreateCall(L, { vm });
         call->setTailCallKind(CallInst::TCK_MustTail);
         IRB.CreateRet(call);
