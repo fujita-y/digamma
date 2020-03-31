@@ -1598,7 +1598,9 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-    CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
+
+//  CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
+    emit_push_vm_stack(ctx, VALUE_INTPTR(CDR(operands)));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     IRB.CreateBr(CONTINUE);
@@ -1626,6 +1628,8 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx2.set_local_var_count(ctx2.m_depth, nargs);
     ctx2.m_depth++;
     ctx2.m_argc = 0;
+    ctx2.reg_cache_clear();
+
     IRB.SetInsertPoint(LOCAL);
     transform(ctx2, CDR(operands), true);
 

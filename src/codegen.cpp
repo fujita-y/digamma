@@ -579,7 +579,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CLOSE_LOCAL: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_close_local(ctx, inst);
                 ctx.m_argc++;
             } break;
