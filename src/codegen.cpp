@@ -730,7 +730,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_close(ctx, inst);
             } break;
             case VMOP_PUSH_NADD_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -773,7 +773,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_gt_n_iloc(ctx, inst);
             } break;
             case VMOP_NADD_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                //reg_cache_synchronize sync(ctx);
                 emit_nadd_iloc(ctx, inst);
             } break;
             case VMOP_EQ_ILOC: {
