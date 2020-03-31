@@ -1842,23 +1842,33 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
 
     intptr_t argc = FIXNUM(CADR(operands));
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto sp = ctx.reg_sp.load(vm);
+
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+    ctx.reg_cache_copy(vm);
+    auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
 
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
-    CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_PUSH_VM_STACK(val);
+//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
+    ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
+
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+//  CREATE_PUSH_VM_STACK(val);
+    ctx.reg_value.store(vm, val);
+    emit_push_vm_stack(ctx, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
+
     // invalid
     IRB.SetInsertPoint(undef_true);
+    ctx.reg_value.copy(vm);
+    ctx.reg_sp.copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
@@ -1897,22 +1907,29 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
 
     intptr_t argc = FIXNUM(CADR(operands));
-    auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
+    auto sp = ctx.reg_sp.load(vm);
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy, IntptrTy}, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
+    ctx.reg_cache_copy(vm);
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
-    CREATE_STORE_VM_REG(vm, m_value, val);
-    CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
+//  CREATE_STORE_VM_REG(vm, m_value, val);
+    ctx.reg_value.store(vm, val);
+//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
+    ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
+
     // invalid
     IRB.SetInsertPoint(undef_true);
+    ctx.reg_value.copy(vm);
+    ctx.reg_sp.copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
     IRB.SetInsertPoint(CONTINUE);
