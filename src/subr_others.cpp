@@ -12,8 +12,9 @@
 #include "reader.h"
 #include "printer.h"
 #include "ioerror.h"
+#include "codegen.h"
 #if USE_PARALLEL_VM
-#include "interpreter.h"
+#include "vmm.h"
 #endif
 
 #define DEFAULT_GENSYM_PREFIX           ".G"
@@ -750,16 +751,6 @@ subr_collect_stack_notify(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_collect(VM* vm, int argc, scm_obj_t argv[])
 {
-#if USE_PARALLEL_VM
-    if (vm->m_heap->m_child > 0) {
-        if (argc == 0) {
-            vm->m_heap->collect();
-            return scm_unspecified;
-        }
-        wrong_number_of_arguments_violation(vm, "collect", 0, 0, argc, argv);
-        return scm_undef;
-    }
-#endif
     bool pack = false;
     if (argc == 0 || argc == 1) {
         if (argc == 1) {
@@ -770,25 +761,45 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
                 return scm_undef;
             }
         }
-        do {
-            vm->m_heap->collect();
-            usleep(100);
-        } while (!vm->m_heap->m_collector_kicked);
-        do {
-            if (vm->m_heap->m_stop_the_world) vm->stop();
-            usleep(100);
-        } while (vm->m_heap->m_collector_kicked);
-        relocate_info_t* info = vm->m_heap->relocate(false);
-        vm->resolve();
-        vm->m_heap->resolve(info);
-        vm->m_heap->relocate_privates(pack);
         if (pack) {
+#if USE_PARALLEL_VM
+            if (vm->m_vmm->live_thread_count() != 1) {
+                implementation_restriction_violation(vm, "collect", "compaction is not available when more than one thread active", MAKEFIXNUM(vm->m_vmm->live_thread_count()), argc, argv);
+                return scm_undef;
+            }
+#endif
+            do {
+                vm->m_heap->collect();
+                usleep(100);
+            } while (!vm->m_heap->m_collector_kicked);
+            do {
+                if (vm->m_heap->m_stop_the_world) vm->stop();
+                usleep(100);
+            } while (vm->m_heap->m_collector_kicked);
+#if ENABLE_LLVM_JIT
+            assert(vm->m_id == 0);
+            assert(vm->m_vmm->live_thread_count() == 1);
+            vm->m_codegen->destroy();
+            delete vm->m_codegen;
+            vm->m_codegen = NULL;
+#endif
+            relocate_info_t* info = vm->m_heap->relocate(false);
+            vm->resolve();
+            vm->m_heap->resolve(info);
+            vm->m_heap->relocate_privates(pack);
             info = vm->m_heap->relocate(true);
             vm->resolve();
             vm->m_heap->resolve(info);
             vm->m_heap->compact_pool();
+#if ENABLE_LLVM_JIT
+            vm->m_codegen = new codegen_t(vm);
+            vm->m_codegen->init();
+#endif
+            return scm_unspecified;
+        } else {
+            vm->m_heap->collect();
+            return scm_unspecified;
         }
-        return scm_unspecified;
     }
     wrong_number_of_arguments_violation(vm, "collect", 0, 1, argc, argv);
     return scm_undef;
@@ -842,7 +853,7 @@ subr_closure_code(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 1) {
         if (CLOSUREP(argv[0])) {
             scm_closure_t closure = (scm_closure_t)argv[0];
-            return (scm_obj_t)closure->code;
+            return (scm_obj_t)closure->pc;
         }
         wrong_type_argument_violation(vm, "closure-code", 0, "closure", argv[0], argc, argv);
         return scm_undef;
@@ -1043,6 +1054,7 @@ subr_tuple_list(VM* vm, int argc, scm_obj_t argv[])
 }
 
 // exit
+/*
 scm_obj_t
 subr_exit(VM* vm, int argc, scm_obj_t argv[])
 {
@@ -1056,6 +1068,53 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
         }
         if (argv[0] == scm_false) throw vm_exit_t(EXIT_FAILURE);
         if (FIXNUMP(argv[0])) throw vm_exit_t(FIXNUM(argv[0]));
+        wrong_type_argument_violation(vm, "exit", 0, "fixnum", argv[0], argc, argv);
+        return scm_undef;
+    }
+    wrong_number_of_arguments_violation(vm, "exit", 0, 1, argc, argv);
+    return scm_undef;
+}
+
+static void terminate_codegen(VM* vm) {
+    if (vm->m_codegen) {
+      vm->m_codegen->destroy();
+      delete vm->m_codegen;
+      vm->m_codegen = NULL;
+    }
+}
+*/
+
+// exit
+scm_obj_t
+subr_exit(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (vm->m_id != VMM::VM_ID_PRIMORDIAL) {
+        thread_unsupported_operation_violation(vm, "exit", argc, argv);
+        return scm_undef;
+    }
+    if (argc == 0) {
+#if PROFILE_OPCODE
+        display_opcode_profile();
+#endif
+#if PROFILE_SUBR
+        display_subr_profile();
+#endif
+        vm->m_vmm->destroy();
+        exit(EXIT_SUCCESS);
+    }
+    if (argc == 1) {
+        if (PORTP(vm->m_current_output)) {
+            scoped_lock lock(vm->m_current_output->lock);
+            port_flush_output(vm->m_current_output);
+        }
+        if (argv[0] == scm_false) {
+            vm->m_vmm->destroy();
+            exit(EXIT_FAILURE);
+        }
+        if (FIXNUMP(argv[0])) {
+            vm->m_vmm->destroy();
+            exit(FIXNUM(argv[0]));
+        }
         wrong_type_argument_violation(vm, "exit", 0, "fixnum", argv[0], argc, argv);
         return scm_undef;
     }
@@ -1166,12 +1225,12 @@ subr_tuple_set(VM* vm, int argc, scm_obj_t argv[])
                 intptr_t n = FIXNUM(argv[1]);
                 if (n >= 0 && n < HDR_TUPLE_COUNT(tuple->hdr)) {
 #if USE_PARALLEL_VM
-                    if (vm->m_interp->live_thread_count() > 1) {
+                    if (vm->m_vmm->live_thread_count() > 1) {
                         if (!vm->m_heap->in_heap(tuple)) {
                             thread_object_access_violation(vm, "tuple-set!",argc, argv);
                             return scm_undef;
                         }
-                        if (vm->m_heap->m_child > 0) vm->m_interp->remember(tuple->elts[n], argv[2]);
+                        if (vm->m_heap->m_child > 0) vm->m_vmm->remember(tuple->elts[n], argv[2]);
                     }
 #endif
                     vm->m_heap->write_barrier(argv[2]);
@@ -1561,7 +1620,7 @@ subr_copy_environment_variables(VM* vm, int argc, scm_obj_t argv[])
                 scm_environment_t from = (scm_environment_t)argv[0];
                 scm_environment_t to = (scm_environment_t)argv[1];
 #if USE_PARALLEL_VM
-                if (vm->m_interp->live_thread_count() > 1) {
+                if (vm->m_vmm->live_thread_count() > 1) {
                     if (!vm->m_heap->in_heap(to)) {
                         thread_object_access_violation(vm, "copy-environment-variables!" ,argc, argv);
                         return scm_undef;
@@ -1595,7 +1654,7 @@ subr_copy_environment_variables(VM* vm, int argc, scm_obj_t argv[])
                         to_gloc->value = from_gloc->value;
 #if USE_PARALLEL_VM
                         if (vm->m_heap->m_child > 0) {
-                            vm->m_interp->remember(get_hashtable(to->variable, to_symbol), to_gloc);
+                            vm->m_vmm->remember(get_hashtable(to->variable, to_symbol), to_gloc);
                         }
 #endif
                         vm->m_heap->write_barrier(to_symbol);
@@ -1632,7 +1691,7 @@ subr_copy_environment_macros(VM* vm, int argc, scm_obj_t argv[])
                 scm_environment_t from = (scm_environment_t)argv[0];
                 scm_environment_t to = (scm_environment_t)argv[1];
 #if USE_PARALLEL_VM
-                if (vm->m_interp->live_thread_count() > 1) {
+                if (vm->m_vmm->live_thread_count() > 1) {
                     if (!vm->m_heap->in_heap(to)) {
                         thread_object_access_violation(vm, "copy-environment-macros!" ,argc, argv);
                         return scm_undef;
@@ -1663,7 +1722,7 @@ subr_copy_environment_macros(VM* vm, int argc, scm_obj_t argv[])
                     if (obj != scm_undef) {
 #if USE_PARALLEL_VM
                         if (vm->m_heap->m_child > 0) {
-                            vm->m_interp->remember(get_hashtable(to->macro, to_symbol), obj);
+                            vm->m_vmm->remember(get_hashtable(to->macro, to_symbol), obj);
                         }
 #endif
                         vm->m_heap->write_barrier(to_symbol);
@@ -1823,7 +1882,7 @@ subr_make_uuid(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 0) {
         char buf[64];
 #if USE_PARALLEL_VM
-        vm->m_interp->generate_uuid(buf, sizeof(buf));
+        vm->m_vmm->generate_uuid(buf, sizeof(buf));
 #else
         uuid_v4(buf, sizeof(buf));
 #endif

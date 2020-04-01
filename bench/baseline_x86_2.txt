@@ -1,0 +1,67 @@
+(define (foo a b c d) (list a b c d))
+
+  .section  __TEXT,__text,regular,pure_instructions
+  .macosx_version_min 10, 15
+  .intel_syntax noprefix
+  .globl  "_9601d0f6-7926-411c-8da7-2fa29a1ee77a" ## -- Begin function 9601d0f6-7926-411c-8da7-2fa29a1ee77a
+  .p2align  4, 0x90
+"_9601d0f6-7926-411c-8da7-2fa29a1ee77a": ## @"9601d0f6-7926-411c-8da7-2fa29a1ee77a"
+  .cfi_startproc
+## %bb.0:                               ## %entry
+  push  rbx
+  .cfi_def_cfa_offset 16
+  .cfi_offset rbx, -16
+  mov rbx, rdi
+  mov rax, qword ptr [rdi + 48]
+  lea rcx, [rax + 32]
+  cmp rcx, qword ptr [rdi + 56]
+  jb  LBB0_2
+## %bb.1:                               ## %stack_overflow
+  mov esi, 32
+  mov rdi, rbx
+  call  _c_collect_stack
+  mov rax, qword ptr [rbx + 48]
+  lea rcx, [rax + 32]
+
+LBB0_2:                                 ## %stack_ok
+  mov rdx, qword ptr [rbx + 24]
+  mov rdx, qword ptr [rdx - 40]
+  mov qword ptr [rax], rdx
+  lea rdx, [rax + 8]
+  mov qword ptr [rbx + 48], rdx
+
+  mov rdx, qword ptr [rbx + 24]
+  mov rdx, qword ptr [rdx - 32]
+  mov qword ptr [rax + 8], rdx
+  lea rdx, [rax + 16]
+  mov qword ptr [rbx + 48], rdx
+
+  mov rdx, qword ptr [rbx + 24]
+  mov rdx, qword ptr [rdx - 24]
+  mov qword ptr [rax + 16], rdx
+  lea rdx, [rax + 24]
+  mov qword ptr [rbx + 48], rdx
+
+  mov rdx, qword ptr [rbx + 24]
+  mov rdx, qword ptr [rdx - 16]
+  mov qword ptr [rax + 24], rdx
+  mov qword ptr [rbx + 48], rcx
+
+  mov rdx, qword ptr [rbx + 16]
+  movabs  rax, 4529265968
+  lea rcx, [rax + 43564016]
+  mov qword ptr [rbx], rcx
+  mov esi, 4
+  mov rdi, rbx
+  call  rax
+
+  mov qword ptr [rbx + 64], rax
+  xor ecx, ecx
+  cmp rax, 66
+  sete  cl
+  lea rax, [rcx + rcx + 1]
+  pop rbx
+  ret
+  .cfi_endproc
+                                        ## -- End function
+.subsections_via_symbols

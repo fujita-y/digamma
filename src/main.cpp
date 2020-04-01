@@ -3,10 +3,16 @@
 
 #include "core.h"
 #include "vm.h"
-#include "interpreter.h"
+#include "vmm.h"
+
+#if ENABLE_LLVM_JIT
+  #include "llvm/Support/InitLLVM.h"
+  #include "llvm/Support/TargetSelect.h"
+  #include "llvm/Support/DynamicLibrary.h"
+#endif
 
 int main_command_line_argc;
-char* const* main_command_line_argv;
+const char** main_command_line_argv;
 
 #if defined(NO_TLS)
   pthread_key_t s_current_vm;
@@ -14,7 +20,7 @@ char* const* main_command_line_argv;
   __thread VM* s_current_vm;
 #endif
 
-static int opt_heap_limit(int argc, char* const argv[])
+static int opt_heap_limit(int argc, const char** argv)
 {
     int value = DEFAULT_HEAP_LIMIT;
     for (int i = 0; i < argc; i++) {
@@ -97,11 +103,17 @@ signal_waiter(void* param)
     return NULL;
 }
 
-int main(int argc, char* const argv[])
+int main(int argc, const char** argv)
 {
     srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
     main_command_line_argc = argc;
     main_command_line_argv = argv;
+#if ENABLE_LLVM_JIT
+    llvm::InitLLVM X(argc, argv);
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+#endif
 #ifndef NDEBUG
     struct foo { char i; };
     struct bar { int i; struct foo o; };
@@ -121,8 +133,6 @@ int main(int argc, char* const argv[])
     printf("FIXNUM_MIN %ld %lx\n", (long)FIXNUM_MIN, (long)FIXNUM_MIN);
     printf("sizeof(pthread_mutex_t) %d\n", (int)sizeof(pthread_mutex_t));
     printf("sizeof(pthread_cond_t) %d\n", (int)sizeof(pthread_cond_t));
-//  printf("sizeof(queue_t<scm_obj_t>) %d\n", (int)sizeof(queue_t<scm_obj_t>));
-//  printf("sizeof(object_slab_cache_t) %d\n", (int)sizeof(object_slab_cache_t));
     printf("offsetof(nudge, x) %d\n", (int)offsetof(nudge, x));
 #endif
 #if MTDEBUG
@@ -161,7 +171,7 @@ int main(int argc, char* const argv[])
 #endif
     heap->init_primordial(heap_limit, heap_init);
     VM rootVM;
-    rootVM.init(heap);
+    rootVM.init_root(heap);
 #if defined(NO_TLS)
     MTVERIFY(pthread_key_create(&s_current_vm, NULL));
     MTVERIFY(pthread_setspecific(s_current_vm, &rootVM));
@@ -169,10 +179,11 @@ int main(int argc, char* const argv[])
     s_current_vm = &rootVM;
 #endif
 #if USE_PARALLEL_VM
-    Interpreter interp;
-    interp.init(&rootVM, 128);
+    VMM vmm;
+    vmm.init(&rootVM, 128);
     rootVM.boot();
     rootVM.standalone();
+    vmm.destroy();
 #else
     rootVM.boot();
     rootVM.standalone();

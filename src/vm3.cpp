@@ -67,11 +67,7 @@ VM::apply_scheme(scm_obj_t proc, int argc, ...)
     if (CDR(m_pc) == scm_nil) {
         code = CONS(scm_unspecified, code);
     } else {
-        if (PAIRP(CAR(m_pc)) && CAAR(m_pc) == INST_PUSH_SUBR) {
-            code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CONS(LIST1(INST_PUSH) , CDR(m_pc))));
-        } else {
-            code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CDR(m_pc)));
-        }
+        code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CDR(m_pc)));
     }
     m_pc = code;
 }
@@ -85,11 +81,7 @@ VM::apply_scheme_argv(scm_obj_t proc, int argc, scm_obj_t argv[])
     if (CDR(m_pc) == scm_nil) {
         code = CONS(scm_unspecified, code);
     } else {
-        if (CAAR(m_pc) == INST_PUSH_SUBR) {
-            code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CONS(LIST1(INST_PUSH) , CDR(m_pc))));
-        } else {
-            code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CDR(m_pc)));
-        }
+        code = CONS(scm_unspecified, CONS(CONS(INST_CALL, code), CDR(m_pc)));
     }
     m_pc = code;
 }
@@ -136,7 +128,7 @@ VM::call_scheme_stub(scm_obj_t proc, int argc, scm_obj_t argv[])
     m_sp[0] = cont_pc;
     m_sp++;
     m_pc = LIST2(CONS(INST_CALL, code), LIST1(INST_VM_ESCAPE));
-    run(false);
+    run();
     --m_sp;
     cont_pc = m_sp[0];
     if (cont_pc == scm_nil) {
@@ -175,8 +167,8 @@ VM::call_scheme_argv(scm_obj_t proc, int argc, scm_obj_t argv[])
         fatal("fatal in apply: unexpected exception io_expecption_t(%d, %s)", e.m_err, e.m_message);
     } catch (io_codec_exception_t& e) {
         fatal("fatal in apply: unexpected exception io_codec_exception_t(%d, %s)", e.m_operation, e.m_message);
-    } catch (vm_exit_t& e) {
-        throw;
+//  } catch (vm_exit_t& e) {
+//      throw;
     } catch (int code) {
         fatal("fatal in apply: unexpected exception (errno %d, %s)", code, strerror(code));
     } catch (...) {
@@ -214,8 +206,8 @@ VM::call_scheme(scm_obj_t proc, int argc, ...)
         fatal("fatal in apply: unexpected exception io_expecption_t(%d, %s)", e.m_err, e.m_message);
     } catch (io_codec_exception_t& e) {
         fatal("fatal in apply: unexpected exception io_codec_exception_t(%d, %s)", e.m_operation, e.m_message);
-    } catch (vm_exit_t& e) {
-        throw;
+//  } catch (vm_exit_t& e) {
+//      throw;
     } catch (int code) {
         fatal("fatal in apply: unexpected exception (errno %d, %s)", code, strerror(code));
     } catch (...) {
@@ -295,6 +287,7 @@ VM::check_vm_cont(void* lnk)
 void
 VM::check_vm_state()
 {
+    // [TODO] Fix this work with multi vm build
     void* lnk;
     lnk = m_env;
     while (lnk) {

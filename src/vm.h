@@ -6,11 +6,13 @@
 
 #include "core.h"
 #include "heap.h"
+#include "heap.h"
 
 class printer_t;
+class codegen_t;
 
 #if USE_PARALLEL_VM
-class Interpreter;
+class VMM;
 #endif
 
 class VM {
@@ -37,12 +39,12 @@ public:
     int             m_stack_size;
     int             m_stack_busy;
 
-    bool            init(object_heap_t* heap);
+    bool            init_root(object_heap_t* heap);
     void            boot();
     void            standalone();
     void            reset();
-    void            run(bool init);
-    void            loop(bool init, bool resume);
+    void            run();
+    void            loop(bool resume);
 
     void            scheme_warning(const char* fmt, ...);
     void            scheme_error(const char* fmt, ...) ATTRIBUTE(noreturn);
@@ -61,6 +63,20 @@ public:
         scm_obj_t   warning_level;                // #t or #f or fixnum
     } m_flags;
 
+    enum {
+        native_thunk_apply = 0,
+        native_thunk_pop_cont,
+        native_thunk_loop,
+        native_thunk_resume_loop,
+        native_thunk_escape,
+        native_thunk_error_apply_iloc,
+        native_thunk_error_apply_gloc,
+        native_thunk_error_ret_iloc,
+        native_thunk_error_push_gloc,
+        native_thunk_invalid_state,
+        native_thunk_unreachable,
+    };
+
     scm_port_t          m_bootport;
     scm_port_t          m_current_input;
     scm_port_t          m_current_output;
@@ -73,11 +89,14 @@ public:
     int                 m_recursion_level;
     int                 m_shared_object_errno;
 #if USE_PARALLEL_VM
-    Interpreter*        m_interp;
-    VM*                 m_parent;
     int                 m_id;
+    VM*                 m_parent;
+#if ENABLE_LLVM_JIT
+    codegen_t*          m_codegen;
+#endif
     scm_obj_t           m_spawn_timeout; // #f or fixnum, no gc protect
     size_t              m_spawn_heap_limit;
+    VMM*                m_vmm;
 #endif
 
     scm_closure_t       lookup_system_closure(const char* name);
@@ -88,7 +107,8 @@ public:
     bool                backtrace(scm_port_t port);
     void                stop();
     void                resolve();
-
+    void*               save_env(void* lnk);
+    void                update_cont(void* lnk);
 private:
     scm_obj_t           prebind_literal(scm_obj_t literal);
     scm_gloc_t          prebind_gloc(scm_obj_t variable);
@@ -98,9 +118,7 @@ private:
     scm_obj_t           backtrace_fetch(const char* name, int line, int column);
     void                backtrace_seek_make_cont(scm_obj_t note);
 
-    void*               save_env(void* lnk);
     void*               save_cont(void* lnk);
-    void                update_cont(void* lnk);
     void                save_stack();
 
     void*               gc_env(void* lnk);
@@ -142,12 +160,12 @@ public:
     void display_subr_profile();
 #endif
 
-    scm_obj_t symbol_to_instruction(scm_obj_t obj) {
+    static scm_obj_t symbol_to_instruction(scm_obj_t obj) {
         assert(OPCODESYMBOLP(obj));
         return obj;
     }
 
-    int instruction_to_opcode(scm_obj_t obj) {
+    static int instruction_to_opcode(scm_obj_t obj) {
         assert(OPCODESYMBOLP(obj));
         return HDR_SYMBOL_CODE(((scm_symbol_t)obj)->hdr);
     }

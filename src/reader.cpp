@@ -934,6 +934,7 @@ top:
                             if (c2 == '=') {
                                 scm_obj_t obj = read_expr();
                                 if (obj == scm_eof) lexical_error("unexpected end-of-file while reading tag #%ld=", mark);
+                                scoped_lock lock(m_graph->lock);
                                 if (get_hashtable(m_graph, MAKEFIXNUM(mark)) == scm_undef) {
                                     int nsize = put_hashtable(m_graph, MAKEFIXNUM(mark), obj);
                                     if (nsize) rehash_hashtable(m_vm->m_heap, m_graph, nsize);
@@ -1012,6 +1013,7 @@ scm_obj_t
 reader_t::lookup_graph(scm_tuple_t tuple)
 {
     scm_obj_t obj;
+    scoped_lock lock(m_graph->lock);
     obj = get_hashtable(m_graph, tuple->elts[0]);
     if (TUPLEP(obj)) return lookup_graph((scm_tuple_t)obj);
     if (obj != scm_undef) return obj;

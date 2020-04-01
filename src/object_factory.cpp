@@ -9,7 +9,7 @@
 #include "port.h"
 #include "socket.h"
 #if USE_PARALLEL_VM
-#include "interpreter.h"
+#include "vmm.h"
 #include "vm.h"
 #endif
 
@@ -517,13 +517,14 @@ make_subr(object_heap_t* heap, subr_proc_t adrs, scm_obj_t doc)
 }
 
 scm_closure_t
-make_closure(object_heap_t* heap, int argc, int rest, void* env, scm_obj_t code, scm_obj_t doc)
+make_closure(object_heap_t* heap, int argc, int rest, void* env, scm_obj_t pc, scm_obj_t doc)
 {
     int args = rest ? (- 1 - argc) : argc;
     scm_closure_t obj = (scm_closure_t)heap->allocate_collectible(sizeof(scm_closure_rec_t));
     obj->hdr = scm_hdr_closure | MAKEBITS(args, HDR_CLOSURE_ARGS_SHIFT);
     obj->env = env;
-    obj->code = code;
+    obj->code = NULL;
+    obj->pc = pc;
     obj->doc = doc;
     return obj;
 }
@@ -536,6 +537,7 @@ make_closure(object_heap_t* heap, scm_closure_t tmpl, void* env)
         obj->hdr = tmpl->hdr;
         obj->env = env;
         obj->code = tmpl->code;
+        obj->pc = tmpl->pc;
         obj->doc = tmpl->doc;
         return obj;
     }
@@ -543,12 +545,13 @@ make_closure(object_heap_t* heap, scm_closure_t tmpl, void* env)
 }
 
 scm_closure_t
-make_closure(object_heap_t* heap, scm_hdr_t hdr, void* env, scm_obj_t code, scm_obj_t doc)
+make_closure(object_heap_t* heap, scm_hdr_t hdr, void* env, scm_obj_t pc, scm_obj_t doc)
 {
     scm_closure_t obj = (scm_closure_t)heap->allocate_collectible(sizeof(scm_closure_rec_t));
     obj->hdr = hdr;
     obj->env = env;
-    obj->code = code;
+    obj->code = NULL;
+    obj->pc = pc;
     obj->doc = doc;
     return obj;
 }
@@ -761,25 +764,6 @@ make_sharedqueue(object_heap_t* heap, int n)
     obj->hdr = scm_hdr_sharedqueue;
     obj->buf.init(n + MAX_VIRTUAL_MACHINE);
     obj->queue.init(n);
-    return obj;
-}
-
-scm_sharedbag_t
-make_sharedbag(object_heap_t* heap, int depth)
-{
-    scm_sharedbag_t obj = (scm_sharedbag_t)heap->allocate_collectible(sizeof(scm_sharedbag_rec_t));
-    sharedbag_slot_t** datum = (sharedbag_slot_t**)malloc(sizeof(sharedbag_slot_t*) * MAX_VIRTUAL_MACHINE);
-    for (int i = 0; i < MAX_VIRTUAL_MACHINE; i++) {
-        datum[i] = (sharedbag_slot_t*)malloc(sizeof(sharedbag_slot_t));
-        datum[i]->key = NULL;
-        datum[i]->buf.init(depth + MAX_VIRTUAL_MACHINE);
-        datum[i]->queue.init(depth);
-    }
-    obj->hdr = scm_hdr_sharedbag;
-    obj->capacity = MAX_VIRTUAL_MACHINE;
-    obj->depth = depth;
-    obj->datum = datum;
-    obj->lock.init();
     return obj;
 }
 
@@ -1082,18 +1066,6 @@ finalize(object_heap_t* heap, void* obj)
             queue->queue.destroy();
             break;
         }
-        case TC_SHAREDBAG: {
-            scm_sharedbag_t bag = (scm_sharedbag_t)obj;
-            for (int i = 0; i < bag->capacity; i++) {
-                bag->datum[i]->buf.destroy();
-                bag->datum[i]->queue.destroy();
-                free(bag->datum[i]->key);
-                free(bag->datum[i]);
-            }
-            free(bag->datum);
-            bag->lock.destroy();
-            break;
-        }
     }
 }
 
@@ -1133,18 +1105,6 @@ renounce(void* obj, int size, void* refcon)
             scm_sharedqueue_t queue = (scm_sharedqueue_t)obj;
             queue->buf.destroy();
             queue->queue.destroy();
-            break;
-        }
-        case TC_SHAREDBAG: {
-            scm_sharedbag_t bag = (scm_sharedbag_t)obj;
-            for (int i = 0; i < bag->capacity; i++) {
-                bag->datum[i]->buf.destroy();
-                bag->datum[i]->queue.destroy();
-                free(bag->datum[i]->key);
-                free(bag->datum[i]);
-            }
-            free(bag->datum);
-            bag->lock.destroy();
             break;
         }
     }

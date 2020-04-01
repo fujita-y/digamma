@@ -16,7 +16,7 @@
 #include "ioerror.h"
 #include "printer.h"
 #include "violation.h"
-#include "interpreter.h"
+#include "vmm.h"
 
 static scm_obj_t
 do_transpose(object_heap_t* heap, int each_len, int argc, scm_obj_t argv[])
@@ -200,12 +200,12 @@ subr_set_car(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 2) {
         if (PAIRP(argv[0])) {
 #if USE_PARALLEL_VM
-            if (vm->m_interp->live_thread_count() > 1) {
+            if (vm->m_vmm->live_thread_count() > 1) {
                 if (!vm->m_heap->in_heap(argv[0])) {
                     thread_object_access_violation(vm, "set-car!" ,argc, argv);
                     return scm_undef;
                 }
-                if (vm->m_heap->m_child > 0) vm->m_interp->remember(CAR(argv[0]), argv[1]);
+                if (vm->m_heap->m_child > 0) vm->m_vmm->remember(CAR(argv[0]), argv[1]);
             }
 #endif
 #if USE_CONST_LITERAL
@@ -232,12 +232,12 @@ subr_set_cdr(VM* vm, int argc, scm_obj_t argv[])
     if (argc == 2) {
         if (PAIRP(argv[0])) {
 #if USE_PARALLEL_VM
-            if (vm->m_interp->live_thread_count() > 1) {
+            if (vm->m_vmm->live_thread_count() > 1) {
                 if (!vm->m_heap->in_heap(argv[0])) {
                     thread_object_access_violation(vm, "set-cdr!" ,argc, argv);
                     return scm_undef;
                 }
-                if (vm->m_heap->m_child > 0) vm->m_interp->remember(CDR(argv[0]), argv[1]);
+                if (vm->m_heap->m_child > 0) vm->m_vmm->remember(CDR(argv[0]), argv[1]);
             }
 #endif
 #if USE_CONST_LITERAL

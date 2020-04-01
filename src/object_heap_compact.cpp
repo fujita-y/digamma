@@ -66,7 +66,7 @@ relocate_collectible(void* obj, int size, void* desc)
     scm_obj_t from = (scm_obj_t)obj;
     scm_obj_t to;
     if (PAIRP(obj)) {
-        assert(size == sizeof(scm_pair_rec_t));
+        assert(size >= sizeof(scm_pair_rec_t));
 
 #if USE_CONST_LITERAL
         object_slab_traits_t* traits = OBJECT_SLAB_TRAITS_OF(obj);
@@ -79,10 +79,10 @@ relocate_collectible(void* obj, int size, void* desc)
         to = heap->allocate_cons();
 #endif
     } else if (FLONUMP(obj)) {
-        assert(size == sizeof(scm_flonum_rec_t));
+        assert(size >= sizeof(scm_flonum_rec_t));
         to = heap->allocate_flonum();
     } else if (WEAKMAPPINGP(obj)) {
-        assert(size == sizeof(scm_weakmapping_rec_t));
+        assert(size >= sizeof(scm_weakmapping_rec_t));
         to = heap->allocate_weakmapping();
     } else {
         to = heap->allocate_collectible(size);
@@ -237,9 +237,13 @@ resolve_collectible(void* obj, int size, void* desc)
 
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            closure->code = heap->forward(closure->code);
+            closure->pc = heap->forward(closure->pc);
             closure->doc = heap->forward(closure->doc);
             closure->env = heap->interior_forward(closure->env);
+#if ENABLE_LLVM_JIT
+            closure->hdr = closure->hdr & ~MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+            closure->code = NULL;
+#endif
         } break;
 
         case TC_CONT: {
@@ -266,6 +270,9 @@ resolve_collectible(void* obj, int size, void* desc)
             cont->pc = heap->forward(cont->pc);
             cont->trace = heap->forward(cont->trace);
             for (scm_obj_t* args = (scm_obj_t*)top; args < (scm_obj_t*)cont; args++) *args = heap->forward(*args);
+#if ENABLE_LLVM_JIT
+            cont->code = NULL;
+#endif
         } break;
 
         case TC_ENVIRONMENT: {

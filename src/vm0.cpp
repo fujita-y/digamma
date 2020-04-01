@@ -7,8 +7,9 @@
 #include "port.h"
 #include "reader.h"
 #include "printer.h"
+#include "codegen.h"
 #if USE_PARALLEL_VM
-#include "interpreter.h"
+#include "vmm.h"
 #endif
 
 scm_obj_t
@@ -40,9 +41,9 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
     if (obj != scm_undef) {
         assert(GLOCP(obj));
 #if USE_PARALLEL_VM
-        if (m_interp->live_thread_count() > 1) {
+        if (m_vmm->live_thread_count() > 1) {
             assert(m_heap->in_heap(obj));
-            m_interp->remember(((scm_gloc_t)obj)->value, value);
+            m_vmm->remember(((scm_gloc_t)obj)->value, value);
         }
 #endif
         m_heap->write_barrier(value);
@@ -58,7 +59,7 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
 }
 
 bool
-VM::init(object_heap_t* heap)
+VM::init_root(object_heap_t* heap)
 {
     try {
         m_heap = heap;
@@ -110,7 +111,10 @@ VM::init(object_heap_t* heap)
         m_flags.restricted_print_line_length = MAKEFIXNUM(40);
         m_flags.record_print_nesting_limit = MAKEFIXNUM(2);
         m_flags.warning_level = scm_false;
-        run(true);
+#if ENABLE_LLVM_JIT
+        m_codegen = new codegen_t(this);
+        m_codegen->init();
+#endif
         return true;
     } catch (io_exception_t& e) {
         fatal("fatal in init-vm: unexpected io_expecption_t(%d, %s)", e.m_err, e.m_message);
@@ -212,8 +216,9 @@ VM::backtrace_seek_make_cont(scm_obj_t note)
         vm_cont_t cont = (vm_cont_t)m_sp;
         cont->trace = note;
         cont->fp = m_fp;
-        cont->env = m_env;
         cont->pc = scm_nil;
+        cont->code = NULL;
+        cont->env = m_env;
         cont->up = m_cont;
         m_sp = m_fp = (scm_obj_t*)(cont + 1);
         m_cont = &cont->up;
@@ -313,12 +318,12 @@ more_more_seek:
             return;
         case VMOP_CAR_ILOC:
         case VMOP_CDR_ILOC:
-        case VMOP_VECTREF_ILOC:
+        //case VMOP_VECTREF_ILOC:
         case VMOP_PUSH_CAR_ILOC:
         case VMOP_PUSH_CDR_ILOC:
         case VMOP_PUSH_CADR_ILOC:
         case VMOP_PUSH_CDDR_ILOC:
-        case VMOP_PUSH_VECTREF_ILOC:
+        //case VMOP_PUSH_VECTREF_ILOC:
             if (PAIRP(CDR(operands))) backtrace_seek_make_cont(CDR(operands));
             return;
         case VMOP_CONST:
@@ -568,7 +573,7 @@ VM::boot()
                 if (obj == scm_eof) break;
                 m_pc = obj;
                 prebind(m_pc);
-                run(false);
+                run();
             }
             port_close(m_bootport);
         }
@@ -603,7 +608,7 @@ VM::boot()
                 if (obj == scm_eof) break;
                 m_pc = obj;
                 prebind(m_pc);
-                run(false);
+                run();
             }
             port_close(m_bootport);
         }
@@ -638,17 +643,9 @@ loop:
     try {
         reset();
         scm_closure_t closure = lookup_system_closure(".@start-scheme-session");
-        m_pc = closure->code;
+        m_pc = closure->pc;
         prebind(m_pc);
-        run(false);
-    } catch (vm_exit_t& e) {
-#if PROFILE_OPCODE
-        display_opcode_profile();
-#endif
-#if PROFILE_SUBR
-        display_subr_profile();
-#endif
-        exit(e.m_code);
+        run();
     } catch (vm_exception_t& e) {
         backtrace(m_current_error);
         goto loop;
@@ -722,9 +719,17 @@ VM::stop()
         }
     }
 #if USE_PARALLEL_VM
-    if (m_interp->live_thread_count() > 1) {
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_EVERYTHING) m_interp->snapshot(this, false);
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_interp->snapshot(this, true);
+    if (m_vmm->live_thread_count() > 1) {
+        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_EVERYTHING) m_vmm->snapshot(this, false);
+        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_vmm->snapshot(this, true);
+    }
+#endif
+#if ENABLE_COMPILE_THREAD
+    if (m_codegen) {
+        scoped_lock lock(m_codegen->m_compile_queue_lock);
+        for(scm_closure_t closure: m_codegen->m_compile_queue) {
+            m_heap->enqueue_root(closure);
+        }
     }
 #endif
     m_heap->m_collector_lock.lock();

@@ -1,8 +1,8 @@
 // Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
-#ifndef INTERPRETER_H_INCLUDED
-#define INTERPRETER_H_INCLUDED
+#ifndef VMM_H_INCLUDED
+#define VMM_H_INCLUDED
 
 #include "core.h"
 #include "heap.h"
@@ -38,16 +38,16 @@ public:
     void    display_status(VM* vm);
 };
 
-class Interpreter {
+class VMM {
     enum { VM_PARENT_NONE = -1 };
     struct vm_table_rec_t {
-        Interpreter*    interp;
+        VMM*            vmm;
         cond_t          notify;
         VM*             vm;
         int             id;
         int             state;
         int             parent;
-        scm_obj_t       param;
+        scm_obj_t       protect;
         char            name[64];
     };
     mutex_t             m_lock;
@@ -57,10 +57,15 @@ class Interpreter {
     remember_set_t      m_remember_set;
     mutex_t             m_uuid_lock;
 
-    static thread_main_t mutator_thread(void* param);
+    static thread_main_t  child_mutator(void* param);
+    static void           terminate_collector(object_heap_t* heap);
+
+    void    init_child_vm(VM* vm, VM* parent, int id);
 
 public:
-            Interpreter() { m_table = NULL; }
+    static const int VM_ID_PRIMORDIAL = 0;
+
+            VMM() { m_table = NULL; }
     void    init(VM* root, int n);
     void    destroy();
     int     spawn(VM* parent, scm_closure_t func, int argc, scm_obj_t argv[]);
@@ -68,7 +73,6 @@ public:
     void    snapshot(VM* vm, bool retry);
     void    remember(scm_obj_t obj);
     void    remember(scm_obj_t lhs, scm_obj_t rhs);
-    bool    primordial(int id);
     void    display_status(VM* vm);
     int     live_thread_count() { return m_live; }
     int     max_thread_count() { return m_capacity; }
@@ -77,6 +81,6 @@ public:
     void    generate_uuid(char* buf, int bufsize);
 };
 
-#endif
+#endif // USE_PARALLEL_VM
 
 #endif

@@ -27,7 +27,18 @@
   #define DEFAULT_HEAP_LIMIT        32 // MB
 #endif
 
-#define UNBOUND_GLOC_RETURN_UNSPEC  0
+#define UNBOUND_GLOC_RETURN_UNSPEC  0  // default: 0
+
+#define ENABLE_LLVM_JIT             1
+#if ENABLE_LLVM_JIT
+  #define ENABLE_COMPILE_GLOC       1
+  #define ENABLE_COMPILE_DEFERRED   1
+  #define ENABLE_COMPILE_THREAD     1
+#else
+  #define ENABLE_COMPILE_GLOC       0
+  #define ENABLE_COMPILE_DEFERRED   0
+  #define ENABLE_COMPILE_THREAD     0
+#endif
 
 #ifdef NDEBUG
     #define MTDEBUG                 0
@@ -38,13 +49,13 @@
     #define HPDEBUG                 0
     #define ASDEBUG                 0
 #else
-    #define MTDEBUG                 0
-    #define GCDEBUG                 0
-    #define SCDEBUG                 0
-    #define STDEBUG                 0
-    #define WBDEBUG                 0
-    #define HPDEBUG                 0
-    #define ASDEBUG                 1
+    #define MTDEBUG                 1
+    #define GCDEBUG                 1
+    #define SCDEBUG                 1
+    #define STDEBUG                 1
+    #define WBDEBUG                 1
+    #define HPDEBUG                 1
+    #define ASDEBUG                 0
 #endif
 
 #define PROFILE_OPCODE              0
@@ -81,11 +92,11 @@
 #endif
 
 #ifndef SYSTEM_SHARE_PATH
-  #define SYSTEM_SHARE_PATH       "/usr/local/share/digamma"
+  #define SYSTEM_SHARE_PATH         "/usr/local/share/digamma"
 #endif
 
 #ifndef SYSTEM_EXTENSION_PATH
-  #define SYSTEM_EXTENSION_PATH   "/usr/local/lib/digamma"
+  #define SYSTEM_EXTENSION_PATH     "/usr/local/lib/digamma"
 #endif
 
 #define MAX_VIRTUAL_MACHINE         32
@@ -97,7 +108,7 @@ class VM;
 #include "sysdep.h"
 
 extern int          main_command_line_argc;
-extern char* const* main_command_line_argv;
+extern const char** main_command_line_argv;
 extern void         fatal(const char* fmt, ...) ATTRIBUTE(noreturn);
 extern void         warning(const char* fmt, ...);
 extern void         trace(const char* fmt, ...);

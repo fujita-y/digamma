@@ -39,7 +39,7 @@
     nnnn nnnn nnnn nnnn .... NZ-- ---- 1010 : scm_hdr_bignum        NZ: (01 positive) (11 negative) (00 zero)
     .... .... .... .... .... P.-- ---- 1010 : scm_hdr_flonum        P: precision (0 64bit) (1 32bit)
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_cont
-    nnnn nnnn nnnn nnnn .... ..-- ---- 1010 : scm_hdr_closure       if has rest arguments then n == (- 1 - <required argc>)
+    nnnn nnnn nnnn nnnn .... C.-- ---- 1010 : scm_hdr_closure       I: compiled, n == (- 1 - <required argc>) if there are rest arguments
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_subr
     .... .... .... .... .... L.-- ---- 1010 : scm_hdr_vector        L: literal
     .... .... .... .... .... ..-- ---- 1010 : scm_hdr_port
@@ -122,7 +122,6 @@ const scm_obj_t scm_proc_apply_values   = (scm_obj_t)0xd2;
 #define TC_ENVIRONMENT      0x14
 #define TC_SOCKET           0x15
 #define TC_SHAREDQUEUE      0x16
-#define TC_SHAREDBAG        0x17
 #define TC_MASKBITS         0x3f
 
 const scm_hdr_t scm_hdr_symbol          = 0x00a | (TC_SYMBOL << 4);
@@ -148,7 +147,6 @@ const scm_hdr_t scm_hdr_weakhashtable   = 0x00a | (TC_WEAKHASHTABLE << 4);
 const scm_hdr_t scm_hdr_bvector         = 0x00a | (TC_BVECTOR << 4);
 const scm_hdr_t scm_hdr_socket          = 0x00a | (TC_SOCKET << 4);
 const scm_hdr_t scm_hdr_sharedqueue     = 0x00a | (TC_SHAREDQUEUE << 4);
-const scm_hdr_t scm_hdr_sharedbag       = 0x00a | (TC_SHAREDBAG << 4);
 
 #define HDR_TYPE_MASKBITS    0x3ff
 
@@ -174,7 +172,6 @@ struct scm_weakhashtable_rec_t;
 struct scm_bvector_rec_t;
 struct scm_socket_rec_t;
 struct scm_sharedqueue_rec_t;
-struct scm_sharedbag_rec_t;
 
 typedef scm_pair_rec_t*             scm_pair_t;
 typedef scm_symbol_rec_t*           scm_symbol_t;
@@ -198,7 +195,6 @@ typedef scm_weakhashtable_rec_t*    scm_weakhashtable_t;
 typedef scm_bvector_rec_t*          scm_bvector_t;
 typedef scm_socket_rec_t*           scm_socket_t;
 typedef scm_sharedqueue_rec_t*      scm_sharedqueue_t;
-typedef scm_sharedbag_rec_t*        scm_sharedbag_t;
 
 struct vm_cont_rec_t;
 struct vm_env_rec_t;
@@ -245,6 +241,7 @@ OBJECT_ALIGNED(scm_closure_rec_t) {
     scm_obj_t   doc;
     void*       env;
     void*       code;
+    scm_obj_t   pc;
 } END;
 
 OBJECT_ALIGNED(scm_subr_rec_t) {
@@ -393,21 +390,7 @@ OBJECT_ALIGNED(scm_socket_rec_t) {
 OBJECT_ALIGNED(scm_sharedqueue_rec_t) {
     scm_hdr_t               hdr;
     fifo_buffer_t           buf;
-    sync_queue_t<intptr_t>  queue;
-} END;
-
-struct sharedbag_slot_t {
-    char*                   key;
-    fifo_buffer_t           buf;
-    sync_queue_t<intptr_t>  queue;
-};
-
-OBJECT_ALIGNED(scm_sharedbag_rec_t) {
-    scm_hdr_t           hdr;
-    mutex_t             lock;
-    int                 capacity;
-    int                 depth;
-    sharedbag_slot_t**  datum;
+    concurrent_queue_t<intptr_t>  queue;
 } END;
 
 #undef OBJECT_ALIGNED
@@ -419,6 +402,7 @@ struct vm_cont_rec_t {          // record size is variable
     scm_obj_t   trace;
     scm_obj_t*  fp;
     void*       env;
+    void*       code;
     void*       up;             // 'm_cont' and 'up' point here
 };
 
@@ -501,9 +485,11 @@ struct vm_env_rec_t {           // record size is variable
 #define HDR_VECTOR_LITERAL_SHIFT            11
 #define HDR_BVECTOR_LITERAL_SHIFT           11
 #define HDR_GLOC_UNINTERNED_SHIFT           10
+#define HDR_CLOSURE_INSPECTED_SHIFT         11
 
 #define HDR_TC(hdr)                         (((hdr) >> 4) & TC_MASKBITS)
 #define HDR_CLOSURE_ARGS(hdr)               (((intptr_t)(hdr)) >> HDR_CLOSURE_ARGS_SHIFT)
+#define HDR_CLOSURE_INSPECTED(hdr)          (((hdr) >> HDR_CLOSURE_INSPECTED_SHIFT) & 1)
 #define HDR_STRING_LITERAL(hdr)             (((hdr) >> HDR_STRING_LITERAL_SHIFT) & 1)
 #define HDR_STRING_TYPE(hdr)                (((hdr) >> HDR_STRING_TYPE_SHIFT) & 1)
 #define HDR_VALUES_COUNT(hdr)               (((uintptr_t)(hdr)) >> HDR_VALUES_COUNT_SHIFT)
@@ -561,15 +547,15 @@ struct vm_env_rec_t {           // record size is variable
 #define HASH_BOUND_MAX                      UINT32_MAX
 
 #if ARCH_LP64
-#define OBJECT_SLAB_SIZE                    (8192L)
+  #define OBJECT_SLAB_SIZE                  (8192L)
   #define OBJECT_SLAB_SIZE_SHIFT            13
   #define OBJECT_SLAB_THRESHOLD             (OBJECT_SLAB_SIZE / 8)  // m_shared[] and m_atomic[] in ObjectFactory in effect this value
-  #define VM_STACK_BYTESIZE                 (8192L)
+  #define VM_STACK_BYTESIZE                 (OBJECT_SLAB_SIZE * 2)
 #else
   #define OBJECT_SLAB_SIZE                  (4096L)
   #define OBJECT_SLAB_SIZE_SHIFT            12
   #define OBJECT_SLAB_THRESHOLD             (OBJECT_SLAB_SIZE / 4)  // m_shared[] and m_atomic[] in ObjectFactory in effect this value
-  #define VM_STACK_BYTESIZE                 (4096L)
+  #define VM_STACK_BYTESIZE                 (OBJECT_SLAB_SIZE * 2)
 #endif
 #define VM_STACK_BUSY_THRESHOLD(n)          ((n) - ((n) >> 2))      // 75%
 
@@ -603,10 +589,12 @@ struct io_codec_exception_t {
     io_codec_exception_t(int opration, const char* message, scm_obj_t ch) { m_operation = opration; m_ch = ch; m_message = message; }
 };
 
+/*
 struct vm_exit_t {
     int m_code;
     vm_exit_t(int code) { m_code = code; }
 };
+*/
 
 struct vm_exception_t {
     vm_exception_t() {}

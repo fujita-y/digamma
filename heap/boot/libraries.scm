@@ -439,7 +439,7 @@
                         warning-level
                         restricted-print-line-length
                         record-print-nesting-limit
-                        macro-expand compile compile-coreform closure-code
+                        macro-expand compile compile-coreform closure-code closure-codegen display-codegen-statistics
                         current-environment current-macro-environment current-variable-environment current-dynamic-environment
                         system-environment interaction-environment
                         make-environment
@@ -521,10 +521,6 @@
                         shared-queue-shutdown
                         shared-queue-push!
                         shared-queue-pop!
-                        make-shared-bag
-                        shared-bag?
-                        shared-bag-put!
-                        shared-bag-get!
                         serializable?
                         timeout-object?
                         shutdown-object?

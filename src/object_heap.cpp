@@ -314,6 +314,7 @@ object_heap_t::init_primordial(size_t pool_size, size_t init_size)
     init_subr_process(this);
     init_subr_thread(this);
     init_subr_others(this);
+    init_subr_codegen(this);
     // procedure
     intern_system_environment(make_symbol(this, "apply"), scm_proc_apply);
     intern_system_environment(make_symbol(this, "call-with-current-continuation"), scm_proc_callcc);
@@ -1025,8 +1026,8 @@ object_heap_t::trace(scm_obj_t obj)
     object_slab_traits_t* traits = OBJECT_SLAB_TRAITS_OF(obj);
     if (traits->cache->test_and_mark(obj)) {
 #if HPDEBUG
-        printf(";; [collector: duplicate objects in mark stack]\n");
-        fflush(stdout);
+//        printf(";; [collector: duplicate objects in mark stack]\n");
+//        fflush(stdout);
 #endif
         return;
     }
@@ -1112,7 +1113,7 @@ object_heap_t::trace(scm_obj_t obj)
         }
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            shade(closure->code);
+            shade(closure->pc);
             shade(closure->doc);
             interior_shade(closure->env);
             break;
@@ -1326,7 +1327,6 @@ object_heap_t::display_heap_statistics(scm_port_t port)
     port_flush_output(port);
 }
 
-
 void
 object_heap_t::init_inherents()
 {
@@ -1425,8 +1425,9 @@ object_heap_t::init_inherents()
     make_symbol_inherent(this, "<=.iloc", VMOP_LE_ILOC);
     make_symbol_inherent(this, ">.iloc", VMOP_GT_ILOC);
     make_symbol_inherent(this, ">=.iloc", VMOP_GE_ILOC);
-    make_symbol_inherent(this, "push.vector-ref.iloc", VMOP_PUSH_VECTREF_ILOC);
-    make_symbol_inherent(this, "vector-ref.iloc", VMOP_VECTREF_ILOC);
+    //make_symbol_inherent(this, "push.vector-ref.iloc", VMOP_PUSH_VECTREF_ILOC);
+    //make_symbol_inherent(this, "vector-ref.iloc", VMOP_VECTREF_ILOC);
+    //make_symbol_inherent(this, "native", VMOP_NATIVE);
     make_symbol_inherent(this, "little", S_CODE_LITTLE);
     make_symbol_inherent(this, "big", S_CODE_BIG);
     make_symbol_inherent(this, "quote", S_CODE_QUOTE);
@@ -1612,7 +1613,7 @@ check_collectible(void* obj, int size, void* refcon)
         } return;
         case TC_CLOSURE: {
             scm_closure_t closure = (scm_closure_t)obj;
-            VERIFY_OBJ(closure, code);
+            VERIFY_OBJ(closure, pc);
             VERIFY_OBJ(closure, doc);
             VERIFY_INTERIOR_OBJ(closure, env);
         } return;

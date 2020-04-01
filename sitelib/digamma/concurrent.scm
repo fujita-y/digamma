@@ -5,20 +5,20 @@
 (library (digamma concurrent)
   (export define-thread-variable
           define-autoload-variable
+          pmap
+          pbegin
+          async
+          awaitable?
+          await
           make-uuid
-          future
           make-shared-queue
           shared-queue?
           shared-queue-push!
           shared-queue-pop!
           shared-queue-shutdown
-          make-shared-bag
-          shared-bag?
-          shared-bag-put!
-          shared-bag-get!
-          serializable?
           timeout-object?
           shutdown-object?
+          serializable?
           spawn
           spawn*
           spawn-timeout
@@ -35,14 +35,8 @@
          (define accessor
            (lambda ()
              (let ((p (param)))
-               (if (local-heap-object? p)
-                   (car p)
-                   (let ((val init))
-                     (param (list val)) val)))))
-         (define-syntax var
-           (identifier-syntax
-             (_ (accessor))
-             ((set! _ x) (mutator x))))))))
+               (if (local-heap-object? p) (car p) (let ((val init)) (param (list val)) val)))))
+         (define-syntax var (identifier-syntax (_ (accessor)) ((set! _ x) (mutator x))))))))
 
   (define-syntax define-autoload-variable
     (syntax-rules ()
@@ -53,72 +47,158 @@
          (define accessor
            (lambda ()
              (if (on-primordial-thread?)
-                 (let ((val init))
-                   (set! accessor (lambda () val)) val)
+                 (let ((val init)) (set! accessor (lambda () val)) val)
                  (let ((val (param)))
-                   (if (not (eq? val undefined))
-                       val
-                       (let ((val init))
-                         (param val) val))))))
+                   (if (not (eq? val undefined)) val (let ((val init)) (param val) val))))))
          (define-syntax var
            (identifier-syntax
              (_ (accessor))
              ((set! var x)
-              (assertion-violation 'set! (format "attempt to modify autoload variable ~u" 'var) '(set! var x)))))))))
+              (assertion-violation
+                'set!
+                (format "attempt to modify autoload variable ~u" 'var)
+                '(set! var x)))))))))
 
-  (define future-error
-    (condition
-     (make-error)
-     (make-who-condition 'future)
-     (make-message-condition "child thread has terminated by unhandled exception")))
-
-  (define-syntax future
+  (define-syntax async
     (syntax-rules ()
       ((_ e0 e1 ...)
-       (let ((queue (make-shared-queue)))
+       (let ((promise (make-shared-queue)))
          (spawn*
-          (lambda () e0 e1 ...)
-          (lambda (ans)
-            (if (condition? ans)
-                (shared-queue-push! queue future-error)
-                (shared-queue-push! queue ans))
-            (shared-queue-shutdown queue)))
-         (lambda timeout
-           (let ((ans (apply shared-queue-pop! queue timeout)))
-             (if (condition? ans) (raise ans) ans)))))))
+           (lambda () e0 e1 ...)
+           (lambda (ans) (shared-queue-push! promise ans)))
+         (tuple
+          'type:awaitable
+           (lambda timeout
+              (let ((ans (apply shared-queue-pop! promise timeout)))
+                (cond ((timeout-object? ans) ans)
+                      (else
+                        (shared-queue-shutdown promise)
+                        (if (condition? ans) (raise ans) ans))))))))))
+
+  (define awaitable?
+    (lambda (obj)
+      (and (tuple? obj) (eq? (tuple-ref obj 0) 'type:awaitable))))
+
+  (define await
+    (lambda (x . timeout)
+      (or (awaitable? x)
+          (assertion-violation 'await (format "expected awaitable, but got ~r, as argument 1" x) (cons x timeout)))
+      (apply (tuple-ref x 1) timeout)))
+
+  (define pmap
+    (lambda (proc lst1 . lst2)
+      (define pmap-1
+        (lambda (proc lst)
+          (map await (map (lambda (arg) (async (proc arg))) lst))))
+      (define pmap-n
+        (lambda (proc lst)
+          (map await (map (lambda (args) (async (apply proc args))) lst))))
+      (if (null? lst2)
+          (if (list? lst1)
+              (pmap-1 proc lst1)
+              (assertion-violation 'pmap "expected proper lists" (cons* proc lst1 lst2)))
+          (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (pmap-n proc lst)))
+                (else (assertion-violation 'pmap "expected same length proper lists" (cons* proc lst1 lst2)))))))
+
+  (define-syntax pbegin
+    (lambda (x)
+      (syntax-case x ()
+        ((_ e ...)
+         (with-syntax (((p ...) (generate-temporaries (syntax (e ...)))))
+            (syntax
+              (let* ((p (async e)) ...)
+                (await p) ...)))))))
 
   (define spawn*
     (lambda (body finally)
-
-      (define print-exception
-        (lambda (c)
-          (let ((e (current-error-port)))
-            (format e "\nerror in thread: unhandled exception has occurred\n")
-            (let ((in (open-string-input-port
-                       (call-with-string-output-port
-                        (lambda (s)
-                          (set-current-error-port! s)
-                          ((current-exception-printer) c)
-                          (set-current-error-port! e))))))
-              (or (char=? (lookahead-char in) #\linefeed) (put-string e "  "))
-              (let loop ((ch (get-char in)))
-                (cond ((eof-object? ch)
-                       (format e "[thread exit]\n\n"))
-                      ((char=? ch #\linefeed)
-                       (put-string e "\n  ")
-                       (loop (get-char in)))
-                      (else
-                       (put-char e ch)
-                       (loop (get-char in)))))))))
-
-      (spawn (lambda ()
-               (finally
-                (call/cc
-                 (lambda (escape)
-                   (with-exception-handler
-                    (lambda (c)
-                      (print-exception c)
-                      (and (serious-condition? c) (escape c)))
-                    (lambda () (body))))))))))
+      (spawn
+        (lambda ()
+          (finally
+            (call/cc
+              (lambda (escape)
+                (with-exception-handler (lambda (c) (escape c)) (lambda () (body))))))))))
 
   ) ;[end]
+
+#|
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+
+(define (test-para)
+  (pmap fib '(40 40 40 40 40 40 40 40))) ; x8
+
+(time (test-para))
+
+(define (test-plain)
+   (map fib '(40 40 40 40 40 40 40 40))) ; x8
+
+(time (fib 40))
+;;  8.342836 real    8.339067 user    0.002708 sys
+
+(time (test-plain))
+;; 65.820770 real   65.808054 user    0.014191 sys
+
+(time (test-para))
+(time (let ((a (async (test-para)))) (await a)))
+;; 15.660831 real  122.926724 user    0.069117 sys
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(pmap list '(1 2 3) '(4 5 6))
+
+(pmap exit '(1 2 3))
+(begin (async (fib 40)) (exit))
+
+////
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (ack m n)
+  (cond ((= m 0) (+ n 1))
+        ((= n 0) (ack (- m 1) 1))
+        (else (ack (- m 1) (ack m (- n 1))))))
+
+(define (test-para)
+  (pmap ack '(3 3 3 3 3 3 3 3) '(9 9 9 9 9 9 9 9)))
+
+(time (test-para))
+
+(define s (aync (fib (await (aync (ack 2 9))))))
+
+////
+
+(import (digamma concurrent))
+(import (digamma time))
+
+(define (ack m n)
+  (cond ((= m 0) (+ n 1))
+        ((= n 0) (ack (- m 1) 1))
+        (else (ack (- m 1) (ack m (- n 1))))))
+
+(define (fib n)
+  (if (< n 2)
+    n
+    (+ (fib (- n 1))
+       (fib (- n 2)))))
+
+(let* ((arg1 (async 2))
+       (arg2 (async 9))
+       (n (async (ack (await arg1) (await arg2))))
+       (a (async (fib (await n)))))
+  (await a))
+
+(let* ((arg1 (async 2))
+       (arg2 (async 9))
+       (n (async (ack (await arg1) (await arg2))))
+       (a (async (fib (await arg2)))))
+  (await a))
+|#

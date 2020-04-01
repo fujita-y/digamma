@@ -1,24 +1,26 @@
 #   Makefile for Linux, Darwin
-#   Requirements: GNU Make, clang++
+#   Requirements: GNU Make, llvm, libffi
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
 PROG = digamma
 
 PREFIX = /usr/local
 
+# -DNDEBUG
 CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -DSYSTEM_EXTENSION_PATH='"$(DESTDIR)$(PREFIX)/lib/$(PROG)"'
 
 CXX = clang++
 
-CXXFLAGS = -pipe -fstrict-aliasing -fPIC
+CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
 
 SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp object_set.cpp \
-       subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp interpreter.cpp serialize.cpp \
+       subr_hash.cpp vm2.cpp object_slab.cpp subr_list.cpp vmm.cpp serialize.cpp \
        vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp subr_port.cpp subr_r5rs_arith.cpp \
-       equiv.cpp reader.cpp subr_base.cpp bag.cpp uuid.cpp subr_thread.cpp subr_socket.cpp \
+       equiv.cpp reader.cpp subr_base.cpp uuid.cpp subr_thread.cpp subr_socket.cpp \
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp \
        main.cpp subr_bvector.cpp violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp \
-       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp
+       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp subr_codegen.cpp \
+       codegen.cpp
 
 VPATH = src
 
@@ -36,6 +38,8 @@ endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
   CXXFLAGS += -O3 -pthread -fomit-frame-pointer
+  LDFLAGS = -fuse-ld=lld
+  LDLIBS = -Wl,--export-dynamic -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all)
   ifneq (,$(findstring arm, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
       CXXFLAGS += -march=armv7-a
@@ -51,12 +55,17 @@ ifneq (,$(findstring Linux, $(UNAME)))
       CXXFLAGS += -march=x86-64
     endif
   endif
-  LDLIBS = -pthread -Wl,--no-as-needed -ldl -lffi
+  LDLIBS += -pthread -Wl,--no-as-needed -ldl -lffi
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  CPPFLAGS += -DNO_FFI
-  CXXFLAGS += -O2 -fomit-frame-pointer -momit-leaf-frame-pointer
+	# export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
+  # CPPFLAGS += -DNO_FFI
+  # CXXFLAGS += -O0 -glldb
+	CPPFLAGS += $(shell pkg-config libffi --cflags)
+	CXXFLAGS += -O3 -momit-leaf-frame-pointer
+  LDFLAGS += $(shell pkg-config libffi --libs)
+  LDLIBS += $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))
@@ -68,7 +77,7 @@ all: $(PROG) $(EXTS)
 	@mkdir -p -m755 $(HOME)/.digamma
 
 $(PROG): $(OBJS)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 vm1.s: vm1.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) \
@@ -164,7 +173,7 @@ moreclean: distclean
 	find . -type f -name '*~' -print0 | xargs -0 rm -f
 
 %.d: %.cpp
-	$(SHELL) -ec '$(CXX) -MM $(CPPFLAGS) $< | sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; [ -s $@ ] || rm -f $@'
+	$(SHELL) -ec '$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< | sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; [ -s $@ ] || rm -f $@'
 
 ifeq ($(findstring clean, $(MAKECMDGOALS)), )
   ifeq ($(findstring uninstall, $(MAKECMDGOALS)), )

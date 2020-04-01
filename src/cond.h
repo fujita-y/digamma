@@ -5,6 +5,7 @@
 #define COND_H_INCLUDED
 
 #include "core.h"
+#include "mutex.h"
 
 class cond_t {
     cond_t(const cond_t&);
@@ -15,23 +16,19 @@ public:
 
     cond_t() { /* should be blank */ }
 
-    void init()
-    {
+    void init() {
         MTVERIFY(pthread_cond_init(&cv, NULL));
     }
 
-    void destroy()
-    {
+    void destroy() {
         MTVERIFY(pthread_cond_destroy(&cv));
     }
 
-    void signal()
-    {
+    void signal() {
         MTVERIFY(pthread_cond_signal(&cv));
     }
 
-    void wait(mutex_t& mutex)
-    {
+    void wait(mutex_t& mutex) {
         MTVERIFY(pthread_cond_wait(&cv, &mutex.mutex));
     }
 };
