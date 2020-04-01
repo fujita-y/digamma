@@ -68,18 +68,18 @@ class codegen_t {
             reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this), reg_value(this) { }
     };
     class reg_cache_synchronize {
-      codegen_t::context_t& ctx;
-      bool previous;
+        codegen_t::context_t& ctx;
+        bool previous;
     public:
-      reg_cache_synchronize(codegen_t::context_t& context) : ctx(context), previous(ctx.m_disable_reg_cache) {
-          auto vm = ctx.m_function->arg_begin();
-          ctx.reg_cache_copy(vm);
-          ctx.reg_cache_clear();
-          ctx.m_disable_reg_cache = true;
-      }
-      ~reg_cache_synchronize() {
-          ctx.m_disable_reg_cache = previous;
-      }
+        reg_cache_synchronize(codegen_t::context_t& context) : ctx(context), previous(ctx.m_disable_reg_cache) {
+            auto vm = ctx.m_function->arg_begin();
+            ctx.reg_cache_copy(vm);
+            ctx.reg_cache_clear();
+            ctx.m_disable_reg_cache = true;
+        }
+        ~reg_cache_synchronize() {
+            ctx.m_disable_reg_cache = previous;
+        }
     };
     enum cc_t { LT, GT, LE, GE, EQ, };
     VM* m_vm;
