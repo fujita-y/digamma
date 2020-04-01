@@ -17,10 +17,6 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
-#if __clang_major__ > 9
-using namespace std;
-#endif
-
 using namespace llvm;
 using namespace llvm::orc;
 
@@ -140,8 +136,7 @@ codegen_t::context_t::set_local_var_count(int depth, scm_closure_t closure)
 {
     int argc = HDR_CLOSURE_ARGS(closure->hdr);
     if (argc < 0) argc = -argc;
-    m_local_var_count.resize(depth + 1);
-    m_local_var_count[depth] = argc;
+    set_local_var_count(depth, argc);
 }
 
 int
@@ -151,7 +146,6 @@ codegen_t::context_t::get_local_var_count(int depth)
     return 0;
 }
 
-
 codegen_t::codegen_t(VM* vm) : m_vm(vm), m_debug(false) { }
 
 void
@@ -160,11 +154,7 @@ codegen_t::init()
     auto J = ExitOnErr(LLJITBuilder().create());
     auto D = J->getDataLayout();
     auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
-#if __clang_major__ < 10
-    J->getMainJITDylib().setGenerator(G);
-#else
     J->getMainJITDylib().addGenerator(std::move(G));
-#endif
     m_jit = std::move(J);
 #if ENABLE_COMPILE_THREAD
     m_compile_thread_terminating = false;
@@ -230,18 +220,12 @@ codegen_t::compile_thread(void* param)
 #endif
 
 ThreadSafeModule
-codegen_t::optimizeModule(ThreadSafeModule TSM) {
-#if __clang_major__ < 10
-    Module &M = *TSM.getModule();
-#else
+codegen_t::optimizeModule(ThreadSafeModule TSM)
+{
     Module &M = *TSM.getModuleUnlocked();
-#endif
     PassManagerBuilder B;
     B.OptLevel = 2;
     B.SizeLevel = 1;
-
-    // puts(";=== IR before optimize ===");
-    // M.print(outs(), nullptr);
 
     legacy::FunctionPassManager FPM(&M);
     B.populateFunctionPassManager(FPM);
@@ -273,7 +257,6 @@ codegen_t::is_compiled(scm_closure_t closure)
     return closure->code != NULL;
 }
 
-// compile one top-level function
 void
 codegen_t::compile(scm_closure_t closure)
 {
@@ -322,11 +305,11 @@ codegen_t::compile_each(scm_closure_t closure)
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));
 
-    auto Context = make_unique<LLVMContext>();
+    auto Context = std::make_unique<LLVMContext>();
     LLVMContext& C = *Context;
     DECLEAR_COMMON_TYPES;
 
-    auto M = make_unique<Module>(module_id, C);
+    auto M = std::make_unique<Module>(module_id, C);
     Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M.get());
 #if USE_LLVM_ATTRIBUTES
     for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
@@ -344,7 +327,7 @@ codegen_t::compile_each(scm_closure_t closure)
 
     transform(context, closure->pc, true);
 
-    verifyModule(*M, &outs());
+    if (verifyModule(*M, &outs())) fatal("%s:%u verify module failed", __FILE__, __LINE__);
 
 #if USE_LLVM_OPTIMIZE
     ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
@@ -352,7 +335,7 @@ codegen_t::compile_each(scm_closure_t closure)
     ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
 #endif
 
-    //m_jit->getMainJITDylib().dump(llvm::outs());
+    // m_jit->getMainJITDylib().dump(llvm::outs());
 
     auto symbol = ExitOnErr(m_jit->lookup(function_id));
     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))symbol.getAddress();
@@ -371,7 +354,6 @@ codegen_t::get_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     if (!is_compiled(closure)) fatal("%s:%u closure is not compiled", __FILE__, __LINE__);
-
     intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(closure->code);
     auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
     Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
@@ -469,19 +451,13 @@ void
 codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
 {
     ctx.update_reg_cache_context();
-
-#if USE_UNIFIED_STACK_CHECK
     if (insert_stack_check) emit_stack_overflow_check(ctx, calc_stack_size(inst));
-#endif
-
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
             case VMOP_IF_FALSE_CALL: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_false_call(ctx, inst);
             } break;
             case VMOP_CALL: {
-                //reg_cache_synchronize sync(ctx);
                 ctx.m_function = emit_call(ctx, inst);
             } break;
             case VMOP_RET_GLOC: {
@@ -493,69 +469,55 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_const(ctx, inst);
             } break;
             case VMOP_RET_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_GLOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_gloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_SUBR: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_subr(ctx, inst);
                 intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_PUSH_CAR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_car_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CDR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_cdr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_ILOC0: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_iloc0(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_const(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_ILOC1: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_iloc1(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_APPLY_GLOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_apply_gloc(ctx, inst);
             } break;
             case VMOP_RET_SUBR: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_subr(ctx, inst);
             } break;
             case VMOP_APPLY_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_apply_iloc(ctx, inst);
             } break;
             case VMOP_APPLY_ILOC_LOCAL: {
-                //reg_cache_synchronize sync(ctx);
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {
@@ -563,7 +525,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply(ctx, inst);
             } break;
             case VMOP_EXTEND: {
-                //reg_cache_synchronize sync(ctx);
                 emit_extend(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;
@@ -575,13 +536,11 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_EXTEND_ENCLOSE_LOCAL: {
-                //reg_cache_synchronize sync(ctx);
                 emit_extend_enclose_local(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;
             } break;
             case VMOP_EXTEND_UNBOUND: {
-                //reg_cache_synchronize sync(ctx);
                 emit_extend_unbound(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;
@@ -592,7 +551,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CLOSE_LOCAL: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_close_local(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -602,108 +560,83 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc = 0;
             } break;
             case VMOP_GLOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_gloc(ctx, inst);
             } break;
             case VMOP_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_iloc(ctx, inst);
             } break;
             case VMOP_CAR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_car_iloc(ctx, inst);
             } break;
             case VMOP_CDR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_cdr_iloc(ctx, inst);
             } break;
             case VMOP_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_const(ctx, inst);
             } break;
             case VMOP_SUBR: {
-                //reg_cache_synchronize sync(ctx);
                 emit_subr(ctx, inst);
                 intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_ILOC1: {
-                //reg_cache_synchronize sync(ctx);
                 emit_iloc1(ctx, inst);
             } break;
             case VMOP_ILOC0: {
-                //reg_cache_synchronize sync(ctx);
                 emit_iloc0(ctx, inst);
             } break;
             case VMOP_IF_TRUE: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_true(ctx, inst);
             } break;
             case VMOP_IF_NULLP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_nullp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_EQP: {
-                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_eqp(ctx, inst);
             } break;
             case VMOP_IF_NULLP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_nullp(ctx, inst);
             } break;
             case VMOP_IF_PAIRP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_pairp(ctx, inst);
             } break;
             case VMOP_IF_SYMBOLP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_symbolp(ctx, inst);
             } break;
             case VMOP_IF_TRUE_RET: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_true_ret(ctx, inst);
             } break;
             case VMOP_IF_FALSE_RET: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_false_ret(ctx, inst);
             } break;
             case VMOP_IF_TRUE_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_true_ret_const(ctx, inst);
             } break;
             case VMOP_IF_FALSE_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_false_ret_const(ctx, inst);
             } break;
             case VMOP_IF_EQP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_eqp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_PAIRP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_pairp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_SYMBOLP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_PAIRP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_not_pairp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_NULLP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_not_nullp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_EQP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 ctx.m_argc--;
                 emit_if_not_eqp_ret_const(ctx, inst);
             } break;
             case VMOP_IF_NOT_SYMBOLP_RET_CONST: {
-                //reg_cache_synchronize sync(ctx);
                 emit_if_not_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_CLOSE: {
@@ -719,23 +652,18 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_set_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_CONS: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_cons(ctx, inst);
             } break;
             case VMOP_RET_CONS: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_cons(ctx, inst);
             } break;
             case VMOP_RET_EQP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_eqp(ctx, inst);
             } break;
             case VMOP_RET_NULLP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_nullp(ctx, inst);
             } break;
             case VMOP_RET_PAIRP: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_pairp(ctx, inst);
             } break;
             case VMOP_RET_CLOSE: {
@@ -743,89 +671,70 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_close(ctx, inst);
             } break;
             case VMOP_PUSH_NADD_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_nadd_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CADR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_cadr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_PUSH_CDDR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_cddr_iloc(ctx, inst);
                 ctx.m_argc++;
             } break;
             case VMOP_CADR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_cadr_iloc(ctx, inst);
             } break;
             case VMOP_CDDR_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_cddr_iloc(ctx, inst);
             } break;
             case VMOP_EQ_N_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_eq_n_iloc(ctx, inst);
             } break;
             case VMOP_LT_N_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_lt_n_iloc(ctx, inst);
             } break;
             case VMOP_GE_N_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ge_n_iloc(ctx, inst);
             } break;
             case VMOP_LE_N_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_le_n_iloc(ctx, inst);
             } break;
             case VMOP_GT_N_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_gt_n_iloc(ctx, inst);
             } break;
             case VMOP_NADD_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_nadd_iloc(ctx, inst);
             } break;
             case VMOP_EQ_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_eq_iloc(ctx, inst);
             } break;
             case VMOP_LT_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_lt_iloc(ctx, inst);
             } break;
             case VMOP_LE_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_le_iloc(ctx, inst);
             } break;
             case VMOP_GT_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_gt_iloc(ctx, inst);
             } break;
             case VMOP_GE_ILOC: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ge_iloc(ctx, inst);
             } break;
             case VMOP_TOUCH_GLOC: {
                 // nop
             } break;
             case VMOP_SUBR_GLOC_OF: {
-                //reg_cache_synchronize sync(ctx);
                 emit_subr_gloc_of(ctx, inst);
                 intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc;
             } break;
             case VMOP_PUSH_SUBR_GLOC_OF: {
-                //reg_cache_synchronize sync(ctx);
                 emit_push_subr_gloc_of(ctx, inst);
                 intptr_t argc = FIXNUM(CADR(CDAR(inst)));
                 ctx.m_argc = ctx.m_argc - argc + 1;
             } break;
             case VMOP_RET_SUBR_GLOC_OF: {
-                //reg_cache_synchronize sync(ctx);
                 emit_ret_subr_gloc_of(ctx, inst);
             } break;
             case VMOP_VM_ESCAPE: {

@@ -7,8 +7,6 @@ codegen_t::emit_push(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(CREATE_LOAD_VM_REG(vm, m_value));
     emit_push_vm_stack(ctx, ctx.reg_value.load(vm));
 }
 
@@ -20,8 +18,6 @@ codegen_t::emit_push_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(VALUE_INTPTR(operands));
     emit_push_vm_stack(ctx, VALUE_INTPTR(operands));
 }
 
@@ -33,8 +29,6 @@ codegen_t::emit_push_iloc0(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
     emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
 }
 
@@ -46,8 +40,6 @@ codegen_t::emit_push_iloc1(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
     emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
 }
 
@@ -59,11 +51,8 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-//  CREATE_PUSH_VM_STACK(val);
     emit_push_vm_stack(ctx, val);
 }
 
@@ -75,7 +64,6 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
@@ -93,7 +81,6 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair
     IRB.SetInsertPoint(pair_true);
-//  CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
     emit_push_vm_stack(ctx, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
 }
 
@@ -105,7 +92,6 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
@@ -123,7 +109,6 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair
     IRB.SetInsertPoint(pair_true);
-//  CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
     emit_push_vm_stack(ctx, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
 }
 
@@ -135,7 +120,6 @@ codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
@@ -159,7 +143,6 @@ codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair + pair
     IRB.SetInsertPoint(pair2_true);
-//  CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
     emit_push_vm_stack(ctx, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
 }
 
@@ -171,7 +154,6 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
@@ -193,9 +175,8 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* pair2_true = BasicBlock::Create(C, "pair2_true", F);
     emit_cond_pairp(ctx, pair2, pair2_true, pair_false);
 
-    // pair + pair
+    // pair - pair
     IRB.SetInsertPoint(pair2_true);
-//  CREATE_PUSH_VM_STACK(CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), car));
     emit_push_vm_stack(ctx, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), car));
 }
 
@@ -206,8 +187,6 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* fixnum_true = BasicBlock::Create(C, "fixnum_true", F);
@@ -226,8 +205,8 @@ codegen_t::emit_push_nadd_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* valid_true = BasicBlock::Create(C, "valid_true", F);
     IRB.CreateCondBr(valid_cond, valid_true, fallback);
 
+    // no overflow
     IRB.SetInsertPoint(valid_true);
-    //CREATE_PUSH_VM_STACK(ans);
     auto sp = ctx.reg_sp.load(vm);
     IRB.CreateStore(ans, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
     CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
@@ -256,8 +235,6 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
-
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -290,18 +267,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 #if DEBUG_CODEGEN
         puts("+ self recursive");
 #endif
-        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-        // printf("argc = %d\n", ctx.m_argc);
-/*
-        auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-        auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(ctx.m_top_level_closure) });
-#if USE_LLVM_ATTRIBUTES
-        auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-        attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
-        attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
-        call1->setAttributes(attrs);
-#endif
-*/
         emit_prepair_apply(ctx, ctx.m_top_level_closure);
         ctx.reg_cache_copy(vm);
 
@@ -311,10 +276,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         return;
     } else {
         if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
-            //printf("obj %p\n", obj);
-            //printf("ctx.m_top_level_closure %p\n", ctx.m_top_level_closure);
-            //printf("closure argc %ld\n", HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr));
-            //printf("ctx.m_argc %d\n", ctx.m_argc);
             scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
             if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
 #if DEBUG_CODEGEN
@@ -325,17 +286,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                     Function* F2 = emit_inner_function(ctx, closure);
                     if (F2 != NULL) {
                         m_usage.inners++;
-                        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
-/*
-                        auto c_prepare_apply = M->getOrInsertFunction("c_prepare_apply", VoidTy, IntptrPtrTy, IntptrTy);
-                        auto call1 = IRB.CreateCall(c_prepare_apply, { vm, VALUE_INTPTR(closure) });
-#if USE_LLVM_ATTRIBUTES
-                        auto attrs = AttributeList::get(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-                        attrs = attrs.addParamAttribute(C, 0, Attribute::NoAlias);
-                        attrs = attrs.addParamAttribute(C, 0, Attribute::NoCapture);
-                        call1->setAttributes(attrs);
-#endif
-*/
                         emit_prepair_apply(ctx, closure);
                         ctx.reg_cache_copy(vm);
                         auto call2 = IRB.CreateCall(F2, {vm});
@@ -344,7 +294,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                         return;
                     } else {
 #if VERBOSE_CODEGEN
-                      puts("emit_apply_gloc: out of top level context, F2 == NULL");
+                        puts("emit_apply_gloc: out of top level context, F2 == NULL");
 #endif
                     }
                 } else {
@@ -355,21 +305,20 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             }
         }
 
-        // we cannot assume what is in gloc box at this point
-
         auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy);
         auto val = CREATE_LOAD_GLOC_REC(gloc, value);
-//      CREATE_STORE_VM_REG(vm, m_value, val);
         ctx.reg_value.store(vm, val);
 
         BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
         BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
         auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
         IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+
         // valid
         IRB.SetInsertPoint(undef_false);
         ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
+
         // invalid
         IRB.SetInsertPoint(undef_true);
         ctx.reg_cache_copy(vm);
@@ -399,17 +348,18 @@ codegen_t::emit_ret_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+
     // valid
     IRB.SetInsertPoint(undef_false);
     ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+
     // invalid
     IRB.SetInsertPoint(undef_true);
     ctx.reg_cache_copy(vm);
@@ -424,9 +374,7 @@ codegen_t::emit_ret_cons(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
-//  auto val = CREATE_LOAD_VM_REG(vm, m_value);
     auto val = ctx.reg_value.load(vm);
 
     auto sp_minus_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
@@ -444,7 +392,6 @@ codegen_t::emit_if_true(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* f9h_true = BasicBlock::Create(C, "f9h_true", F);
@@ -468,7 +415,6 @@ codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -492,13 +438,10 @@ codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     auto val1 = IRB.CreateLoad(ea);
-//  auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -522,7 +465,6 @@ codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -549,7 +491,6 @@ codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 }
 
@@ -562,7 +503,6 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 }
 
@@ -575,7 +515,6 @@ codegen_t::emit_iloc1(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 }
 
@@ -587,8 +526,6 @@ codegen_t::emit_push_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
     emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
 }
 
@@ -600,7 +537,6 @@ codegen_t::emit_if_true_ret(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
@@ -613,6 +549,7 @@ codegen_t::emit_if_true_ret(context_t& ctx, scm_obj_t inst)
     ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 
+    // continue
     IRB.SetInsertPoint(value_false);
 }
 
@@ -624,18 +561,19 @@ codegen_t::emit_if_false_ret(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
     IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+
     // pop
     IRB.SetInsertPoint(value_false);
     ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
-    // loop
+
+    // continue
     IRB.SetInsertPoint(value_nonfalse);
 }
 
@@ -647,7 +585,6 @@ codegen_t::emit_if_true_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
@@ -661,6 +598,7 @@ codegen_t::emit_if_true_ret_const(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 
+    // continue
     IRB.SetInsertPoint(value_false);
 }
 
@@ -718,8 +656,10 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
+
     BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
     IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
+
     IRB.SetInsertPoint(fallback_fail);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
@@ -766,7 +706,6 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto lhs = CREATE_LOAD_VM_REG(vm, m_value);
     auto lhs = ctx.reg_value.load(vm);
     auto rhs = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
 
@@ -799,8 +738,10 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto c_function = M->getOrInsertFunction(cfunc, IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     auto fallback_cond = IRB.CreateICmpEQ(IRB.CreateCall(c_function, { vm, lhs, rhs }), VALUE_INTPTR(0));
+
     BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
     IRB.CreateCondBr(fallback_cond, CONTINUE, fallback_fail);
+
     IRB.SetInsertPoint(fallback_fail);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
 
@@ -846,8 +787,6 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_cont_rec_t));
-
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
 
@@ -861,30 +800,26 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
 
     // vm_cont_t cont = (vm_cont_t)m_sp;
-//  auto cont = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     auto cont = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     // cont->pc
     CREATE_STORE_CONT_REC(cont, pc, VALUE_INTPTR(CDR(inst)));
     // cont->trace
     CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
     // cont->fp
-    CREATE_STORE_CONT_REC(cont, fp, ctx.reg_fp.load(vm)); // CREATE_LOAD_VM_REG(vm, m_fp));
+    CREATE_STORE_CONT_REC(cont, fp, ctx.reg_fp.load(vm));
     // cont->env
-    CREATE_STORE_CONT_REC(cont, env, ctx.reg_env.load(vm)); // CREATE_LOAD_VM_REG(vm, m_env));
+    CREATE_STORE_CONT_REC(cont, env, ctx.reg_env.load(vm));
     // cont->code
     CREATE_STORE_CONT_REC(cont, code, IRB.CreateBitOrPointerCast(K, IntptrTy));
     // cont->up
-    CREATE_STORE_CONT_REC(cont, up, ctx.reg_cont.load(vm)); // CREATE_LOAD_VM_REG(vm, m_cont));
+    CREATE_STORE_CONT_REC(cont, up, ctx.reg_cont.load(vm));
     // m_sp
     auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
-//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
     ctx.reg_sp.store(vm, ea1);
     // m_fp
-//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
     ctx.reg_fp.store(vm, ea1);
     // m_cont
     auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
-//  CREATE_STORE_VM_REG(vm, m_cont, ea2);
     ctx.reg_cont.store(vm, ea2);
 
     context_t ctx2 = ctx;
@@ -904,7 +839,6 @@ codegen_t::emit_if_false_call(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    //auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
@@ -930,19 +864,13 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
     auto argc = VALUE_INTPTR(FIXNUM(operands));
-//  auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, argc);
-//  CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
     auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
     ctx.reg_sp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
     ctx.reg_fp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
     ctx.set_local_var_count(ctx.m_depth, FIXNUM(operands));
 }
@@ -955,20 +883,13 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t));
-//  CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
     emit_push_vm_stack(ctx, VALUE_INTPTR(CDR(operands)));
-//  auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
-//  CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
     auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
     ctx.reg_sp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
     ctx.reg_fp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
@@ -991,11 +912,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     ctx.set_local_var_count(ctx.m_depth, 1);
     m_usage.locals++;
 
-    // printf("emit_extend_enclose_local function_index = %x ctx.m_depth = %d index = %d\n",function_index, ctx.m_depth, 0);
-    // printf("emit_extend_enclose_local ctx.m_local_functions.at(%d) = %p\n", ctx.m_depth, ctx.m_local_functions.at(ctx.m_depth));
-
-
-    context_t ctx2 = ctx; // [TODO] ctx2 goes new function so that it need new reg_cache
+    context_t ctx2 = ctx;
     ctx2.m_function = L;
     int nargs = FIXNUM(CAR(CAR(operands))) + FIXNUM(CADR(CAR(operands)));
     ctx2.set_local_var_count(ctx2.m_depth, 1);
@@ -1020,47 +937,35 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 
     int level = FIXNUM(CAAR(operands));
     int index = FIXNUM(CDAR(operands));
-    // int function_index = (level == 0 ? ctx.m_depth : ctx.m_depth - level - 1) + (index << 16);
     int function_index = ctx.m_depth - level - 1 + (index << 16);
 
     if (ctx.m_depth - level - 1 < 0 || ctx.m_local_functions[function_index] == NULL) {
 #if VERBOSE_CODEGEN
         printf("emit_apply_iloc_local: out of local context, level = %d index = %d ctx.m_depth = %d ctx.m_depth - level - 1 = %x \n", level, index, ctx.m_depth, ctx.m_depth - level - 1);
 #endif
-        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(emit_lookup_iloc(ctx, level, index)));
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
         auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
-//      auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
         auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-//      CREATE_STORE_VM_REG(vm, m_sp, ea1);
         ctx.reg_sp.store(vm, ea1);
-//      CREATE_STORE_VM_REG(vm, m_fp, ea1);
         ctx.reg_fp.store(vm, ea1);
-//      CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
         ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
         ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_loop));
     } else {
-        // printf("emit_apply_iloc_local level = %d index = %d ctx.m_depth = %d function_index = %x \n", level, index, ctx.m_depth, function_index);
-        CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t));
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
         auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
-//      auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
         auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-//      CREATE_STORE_VM_REG(vm, m_sp, ea1);
         ctx.reg_sp.store(vm, ea1);
-//      CREATE_STORE_VM_REG(vm, m_fp, ea1);
         ctx.reg_fp.store(vm, ea1);
-//      CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
         ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
         ctx.reg_cache_copy(vm);
         Function* L = ctx.m_local_functions[function_index];
@@ -1081,15 +986,12 @@ codegen_t::emit_push_cons(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
-//  auto val = CREATE_LOAD_VM_REG(vm, m_value);
     auto val = ctx.reg_value.load(vm);
 
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
     auto sp_minus_1 = IRB.CreateLoad(ea);
     auto c_make_pair = M->getOrInsertFunction("c_make_pair", IntptrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    //ctx.reg_cache_copy(vm);
     IRB.CreateStore(IRB.CreateCall(c_make_pair, { vm, sp_minus_1, val }), ea);
 }
 
@@ -1118,7 +1020,6 @@ codegen_t::emit_car_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair
     IRB.SetInsertPoint(pair_true);
-//  CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
     ctx.reg_value.store(vm, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), car));
 }
 
@@ -1147,7 +1048,6 @@ codegen_t::emit_cdr_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair
     IRB.SetInsertPoint(pair_true);
-//  CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
     ctx.reg_value.store(vm, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair, IntptrPtrTy), cdr));
 }
 
@@ -1177,7 +1077,6 @@ codegen_t::emit_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
     ctx.reg_value.store(vm, VALUE_INTPTR(operands));
 }
 
@@ -1193,9 +1092,11 @@ codegen_t::emit_if_pairp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
 
     emit_cond_pairp(ctx, ctx.reg_value.load(vm), taken_true, taken_false);
+
     // taken
     IRB.SetInsertPoint(taken_true);
     transform(ctx, operands, false);
+
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
@@ -1208,15 +1109,12 @@ codegen_t::emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
 
     auto val1 = IRB.CreateLoad(ea);
-//  auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1265,7 +1163,6 @@ codegen_t::emit_cadr_iloc(context_t& ctx, scm_obj_t inst)
 
     // pair + pair
     IRB.SetInsertPoint(pair2_true);
-//  CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), car));
     ctx.reg_value.store(vm, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), car));
 }
 
@@ -1298,9 +1195,8 @@ codegen_t::emit_cddr_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* pair2_true = BasicBlock::Create(C, "pair2_true", F);
     emit_cond_pairp(ctx, pair2, pair2_true, pair_false);
 
-    // pair + pair
+    // pair - pair
     IRB.SetInsertPoint(pair2_true);
-//  CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
     ctx.reg_value.store(vm, CREATE_LOAD_PAIR_REC(IRB.CreateBitOrPointerCast(pair2, IntptrPtrTy), cdr));
 }
 
@@ -1312,15 +1208,12 @@ codegen_t::emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
 
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
     auto val1 = IRB.CreateLoad(ea);
-//  auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1346,7 +1239,6 @@ codegen_t::emit_if_not_pairp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1371,7 +1263,6 @@ codegen_t::emit_if_false_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
@@ -1385,6 +1276,7 @@ codegen_t::emit_if_false_ret_const(context_t& ctx, scm_obj_t inst)
     CREATE_STORE_VM_REG(vm, m_value, VALUE_INTPTR(operands));
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
 
+    // continue
     IRB.SetInsertPoint(value_nonfalse);
 }
 
@@ -1396,7 +1288,6 @@ codegen_t::emit_ret_nullp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1425,7 +1316,6 @@ codegen_t::emit_ret_pairp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1466,14 +1356,11 @@ codegen_t::emit_ret_eqp(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
     auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateBitOrPointerCast(ea, IntptrTy));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
     auto val1 = IRB.CreateLoad(ea);
-//  auto val2 = CREATE_LOAD_VM_REG(vm, m_value);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1521,22 +1408,15 @@ codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     int argc = FIXNUM(operands);
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(vm_env_rec_t) + sizeof(scm_obj_t*) * argc);
     for (intptr_t i = 0; i < argc; i++) {
-//      CREATE_PUSH_VM_STACK(VALUE_INTPTR(scm_undef));
         emit_push_vm_stack(ctx, VALUE_INTPTR(scm_undef));
     }
-//  auto env = IRB.CreateBitOrPointerCast(CREATE_LOAD_VM_REG(vm, m_sp), IntptrPtrTy);
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
-//  CREATE_STORE_ENV_REC(env, up, CREATE_LOAD_VM_REG(vm, m_env));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
     auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
-//  CREATE_STORE_VM_REG(vm, m_sp, ea1);
     ctx.reg_sp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_fp, ea1);
     ctx.reg_fp.store(vm, ea1);
-//  CREATE_STORE_VM_REG(vm, m_env, CREATE_LEA_ENV_REC(env, up));
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
 
     ctx.set_local_var_count(ctx.m_depth, argc);
@@ -1568,7 +1448,6 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     m_usage.templates++;
 #endif
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
     auto c_push_close = M->getOrInsertFunction("c_push_close", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_push_close, { vm, VALUE_INTPTR(operands) });
 }
@@ -1616,9 +1495,6 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
-
-//  CREATE_PUSH_VM_STACK(VALUE_INTPTR(CDR(operands)));
     emit_push_vm_stack(ctx, VALUE_INTPTR(CDR(operands)));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
@@ -1635,11 +1511,12 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
 #endif
     BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
     int function_index = ctx.m_depth - 1 + (ctx.m_argc << 16);
+    ctx.m_local_functions[function_index] = L;
+    m_usage.locals++;
+
 #if DEBUG_CODEGEN
     printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
 #endif
-    ctx.m_local_functions[function_index] = L;
-    m_usage.locals++;
 
     context_t ctx2 = ctx;
     ctx2.m_function = L;
@@ -1664,7 +1541,6 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
-//  CREATE_STORE_VM_REG(vm, m_value, CREATE_LOAD_GLOC_REC(gloc, value));
     ctx.reg_value.store(vm, CREATE_LOAD_GLOC_REC(gloc, value));
 }
 
@@ -1676,7 +1552,6 @@ codegen_t::emit_if_symbolp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* symbol_true = BasicBlock::Create(C, "symbol_true", F);
@@ -1701,7 +1576,6 @@ codegen_t::emit_if_pairp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1726,7 +1600,6 @@ codegen_t::emit_if_not_nullp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1752,7 +1625,6 @@ codegen_t::emit_if_not_symbolp_ret_const(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto value = CREATE_LOAD_VM_REG(vm, m_value);
     auto value = ctx.reg_value.load(vm);
 
     BasicBlock* symbol_true = BasicBlock::Create(C, "symbol_true", F);
@@ -1776,8 +1648,6 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t));
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* fixnum_true = BasicBlock::Create(C, "fixnum_true", F);
@@ -1821,7 +1691,6 @@ codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    CREATE_STACK_OVERFLOW_HANDLER(sizeof(scm_obj_t) + sizeof(vm_env_rec_t));
     auto c_extend_enclose = M->getOrInsertFunction("c_extend_enclose", IntptrTy, IntptrPtrTy, IntptrTy);
     IRB.CreateCall(c_extend_enclose, { vm, VALUE_INTPTR(operands) });
 
@@ -1840,9 +1709,11 @@ codegen_t::emit_if_symbolp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
 
     emit_cond_symbolp(ctx, ctx.reg_value.load(vm), taken_true, taken_false);
+
     // taken
     IRB.SetInsertPoint(taken_true);
     transform(ctx, operands, false);
+
     // not taken
     IRB.SetInsertPoint(taken_false);
 }
@@ -1880,7 +1751,6 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
 
     intptr_t argc = FIXNUM(CADR(operands));
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
 
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
@@ -1891,11 +1761,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     ctx.reg_cache_copy(vm);
     auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
 
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
     ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
-
-//  CREATE_STORE_VM_REG(vm, m_value, val);
-//  CREATE_PUSH_VM_STACK(val);
     ctx.reg_value.store(vm, val);
     emit_push_vm_stack(ctx, val);
 
@@ -1945,7 +1811,6 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
 
     intptr_t argc = FIXNUM(CADR(operands));
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
     auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
 
@@ -1955,9 +1820,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     ctx.reg_cache_copy(vm);
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
-//  CREATE_STORE_VM_REG(vm, m_sp, IRB.CreateSub(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(argc << log2_of_intptr_size())));
     ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -2003,9 +1866,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-//  auto sp = CREATE_LOAD_VM_REG(vm, m_sp);
     auto sp = ctx.reg_sp.load(vm);
-//  auto fp = CREATE_LOAD_VM_REG(vm, m_fp);
     auto fp = ctx.reg_fp.load(vm);
     auto argc = VALUE_INTPTR(ctx.m_argc);
 
@@ -2015,17 +1876,18 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     ctx.reg_cache_copy(vm);
     auto val = IRB.CreateCall(ptr, { vm, argc, fp });
 
-//  CREATE_STORE_VM_REG(vm, m_value, val);
     ctx.reg_value.store(vm, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
     IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+
     // valid
     IRB.SetInsertPoint(undef_false);
     ctx.reg_value.copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
+
     // invalid
     IRB.SetInsertPoint(undef_true);
     ctx.reg_value.copy(vm);

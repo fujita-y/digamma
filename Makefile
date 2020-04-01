@@ -59,10 +59,13 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  CPPFLAGS += -DNO_FFI
-  #CXXFLAGS += -O0 -glldb
+	# export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
+  # CPPFLAGS += -DNO_FFI
+  # CXXFLAGS += -O0 -glldb
+	CPPFLAGS += $(shell pkg-config libffi --cflags)
 	CXXFLAGS += -O3 -momit-leaf-frame-pointer
-  LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
+  LDFLAGS += $(shell pkg-config libffi --libs)
+  LDLIBS += $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))

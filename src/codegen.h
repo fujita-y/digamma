@@ -15,7 +15,6 @@
 
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
-#define USE_UNIFIED_STACK_CHECK   1
 #define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             1
 
@@ -123,7 +122,7 @@ private:
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
     void emit_push_vm_stack(context_t& ctx, llvm::Value* val);
     void emit_prepair_apply(context_t& ctx, scm_closure_t closure);
-    llvm::Function* emit_define_prepare_call(context_t& ctx);
+    // llvm::Function* emit_define_prepare_call(context_t& ctx);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
     llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
@@ -136,7 +135,6 @@ private:
     void emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
-
     llvm::Function* emit_call(context_t& ctx, scm_obj_t inst);
     void emit_if_false_call(context_t& ctx, scm_obj_t inst);
     void emit_subr(context_t& ctx, scm_obj_t inst);
@@ -154,15 +152,12 @@ private:
     void emit_push_iloc(context_t& ctx, scm_obj_t inst);
     void emit_push_cons(context_t& ctx, scm_obj_t inst);
     void emit_push_close(context_t& ctx, scm_obj_t inst);
-
     void emit_apply_iloc(context_t& ctx, scm_obj_t inst);
     void emit_apply_gloc(context_t& ctx, scm_obj_t inst);
-
     void emit_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_ret_iloc(context_t& ctx, scm_obj_t inst);
     void emit_ret_cons(context_t& ctx, scm_obj_t inst);
     void emit_ret_subr(context_t& ctx, scm_obj_t inst);
-
     void emit_if_true(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp(context_t& ctx, scm_obj_t inst);
     void emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst);
@@ -174,7 +169,6 @@ private:
     void emit_if_true_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_false_ret(context_t& ctx, scm_obj_t inst);
     void emit_if_eqp(context_t& ctx, scm_obj_t inst);
-
     void emit_gloc(context_t& ctx, scm_obj_t inst);
     void emit_iloc(context_t& ctx, scm_obj_t inst);
     void emit_iloc0(context_t& ctx, scm_obj_t inst);
@@ -186,7 +180,6 @@ private:
     void emit_ge_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_le_n_iloc(context_t& ctx, scm_obj_t inst);
     void emit_eq_n_iloc(context_t& ctx, scm_obj_t inst);
-
     void emit_extend(context_t& ctx, scm_obj_t inst);
     void emit_extend_enclose(context_t& ctx, scm_obj_t inst);
     void emit_extend_enclose_local(context_t& ctx, scm_obj_t inst);
@@ -197,7 +190,6 @@ private:
     void emit_le_iloc(context_t& ctx, scm_obj_t inst);
     void emit_ge_iloc(context_t& ctx, scm_obj_t inst);
     void emit_eq_iloc(context_t& ctx, scm_obj_t inst);
-
     void emit_set_gloc(context_t& ctx, scm_obj_t inst);
     void emit_const(context_t& ctx, scm_obj_t inst);
     void emit_if_pairp(context_t& ctx, scm_obj_t inst);
@@ -209,7 +201,6 @@ private:
     void emit_if_false_ret_const(context_t& ctx, scm_obj_t inst);
     void emit_ret_nullp(context_t& ctx, scm_obj_t inst);
     void emit_ret_pairp(context_t& ctx, scm_obj_t inst);
-
     void emit_ret_gloc(context_t& ctx, scm_obj_t inst);
     void emit_ret_eqp(context_t& ctx, scm_obj_t inst);
     void emit_set_iloc(context_t& ctx, scm_obj_t inst);
@@ -221,33 +212,9 @@ private:
     void emit_nadd_iloc(context_t& ctx, scm_obj_t inst);
     void emit_apply(context_t& ctx, scm_obj_t inst);
     void emit_escape(context_t& ctx, scm_obj_t inst);
-
     void emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst);
     void emit_subr_gloc_of(context_t& ctx, scm_obj_t inst);
     void emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst);
 };
 
 #endif
-
-//extern codegen_t* s_codegen;
-
-/*
-for (Argument& argument : L->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
-
-(backtrace #f)
-(import (digamma time))
-
-(define (fib n)
-  (if (< n 2)
-    n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
-(closure-compile fib)
-(time (fib 40)) ;=> 102334155
-
-macbook default
-;; 18.153539 real   18.145671 user    0.005424 sys
-macbook jit
-;;  8.706625 real    8.699991 user    0.004582 sys
-   (7.350153 real    7.345971 user    0.002947 sys)
-*/

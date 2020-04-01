@@ -199,18 +199,7 @@ extern "C" {
     intptr_t c_n_compare(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         return n_compare(vm->m_heap, obj, operands);
     }
-/*
-    void c_prepare_apply(VM* vm, scm_closure_t closure) {
-        // assume vm->m_sp - vm->m_fp == args
-        intptr_t args = HDR_CLOSURE_ARGS(closure->hdr);
-        vm_env_t env = (vm_env_t)vm->m_sp;
-        env->count = args;
-        env->up = closure->env;
-        vm->m_sp = vm->m_fp = (scm_obj_t*)(env + 1);
-        vm->m_pc = closure->pc;
-        vm->m_env = &env->up;
-    }
-*/
+
     void c_push_close(VM* vm, scm_closure_t operands) {
         if (STACKP(vm->m_env)) {
             vm->m_env = vm->save_env(vm->m_env);
@@ -337,5 +326,4 @@ extern "C" {
         wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
         return 1;
     }
-
 }
