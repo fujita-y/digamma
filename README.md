@@ -7,11 +7,9 @@ Digamma virtual machine supports native thread to execute arbitrary scheme code 
 Each execution thread have own GC thread run independently from others.
 For example, when applying parallel map to 4 elements, digamma starts new 8 native threads running simultaneously (program x 4 + GC x 4).
 
+Digamma uses a separate compilation thread to incrementally generate native code for scheme procedures in background.
+
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
-
-### Special note for MacOS users
-
-You may want try "export MACOSX_DEPLOYMENT_TARGET=10.14" if you get "Segmentation fault: 11 (stack_not_16_byte_aligned_error)" on program execution. https://forums.developer.apple.com/thread/121887
 
 ### Run
 
