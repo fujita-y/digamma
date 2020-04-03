@@ -1,4 +1,4 @@
-  .section	__TEXT,__text,regular,pure_instructions
+	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 10, 15
 	.intel_syntax noprefix
 	.globl	"_27571fde-30ff-4ccb-96d7-18ad93155dfd" ## -- Begin function 27571fde-30ff-4ccb-96d7-18ad93155dfd
