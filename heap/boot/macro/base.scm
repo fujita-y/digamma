@@ -11,8 +11,7 @@
                (if (null? body)
                    (syntax-violation 'lambda "empty body" form)
                    (annotate `(lambda ,(rename-lambda-formals (cadr form) renames) ,@body) form)))))
-          (else
-           (syntax-violation 'lambda "expected formals and body" form)))))
+          (else (syntax-violation 'lambda "expected formals and body" form)))))
 
 (define expand-quote
   (lambda (form env)
@@ -23,23 +22,18 @@
 (define expand-begin
   (lambda (form env)
     (and (unexpect-top-level-form)
-         (or (pair? (cdr form))
-             (syntax-violation 'begin "misplaced empty begin" form)))
+         (or (pair? (cdr form)) (syntax-violation 'begin "misplaced empty begin" form)))
     (annotate `(begin ,@(flatten-begin (expand-each (cdr form) env) env)) form)))
 
 (define expand-if
   (lambda (form env)
-    (annotate (destructuring-match form
-                ((_ test expr)
-                 `(if ,(expand-form test env)
-                      ,(expand-form expr env)))
-                ((_ test expr1 expr2)
-                 `(if ,(expand-form test env)
-                      ,(expand-form expr1 env)
-                      ,(expand-form expr2 env)))
-                (_
-                 (syntax-violation 'if "expected 2 or 3 expressions" form)))
-              form)))
+    (annotate
+      (destructuring-match form
+        ((_ test expr) `(if ,(expand-form test env) ,(expand-form expr env)))
+        ((_ test expr1 expr2)
+         `(if ,(expand-form test env) ,(expand-form expr1 env) ,(expand-form expr2 env)))
+        (_ (syntax-violation 'if "expected 2 or 3 expressions" form)))
+      form)))
 
 (define expand-set!
   (lambda (form env)
@@ -53,20 +47,17 @@
                ((or (special? deno) (macro? deno))
                 (syntax-violation 'set! "misplaced syntactic keyword as variable" form))
                (else
-                (let ((var (expand-form name env)))
-                  (and (core-hashtable-contains? immutable-primitives var)
-                       (syntax-violation 'set! "attempt to modify immutable variable" form))
-                  (and (current-immutable-identifiers)
-                       (not (renamed-id? var))
-                       (core-hashtable-ref (current-immutable-identifiers) name #f)
-                       (syntax-violation 'set! "attempt to modify immutable variable" form))
-                  (let ((body (expand-form expr env)))
-                    (and (pair? body)
-                         (denote-lambda? env (car body))
-                         (set-closure-comment! body (original-id var)))
-                    (annotate `(set! ,var ,body) form)))))))
-      (_
-       (syntax-violation 'set! "expected variable and single expression" form)))))
+                 (let ((var (expand-form name env)))
+                   (and (core-hashtable-contains? immutable-primitives var)
+                        (syntax-violation 'set! "attempt to modify immutable variable" form))
+                   (and (current-immutable-identifiers)
+                        (not (renamed-id? var))
+                        (core-hashtable-ref (current-immutable-identifiers) name #f)
+                        (syntax-violation 'set! "attempt to modify immutable variable" form))
+                   (let ((body (expand-form expr env)))
+                     (and (pair? body) (denote-lambda? env (car body)) (set-closure-comment! body (original-id var)))
+                     (annotate `(set! ,var ,body) form)))))))
+      (_ (syntax-violation 'set! "expected variable and single expression" form)))))
 
 (define expand-let-syntax
   (lambda (form env)
@@ -75,9 +66,8 @@
        (begin
          (check-let-bindings form bindings)
          (fresh-rename-count)
-         (expand-form `(.BEGIN ,@body) (expand-let-syntax-bindings form bindings env))))
-      (_
-       (syntax-violation (car form) "expected bindings and body" form)))))
+         (expand-form `(|.begin| ,@body) (expand-let-syntax-bindings form bindings env))))
+      (_ (syntax-violation (car form) "expected bindings and body" form)))))
 
 (define expand-letrec-syntax
   (lambda (form env)
@@ -86,14 +76,12 @@
        (begin
          (check-let-bindings form bindings)
          (fresh-rename-count)
-         (expand-form `(.BEGIN ,@body) (expand-letrec-syntax-bindings form bindings env))))
-      (_
-       (syntax-violation (car form) "expected bindings and body" form)))))
+         (expand-form `(|.begin| ,@body) (expand-letrec-syntax-bindings form bindings env))))
+      (_ (syntax-violation (car form) "expected bindings and body" form)))))
 
 (define expand-define-syntax
   (lambda (form env)
-    (and (unexpect-top-level-form)
-         (syntax-violation (car form) "misplaced definition" form))
+    (and (unexpect-top-level-form) (syntax-violation (car form) "misplaced definition" form))
     (destructuring-match form
       ((_ (? symbol? name) body)
        (begin
@@ -101,15 +89,13 @@
            (env-delete! env name)
            (let-values (((code . expr) (compile-macro form body env)))
              (if (macro-variable? code)
-                 (.set-top-level-macro! 'variable name (cadr code) env)
-                 (.set-top-level-macro! 'syntax name code env))))
+                 (|.set-top-level-macro!| 'variable name (cadr code) env)
+                 (|.set-top-level-macro!| 'syntax name code env))))
          '(begin)))
-      (_
-       (syntax-violation (car form) "expected symbol and single expression" form)))))
+      (_ (syntax-violation (car form) "expected symbol and single expression" form)))))
 
 (define expand-define
   (lambda (form env)
-
     (define immutable?
       (lambda (id)
         (or (core-hashtable-contains? immutable-primitives id)
@@ -120,25 +106,19 @@
                        begin quasiquote unquote unquote-splicing
                        let-syntax letrec-syntax syntax-rules identifier-syntax
                        assert else => ... _)))))
-
-    (define let?
-      (lambda (id)
-        (denote-let? env id)))
-
-    (and (unexpect-top-level-form)
-         (syntax-violation (car form) "misplaced definition" form))
+    (define let? (lambda (id) (denote-let? env id)))
+    (and (unexpect-top-level-form) (syntax-violation (car form) "misplaced definition" form))
     (destructuring-match (desugar-define form)
       ((_ name body)
        (begin
          (and (immutable? name)
               (syntax-violation (car form) "attempt to modify immutable binding" form))
-         (let ((body (parameterize ((unexpect-top-level-form #t) (current-top-level-exterior name))
-                       (env-delete! env name)
-                       (expand-form body env))))
+         (let ((body
+                 (parameterize ((unexpect-top-level-form #t) (current-top-level-exterior name))
+                   (env-delete! env name)
+                   (expand-form body env))))
            (destructuring-match body
-             (((? let? _) _ e1)
-              (set-closure-comment! e1 (original-id name)))
-             (_
-              (set-closure-comment! body (original-id name))))
+             (((? let? _) _ e1) (set-closure-comment! e1 (original-id name)))
+             (_ (set-closure-comment! body (original-id name))))
            (core-hashtable-delete! (current-macro-environment) name)
            (annotate `(define ,name ,body) form)))))))

@@ -257,7 +257,7 @@ printer_t::format_va_list(const char* fmt, va_list ap)
                     case 'm': { // macro form
                         int save_limit = m_column_limit;
                         m_column_limit = m_column_limit ? m_column_limit : FIXNUM(m_vm->m_flags.backtrace_line_length);
-                        m_escape = true;
+                        m_escape = false;
                         m_unwrap = true;
                         m_radix = 10;
                         scm_obj_t expr = va_arg(ap, scm_obj_t);
@@ -270,18 +270,18 @@ printer_t::format_va_list(const char* fmt, va_list ap)
 
                             scm_obj_t obj = get_hashtable(ht, expr);
                             if (PAIRP(obj)) {
-                                port_puts(m_port, "\n  ...");
+                                port_puts(m_port, "\n  ... ");
                                 write(CAR(obj));
-                                snprintf(buf, sizeof(buf), " line %ld", labs(FIXNUM(CDR(obj))) / MAX_SOURCE_COLUMN);
+                                snprintf(buf, sizeof(buf), ":%ld", labs(FIXNUM(CDR(obj))) / MAX_SOURCE_COLUMN);
                                 port_puts(m_port, buf);
                             } else {
                                 scm_obj_t path = get_hashtable(ht, make_symbol(m_vm->m_heap, ".&SOURCE-PATH"));
                                 if (path != scm_undef) {
-                                    port_puts(m_port, "\n  ...");
+                                    port_puts(m_port, "\n  ... ");
                                     write(path);
                                     scm_obj_t line = get_hashtable(ht, expr);
                                     if (line != scm_undef) {
-                                        snprintf(buf, sizeof(buf), " line %ld", labs(FIXNUM(line)) / MAX_SOURCE_COLUMN);
+                                        snprintf(buf, sizeof(buf), ":%ld", labs(FIXNUM(line)) / MAX_SOURCE_COLUMN);
                                         port_puts(m_port, buf);
                                     }
                                 }
@@ -292,7 +292,7 @@ printer_t::format_va_list(const char* fmt, va_list ap)
                     } break;
 
                     case 'n': { // line and path comment
-                        m_escape = true;
+                        m_escape = false;
                         m_unwrap = true;
                         m_radix = 10;
                         scm_obj_t expr = va_arg(ap, scm_obj_t);
@@ -302,18 +302,18 @@ printer_t::format_va_list(const char* fmt, va_list ap)
                             scoped_lock lock(ht->lock);
                             scm_obj_t obj = get_hashtable(ht, expr);
                             if (PAIRP(obj)) {
-                                port_puts(m_port, "...");
+                                port_puts(m_port, "... ");
                                 write(CAR(obj));
-                                snprintf(buf, sizeof(buf), " line %ld", labs(FIXNUM(CDR(obj))) / MAX_SOURCE_COLUMN);
+                                snprintf(buf, sizeof(buf), ":%ld", labs(FIXNUM(CDR(obj))) / MAX_SOURCE_COLUMN);
                                 port_puts(m_port, buf);
                             } else {
                                 scm_obj_t path = get_hashtable(ht, make_symbol(m_vm->m_heap, ".&SOURCE-PATH"));
                                 if (path != scm_undef) {
-                                    port_puts(m_port, "...");
+                                    port_puts(m_port, "... ");
                                     write(path);
                                     scm_obj_t line = get_hashtable(ht, expr);
                                     if (line != scm_undef) {
-                                        snprintf(buf, sizeof(buf), " line %ld", labs(FIXNUM(line)) / MAX_SOURCE_COLUMN);
+                                        snprintf(buf, sizeof(buf), ":%ld", labs(FIXNUM(line)) / MAX_SOURCE_COLUMN);
                                         port_puts(m_port, buf);
                                     }
                                 }
@@ -746,8 +746,8 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
         }
         if (obj == scm_nil)               { port_puts(m_port, "()");                        return; }
         if (obj == scm_eof)               { port_puts(m_port, "#<eof>");                    return; }
-        if (obj == scm_timeout)           { port_puts(m_port, "#<timeout>");                return; }
-        if (obj == scm_shutdown)          { port_puts(m_port, "#<shutdown>");               return; }
+        if (obj == scm_timeout)           { port_puts(m_port, "#<queue timeout>");          return; }
+        if (obj == scm_shutdown)          { port_puts(m_port, "#<queue shutdown>");         return; }
         if (obj == scm_true)              { port_puts(m_port, "#t");                        return; }
         if (obj == scm_false)             { port_puts(m_port, "#f");                        return; }
         if (obj == scm_undef)             { port_puts(m_port, "#<undefined>");              return; }

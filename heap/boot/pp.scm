@@ -77,7 +77,7 @@
 
       (define indent-type2?
         (lambda (id)
-          (memq id '(if cond case and or set! import export cons map for-each exists for-all))))
+          (memq id '(if cond case and or set! import export cons map exists for-all)))) ; for-each
 
       (define indent-type3?
         (lambda (id)

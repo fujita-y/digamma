@@ -389,14 +389,14 @@ VM::backtrace_each(printer_t* prt, int n, scm_obj_t note)
         } else {
             prt->format(" %d  ~u", n, expr);
         }
-       prt->format("~%  ...~s line %d", string, line);
+       prt->format("~%  ... ~a:%d", string, line);
     } else {
         // (expr path . fixnum) : repl
         scm_string_t string = (scm_string_t)CADR(note);
         int comment = FIXNUM(CDDR(note));
         int line = comment / MAX_SOURCE_COLUMN;
         prt->format(" %d  ~u", n, CAR(note));
-        prt->format("~%  ...~s line %d", string, line);
+        prt->format("~%  ... ~a:%d", string, line);
     }
     prt->format("~%");
 }
