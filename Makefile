@@ -1,5 +1,5 @@
 #   Makefile for Linux, Darwin
-#   Requirements: GNU Make, llvm, libffi
+#   Requirements: GNU Make, llvm-10, libffi
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
 PROG = digamma
@@ -59,11 +59,11 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-	# export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
+  # export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
   # CPPFLAGS += -DNO_FFI
   # CXXFLAGS += -O0 -glldb
-	CPPFLAGS += $(shell pkg-config libffi --cflags)
-	CXXFLAGS += -O3 -momit-leaf-frame-pointer
+  CPPFLAGS += $(shell pkg-config libffi --cflags)
+  CXXFLAGS += -O3 -momit-leaf-frame-pointer
   LDFLAGS += $(shell pkg-config libffi --libs)
   LDLIBS += $(shell llvm-config --ldflags --system-libs --libs all)
 endif

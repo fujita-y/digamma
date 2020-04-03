@@ -110,11 +110,11 @@ reader_t::lexical_error(const char* fmt, ...)
     va_start(ap, fmt);
     prt.format_va_list(fmt, ap);
     va_end(ap);
-    prt.format("~%  ...~s ", m_in->name);
+    prt.format("~%  ... ~a", m_in->name);
     if (m_parsing_line_from == m_parsing_line_to) {
-        prt.format("line %d", m_parsing_line_from);
+        prt.format(":%d", m_parsing_line_from);
     } else {
-        prt.format("line %d-%d", m_parsing_line_from, m_parsing_line_to);
+        prt.format(":%d-%d", m_parsing_line_from, m_parsing_line_to);
     }
     scm_string_t message = make_string(m_vm->m_heap, (const char*)port->buf_head, port->buf_tail - port->buf_head);
     throw reader_exception_t(message);

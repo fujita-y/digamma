@@ -22,6 +22,7 @@
   (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
   (let* ((run (apply run-maker args))
          (warmup (run-bench name 1 ok? run))
+         (usleep 1000000)
          (result (time (run-bench name count ok? run))))
     (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
   (format #t ";;  ----------------------------------------------------------------~!")
@@ -118,6 +119,7 @@
 
 ;(closure-compile map)
 ;(closure-compile for-each)
+(usleep 5000000)
 
 (format #t "\n\n;;  GABRIEL\n")
 (time-bench ack 3)
