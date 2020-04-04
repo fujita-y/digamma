@@ -6,9 +6,9 @@
 #include "vmm.h"
 
 #if ENABLE_LLVM_JIT
-  #include "llvm/Support/InitLLVM.h"
-  #include "llvm/Support/TargetSelect.h"
-  #include "llvm/Support/DynamicLibrary.h"
+  #include <llvm/Support/InitLLVM.h>
+  #include <llvm/Support/TargetSelect.h>
+  #include <llvm/Support/DynamicLibrary.h>
 #endif
 
 int main_command_line_argc;

@@ -8,10 +8,10 @@
 #include "object.h"
 #include "vm.h"
 
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Module.h>
 
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1

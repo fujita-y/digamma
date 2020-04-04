@@ -219,7 +219,7 @@
                      '(|.unspecified|)
                      (let ((clause (car lst)))
                        (destructuring-match clause
-                         (((? else? _) ? pair? expr)
+                         (((? else? _) . (? pair? expr))
                           (if (null? (cdr lst))
                               `(|.begin| ,@expr)
                               (syntax-violation (car form) "misplaced else" form clause)))
@@ -242,7 +242,7 @@
     (define =>? (lambda (id) (denote-=>? env id)))
     (define maplist (lambda (func lst) (cond ((null? lst) '()) (else (cons (func lst) (maplist func (cdr lst)))))))
     (destructuring-match form
-      ((_ key ? pair? clauses)
+      ((_ key . (? pair? clauses))
        (let ((temp (generate-temporary-symbol)))
          (expand-form
            (annotate
@@ -257,7 +257,7 @@
                            (if (null? more)
                                `(|.else| (,expr ,temp))
                                (syntax-violation (car form) "misplaced else" form (car lst))))
-                          ((((? else? _) ? pair? expr) more ...)
+                          ((((? else? _) . (? pair? expr)) more ...)
                            (if (null? more)
                                `(|.else| ,@expr)
                                (syntax-violation (car form) "misplaced else" form (car lst))))
@@ -266,7 +266,7 @@
                            (if (or (symbol? datum) (fixnum? datum) (char? datum) (boolean? datum) (null? datum))
                                `((|.eq?| ,temp ',datum) (,expr ,temp))
                                `((|.eqv?| ,temp ',datum) (,expr ,temp))))
-                          ((((datum) ? pair? expr) _ ...)
+                          ((((datum) . (? pair? expr)) _ ...)
                            (if (or (symbol? datum) (fixnum? datum) (char? datum) (boolean? datum) (null? datum))
                                `((|.eq?| ,temp ',datum) ,@expr)
                                `((|.eqv?| ,temp ',datum) ,@expr)))
@@ -278,7 +278,7 @@
                                     datum)
                                   `((|.memq| ,temp ',datum) (,expr ,temp)))
                                  (else `((|.memv| ,temp ',datum) (,expr ,temp)))))
-                          ((((? list? datum) ? pair? expr) _ ...)
+                          ((((? list? datum) . (? pair? expr)) _ ...)
                            (cond ((null? datum) '(#f))
                                  ((every1
                                     (lambda (e) (or (symbol? e) (fixnum? e) (char? e) (boolean? e) (null? datum)))
@@ -308,7 +308,7 @@
        (begin
          (collect-lambda-formals (annotate formals form) form)
          (annotate `(define ,name (|.lambda| ,formals (|.unspecified|))) form)))
-      ((_ ((? symbol? name) . formals) ? pair? body)
+      ((_ ((? symbol? name) . formals) . (? pair? body))
        (begin
          (collect-lambda-formals (annotate formals form) form)
          (annotate `(define ,name (|.lambda| ,formals ,@body)) form)))

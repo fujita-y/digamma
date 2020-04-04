@@ -18,23 +18,16 @@
 
 (define perform-dynamic-wind
   (lambda (new cont args)
-
     (define common-tail
       (lambda (x y)
         (let ((nx (length x)) (ny (length y)))
-          (do ((x (if (> nx ny) (list-tail x (- nx ny)) x) (cdr x))
-               (y (if (> ny nx) (list-tail y (- ny nx)) y) (cdr y)))
+          (do
+            ((x (if (> nx ny) (list-tail x (- nx ny)) x) (cdr x))
+             (y (if (> ny nx) (list-tail y (- ny nx)) y) (cdr y)))
             ((eq? x y) x)))))
-
     (let ((tail (common-tail new (current-dynamic-wind-record))))
       (let loop ((rec (current-dynamic-wind-record)))
-        (cond ((not (eq? rec tail))
-               (current-dynamic-wind-record (cdr rec))
-               ((cdar rec))
-               (loop (cdr rec)))))
+        (cond ((not (eq? rec tail)) (current-dynamic-wind-record (cdr rec)) ((cdar rec)) (loop (cdr rec)))))
       (let loop ((rec new))
-        (cond ((not (eq? rec tail))
-               (loop (cdr rec))
-               ((caar rec))
-               (current-dynamic-wind-record rec)))))
+        (cond ((not (eq? rec tail)) (loop (cdr rec)) ((caar rec)) (current-dynamic-wind-record rec)))))
     (apply cont args)))
