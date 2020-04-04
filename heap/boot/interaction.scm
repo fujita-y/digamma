@@ -108,8 +108,7 @@
                   (output-irritants)
                   (output-expansion))))
         (format port "~%")
-        (let ((plugged
-                (or (lookup-process-environment "EMACS") (not (eq? (port-device-subtype (current-input-port)) 'char)))))
+        (let ((plugged (not (eq? (port-device-subtype (current-input-port)) 'char))))
           (and (serious-condition? c) (display-backtrace port))
           (if plugged
               (format out "~a~!" (extract-accumulated-string port))
@@ -259,8 +258,7 @@
             (pretty-print subform port)
             (and (pair? subform) (format port "~%  ~n" subform))))
         (format port "~%")
-        (let ((plugged
-                (or (lookup-process-environment "EMACS") (not (eq? (port-device-subtype (current-input-port)) 'char)))))
+        (let ((plugged (not (eq? (port-device-subtype (current-input-port)) 'char))))
           (if plugged
               (format (current-error-port) "~a~!" (extract-accumulated-string port))
               (format (current-error-port) "~%~a~!" (extract-accumulated-string port))))))))
