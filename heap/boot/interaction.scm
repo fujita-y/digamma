@@ -143,24 +143,14 @@
 
 (define home-directory
   (lambda ()
-    (let ((path
-            (format
-              "~/"
-              (if (string-contains (architecture-feature 'operating-system) "windows")
-                  (string-append
-                    (or (lookup-process-environment "HOMEDRIVE") "")
-                    (or (lookup-process-environment "HOMEPATH") ""))
-                  (or (lookup-process-environment "HOME") "")))))
+    (let ((path (or (lookup-process-environment "HOME") "")))
       (and (file-exists? path) path))))
 
 (define process (lambda args (apply process-spawn #t #f #f #f #f args)))
 
 (define process-shell-command
   (lambda (command)
-    (cond ((string-contains (architecture-feature 'operating-system) "windows")
-           (process (or (getenv "COMSPEC") "cmd.exe") "/c" command))
-          (else
-           (process (or (getenv "SHELL") "/bin/sh") "-c" command)))))
+    (process (or (getenv "SHELL") "/bin/sh") "-c" command)))
 
 (define apply-scheme-proc-assistant
   (lambda (proc . args)
@@ -277,20 +267,9 @@
           (and (directory-exists? path) (add-library-path path)))))
     (define init-sys-acc
       (lambda ()
-        (cond ((string-contains (architecture-feature 'operating-system) "windows")
-               (cond
-                 ((lookup-process-environment "TEMP")
-                  =>
-                  (lambda (path)
-                    (cond
-                      ((directory-exists? path)
-                       (or (directory-exists? (format "~//Digamma" path)) (create-directory (format "~//Digamma" path)))
-                       (auto-compile-cache (format "~//Digamma" path))))))))
-              ((home-directory)
-               =>
-               (lambda (home)
-                 (and (directory-exists? (format "~//.digamma" home))
-                      (auto-compile-cache (format "~//.digamma" home))))))))
+        (let ((home (home-directory)))
+          (and (directory-exists? (format "~//.digamma" home))
+               (auto-compile-cache (format "~//.digamma" home))))))
     (define init-env-acc
       (lambda ()
         (cond
@@ -318,10 +297,7 @@
                            (current-error-port)
                            "** ERROR in environment variable 'DIGAMMA_SITELIB': directory ~s not exist~%"
                            path))))
-               (reverse
-                 (if (string-contains (architecture-feature 'operating-system) "windows")
-                     (string-split paths #\;)
-                     (string-split paths #\:)))))))))
+               (reverse (string-split paths #\:))))))))
     (define init-env-loadpath
       (lambda ()
         (cond
@@ -336,10 +312,7 @@
                            (current-error-port)
                            "** ERROR in environment variable 'DIGAMMA_LOADPATH': directory ~s not exist~%"
                            path))))
-               (reverse
-                 (if (string-contains (architecture-feature 'operating-system) "windows")
-                     (string-split paths #\;)
-                     (string-split paths #\:)))))))))
+               (reverse (string-split paths #\:))))))))
     (define add-opt-sitelib
       (lambda (paths)
         (for-each
@@ -352,10 +325,7 @@
                       paths
                       path)
                     (exit #f))))
-          (reverse
-            (if (string-contains (architecture-feature 'operating-system) "windows")
-                (string-split paths #\;)
-                (string-split paths #\:))))))
+          (reverse (string-split paths #\:)))))
     (define add-opt-loadpath
       (lambda (paths)
         (for-each
@@ -368,10 +338,7 @@
                       paths
                       path)
                     (exit #f))))
-          (reverse
-            (if (string-contains (architecture-feature 'operating-system) "windows")
-                (string-split paths #\;)
-                (string-split paths #\:))))))
+          (reverse (string-split paths #\:)))))
     (define set-opt-acc
       (lambda (path)
         (cond ((directory-exists? (expand-path path)) (auto-compile-cache (expand-path path)))
