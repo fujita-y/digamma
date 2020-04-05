@@ -253,6 +253,7 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_iloc));
 }
 
+/*
 void
 codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 {
@@ -324,6 +325,102 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         ctx.reg_cache_copy(vm);
         IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
     }
+}
+*/
+
+void
+codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    scm_obj_t operands = CDAR(inst);
+    auto vm = F->arg_begin();
+
+    scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
+    scm_obj_t obj = gloc->value;
+    if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
+#if VERBOSE_CODEGEN
+        printf("emit_apply_gloc: self recursive: %s\n", symbol->name);
+#endif
+        emit_prepair_apply(ctx, ctx.m_top_level_closure);
+        ctx.reg_cache_copy(vm);
+
+        auto call2 = IRB.CreateCall(ctx.m_top_level_function, { vm });
+        call2->setTailCallKind(CallInst::TCK_MustTail);
+        IRB.CreateRet(call2);
+        return;
+    }
+    if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
+        scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
+        scm_closure_t closure = (scm_closure_t)obj;
+        if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
+#if VERBOSE_CODEGEN
+            printf("emit_apply_gloc: uninterned gloc: %s\n", symbol->name);
+#endif
+            if (closure->env == NULL) {
+                Function* F2 = emit_inner_function(ctx, closure);
+                if (F2 != NULL) {
+                    m_usage.inners++;
+                    emit_prepair_apply(ctx, closure);
+                    ctx.reg_cache_copy(vm);
+                    auto call2 = IRB.CreateCall(F2, {vm});
+                    call2->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call2);
+                    return;
+                } else {
+#if VERBOSE_CODEGEN
+                    printf("emit_apply_gloc: out of top level context, F2 == NULL: %s\n", symbol->name);
+#endif
+                }
+            } else {
+#if VERBOSE_CODEGEN
+                printf("emit_apply_gloc: out of top level context, closure->env != NULL: %s\n", symbol->name);
+#endif
+            }
+        } else if (strchr(symbol->name, IDENTIFIER_LIBRARY_SUFFIX)) {
+#if VERBOSE_CODEGEN
+            printf("emit_apply_gloc: library top level: %s\n", symbol->name);
+#endif
+            if (HDR_CLOSURE_ARGS(closure->hdr) == ctx.m_argc) {
+                if (closure->code) {
+                    auto procType = FunctionType::get(IntptrTy, { IntptrPtrTy }, false);
+                    auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(closure->code), procType->getPointerTo());
+                    emit_prepair_apply(ctx, closure);
+                    ctx.reg_cache_copy(vm);
+                    auto call = IRB.CreateCall(ptr, { vm });
+                    call->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call);
+                    return;
+                } else {
+#if VERBOSE_CODEGEN
+                    printf("emit_apply_gloc: library top level not compiled: %s\n", symbol->name);
+#endif
+                }
+            } else {
+#if VERBOSE_CODEGEN
+                printf("emit_apply_gloc: library top level ctx.m_argc does not match: %s\n", symbol->name);
+#endif
+            }
+        }
+    }
+
+    auto val = CREATE_LOAD_GLOC_REC(IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy), value);
+    ctx.reg_value.store(vm, val);
+
+    BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
+    BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
+    auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+
+    // valid
+    IRB.SetInsertPoint(undef_false);
+    ctx.reg_cache_copy(vm);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
+
+    // invalid
+    IRB.SetInsertPoint(undef_true);
+    ctx.reg_cache_copy(vm);
+    IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_error_apply_gloc));
 }
 
 void

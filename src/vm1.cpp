@@ -394,7 +394,7 @@ VM::loop(bool resume)
     if (resume) goto pop_cont;
     goto loop;
 
-    apply:
+    apply: {
         if (CLOSUREP(m_value)) {
             if (m_heap->m_stop_the_world) stop();
             if ((uintptr_t)m_sp + sizeof(vm_env_rec_t) < (uintptr_t)m_stack_limit) {
@@ -407,13 +407,11 @@ VM::loop(bool resume)
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
                 m_pc = closure->pc;
                 m_env = &env->up;
-
                 if (closure->code) {
                     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
                     intptr_t n = (*thunk)((intptr_t)this);
                     NATIVE_THUNK_POST_DISPATCH(n);
                 }
-
                 goto trace_n_loop;
             }
             goto COLLECT_STACK_ENV_REC_N_APPLY;
@@ -425,7 +423,36 @@ VM::loop(bool resume)
             if (m_value == scm_undef) goto BACK_TO_TRACE_N_LOOP;
             goto pop_cont;
         }
-        goto APPLY_SPECIAL;
+    }
+    goto APPLY_SPECIAL;
+
+    pop_cont: {
+        if (m_cont == NULL) return;
+        vm_cont_t cont = (vm_cont_t)((intptr_t)m_cont - offsetof(vm_cont_rec_t, up));
+        m_trace = cont->trace;
+        m_fp = cont->fp;
+        m_pc = cont->pc;
+        m_env = cont->env;
+        m_cont = cont->up;
+        if (STACKP(cont)) {
+            m_sp = (scm_obj_t*)cont;
+        } else {
+            intptr_t nargs = (scm_obj_t*)cont - (scm_obj_t*)cont->fp;
+            const scm_obj_t* s = (scm_obj_t*)cont->fp;
+            scm_obj_t* d = (scm_obj_t*)m_stack_top;
+            for (intptr_t i = 0; i < nargs; i++) d[i] = s[i];
+            m_fp = m_stack_top;
+            m_sp = m_fp + nargs;
+        }
+        m_trace_tail = scm_unspecified;
+        if (m_heap->m_stop_the_world) stop();
+        if (cont->code != NULL) {
+            intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
+            intptr_t n = (*thunk)((intptr_t)this);
+            NATIVE_THUNK_POST_DISPATCH(n);
+        }
+    }
+    goto loop;
 
     trace_n_loop:
         if (operand_trace != scm_nil) {
@@ -459,36 +486,6 @@ VM::loop(bool resume)
 #endif
         }
         goto loop;
-
-    pop_cont:
-        if (m_cont == NULL) return;
-        {
-            vm_cont_t cont = (vm_cont_t)((intptr_t)m_cont - offsetof(vm_cont_rec_t, up));
-            m_trace = cont->trace;
-            m_fp = cont->fp;
-            m_pc = cont->pc;
-            m_env = cont->env;
-            m_cont = cont->up;
-            if (STACKP(cont)) {
-                m_sp = (scm_obj_t*)cont;
-            } else {
-                intptr_t nargs = (scm_obj_t*)cont - (scm_obj_t*)cont->fp;
-                {
-                    const scm_obj_t* s = (scm_obj_t*)cont->fp;
-                    scm_obj_t* d = (scm_obj_t*)m_stack_top;
-                    for (intptr_t i = 0; i < nargs; i++) d[i] = s[i];
-                }
-                m_fp = m_stack_top;
-                m_sp = m_fp + nargs;
-            }
-            m_trace_tail = scm_unspecified;
-            if (m_heap->m_stop_the_world) stop();
-            if (cont->code != NULL) {
-                intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))cont->code;
-                intptr_t n = (*thunk)((intptr_t)this);
-                NATIVE_THUNK_POST_DISPATCH(n);
-            }
-        }
 
     loop:
         assert(m_sp <= m_stack_limit);
@@ -1486,14 +1483,12 @@ VM::loop(bool resume)
             if (CLOSUREP(m_value)) {
                 int x = apply_apply_closure(obj);
                 if (x == apply_apply_trace_n_loop) {
-
                     scm_closure_t closure = (scm_closure_t)m_value;
                     if (closure->code) {
                         intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
                         intptr_t n = (*thunk)((intptr_t)this);
                         NATIVE_THUNK_POST_DISPATCH(n);
                     }
-
                     goto trace_n_loop;
                 }
                 if (x == apply_apply_wrong_number_args) goto ERROR_APPLY_WRONG_NUMBER_ARGS;
@@ -1627,13 +1622,11 @@ VM::loop(bool resume)
                 m_sp = m_fp = (scm_obj_t*)(env + 1);
                 m_pc = closure->pc;
                 m_env = &env->up;
-
                 if (closure->code) {
                     intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))closure->code;
                     intptr_t n = (*thunk)((intptr_t)this);
                     NATIVE_THUNK_POST_DISPATCH(n);
                 }
-
                 goto trace_n_loop;
             }
             goto ERROR_APPLY_WRONG_NUMBER_ARGS;

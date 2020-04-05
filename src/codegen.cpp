@@ -80,6 +80,17 @@ void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
 }
 
 template<int byte_offset>
+void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
+#if USE_REG_CACHE
+    if (ctx->m_disable_reg_cache) return;
+    if (val && need_write_back) {
+        IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        need_write_back = false;
+    }
+#endif
+}
+
+template<int byte_offset>
 codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
   : ctx(context), val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
     IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
