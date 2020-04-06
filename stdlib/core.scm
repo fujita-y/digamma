@@ -244,6 +244,7 @@
     closure-codegen
     cmwc-random-real
     cmwc-random-u32
+    codegen-queue-count
     collect
     collect-notify
     collect-stack-notify

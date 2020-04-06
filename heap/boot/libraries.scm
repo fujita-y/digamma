@@ -439,7 +439,8 @@
                         warning-level
                         restricted-print-line-length
                         record-print-nesting-limit
-                        macro-expand compile compile-coreform closure-code closure-codegen display-codegen-statistics
+                        macro-expand compile compile-coreform closure-code
+                        closure-codegen codegen-queue-count display-codegen-statistics
                         current-environment current-macro-environment current-variable-environment current-dynamic-environment
                         system-environment interaction-environment
                         make-environment
