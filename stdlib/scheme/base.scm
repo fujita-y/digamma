@@ -6,6 +6,7 @@
                           for-each map member assoc string->list string-copy string-fill!
                           vector->list vector-fill! bytevector-copy vector-map)
                   (define-record-type r6rs:define-record-type)
+                  (flush-output-port r6rs:flush-output-port)
                   (expt r6rs:expt)
                   (error r6rs:error)
                   (string->utf8 r6rs:string->utf8)
@@ -608,6 +609,11 @@
       (syntax-rules ()
         ((_ msg args ...)
          (syntax-violation #f msg '(args ...)))))
+
+    (define flush-output-port
+      (lambda options
+        (let-optionals options ((port (current-output-port)))
+          (r6rs:flush-output-port port))))
 
     (define-syntax cond-expand
       (lambda (x)
