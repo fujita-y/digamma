@@ -9,13 +9,13 @@
 #include "vmm.h"
 #include "port.h"
 
-#include "llvm/IR/Verifier.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include <llvm/IR/Verifier.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Support/InitLLVM.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -75,6 +75,17 @@ void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
     if (ctx->m_disable_reg_cache) return;
     if (val && need_write_back) {
         IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    }
+#endif
+}
+
+template<int byte_offset>
+void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
+#if USE_REG_CACHE
+    if (ctx->m_disable_reg_cache) return;
+    if (val && need_write_back) {
+        IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        need_write_back = false;
     }
 #endif
 }

@@ -3,9 +3,10 @@
 
 (define make-parameter
   (lambda (init . maybe-filter)
-    (let ((parameter (if (null? maybe-filter)
-                         (parameter-proc-0 (gensym))
-                         (parameter-proc-1 (gensym) (car maybe-filter)))))
+    (let ((parameter
+            (if (null? maybe-filter)
+                (parameter-proc-0 (gensym))
+                (parameter-proc-1 (gensym) (car maybe-filter)))))
       (begin (parameter init) parameter))))
 
 (define parameter-proc-0

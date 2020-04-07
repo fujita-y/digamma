@@ -71,7 +71,28 @@ subr_display_codegen_statistics(VM* vm, int argc, scm_obj_t argv[])
     wrong_number_of_arguments_violation(vm, "display-codegen-statistics", 0, 0, argc, argv);
     return scm_undef;
 #else
-    implementation_restriction_violation(vm, "closure-codegen", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+    implementation_restriction_violation(vm, "display-codegen-statistics", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+    return scm_undef;
+#endif
+}
+
+// codegen-queue-count
+scm_obj_t
+subr_codegen_queue_count(VM* vm, int argc, scm_obj_t argv[])
+{
+#if ENABLE_LLVM_JIT
+    if (argc == 0) {
+        if (vm->m_codegen) {
+            return MAKEFIXNUM(vm->m_codegen->m_compile_queue.size());
+        } else {
+            implementation_restriction_violation(vm, "codegen-queue-size", "codegen not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
+            return scm_undef;
+        }
+    }
+    wrong_number_of_arguments_violation(vm, "codegen-queue-size", 0, 0, argc, argv);
+    return scm_undef;
+#else
+    implementation_restriction_violation(vm, "codegen-queue-size", "not available on this vm", MAKEFIXNUM(vm->m_id), argc, argv);
     return scm_undef;
 #endif
 }
@@ -82,5 +103,6 @@ init_subr_codegen(object_heap_t* heap)
 #define DEFSUBR(SYM, FUNC)  heap->intern_system_subr(SYM, FUNC)
 
     DEFSUBR("display-codegen-statistics", subr_display_codegen_statistics);
+    DEFSUBR("codegen-queue-count", subr_codegen_queue_count);
     DEFSUBR("closure-codegen", subr_closure_codegen);
 }

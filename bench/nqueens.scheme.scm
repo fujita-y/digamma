@@ -1,6 +1,6 @@
 (import (digamma time))
 
-;; nqueens from Gabriel benchmark
+;; nqueens from Gambit benchmark
 (define (nqueens n)
   (define (|1-to| n) (let loop ((i n) (l '())) (if (= i 0) l (loop (- i 1) (cons i l)))))
   (define (my-try x y z)

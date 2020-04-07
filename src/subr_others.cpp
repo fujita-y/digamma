@@ -1094,10 +1094,10 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
     }
     if (argc == 0) {
 #if PROFILE_OPCODE
-        display_opcode_profile();
+        vm->display_opcode_profile();
 #endif
 #if PROFILE_SUBR
-        display_subr_profile();
+        vm->display_subr_profile();
 #endif
         vm->m_vmm->destroy();
         exit(EXIT_SUCCESS);

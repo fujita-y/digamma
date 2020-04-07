@@ -6,9 +6,9 @@
 #include "vmm.h"
 
 #if ENABLE_LLVM_JIT
-  #include "llvm/Support/InitLLVM.h"
-  #include "llvm/Support/TargetSelect.h"
-  #include "llvm/Support/DynamicLibrary.h"
+  #include <llvm/Support/InitLLVM.h>
+  #include <llvm/Support/TargetSelect.h>
+  #include <llvm/Support/DynamicLibrary.h>
 #endif
 
 int main_command_line_argc;
@@ -44,7 +44,7 @@ static int opt_heap_limit(int argc, const char** argv)
             if ((sscanf(param, "%d", &tmp) == 1) && (tmp >= 16) && (tmp < 2048)) {
                 value = tmp;
             } else {
-                fprintf(stderr, "** ERROR in option '--heap-limit=%s': parameter should be in the range of 16 .. 2047\n", param);
+                fprintf(stderr, "** ERROR in option '--heap-limit=%s': parameter must be in the range [16 .. 2047]\n", param);
                 exit(EXIT_FAILURE);
             }
         }

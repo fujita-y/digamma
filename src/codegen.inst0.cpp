@@ -156,7 +156,7 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
         auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk4, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
         return env;
     }
-    ctx.reg_cache_copy(vm);
+    ctx.reg_env.writeback(vm);
     auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
     return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
 }
@@ -185,7 +185,7 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
         return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
 #endif
     }
-    ctx.reg_cache_copy(vm);
+    ctx.reg_env.writeback(vm);
     auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
     return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
 }
