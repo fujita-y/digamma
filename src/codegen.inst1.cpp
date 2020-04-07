@@ -359,20 +359,18 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 #endif
             if (closure->env == NULL) {
                 Function* F2 = emit_inner_function(ctx, closure);
-                if (F2 != NULL) {
-                    m_usage.inners++;
-                    emit_prepair_apply(ctx, closure);
-                    ctx.reg_cache_copy(vm);
-                    auto call2 = IRB.CreateCall(F2, {vm});
-                    call2->setTailCallKind(CallInst::TCK_MustTail);
-                    IRB.CreateRet(call2);
-                    return;
-                } else {
-#if VERBOSE_CODEGEN
-                    printf("emit_apply_gloc: out of top level context, F2 == NULL: %s\n", symbol->name);
-#endif
-                }
+                if (F2 == NULL) fatal("%s:%u inconsistent state", __FILE__, __LINE__);
+                m_usage.inners++;
+                emit_prepair_apply(ctx, closure);
+                ctx.reg_cache_copy(vm);
+                auto call2 = IRB.CreateCall(F2, {vm});
+                call2->setTailCallKind(CallInst::TCK_MustTail);
+                IRB.CreateRet(call2);
+                return;
             } else {
+                if (m_debug) {
+                    printf("hazard: emit_apply_gloc: closure have non NULL environment\n");
+                }
 #if VERBOSE_CODEGEN
                 printf("emit_apply_gloc: out of top level context, closure->env != NULL: %s\n", symbol->name);
 #endif
@@ -1040,6 +1038,13 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
 #if VERBOSE_CODEGEN
         printf("emit_apply_iloc_local: out of local context, level = %d index = %d ctx.m_depth = %d ctx.m_depth - level - 1 = %x \n", level, index, ctx.m_depth, ctx.m_depth - level - 1);
 #endif
+        if (m_debug) {
+            if (ctx.m_depth - level - 1 < 0) {
+                printf("hazard: emit_apply_iloc_local: referencing free variable (%d - %d)\n", ctx.m_depth, level);
+            } else if (ctx.m_local_functions[function_index] == NULL) {
+                printf("hazard: emit_apply_iloc_local: ctx.m_local_functions[%d] == NULL\n", function_index);
+            }
+        }
         CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(emit_lookup_iloc(ctx, level, index)));
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
@@ -1611,7 +1616,7 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx.m_local_functions[function_index] = L;
     m_usage.locals++;
 
-#if DEBUG_CODEGEN
+#if VERBOSE_CODEGEN
     printf("emit_push_close_local level = %d index = %d function_index = %x\n", ctx.m_depth, ctx.m_argc, function_index);
 #endif
 

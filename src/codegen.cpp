@@ -307,7 +307,7 @@ codegen_t::compile_each(scm_closure_t closure)
 {
     VM* vm = m_vm;
     if (is_compiled(closure)) return;
-#if DEBUG_CODEGEN
+#if VERBOSE_CODEGEN
     printer_t prt(vm, vm->m_current_output);
     prt.format("generating native code: ~s~&", closure->doc);
 #endif

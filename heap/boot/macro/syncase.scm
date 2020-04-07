@@ -10,7 +10,7 @@
 ;;   if call (datum->syntax ...) on macro expansion, (syntax-object-renames template-id) should be nil.
 ;;   if call (datum->syntax ...) on transformer evaluation, (syntax-object-renames template-id) should be alist.
 
-(set-top-level-value! '.vars #f)
+(set-top-level-value! '|.vars| #f)
 
 (define make-syntax-object    (lambda (form renames lexname) (tuple 'type:syntax form renames lexname)))
 (define syntax-object-expr    (lambda (obj) (tuple-ref obj 1)))

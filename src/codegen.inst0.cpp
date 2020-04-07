@@ -48,19 +48,19 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 
     auto search = m_lifted_functions.find(closure);
     if (search != m_lifted_functions.end()) {
-#if DEBUG_CODEGEN
+#if VERBOSE_CODEGEN
       puts(" + found in m_lifted_functions, return Function*");
 #endif
       return search->second;
     }
 
     if (is_compiled(closure)) {
-#if DEBUG_CODEGEN
+#if VERBOSE_CODEGEN
         puts(" + emit_inner_function: already compiled, return Function*");
 #endif
         return get_function(ctx, closure);
     }
-#if DEBUG_CODEGEN
+#if VERBOSE_CODEGEN
     puts(" + generating native code for new lifted function");
 #endif
 
