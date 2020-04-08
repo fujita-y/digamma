@@ -69,10 +69,6 @@ public:
         native_thunk_loop,
         native_thunk_resume_loop,
         native_thunk_escape,
-        native_thunk_error_apply_iloc,
-        native_thunk_error_apply_gloc,
-        native_thunk_error_ret_iloc,
-        native_thunk_error_push_gloc,
         native_thunk_invalid_state,
         native_thunk_unreachable,
     };

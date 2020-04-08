@@ -127,12 +127,35 @@ codegen_t::context_t::reg_cache_copy(llvm::Value* vm)
 }
 
 void
+codegen_t::context_t::reg_cache_copy_except_sp(llvm::Value* vm)
+{
+    reg_fp.copy(vm);
+    reg_env.copy(vm);
+    reg_cont.copy(vm);
+    reg_value.copy(vm);
+}
+void
 codegen_t::context_t::reg_cache_copy_except_value(llvm::Value* vm)
 {
     reg_fp.copy(vm);
     reg_env.copy(vm);
     reg_cont.copy(vm);
     reg_sp.copy(vm);
+}
+
+void
+codegen_t::context_t::reg_cache_copy_except_value_and_sp(llvm::Value* vm)
+{
+    reg_fp.copy(vm);
+    reg_env.copy(vm);
+    reg_cont.copy(vm);
+}
+
+void
+codegen_t::context_t::reg_cache_copy_only_value_and_cont(llvm::Value* vm)
+{
+    reg_cont.copy(vm);
+    reg_value.copy(vm);
 }
 
 void
@@ -472,11 +495,9 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_function = emit_call(ctx, inst);
             } break;
             case VMOP_RET_GLOC: {
-                reg_cache_synchronize sync(ctx);
                 emit_ret_gloc(ctx, inst);
             } break;
             case VMOP_RET_CONST: {
-                reg_cache_synchronize sync(ctx);
                 emit_ret_const(ctx, inst);
             } break;
             case VMOP_RET_ILOC: {
@@ -678,7 +699,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_pairp(ctx, inst);
             } break;
             case VMOP_RET_CLOSE: {
-                reg_cache_synchronize sync(ctx);
                 emit_ret_close(ctx, inst);
             } break;
             case VMOP_PUSH_NADD_ILOC: {

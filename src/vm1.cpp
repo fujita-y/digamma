@@ -25,10 +25,6 @@
                 case native_thunk_loop: goto loop; \
                 case native_thunk_resume_loop: goto RESUME_LOOP; \
                 case native_thunk_escape: return; \
-                case native_thunk_error_apply_iloc: goto ERROR_APPLY_ILOC; \
-                case native_thunk_error_apply_gloc: goto ERROR_APPLY_GLOC; \
-                case native_thunk_error_ret_iloc: goto ERROR_RET_ILOC; \
-                case native_thunk_error_push_gloc: goto ERROR_PUSH_GLOC; \
                 default: fatal("unsupported thunk protocol %d", n); \
             } \
         }
