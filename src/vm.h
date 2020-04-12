@@ -83,7 +83,6 @@ public:
     scm_obj_t           m_current_exception_handler;
     scm_obj_t           m_current_source_comments;
     int                 m_recursion_level;
-    int                 m_shared_object_errno;
 #if USE_PARALLEL_VM
     int                 m_id;
     VM*                 m_parent;

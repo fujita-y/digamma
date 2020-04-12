@@ -14,6 +14,9 @@
 int main_command_line_argc;
 const char** main_command_line_argv;
 
+extern void init_c_ffi();
+extern void destroy_c_ffi();
+
 #if defined(NO_TLS)
   pthread_key_t s_current_vm;
 #else
@@ -113,6 +116,7 @@ int main(int argc, const char** argv)
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+    init_c_ffi();
 #endif
 #ifndef NDEBUG
     struct foo { char i; };
@@ -187,6 +191,9 @@ int main(int argc, const char** argv)
 #else
     rootVM.boot();
     rootVM.standalone();
+#endif
+#if ENABLE_LLVM_JIT
+    destroy_c_ffi();
 #endif
     return 0;
 }

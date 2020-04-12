@@ -304,7 +304,7 @@ object_heap_t::init_primordial(size_t pool_size, size_t init_size)
     init_subr_port(this);
     init_subr_socket(this);
     init_subr_unicode(this);
-    init_subr_ffi(this);
+    init_subr_c_ffi(this);
     init_subr_bitwise(this);
     init_subr_fixnum(this);
     init_subr_flonum(this);

@@ -111,7 +111,6 @@ VMM::init_child_vm(VM* vm, VM* parent, int id)
     }
     vm->m_current_dynamic_wind_record = scm_nil;
     vm->m_recursion_level = 0;
-    vm->m_shared_object_errno = 0;
     memcpy(&vm->m_flags, &parent->m_flags, sizeof(parent->m_flags));
     vm->reset();
 }

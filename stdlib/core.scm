@@ -184,7 +184,6 @@
     cadddr
     caddr
     cadr
-    call-shared-object
     call-with-bytevector-output-port
     call-with-current-continuation
     call-with-input-file
@@ -244,7 +243,10 @@
     closure-codegen
     cmwc-random-real
     cmwc-random-u32
+    codegen-cdecl-callback
+    codegen-cdecl-callout
     codegen-queue-count
+    codegen-queue-push!
     collect
     collect-notify
     collect-stack-notify
@@ -610,7 +612,6 @@
     make-assertion-violation
     make-bytevector
     make-bytevector-mapping
-    make-callback-trampoline
     make-cmwc-random-state
     make-core-hashtable
     make-custom-binary-input-port
@@ -823,7 +824,6 @@
     set-current-output-port!
     set-port-position!
     set-top-level-value!
-    shared-object-errno
     shared-queue-pop!
     shared-queue-push!
     shared-queue-shutdown

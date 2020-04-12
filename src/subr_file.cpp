@@ -373,6 +373,15 @@ subr_load_shared_object(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
 {
+    if (argc == 1) {
+        if (STRINGP(argv[0]) || SYMBOLP(argv[0])) {
+            uintptr_t adrs = (uintptr_t)lookup_shared_object(RTLD_DEFAULT, argv[0]);
+            if (adrs == 0) return scm_false;
+            return uintptr_to_integer(vm->m_heap, adrs);
+        }
+        wrong_type_argument_violation(vm, "lookup-shared-object", 0, "string or symbol", argv[0], argc, argv);
+        return scm_undef;
+    }
     if (argc == 2) {
         void* hdl;
         if (exact_positive_integer_pred(argv[0])) {
@@ -392,7 +401,7 @@ subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[])
         wrong_type_argument_violation(vm, "lookup-shared-object", 1, "string or symbol", argv[1], argc, argv);
         return scm_undef;
     }
-    wrong_number_of_arguments_violation(vm, "lookup-shared-object", 2, 2, argc, argv);
+    wrong_number_of_arguments_violation(vm, "lookup-shared-object", 1, 2, argc, argv);
     return scm_undef;
 }
 

@@ -1,5 +1,5 @@
 #   Makefile for Linux, Darwin
-#   Requirements: GNU Make, llvm-10, libffi
+#   Requirements: GNU Make, llvm-10
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
 PROG = digamma
@@ -19,7 +19,7 @@ SRCS = file.cpp main.cpp vm0.cpp object_heap_compact.cpp subr_flonum.cpp vm1.cpp
        equiv.cpp reader.cpp subr_base.cpp uuid.cpp subr_thread.cpp subr_socket.cpp \
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp \
        main.cpp subr_bvector.cpp violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp \
-       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_ffi.cpp subr_codegen.cpp \
+       object_heap.cpp subr_fixnum.cpp bit.cpp list.cpp fasl.cpp socket.cpp subr_c_ffi.cpp subr_codegen.cpp \
        codegen.cpp
 
 VPATH = src
@@ -55,16 +55,12 @@ ifneq (,$(findstring Linux, $(UNAME)))
       CXXFLAGS += -march=x86-64
     endif
   endif
-  LDLIBS += -pthread -Wl,--no-as-needed -ldl -lffi
+  LDLIBS += -pthread -Wl,--no-as-needed -ldl
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  # export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
-  # CPPFLAGS += -DNO_FFI
   # CXXFLAGS += -O0 -glldb
-  CPPFLAGS += $(shell pkg-config libffi --cflags)
   CXXFLAGS += -O3 -momit-leaf-frame-pointer
-  LDFLAGS += $(shell pkg-config libffi --libs)
   LDLIBS += $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 

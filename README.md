@@ -8,6 +8,7 @@ Each execution thread have own GC thread run independently from others.
 For example, when applying parallel map to 4 elements, digamma starts new 8 native threads running simultaneously (program x 4 + GC x 4).
 
 Digamma uses a separate compilation thread to incrementally generate native code for scheme procedures in background.
+Digamma implements FFI for C with LLVM.
 
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
 
