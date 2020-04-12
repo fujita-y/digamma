@@ -6,6 +6,7 @@ Digamma implements mostly concurrent garbage collector that achieves a remarkabl
 
 Digamma virtual machine supports native thread to execute arbitrary scheme code in parallel.
 Each execution thread have own GC thread run independently from others.
+
 For example, when applying parallel map to 4 elements, digamma starts new 8 native threads running simultaneously (program x 4 + GC x 4).
 
 Digamma uses a separate compilation thread to incrementally generate native code for scheme procedures in background. Digamma implements FFI with LLVM by generating native thunk on the fly.
