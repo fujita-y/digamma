@@ -363,6 +363,7 @@
     equal-hash
     equal?
     eqv?
+    errno/string
     error
     error-handling-mode
     error?

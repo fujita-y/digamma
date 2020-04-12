@@ -517,6 +517,7 @@
                         process-spawn
                         process-shell-command
                         process-wait
+                        errno/string
 
                         current-exception-printer
 

@@ -8,6 +8,8 @@
 #include "list.h"
 #include "arith.h"
 
+#include <cstring>
+
 static scm_bvector_t make_posix_env(VM* vm, scm_obj_t env)
 {
     scm_obj_t lst = env;
@@ -483,6 +485,20 @@ subr_system(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+// errno/string
+scm_obj_t
+subr_errno_string(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 0) {
+        scm_values_t values = make_values(vm->m_heap, 2);
+        values->elts[0] = MAKEFIXNUM(errno);
+        values->elts[1] = make_string(vm->m_heap, std::strerror(errno));
+        return values;
+    }
+    wrong_number_of_arguments_violation(vm, "strerror", 0, 0, argc, argv);
+    return scm_undef;
+}
+
 void
 init_subr_process(object_heap_t* heap)
 {
@@ -492,6 +508,7 @@ init_subr_process(object_heap_t* heap)
     DEFSUBR("process-spawn",subr_process_spawn);
     DEFSUBR("process-wait", subr_process_wait);
     DEFSUBR("getenv",subr_getenv);
+    DEFSUBR("errno/string", subr_errno_string);
     DEFSUBR("lookup-process-environment", subr_lookup_process_environment);
     DEFSUBR("process-environment->alist", subr_process_environment_alist);
 }
