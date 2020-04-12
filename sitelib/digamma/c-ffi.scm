@@ -7,11 +7,9 @@
           c-function
           c-function/weak
           c-callback
-
           string->utf8/nul
           bytevector-mapping?
           make-bytevector-mapping
-
           lookup-shared-object
           codegen-cdecl-callout
           codegen-cdecl-callback)
