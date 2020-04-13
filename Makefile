@@ -139,6 +139,12 @@ check: all
 	@echo 'r7rs-test.scm:'
 	@./$(PROG) --r7rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r7rs-test.scm
 	@echo '----------------------------------------'
+	@echo 'c-ffi-test.scm:'
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/c-ffi-test.scm
+	@echo '----------------------------------------'
+	@echo 'async-test.scm:'
+	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/async-test.scm
+	@echo '----------------------------------------'
 	@echo 'syntax-rule-stress-test.scm:'
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/syntax-rule-stress-test.scm
 	@echo '----------------------------------------'

@@ -81,37 +81,3 @@
             #`(begin (codegen-queue-push! closure) (codegen-cdecl-callback closure #,signature)))))))
 
   ) ;[end]
-
-#|
-
-(library (digamma qsort)
-  (export qsort)
-  (import (core) (digamma c-ffi))
-  (define qsort (c-function/weak void qsort (void* int int void*))))
-
-(import (digamma c-ffi))
-(import (digamma qsort))
-
-(define comparison
-  (c-callback int (void* void*)
-    (lambda (a1 a2)
-      (display "[scheme proc invoked]") (newline)
-      (let ((n1 (bytevector-u32-native-ref (make-bytevector-mapping a1 4) 0))
-            (n2 (bytevector-u32-native-ref (make-bytevector-mapping a2 4) 0)))
-        (cond ((= n1 n2) 0)
-              ((< n1 n2) 1)
-              (else -1))))))
-
-(define nums (uint-list->bytevector '(10000 1000 10 100000 100) (native-endianness) 4))
-(qsort nums 5 4 comparison)
-(bytevector->uint-list nums (native-endianness) 4)
-
-;;;
-
-(define printf* (c-function int printf (void* int void* double double) (void*)))
-(printf* (string->utf8/nul "%d %s %lf %lf\n") 293 (string->utf8/nul "hello") 1.2 4.5)
-
-(define printf* (c-function/weak int printf (void* int void* double double) (void*)))
-(printf* (string->utf8/nul "%d %s %lf %lf\n") 293 (string->utf8/nul "hello") 1.2 4.5)
-
-|#
