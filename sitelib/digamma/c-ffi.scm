@@ -66,10 +66,12 @@
     (lambda (x)
       (syntax-case x ()
         ((_ . args)
-           #'(let ()
-               (define-thread-variable thunk
-                 (lambda e (set! thunk (c-function . args)) (apply thunk e)))
-               (lambda e (apply thunk e)))))))
+         #'(let ((thunk0 (make-parameter #f)))
+             (lambda e
+               (let ((thunk (thunk0)))
+                 (cond ((and thunk (local-heap-object? thunk)) (apply thunk e))
+                       (else
+                         (let ((thunk (c-function . args))) (thunk0 thunk) (apply thunk e)))))))))))
 
   (define-syntax c-callback
     (lambda (x)
