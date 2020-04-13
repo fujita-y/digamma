@@ -16,6 +16,7 @@
 
   (import (core)
           (digamma assert)
+          (digamma concurrent)
           (only (digamma c-types) sizeof:int sizeof:long sizeof:size_t sizeof:void*))
 
   (define c-type-class
@@ -65,7 +66,9 @@
     (lambda (x)
       (syntax-case x ()
         ((_ . args)
-           #'(letrec ((thunk (lambda e (set! thunk (c-function . args)) (apply thunk e))))
+           #'(let ()
+               (define-thread-variable thunk
+                 (lambda e (set! thunk (c-function . args)) (apply thunk e)))
                (lambda e (apply thunk e)))))))
 
   (define-syntax c-callback
