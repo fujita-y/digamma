@@ -22,25 +22,31 @@
 
 using namespace llvm;
 
-static ExitOnError ExitOnErr;
+static mutex_t s_compile_lock;
+static std::map<std::string,void*> s_callout_cache;
 static std::unique_ptr<orc::LLJIT> s_c_ffi;
 static std::atomic<uintptr_t> s_trampoline_uid;
+
+static ExitOnError ExitOnErr;
 
 extern "C" {
     bool c_ffi_to_llvm_Int1Ty(VM* vm, int i, scm_obj_t obj[]) {
         return obj[i] == scm_true;
     }
     int8_t c_ffi_to_llvm_Int8Ty(VM* vm, int i, scm_obj_t obj[]) {
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (exact_integer_pred(obj[i])) return coerce_exact_integer_to_intptr(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
         return 0;
     }
     int16_t c_ffi_to_llvm_Int16Ty(VM* vm, int i, scm_obj_t obj[]) {
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (exact_integer_pred(obj[i])) return coerce_exact_integer_to_intptr(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
         return 0;
     }
     int32_t c_ffi_to_llvm_Int32Ty(VM* vm, int i, scm_obj_t obj[]) {
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (exact_integer_pred(obj[i])) return coerce_exact_integer_to_intptr(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
 #if INTPTR_MAX == INT32_MAX
@@ -52,6 +58,7 @@ extern "C" {
         return 0;
     }
     int64_t c_ffi_to_llvm_Int64Ty(VM* vm, int i, scm_obj_t obj[]) {
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (exact_integer_pred(obj[i])) return coerce_exact_integer_to_int64(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
 #if INTPTR_MAX == INT64_MAX
@@ -63,39 +70,50 @@ extern "C" {
         return 0;
     }
     float c_ffi_to_llvm_FloatTy(VM* vm, int i, scm_obj_t obj[]) {
+        if (FLONUMP(obj[i])) return FLONUM(obj[i]);
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
         return 0;
     }
     double c_ffi_to_llvm_DoubleTy(VM* vm, int i, scm_obj_t obj[]) {
+        if (FLONUMP(obj[i])) return FLONUM(obj[i]);
+        if (FIXNUMP(obj[i])) return FIXNUM(obj[i]);
         if (real_pred(obj[i])) return real_to_double(obj[i]);
         return 0;
     }
 
     bool c_ffi_ret_llvm_Int1Ty(VM* vm, scm_obj_t obj) {
-        scm_obj_t argv[] = { obj };
-        return c_ffi_to_llvm_Int1Ty(vm, 0, argv);
+        return obj == scm_true;
     }
     int8_t c_ffi_ret_llvm_Int8Ty(VM* vm, scm_obj_t obj) {
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_Int8Ty(vm, 0, argv);
     }
     int16_t c_ffi_ret_llvm_Int16Ty(VM* vm, scm_obj_t obj) {
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_Int16Ty(vm, 0, argv);
     }
     int32_t c_ffi_ret_llvm_Int32Ty(VM* vm, scm_obj_t obj) {
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_Int32Ty(vm, 0, argv);
     }
     int64_t c_ffi_ret_llvm_Int64Ty(VM* vm, scm_obj_t obj) {
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_Int64Ty(vm, 0, argv);
     }
     float c_ffi_ret_llvm_FloatTy(VM* vm, scm_obj_t obj) {
+        if (FLONUMP(obj)) return FLONUM(obj);
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_FloatTy(vm, 0, argv);
     }
     double c_ffi_ret_llvm_DoubleTy(VM* vm, scm_obj_t obj) {
+        if (FLONUMP(obj)) return FLONUM(obj);
+        if (FIXNUMP(obj)) return FIXNUM(obj);
         scm_obj_t argv[] = { obj };
         return c_ffi_to_llvm_DoubleTy(vm, 0, argv);
     }
@@ -130,6 +148,7 @@ extern "C" {
 
 void init_c_ffi()
 {
+    s_compile_lock.init();
     auto J = ExitOnErr(orc::LLJITBuilder().create());
     auto D = J->getDataLayout();
     auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
@@ -144,6 +163,8 @@ void destroy_c_ffi()
         delete s_c_ffi.release();
         s_c_ffi = NULL;
     }
+    s_callout_cache.clear();
+    s_compile_lock.destroy();
 }
 
 static Type* builtin_type(LLVMContext& C, char code) {
@@ -227,6 +248,11 @@ static std::map<char,FunctionCallee> create_thunk_from_map(Module* M, LLVMContex
 
 static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature, const char* callee_signature)
 {
+    scoped_lock lock(s_compile_lock);
+
+    char cache_key[256];
+    snprintf(cache_key, sizeof(cache_key), "%s:%s:%lu", caller_signature, callee_signature, adrs);
+    if (s_callout_cache[cache_key]) return s_callout_cache[cache_key];
     char module_id[40];
     char function_id[40];
     uuid_v4(module_id, sizeof(module_id));
@@ -269,12 +295,15 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
     if (verifyModule(*M, &outs())) fatal("%s:%u verify module failed", __FILE__, __LINE__);
     ExitOnErr(s_c_ffi->addIRModule(std::move(orc::ThreadSafeModule(std::move(M), std::move(Context)))));
     auto symbol = ExitOnErr(s_c_ffi->lookup(function_id));
-    return (void*)symbol.getAddress();
+    void* ptr = (void*)symbol.getAddress();
+    s_callout_cache[cache_key] = ptr;
+    return ptr;
 }
 
 static void*
 compile_callback_thunk(VM* vm, uintptr_t trampoline_uid, const char* signature)
 {
+    scoped_lock lock(s_compile_lock);
     char module_id[40];
     char function_id[40];
     uuid_v4(module_id, sizeof(module_id));

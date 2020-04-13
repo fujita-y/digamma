@@ -4,7 +4,7 @@
 
 (define sqrt (c-function/weak double sqrt (double)))
 
-#;(sqrt 100)
+(sqrt 100)
 
 (define n (await (async (sqrt 100))))
 
