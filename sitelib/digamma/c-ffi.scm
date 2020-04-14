@@ -16,7 +16,6 @@
 
   (import (core)
           (digamma assert)
-          (digamma concurrent)
           (only (digamma c-types) sizeof:int sizeof:long sizeof:size_t sizeof:void*))
 
   (define c-type-class
@@ -69,7 +68,7 @@
          #'(let ((thunk0 (make-parameter #f)))
              (lambda e
                (let ((thunk (thunk0)))
-                 (cond ((and thunk (local-heap-object? thunk)) (apply thunk e))
+                 (cond (thunk (apply thunk e))
                        (else
                          (let ((thunk (c-function . args))) (thunk0 thunk) (apply thunk e)))))))))))
 

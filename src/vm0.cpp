@@ -8,9 +8,6 @@
 #include "reader.h"
 #include "printer.h"
 #include "codegen.h"
-#if USE_PARALLEL_VM
-#include "vmm.h"
-#endif
 
 scm_obj_t
 VM::lookup_current_environment(scm_symbol_t symbol)
@@ -40,12 +37,6 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
     scm_obj_t obj = get_hashtable(ht, symbol);
     if (obj != scm_undef) {
         assert(GLOCP(obj));
-#if USE_PARALLEL_VM
-        if (m_vmm->live_thread_count() > 1) {
-            assert(m_heap->in_heap(obj));
-            m_vmm->remember(((scm_gloc_t)obj)->value, value);
-        }
-#endif
         m_heap->write_barrier(value);
         ((scm_gloc_t)obj)->value = value;
         return;
@@ -59,7 +50,7 @@ VM::intern_current_environment(scm_symbol_t symbol, scm_obj_t value)
 }
 
 bool
-VM::init_root(object_heap_t* heap)
+VM::init(object_heap_t* heap)
 {
     try {
         m_heap = heap;
@@ -717,12 +708,6 @@ VM::stop()
             m_heap->enqueue_root(OBJECT_SLAB_TRAITS_OF(m_env)->cache->lookup(m_env));
         }
     }
-#if USE_PARALLEL_VM
-    if (m_vmm->live_thread_count() > 1) {
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_EVERYTHING) m_vmm->snapshot(this, false);
-        if (m_heap->m_root_snapshot == ROOT_SNAPSHOT_RETRY) m_vmm->snapshot(this, true);
-    }
-#endif
 #if ENABLE_COMPILE_THREAD
     if (m_codegen) {
         scoped_lock lock(m_codegen->m_compile_queue_lock);

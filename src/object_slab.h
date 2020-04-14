@@ -9,14 +9,6 @@
 
 class object_heap_t;
 
-#if PARALLEL_COLLECT
-#include "interlocked.h"
-#endif
-
-#if USE_SPINLOCK
-#include "spinlock.h"
-#endif
-
 #define OBJECT_SLAB_TOP_OF(obj)     ((uint8_t*)(((uintptr_t)(obj)) & ~(OBJECT_SLAB_SIZE-1)))
 #define OBJECT_SLAB_TRAITS_OF(obj)  ((object_slab_traits_t*)(OBJECT_SLAB_TOP_OF(obj) + OBJECT_SLAB_SIZE - sizeof(object_slab_traits_t)))
 
@@ -40,11 +32,7 @@ struct object_slab_traits_t {       // <- locate to bottom of each slab
 typedef void (*object_iter_proc_t)(void* obj, int size, void* refcon);
 
 struct object_slab_cache_t {
-#if USE_SPINLOCK
-    spinlock_t              m_lock;
-#else
     mutex_t                 m_lock;
-#endif
     int                     m_object_size;
     int                     m_object_size_shift;
     int                     m_bitmap_size;
@@ -89,11 +77,7 @@ struct object_slab_cache_t {
         uint8_t* bitmap = (uint8_t*)OBJECT_SLAB_TRAITS_OF(obj) - m_bitmap_size;
         int bit_n = ((intptr_t)obj & (OBJECT_SLAB_SIZE - 1)) >> m_object_size_shift;
         assert(bit_n < m_bitmap_size * 8);
-#if PARALLEL_COLLECT
-        interlocked_or_uint8(bitmap + (bit_n >> 3), 1 << (bit_n & 7));
-#else
         bitmap[bit_n >> 3] |= (1 << (bit_n & 7));
-#endif
     }
 
     bool test_and_mark(void* obj)
@@ -105,11 +89,7 @@ struct object_slab_cache_t {
         uint8_t bit = (1 << (bit_n & 7));
         uint8_t* p = bitmap + (bit_n >> 3);
         if (*p & bit) return true;
-#if PARALLEL_COLLECT
-        interlocked_or_uint8(p, bit);
-#else
         *p |= bit;
-#endif
         return false;
     }
 };

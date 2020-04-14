@@ -262,7 +262,6 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
     auto M = std::make_unique<Module>(module_id, C);
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
-
     std::map<char,FunctionCallee> thunk_to = create_thunk_to_map(M.get(), C);
     std::map<char,FunctionCallee> thunk_from = create_thunk_from_map(M.get(), C);
 
@@ -313,7 +312,6 @@ compile_callback_thunk(VM* vm, uintptr_t trampoline_uid, const char* signature)
     auto M = std::make_unique<Module>(module_id, C);
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
     auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
-
     std::map<char,FunctionCallee> thunk_ret = create_thunk_ret_map(M.get(), C);
     std::map<char,FunctionCallee> thunk_from = create_thunk_from_map(M.get(), C);
 

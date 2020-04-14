@@ -228,22 +228,6 @@ extern "C" {
     intptr_t c_set_gloc(VM* vm, scm_closure_t operands) {
         scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
         assert(GLOCP(gloc));
-#if USE_PARALLEL_VM
-  #if UNSPECIFIED_GLOC_IS_SPECIAL
-        if (m_vmm->live_thread_count() > 1 && gloc->value != scm_unspecified) {
-            if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
-            m_vmm->remember(gloc->value, m_value);
-        }
-  #else
-        if (vm->m_vmm->live_thread_count() > 1) {
-            if (!vm->m_heap->in_heap(gloc)) {
-                thread_global_access_violation(vm, ((scm_gloc_t)CAR(operands))->variable, vm->m_value);
-                return 1;
-            }
-            vm->m_vmm->remember(gloc->value, vm->m_value);
-        }
-  #endif
-#endif
         vm->m_heap->write_barrier(vm->m_value);
         gloc->value = vm->m_value;
         return 0;
@@ -253,20 +237,6 @@ extern "C" {
         scm_obj_t loc = CAR(operands);
         scm_obj_t* slot = c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
         if (!STACKP(slot)) {
-#if USE_PARALLEL_VM
-            if (vm->m_vmm->live_thread_count() > 1) {
-                if (!vm->m_heap->in_heap(slot)) {
-                  scm_obj_t doc = CDR(operands);
-                  if (PAIRP(doc)) {
-                      thread_lexical_access_violation(vm, CADAR(doc), vm->m_value);
-                  } else {
-                      thread_lexical_access_violation(vm, NULL, vm->m_value);
-                  }
-                  return 1;
-                }
-                if (vm->m_heap->m_child > 0) vm->m_vmm->remember(*slot, vm->m_value);
-            }
-#endif
             vm->m_heap->write_barrier(vm->m_value);
         }
         *slot = vm->m_value;

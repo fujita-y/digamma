@@ -6,7 +6,6 @@
 #include "arith.h"
 #include "printer.h"
 #include "violation.h"
-#include "vmm.h"
 #include "codegen.h"
 
 #define FOLD_TAIL_CALL_TRACE            1
@@ -1123,19 +1122,6 @@ VM::loop(bool resume)
             CASE(VMOP_SET_GLOC) {
                 scm_gloc_t gloc = (scm_gloc_t)CAR(OPERANDS);
                 assert(GLOCP(gloc));
-#if USE_PARALLEL_VM
-  #if UNSPECIFIED_GLOC_IS_SPECIAL
-                if (m_interp->live_thread_count() > 1 && gloc->value != scm_unspecified) {
-                    if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
-                    m_interp->remember(gloc->value, m_value);
-                }
-  #else
-                if (m_vmm->live_thread_count() > 1) {
-                    if (!m_heap->in_heap(gloc)) goto ERROR_SET_GLOC_BAD_CONTEXT;
-                    m_vmm->remember(gloc->value, m_value);
-                }
-  #endif
-#endif
                 m_heap->write_barrier(m_value);
                 gloc->value = m_value;
                 m_pc = CDR(m_pc);
@@ -1145,12 +1131,6 @@ VM::loop(bool resume)
             CASE(VMOP_SET_ILOC) {
                 scm_obj_t* slot = lookup_iloc(CAR(OPERANDS));
                 if (!STACKP(slot)) {
-#if USE_PARALLEL_VM
-                    if (m_vmm->live_thread_count() > 1) {
-                        if (!m_heap->in_heap(slot)) goto ERROR_SET_ILOC_BAD_CONTEXT;
-                        if (m_heap->m_child > 0) m_vmm->remember(*slot, m_value);
-                    }
-#endif
                     m_heap->write_barrier(m_value);
                 }
                 *slot = m_value;
@@ -1998,22 +1978,6 @@ VM::loop(bool resume)
     ERROR_INVALID_APPLICATION:
         invalid_application_violation(this, m_value, m_sp - m_fp, m_fp);
         goto BACK_TO_TRACE_N_LOOP;
-
-#if USE_PARALLEL_VM
-    ERROR_SET_GLOC_BAD_CONTEXT:
-        operand_trace = CDR(OPERANDS);
-        thread_global_access_violation(this, ((scm_gloc_t)CAR(OPERANDS))->variable, m_value);
-        goto BACK_TO_TRACE_N_LOOP;
-
-    ERROR_SET_ILOC_BAD_CONTEXT:
-        operand_trace = CDR(OPERANDS);
-        if (PAIRP(operand_trace)) {
-            thread_lexical_access_violation(this, CADAR(operand_trace), m_value);
-        } else {
-            thread_lexical_access_violation(this, NULL, m_value);
-        }
-        goto BACK_TO_TRACE_N_LOOP;
-#endif
 
     RESUME_LOOP:
         m_sp = m_fp;

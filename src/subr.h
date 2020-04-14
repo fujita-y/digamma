@@ -24,7 +24,6 @@ void init_subr_hash(object_heap_t* heap);
 void init_subr_list(object_heap_t* heap);
 void init_subr_file(object_heap_t* heap);
 void init_subr_process(object_heap_t* heap);
-void init_subr_thread(object_heap_t* heap);
 void init_subr_others(object_heap_t* heap);
 void init_subr_codegen(object_heap_t* heap);
 

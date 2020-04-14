@@ -1033,11 +1033,6 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
             format(" ~a>", socket_name_string(m_vm->m_heap, socket));
             return;
         }
-        case TC_SHAREDQUEUE: {
-            scm_sharedqueue_t queue = (scm_sharedqueue_t)obj;
-            format("#<shared-queue %d/%d 0x%x>", queue->queue.count(), queue->queue.limit(), queue);
-            return;
-        }
         case TC_PORT: {
             scm_port_t port = (scm_port_t)obj;
             scoped_lock lock(port->lock);

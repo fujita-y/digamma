@@ -15,7 +15,6 @@
 #include "ioerror.h"
 #include "printer.h"
 #include "violation.h"
-#include "vmm.h"
 
 // 9.6 Equivalence predicates
 
@@ -910,28 +909,12 @@ subr_string_set(VM* vm, int argc, scm_obj_t argv[])
                     int type = update_string_type(string, ch);
                     if (type == STRING_TYPE_ASCII) {
                         if (index >= 0 && index < string->size) {
-#if USE_PARALLEL_VM
-                            if (vm->m_vmm->live_thread_count() > 1) {
-                                if (!vm->m_heap->in_heap(string)) {
-                                    thread_object_access_violation(vm, "string-set!" , argc, argv);
-                                    return scm_undef;
-                                }
-                            }
-#endif
                             string->name[index] = ch;
                             return scm_unspecified;
                         }
                     } else {
                         if (index >= 0 && index < string->size) {
                             if (HDR_STRING_LITERAL(string->hdr) == 0) {
-#if USE_PARALLEL_VM
-                                if (vm->m_vmm->live_thread_count() > 1) {
-                                    if (!vm->m_heap->in_heap(string)) {
-                                        thread_object_access_violation(vm, "string-set!" , argc, argv);
-                                        return scm_undef;
-                                    }
-                                }
-#endif
                                 if (utf8_string_set(vm->m_heap, string, index, ch)) return scm_unspecified;
                             } else {
                                 invalid_argument_violation(vm, "string-set!", "immutable string,", argv[0], 0, argc, argv);
@@ -1207,14 +1190,6 @@ subr_string_fill(VM* vm, int argc, scm_obj_t argv[])
         if (STRINGP(argv[0])) {
             if (CHARP(argv[1])) {
                 scm_string_t string = (scm_string_t)argv[0];
-#if USE_PARALLEL_VM
-                if (vm->m_vmm->live_thread_count() > 1) {
-                    if (!vm->m_heap->in_heap(string)) {
-                        thread_object_access_violation(vm, "string-fill!" ,argc, argv);
-                        return scm_undef;
-                    }
-                }
-#endif
                 int ucs4 = CHAR(argv[1]);
                 int len = utf8_string_length(string);
                 int bsize = len * utf8_sizeof_ucs4(ucs4);
@@ -1363,21 +1338,11 @@ subr_vector_set(VM* vm, int argc, scm_obj_t argv[])
             if (FIXNUMP(argv[1])) {
                 intptr_t n = FIXNUM(argv[1]);
                 if (n >= 0 && n < vector->count) {
-#if USE_PARALLEL_VM
-                    if (vm->m_vmm->live_thread_count() > 1) {
-                        if (!vm->m_heap->in_heap(vector)) {
-                            thread_object_access_violation(vm, "vector-set!" ,argc, argv);
-                            return scm_undef;
-                        }
-                        if (vm->m_heap->m_child > 0) vm->m_vmm->remember(vector->elts[n], argv[2]);
-                    }
-#endif
 #if USE_CONST_LITERAL
                     if (HDR_VECTOR_LITERAL(vector->hdr)) {
                         literal_constant_access_violation(vm, "vector-set!", argv[0], argc, argv);
                         return scm_undef;
                     }
-
 #endif
                     vm->m_heap->write_barrier(argv[2]);
                     vector->elts[n] = argv[2];
@@ -1451,17 +1416,6 @@ subr_vector_fill(VM* vm, int argc, scm_obj_t argv[])
         if (VECTORP(argv[0])) {
             scm_vector_t vector = (scm_vector_t)argv[0];
             int n = vector->count;
-#if USE_PARALLEL_VM
-            if (vm->m_vmm->live_thread_count() > 1) {
-                if (!vm->m_heap->in_heap(vector)) {
-                    thread_object_access_violation(vm, "vector-fill!" ,argc, argv);
-                    return scm_undef;
-                }
-                if (vm->m_heap->m_child > 0) {
-                    for (int i = 0; i < n; i++) vm->m_vmm->remember(vector->elts[i], argv[1]);
-                }
-            }
-#endif
 #if USE_CONST_LITERAL
             if (HDR_VECTOR_LITERAL(vector->hdr)) {
                 literal_constant_access_violation(vm, "vector-fill!", argv[0], argc, argv);
@@ -1479,15 +1433,7 @@ subr_vector_fill(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
-// 9.16 Errors ans violations
-
-// error assertion-violation (exception.scm)
-
-// 9.17 Control features
-
-// apply (interned)
-// call-with-current-continuation call/cc (dynamic-wind.scm)
-
+// values
 scm_obj_t
 subr_values(VM* vm, int argc, scm_obj_t argv[])
 {
@@ -1496,11 +1442,6 @@ subr_values(VM* vm, int argc, scm_obj_t argv[])
     for (int i = 0; i < argc; i++) values->elts[i] = argv[i];
     return values;
 }
-
-// call-with-values (r6rs-aux.scm)
-// dynamic-wind (dynamic-wind.scm)
-
-////////////
 
 // cxxxr cxxxxr
 

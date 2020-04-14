@@ -521,22 +521,6 @@
 
                         current-exception-printer
 
-                        make-shared-queue
-                        shared-queue?
-                        shared-queue-shutdown
-                        shared-queue-push!
-                        shared-queue-pop!
-                        serializable?
-                        timeout-object?
-                        shutdown-object?
-
-                        spawn
-                        spawn-timeout
-                        spawn-heap-limit
-                        display-thread-status
-                        on-primordial-thread?
-                        local-heap-object?
-
                         make-uuid
                         time-usage
                         microsecond

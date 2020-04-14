@@ -127,11 +127,6 @@
                      "mismatched subsequent call for nongenerative record-type"
                      (list name parent uid sealed? opaque? fields)))))
             (else
-              (or (on-primordial-thread?)
-                  (assertion-violation
-                    'thread
-                    "child thread attempt to create nongenerative record-type"
-                    (list name parent uid sealed? opaque? fields)))
               (let ((new (make-rtd name parent uid sealed? opaque? fields)))
                 (core-hashtable-set! nongenerative-record-types uid new)
                 new))))))

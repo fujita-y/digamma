@@ -6,7 +6,6 @@
 #include "printer.h"
 #include "violation.h"
 #include "uuid.h"
-#include "vmm.h"
 #include "port.h"
 
 #include <llvm/IR/Verifier.h>

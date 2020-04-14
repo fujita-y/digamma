@@ -328,7 +328,6 @@
     display-codegen-statistics
     display-heap-statistics
     display-object-statistics
-    display-thread-status
     div
     div-and-mod
     div0
@@ -602,7 +601,6 @@
     list?
     load
     load-shared-object
-    local-heap-object?
     log
     lookahead-char
     lookahead-u8
@@ -655,7 +653,6 @@
     make-rectangular
     make-serious-condition
     make-shared-core-hashtable
-    make-shared-queue
     make-socket
     make-string
     make-string-hashtable
@@ -710,7 +707,6 @@
     number?
     numerator
     odd?
-    on-primordial-thread?
     opaque
     open-builtin-data-input-port
     open-bytevector-input-port
@@ -815,7 +811,6 @@
     scheme-load-paths
     scheme-load-verbose
     sealed
-    serializable?
     serious-condition?
     set!
     set-car!
@@ -825,11 +820,6 @@
     set-current-output-port!
     set-port-position!
     set-top-level-value!
-    shared-queue-pop!
-    shared-queue-push!
-    shared-queue-shutdown
-    shared-queue?
-    shutdown-object?
     shutdown-output-port
     simple-conditions
     sin
@@ -842,9 +832,6 @@
     socket-send
     socket-shutdown
     socket?
-    spawn
-    spawn-heap-limit
-    spawn-timeout
     sqrt
     standard-error-port
     standard-input-port
@@ -911,7 +898,6 @@
     tan
     textual-port?
     time-usage
-    timeout-object?
     top-level-bound?
     top-level-value
     transcoded-port

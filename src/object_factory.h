@@ -7,13 +7,10 @@
 #include "core.h"
 #include "object.h"
 
-#define INTERNAL_PRIVATE_THRESHOLD      (OBJECT_SLAB_THRESHOLD / 2)
+#define INTERNAL_PRIVATE_THRESHOLD (OBJECT_SLAB_THRESHOLD / 2)
 
-#if USE_PARALLEL_VM
-  #define VERIFY_DATUM(x)
-#else
-  #define VERIFY_DATUM(x)     do { assert(!CELLP(x) || heap->is_collectible(x)); } while(0)
-#endif
+#define VERIFY_DATUM(x) do { assert(!CELLP(x) || heap->is_collectible(x)); } while(0)
+
 
 scm_symbol_t        make_symbol(object_heap_t* heap, const char* name);
 scm_symbol_t        make_symbol(object_heap_t* heap, const char* name, int len);
@@ -63,7 +60,6 @@ scm_port_t          make_transcoded_port(object_heap_t* heap, scm_obj_t name, sc
 scm_port_t          make_temp_file_port(object_heap_t* heap, scm_obj_t name, int buffer_mode, scm_obj_t transcoder);
 scm_socket_t        make_socket(object_heap_t* heap);
 scm_socket_t        make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int m_flags);
-scm_sharedqueue_t   make_sharedqueue(object_heap_t* heap, int n);
 
 void    rehash_hashtable(object_heap_t* heap, scm_hashtable_t ht, int n);
 void    rehash_weakhashtable(object_heap_t* heap, scm_weakhashtable_t ht, int n);

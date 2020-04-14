@@ -5,10 +5,6 @@
 #include "vm.h"
 #include "violation.h"
 #include "serialize.h"
-#if USE_PARALLEL_VM
-#include "list.h"
-#include "vmm.h"
-#endif
 
 #define USE_SHARED_QUEUE_QUICK_ENCODE    1
 #define CYCLIC_CHECK_BEFORE_SERIALIZE    1

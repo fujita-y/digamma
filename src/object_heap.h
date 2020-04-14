@@ -18,9 +18,6 @@
 #include "object_slab.h"
 #include "object_set.h"
 #include "inherent.h"
-#if USE_SPINLOCK
-  #include "spinlock.h"
-#endif
 
 #define ROOT_SNAPSHOT_GLOBALS               0
 #define ROOT_SNAPSHOT_LOCALS                1
@@ -127,15 +124,9 @@ public:
     int                     m_gensym_counter;
     mutex_t                 m_gensym_lock;
     collector_usage_t       m_usage;
-#if USE_PARALLEL_VM
-    object_heap_t*          m_primordial;
-    object_heap_t*          m_parent;
-    int                     m_child;
-#endif
                             object_heap_t();
-    void                    init_common(size_t pool_size, size_t initial_datum_size);
-    void                    init_primordial(size_t pool_size, size_t initial_datum_size);
-    void                    init_child(size_t pool_size, size_t initial_datum_size, object_heap_t* parent);
+    void                    init(size_t pool_size, size_t initial_datum_size);
+    void                    init_pool(size_t pool_size, size_t initial_datum_size);
     void                    init_inherents();
     void                    init_architecture_feature();
     void                    destroy();

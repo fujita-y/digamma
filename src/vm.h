@@ -11,10 +11,6 @@
 class printer_t;
 class codegen_t;
 
-#if USE_PARALLEL_VM
-class VMM;
-#endif
-
 class VM {
 public:
     scm_obj_t       m_pc;
@@ -22,24 +18,21 @@ public:
     scm_obj_t*      m_fp;
     void*           m_env;
     void*           m_cont;
-
-    scm_obj_t       m_trace_tail;
-
+    scm_obj_t       m_value;
     scm_obj_t*      m_sp;
     scm_obj_t*      m_stack_limit;
-    scm_obj_t       m_value;
-
-    scm_obj_t*      m_stack_top;
 
     object_heap_t*  m_heap;
 
+    scm_obj_t       m_trace_tail;
+    scm_obj_t*      m_stack_top;
     scm_obj_t*      m_to_stack_top;
     scm_obj_t*      m_to_stack_limit;
 
     int             m_stack_size;
     int             m_stack_busy;
 
-    bool            init_root(object_heap_t* heap);
+    bool            init(object_heap_t* heap);
     void            boot();
     void            standalone();
     void            reset();
@@ -83,17 +76,9 @@ public:
     scm_obj_t           m_current_exception_handler;
     scm_obj_t           m_current_source_comments;
     int                 m_recursion_level;
-#if USE_PARALLEL_VM
-    int                 m_id;
-    VM*                 m_parent;
 #if ENABLE_LLVM_JIT
     codegen_t*          m_codegen;
 #endif
-    scm_obj_t           m_spawn_timeout; // #f or fixnum, no gc protect
-    size_t              m_spawn_heap_limit;
-    VMM*                m_vmm;
-#endif
-
     scm_closure_t       lookup_system_closure(const char* name);
     scm_obj_t           lookup_current_environment(scm_symbol_t symbol);
     void                intern_current_environment(scm_symbol_t symbol, scm_obj_t value);
@@ -169,7 +154,7 @@ public:
         assert(opcode >= 0 && opcode < VMOP_INSTRUCTION_COUNT);
         return m_heap->inherent_symbol(opcode);
     }
-} ATTRIBUTE(aligned(16));
+} ATTRIBUTE(aligned(64));
 
 
 #endif

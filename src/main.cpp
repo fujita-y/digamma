@@ -3,7 +3,6 @@
 
 #include "core.h"
 #include "vm.h"
-#include "vmm.h"
 
 #if ENABLE_LLVM_JIT
   #include <llvm/Support/InitLLVM.h>
@@ -173,25 +172,18 @@ int main(int argc, const char** argv)
 #ifndef NDEBUG
     printf("heap_limit %d heap_init %d\n", heap_limit, heap_init);
 #endif
-    heap->init_primordial(heap_limit, heap_init);
-    VM rootVM;
-    rootVM.init_root(heap);
+    heap->init(heap_limit, heap_init);
+    VM* root_vm = new(std::align_val_t(64)) VM;
+    root_vm->init(heap);
 #if defined(NO_TLS)
     MTVERIFY(pthread_key_create(&s_current_vm, NULL));
-    MTVERIFY(pthread_setspecific(s_current_vm, &rootVM));
+    MTVERIFY(pthread_setspecific(s_current_vm, root_vm));
 #else
-    s_current_vm = &rootVM;
+    s_current_vm = root_vm;
 #endif
-#if USE_PARALLEL_VM
-    VMM vmm;
-    vmm.init(&rootVM, 128);
-    rootVM.boot();
-    rootVM.standalone();
-    vmm.destroy();
-#else
-    rootVM.boot();
-    rootVM.standalone();
-#endif
+    root_vm->boot();
+    root_vm->standalone();
+    delete root_vm;
 #if ENABLE_LLVM_JIT
     destroy_c_ffi();
 #endif

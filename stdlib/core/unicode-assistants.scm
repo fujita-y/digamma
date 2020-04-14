@@ -54,15 +54,10 @@
     (syntax-rules ()
       ((_ var init)
        (begin
-         (define temp (make-parameter #f))
          (define var
            (lambda ()
-             (if (on-primordial-thread?)
-                 (let ((value init))
-                   (set! var (lambda () value)) value)
-                 (or (temp)
-                     (let ((value init))
-                       (temp value) value)))))))))
+             (let ((value init))
+               (set! var (lambda () value)) value)))))))
 
   (autoload
    general-category-table-1

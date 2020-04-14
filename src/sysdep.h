@@ -112,6 +112,7 @@ typedef int     fd_t;
 
 #define VALUE_NAN           __builtin_nan("")   /* strtod("NAN", NULL) */
 #define VALUE_INF           __builtin_inf()     /* strtod("INF", NULL) */
+
 #if ARCH_PPC
   #define MEM_STORE_FENCE     __asm__ __volatile__ ("lwsync" ::: "memory")
 #elif ARCH_ARM
@@ -156,15 +157,15 @@ inline double msec()
 
 #if MTDEBUG
   #define MTVERIFY(expr)                                                                                              \
-    do {                                                                                                            \
-        int __RETVAL__ = (expr);                                                                                    \
-          if (__RETVAL__) fatal("error:%s:%u " #expr " %d %s", __FILE__, __LINE__, __RETVAL__, strerror(__RETVAL__));\
+    do {                                                                                                              \
+        int __RETVAL__ = (expr);                                                                                      \
+          if (__RETVAL__) fatal("error:%s:%u " #expr " %d %s", __FILE__, __LINE__, __RETVAL__, strerror(__RETVAL__)); \
     } while(0)
 #else
-  #define MTVERIFY(expr)                      \
-    do {                                    \
-        int __RETVAL__ = (expr);            \
-        if (__RETVAL__) throw __RETVAL__;   \
+  #define MTVERIFY(expr)                  \
+    do {                                  \
+        int __RETVAL__ = (expr);          \
+        if (__RETVAL__) throw __RETVAL__; \
     } while(0)
 #endif
 
