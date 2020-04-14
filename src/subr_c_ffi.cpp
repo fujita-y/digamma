@@ -251,7 +251,7 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
     scoped_lock lock(s_compile_lock);
 
     char cache_key[256];
-    snprintf(cache_key, sizeof(cache_key), "%s:%s:%lu", caller_signature, callee_signature, adrs);
+    snprintf(cache_key, sizeof(cache_key), "%s:%s:%p", caller_signature, callee_signature, (void*)adrs);
     if (s_callout_cache[cache_key]) return s_callout_cache[cache_key];
     char module_id[40];
     char function_id[40];
