@@ -2,11 +2,15 @@
 
 R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https://github.com/fujita-y/ypsilon)).
 
-Digamma implements mostly concurrent garbage collector that achieves a remarkably short GC pause time, separate compilation thread to incrementally generate native code in background, on the fly FFI by using LLVM.
+Digamma implements mostly concurrent garbage collector that achieves a remarkably short GC pause time, implements separate compilation thread to incrementally generate native code in background, implements FFI generates native code thunk on the fly.
 
 Digamma is an experimental work and may change its design significantly.
 
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
+
+### Requirements
+
+LLVM 10
 
 ### Run
 
