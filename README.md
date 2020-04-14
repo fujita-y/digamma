@@ -2,14 +2,9 @@
 
 R7RS/R6RS Scheme Implementation derived from Ypsilon ([fujita-y/ypsilon](https://github.com/fujita-y/ypsilon)).
 
-Digamma implements mostly concurrent garbage collector that achieves a remarkably short GC pause time and the best performance in parallel execution.
+Digamma implements mostly concurrent garbage collector that achieves a remarkably short GC pause time, separate compilation thread to incrementally generate native code in background, on the fly FFI by using LLVM.
 
-Digamma virtual machine supports native thread to execute arbitrary scheme code in parallel.
-Each execution thread have own GC thread run independently from others. For example, when applying parallel map to 4 elements, digamma starts new 8 native threads running simultaneously (program x 4 + GC x 4).
-
-Digamma uses a separate compilation thread to incrementally generate native code for scheme procedures in background. 
-
-Digamma implements FFI with LLVM by generating native thunk on the fly.
+Digamma is an experimental work and may change its design significantly.
 
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
 
