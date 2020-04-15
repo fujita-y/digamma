@@ -564,6 +564,15 @@ subr_current_primitive_prefix(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
+// current-temporary-delimiter
+scm_obj_t
+subr_current_temporary_delimiter(VM* vm, int argc, scm_obj_t argv[])
+{
+    if (argc == 0) return MAKECHAR(IDENTIFIER_TEMPORARY_DELIMITER);
+    wrong_number_of_arguments_violation(vm, "current-temporary-delimiter", 0, 0, argc, argv);
+    return scm_undef;
+}
+
 // current-rename-delimiter
 scm_obj_t
 subr_current_rename_delimiter(VM* vm, int argc, scm_obj_t argv[])
@@ -2287,6 +2296,7 @@ init_subr_others(object_heap_t* heap)
     DEFSUBR("current-library-infix", subr_current_library_infix);
     DEFSUBR("current-library-suffix", subr_current_library_suffix);
     DEFSUBR("current-primitive-prefix", subr_current_primitive_prefix);
+    DEFSUBR("current-temporary-delimiter", subr_current_temporary_delimiter);
     DEFSUBR("current-rename-delimiter", subr_current_rename_delimiter);
     DEFSUBR("uninterned-symbol?", subr_uninterned_symbol_pred);
     DEFSUBR("uninterned-symbol-prefix", subr_uninterned_symbol_prefix);

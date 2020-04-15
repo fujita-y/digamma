@@ -108,7 +108,7 @@ subr_codegen_queue_push(VM* vm, int argc, scm_obj_t argv[])
             if (vm->m_codegen) {
                 if (!HDR_CLOSURE_INSPECTED(closure->hdr)) {
                     closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
-                    vm->m_codegen->m_usage.others++;
+                    vm->m_codegen->m_usage.on_demand++;
                     vm->m_codegen->compile(closure);
                 }
                 return scm_unspecified;

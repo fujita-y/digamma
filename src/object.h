@@ -553,6 +553,7 @@ struct vm_env_rec_t {           // record size is variable
 #define IDENTIFIER_LIBRARY_SUFFIX           '\''
 #define IDENTIFIER_LIBRARY_INFIX            '.'
 #define IDENTIFIER_PRIMITIVE_PREFIX         '.'
+#define IDENTIFIER_TEMPORARY_DELIMITER      '~'
 #define IDENTIFIER_CSTUB_MARK               '@'
 
 #define READ_STRING_SMALL_BUFFER_SIZE       2048

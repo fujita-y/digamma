@@ -65,7 +65,7 @@
   (lambda ()
     (let ((count (current-temporary-count)))
       (current-temporary-count (+ count 1))
-      (let ((name (format ".L~a" count)))
+      (let ((name (format ".L~a~a" (current-temporary-delimiter) count)))
         (make-temporary-symbol name (string-length name))))))
 
 (define generate-local-macro-symbol

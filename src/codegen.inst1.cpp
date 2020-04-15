@@ -51,6 +51,18 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+    scm_obj_t obj = ((scm_gloc_t)operands)->value;
+    if (CLOSUREP(obj)) {
+        scm_closure_t closure = (scm_closure_t)obj;
+        if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
+            closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+            m_compile_queue.push_back((scm_closure_t)obj);
+            m_usage.refs++;
+        }
+    }
+#endif
+
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
     emit_push_vm_stack(ctx, val);
@@ -313,6 +325,17 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             }
         }
     }
+
+#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+    if (CLOSUREP(obj)) {
+        scm_closure_t closure = (scm_closure_t)obj;
+        if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
+            closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+            m_compile_queue.push_back((scm_closure_t)obj);
+            m_usage.refs++;
+        }
+    }
+#endif
 
     auto val = CREATE_LOAD_GLOC_REC(IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy), value);
     ctx.reg_value.store(vm, val);
@@ -1529,6 +1552,18 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
+
+#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+    scm_obj_t obj = ((scm_gloc_t)operands)->value;
+    if (CLOSUREP(obj)) {
+        scm_closure_t closure = (scm_closure_t)obj;
+        if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
+            closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+            m_compile_queue.push_back((scm_closure_t)obj);
+            m_usage.refs++;
+        }
+    }
+#endif
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     ctx.reg_value.store(vm, CREATE_LOAD_GLOC_REC(gloc, value));

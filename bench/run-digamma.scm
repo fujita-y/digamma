@@ -18,14 +18,18 @@
                    (- sys-end sys-start)))
          result)))))
 
+(define wait-codegen-idle
+  (lambda ()
+    (let loop ()
+      (usleep 100000)
+      (cond ((= (codegen-queue-count) 0))
+            (else (loop))))))
+
 (define (run-benchmark name count ok? run-maker . args)
   (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
   (let ((run (apply run-maker args)))
       (run-bench name 1 ok? run)
-      (let loop ()
-        (usleep 100000)
-        (cond ((= (codegen-queue-count) 0))
-              (else (loop))))
+      (wait-codegen-idle)
       (let ((result (time (run-bench name count ok? run))))
         (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
       (format #t ";;  ----------------------------------------------------------------~!")
@@ -123,6 +127,9 @@
 ;(closure-compile map)
 ;(closure-compile for-each)
 
+(format #t "\n\n;;  Setup...")
+(wait-codegen-idle)
+
 (format #t "\n\n;;  GABRIEL\n")
 (time-bench ack 3)
 (time-bench boyer 3)
@@ -162,3 +169,4 @@
 (time-bench scheme 3000)
 
 (newline)
+;;(display-codegen-statistics)
