@@ -105,6 +105,8 @@ signal_waiter(void* param)
     return NULL;
 }
 
+static VM s_primordial_vm;
+
 int main(int argc, const char** argv)
 {
     srandom((unsigned int)fmod(msec() * 1000.0, INT_MAX));
@@ -166,24 +168,20 @@ int main(int argc, const char** argv)
     pthread_t tid;
     MTVERIFY(pthread_create(&tid, NULL, signal_waiter, &set));
     MTVERIFY(pthread_detach(tid));
-    object_heap_t* heap = new object_heap_t;
+#if defined(NO_TLS)
+    MTVERIFY(pthread_key_create(&s_current_vm, NULL));
+#endif
     int heap_limit = opt_heap_limit(argc, argv) * 1024 * 1024;
     int heap_init = 4 * 1024 * 1024;
 #ifndef NDEBUG
     printf("heap_limit %d heap_init %d\n", heap_limit, heap_init);
 #endif
+    object_heap_t* heap = new object_heap_t;
     heap->init(heap_limit, heap_init);
-    VM* root_vm = new(std::align_val_t(64)) VM;
-    root_vm->init(heap);
-#if defined(NO_TLS)
-    MTVERIFY(pthread_key_create(&s_current_vm, NULL));
-    MTVERIFY(pthread_setspecific(s_current_vm, root_vm));
-#else
-    s_current_vm = root_vm;
-#endif
-    root_vm->boot();
-    root_vm->standalone();
-    delete root_vm;
+    s_primordial_vm.init(heap);
+    s_primordial_vm.boot();
+    set_current_vm(&s_primordial_vm);
+    s_primordial_vm.standalone();
 #if ENABLE_LLVM_JIT
     destroy_c_ffi();
 #endif
