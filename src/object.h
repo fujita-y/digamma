@@ -29,7 +29,6 @@
     .... .... .... .... .... .... 1110 0010 : (reserved)
     .... .... .... .... .... .... 1111 0010 : (reserved)
 
-    xxxx xxxx xxxx xxxx xxxx xxxx xxxx x100 : scm_inst_t
     pppp pppp pppp pppp pppp pppp pppp p110 : heap forward pointer
 
     boxed:
@@ -68,7 +67,6 @@ typedef uintptr_t   scm_hdr_t;
 typedef scm_obj_t   scm_cell_t;
 typedef scm_obj_t   scm_char_t;
 typedef scm_obj_t   scm_fixnum_t;
-typedef scm_obj_t   scm_inst_t;
 
 #if ARCH_LP64
   #define USE_DIGIT32   0
@@ -123,30 +121,33 @@ const scm_obj_t scm_proc_apply_values   = (scm_obj_t)0xd2;
 #define TC_SOCKET           0x15
 #define TC_MASKBITS         0x3f
 
-const scm_hdr_t scm_hdr_symbol          = 0x00a | (TC_SYMBOL << 4);
-const scm_hdr_t scm_hdr_string          = 0x00a | (TC_STRING << 4);
-const scm_hdr_t scm_hdr_bignum          = 0x00a | (TC_BIGNUM << 4);
-const scm_hdr_t scm_hdr_flonum          = 0x00a | (TC_FLONUM << 4);
-const scm_hdr_t scm_hdr_cont            = 0x00a | (TC_CONT << 4);
-const scm_hdr_t scm_hdr_closure         = 0x00a | (TC_CLOSURE << 4);
-const scm_hdr_t scm_hdr_subr            = 0x00a | (TC_SUBR << 4);
-const scm_hdr_t scm_hdr_vector          = 0x00a | (TC_VECTOR << 4);
-const scm_hdr_t scm_hdr_port            = 0x00a | (TC_PORT << 4);
-const scm_hdr_t scm_hdr_values          = 0x00a | (TC_VALUES << 4);
-const scm_hdr_t scm_hdr_hashtable       = 0x00a | (TC_HASHTABLE << 4);
-const scm_hdr_t scm_hdr_complex         = 0x00a | (TC_COMPLEX << 4);
-const scm_hdr_t scm_hdr_rational        = 0x00a | (TC_RATIONAL << 4);
-const scm_hdr_t scm_hdr_heapenv         = 0x00a | (TC_HEAPENV << 4);    // enclose heap environment
-const scm_hdr_t scm_hdr_heapcont        = 0x00a | (TC_HEAPCONT << 4);   // enclose heap continuation
-const scm_hdr_t scm_hdr_environment     = 0x00a | (TC_ENVIRONMENT << 4);
-const scm_hdr_t scm_hdr_gloc            = 0x00a | (TC_GLOC << 4);
-const scm_hdr_t scm_hdr_tuple           = 0x00a | (TC_TUPLE << 4);
-const scm_hdr_t scm_hdr_weakmapping     = 0x00a | (TC_WEAKMAPPING << 4);
-const scm_hdr_t scm_hdr_weakhashtable   = 0x00a | (TC_WEAKHASHTABLE << 4);
-const scm_hdr_t scm_hdr_bvector         = 0x00a | (TC_BVECTOR << 4);
-const scm_hdr_t scm_hdr_socket          = 0x00a | (TC_SOCKET << 4);
+#define HDR_ATTR_BOXED      0xa
+#define HDR_ATTR_MASKBITS   0xf
 
-#define HDR_TYPE_MASKBITS    0x3ff
+#define HDR_TYPE_MASKBITS   0x3ff
+
+const scm_hdr_t scm_hdr_symbol          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_SYMBOL << 4));
+const scm_hdr_t scm_hdr_string          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_STRING << 4));
+const scm_hdr_t scm_hdr_bignum          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_BIGNUM << 4));
+const scm_hdr_t scm_hdr_flonum          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_FLONUM << 4));
+const scm_hdr_t scm_hdr_cont            = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_CONT << 4));
+const scm_hdr_t scm_hdr_closure         = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_CLOSURE << 4));
+const scm_hdr_t scm_hdr_subr            = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_SUBR << 4));
+const scm_hdr_t scm_hdr_vector          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_VECTOR << 4));
+const scm_hdr_t scm_hdr_port            = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_PORT << 4));
+const scm_hdr_t scm_hdr_values          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_VALUES << 4));
+const scm_hdr_t scm_hdr_hashtable       = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_HASHTABLE << 4));
+const scm_hdr_t scm_hdr_complex         = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_COMPLEX << 4));
+const scm_hdr_t scm_hdr_rational        = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_RATIONAL << 4));
+const scm_hdr_t scm_hdr_heapenv         = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_HEAPENV << 4));
+const scm_hdr_t scm_hdr_heapcont        = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_HEAPCONT << 4));
+const scm_hdr_t scm_hdr_environment     = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_ENVIRONMENT << 4));
+const scm_hdr_t scm_hdr_gloc            = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_GLOC << 4));
+const scm_hdr_t scm_hdr_tuple           = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_TUPLE << 4));
+const scm_hdr_t scm_hdr_weakmapping     = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_WEAKMAPPING << 4));
+const scm_hdr_t scm_hdr_weakhashtable   = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_WEAKHASHTABLE << 4));
+const scm_hdr_t scm_hdr_bvector         = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_BVECTOR << 4));
+const scm_hdr_t scm_hdr_socket          = HDR_TYPE_MASKBITS & (HDR_ATTR_BOXED | (TC_SOCKET << 4));
 
 struct scm_pair_rec_t;
 struct scm_symbol_rec_t;
@@ -406,9 +407,6 @@ struct vm_env_rec_t {           // record size is variable
 #define HEAPFORWARDPTRP(obj)                (((intptr_t)(obj) & 0x7) == 0x6)
 #define MAKEHEAPFORWARDPTR(obj)             ((intptr_t)(obj) | 0x6)
 
-#define VMINSTP(obj)                        (((intptr_t)(obj) & 0x7) == 0x4)
-#define MAKEVMINST(obj)                     ((scm_inst_t)((intptr_t)(obj) | 0x4))
-
 #define FIXNUM_MAX                          (INTPTR_MAX / 2)
 #define FIXNUM_MIN                          (INTPTR_MIN / 2)
 #if ARCH_LP64
@@ -427,7 +425,7 @@ struct vm_env_rec_t {           // record size is variable
 #define FIXNUMP(obj)                        ((BITS(obj) & 0x1))
 #define CELLP(obj)                          ((BITS(obj) & 0x7) == 0)
 #define CHARP(obj)                          ((BITS(obj) & 0xff) == 0x02)
-#define PAIRP(obj)                          (CELLP(obj) && (HDR(obj) & 0xf) != 0xa)
+#define PAIRP(obj)                          (CELLP(obj) && (HDR(obj) & HDR_ATTR_MASKBITS) != HDR_ATTR_BOXED)
 #define FLONUMP(obj)                        (CELLP(obj) && (HDR(obj) & HDR_TYPE_MASKBITS) == scm_hdr_flonum)
 #define BVECTORP(obj)                       (CELLP(obj) && (HDR(obj) & HDR_TYPE_MASKBITS) == scm_hdr_bvector)
 #define BIGNUMP(obj)                        (CELLP(obj) && (HDR(obj) & HDR_TYPE_MASKBITS) == scm_hdr_bignum)

@@ -287,7 +287,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
                 m_usage.inners++;
                 emit_prepair_apply(ctx, closure);
                 ctx.reg_cache_copy_except_value(vm);
-                auto call2 = IRB.CreateCall(F2, {vm});
+                auto call2 = IRB.CreateCall(F2, { vm });
                 call2->setTailCallKind(CallInst::TCK_MustTail);
                 IRB.CreateRet(call2);
                 return;
@@ -1947,7 +1947,7 @@ codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, Ba
     IRB.CreateCondBr(cond1, cond1_true, pair_false);
     IRB.SetInsertPoint(cond1_true);
     auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
-    auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(0xf)), VALUE_INTPTR(0xa));
+    auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_ATTR_MASKBITS)), VALUE_INTPTR(HDR_ATTR_BOXED));
     IRB.CreateCondBr(cond2, pair_true, pair_false);
 }
 

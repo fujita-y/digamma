@@ -713,11 +713,6 @@ printer_t::write(scm_obj_t ht, scm_obj_t obj)
             port_puts(m_port, string->name);
             return;
         }
-        if (VMINSTP(obj)) {
-            int opcode = m_vm->instruction_to_opcode(obj);
-            port_puts(m_port, m_vm->m_heap->inherent_symbol(opcode)->name);
-            return;
-        }
         if (CHARP(obj)) {
             int c = CHAR(obj);
             if (m_escape) {
