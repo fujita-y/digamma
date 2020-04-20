@@ -64,6 +64,29 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 void
 codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
 {
+
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+    auto vm = F->arg_begin();
+
+    ctx.reg_cache_clear();
+    if (nbytes == 0) return;
+    if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
+
+    auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
+    BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
+    BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F);
+    Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(nbytes)), stack_limit);
+    IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow);
+
+    IRB.SetInsertPoint(stack_overflow);
+    auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
+    IRB.CreateCall(c_collect_stack, { vm, VALUE_INTPTR(nbytes) });
+    IRB.CreateBr(stack_ok);
+
+    IRB.SetInsertPoint(stack_ok);
+
+/*
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
@@ -86,6 +109,7 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
         IRB.SetInsertPoint(stack_ok);
         ctx.reg_cache_clear();
     }
+*/
 }
 
 Value*

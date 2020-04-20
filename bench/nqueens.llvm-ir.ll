@@ -1,23 +1,24 @@
-; ModuleID = '40a0983b-5301-4e4a-8f75-9b5f3becce22'
-source_filename = "40a0983b-5301-4e4a-8f75-9b5f3becce22"
+;*** IR after optimize ***
+; ModuleID = '9696a26c-1948-4aec-9eac-1f775393f37c'
+source_filename = "9696a26c-1948-4aec-9eac-1f775393f37c"
 
-define i64 @b7745e8e-f182-4b26-8f07-785454198eea(i64* noalias nocapture %0) local_unnamed_addr {
+define i64 @"48606894-c232-44a1-835f-2a253e06472e"(i64* noalias nocapture %0) local_unnamed_addr {
 entry:
-  %1 = getelementptr i64, i64* %0, i64 6
+  %1 = getelementptr i64, i64* %0, i64 7
   %2 = load i64, i64* %1, align 4
-  %3 = getelementptr i64, i64* %0, i64 7
+  %3 = getelementptr i64, i64* %0, i64 6
   %4 = load i64, i64* %3, align 4
-  %5 = add i64 %2, 88
-  %6 = icmp ult i64 %5, %4
+  %5 = add i64 %4, 88
+  %6 = icmp ult i64 %5, %2
   br i1 %6, label %entry.stack_ok_crit_edge, label %stack_overflow
 
 entry.stack_ok_crit_edge:                         ; preds = %entry
-  %7 = inttoptr i64 %2 to i64*
+  %7 = inttoptr i64 %4 to i64*
   br label %stack_ok
 
 stack_ok:                                         ; preds = %entry.stack_ok_crit_edge, %stack_overflow
   %8 = phi i64* [ %.pre, %stack_overflow ], [ %7, %entry.stack_ok_crit_edge ]
-  store i64 4526800128, i64* %8, align 4
+  store i64 4401937424, i64* %8, align 4
   %9 = getelementptr i64, i64* %8, i64 1
   store i64 82, i64* %9, align 4
   %10 = getelementptr i64, i64* %0, i64 2
@@ -29,7 +30,7 @@ stack_ok:                                         ; preds = %entry.stack_ok_crit
   %15 = getelementptr i64, i64* %8, i64 3
   store i64 %14, i64* %15, align 4
   %16 = getelementptr i64, i64* %8, i64 4
-  store i64 ptrtoint (i64 (i64*)* @"5d1629d8-b071-4bc3-8d2e-0c4a3bb78e93" to i64), i64* %16, align 4
+  store i64 ptrtoint (i64 (i64*)* @bf8534cd-c97d-489d-8941-1e597392dba3 to i64), i64* %16, align 4
   %17 = getelementptr i64, i64* %0, i64 4
   %18 = load i64, i64* %17, align 4
   %19 = getelementptr i64, i64* %8, i64 5
@@ -49,17 +50,17 @@ stack_ok:                                         ; preds = %entry.stack_ok_crit
   store i64 0, i64* %29, align 4
   %30 = add i64 %21, 24
   %31 = ptrtoint i64* %29 to i64
-  store i64 4526882496, i64* %0, align 4
+  store i64 4402016976, i64* %0, align 4
   store i64 %30, i64* %10, align 4
   store i64 %31, i64* %13, align 4
   store i64 %22, i64* %17, align 4
-  store i64 %30, i64* %1, align 4
-  %32 = musttail call i64 @"2c696dce-7d4f-4b08-9e9c-58af994c2399"(i64* nonnull %0)
+  store i64 %30, i64* %3, align 4
+  %32 = musttail call i64 @"47d922f7-5ea0-486b-94da-c9dc0977b2c1"(i64* nonnull %0)
   ret i64 %32
 
 stack_overflow:                                   ; preds = %entry
   tail call void @c_collect_stack(i64* nonnull %0, i64 88)
-  %.phi.trans.insert = bitcast i64* %1 to i64**
+  %.phi.trans.insert = bitcast i64* %3 to i64**
   %.pre = load i64*, i64** %.phi.trans.insert, align 4
   br label %stack_ok
 }
@@ -67,7 +68,7 @@ stack_overflow:                                   ; preds = %entry
 declare void @c_collect_stack(i64*, i64) local_unnamed_addr
 
 ; Function Attrs: nounwind
-define i64 @"5d1629d8-b071-4bc3-8d2e-0c4a3bb78e93"(i64* noalias nocapture %0) #0 {
+define i64 @bf8534cd-c97d-489d-8941-1e597392dba3(i64* noalias nocapture %0) #0 {
 entry:
   %1 = getelementptr i64, i64* %0, i64 5
   %2 = load i64, i64* %1, align 4
@@ -88,30 +89,30 @@ entry:
   store i64 0, i64* %12, align 4
   %13 = add i64 %4, 40
   %14 = ptrtoint i64* %12 to i64
-  store i64 4526877904, i64* %0, align 4
+  store i64 4402013568, i64* %0, align 4
   %15 = getelementptr i64, i64* %0, i64 2
   store i64 %13, i64* %15, align 4
   %16 = getelementptr i64, i64* %0, i64 3
   store i64 %14, i64* %16, align 4
   store i64 %13, i64* %3, align 4
-  %17 = musttail call i64 @"051cca58-8c2c-49b9-9a86-c080a588ede6"(i64* nonnull %0)
+  %17 = musttail call i64 @e0da4e4c-b0ed-4cd5-84ca-e75dfcc365aa(i64* nonnull %0)
   ret i64 %17
 }
 
 ; Function Attrs: nounwind
-define i64 @"2c696dce-7d4f-4b08-9e9c-58af994c2399"(i64* noalias nocapture %0) local_unnamed_addr #0 {
+define i64 @"47d922f7-5ea0-486b-94da-c9dc0977b2c1"(i64* noalias nocapture %0) local_unnamed_addr #0 {
 entry:
-  %1 = getelementptr i64, i64* %0, i64 6
+  %1 = getelementptr i64, i64* %0, i64 7
   %2 = load i64, i64* %1, align 4
-  %3 = getelementptr i64, i64* %0, i64 7
+  %3 = getelementptr i64, i64* %0, i64 6
   %4 = load i64, i64* %3, align 4
-  %5 = add i64 %2, 32
-  %6 = icmp ult i64 %5, %4
+  %5 = add i64 %4, 32
+  %6 = icmp ult i64 %5, %2
   br i1 %6, label %stack_ok, label %stack_overflow
 
 stack_ok:                                         ; preds = %stack_overflow, %entry
   %.pre-phi = phi i64 [ %.pre1, %stack_overflow ], [ %5, %entry ]
-  %7 = phi i64 [ %.pre, %stack_overflow ], [ %2, %entry ]
+  %7 = phi i64 [ %.pre, %stack_overflow ], [ %4, %entry ]
   %8 = getelementptr i64, i64* %0, i64 3
   %9 = load i64, i64* %8, align 4
   %10 = add i64 %9, -8
@@ -129,136 +130,121 @@ stack_ok:                                         ; preds = %stack_overflow, %en
   %19 = getelementptr i64, i64* %18, i64 1
   store i64 0, i64* %19, align 4
   %20 = ptrtoint i64* %19 to i64
-  store i64 4526881376, i64* %0, align 4
+  store i64 4402012400, i64* %0, align 4
   %21 = getelementptr i64, i64* %0, i64 2
   store i64 %.pre-phi, i64* %21, align 4
   store i64 %20, i64* %8, align 4
-  store i64 %.pre-phi, i64* %1, align 4
-  %22 = musttail call i64 @a86247ed-3932-42fe-8b12-f6f7e6ad581c(i64* nonnull %0)
+  store i64 %.pre-phi, i64* %3, align 4
+  %22 = musttail call i64 @"9a10efff-cc4c-4d72-99c6-4efd419644d9"(i64* nonnull %0)
   ret i64 %22
 
 stack_overflow:                                   ; preds = %entry
   tail call void @c_collect_stack(i64* nonnull %0, i64 32) #0
-  %.pre = load i64, i64* %1, align 4
+  %.pre = load i64, i64* %3, align 4
   %.pre1 = add i64 %.pre, 32
   br label %stack_ok
 }
 
 ; Function Attrs: nounwind
-define i64 @a86247ed-3932-42fe-8b12-f6f7e6ad581c(i64* noalias nocapture %0) local_unnamed_addr #0 {
+define i64 @"9a10efff-cc4c-4d72-99c6-4efd419644d9"(i64* noalias nocapture %0) local_unnamed_addr #0 {
 entry:
-  %1 = getelementptr i64, i64* %0, i64 6
-  %2 = getelementptr i64, i64* %0, i64 7
+  %1 = getelementptr i64, i64* %0, i64 7
+  %2 = getelementptr i64, i64* %0, i64 6
   %3 = getelementptr i64, i64* %0, i64 3
-  %4 = getelementptr i64, i64* %0, i64 5
-  %5 = getelementptr i64, i64* %0, i64 2
-  %.pre = load i64, i64* %1, align 4
+  %4 = getelementptr i64, i64* %0, i64 2
+  %.pre = load i64, i64* %2, align 4
   br label %tailrecurse
 
 tailrecurse:                                      ; preds = %continue1, %entry
-  %6 = phi i64 [ %37, %continue1 ], [ %.pre, %entry ]
-  %7 = load i64, i64* %2, align 4
-  %8 = add i64 %6, 32
-  %9 = icmp ult i64 %8, %7
-  br i1 %9, label %stack_ok, label %stack_overflow
+  %5 = phi i64 [ %35, %continue1 ], [ %.pre, %entry ]
+  %6 = load i64, i64* %1, align 4
+  %7 = add i64 %5, 32
+  %8 = icmp ult i64 %7, %6
+  br i1 %8, label %stack_ok, label %stack_overflow
 
 stack_ok:                                         ; preds = %stack_overflow, %tailrecurse
-  %10 = load i64, i64* %3, align 4
-  %11 = add i64 %10, -8
-  %12 = inttoptr i64 %11 to i64*
-  %13 = getelementptr i64, i64* %12, i64 -2
-  %14 = load i64, i64* %13, align 4
-  %15 = and i64 %14, 1
-  %16 = icmp eq i64 %15, 0
-  br i1 %16, label %nonfixnum_true, label %nonfixnum_false
+  %9 = load i64, i64* %3, align 4
+  %10 = add i64 %9, -8
+  %11 = inttoptr i64 %10 to i64*
+  %12 = getelementptr i64, i64* %11, i64 -2
+  %13 = load i64, i64* %12, align 4
+  %14 = and i64 %13, 1
+  %15 = icmp eq i64 %14, 0
+  br i1 %15, label %nonfixnum_true, label %nonfixnum_false
 
 stack_overflow:                                   ; preds = %tailrecurse
   tail call void @c_collect_stack(i64* nonnull %0, i64 32) #0
   br label %stack_ok
 
-continue:                                         ; preds = %nonfixnum_true
-  %.pre6 = load i64, i64* %4, align 4
-  %17 = icmp eq i64 %.pre6, 34
-  br i1 %17, label %f9h_true, label %f9h_false
-
 nonfixnum_true:                                   ; preds = %stack_ok
-  store i64 4526881376, i64* %0, align 4
-  %18 = tail call i64 @c_eq_n_iloc(i64* nonnull %0, i64 %14, i64 1) #0
-  %19 = icmp eq i64 %18, 0
-  br i1 %19, label %continue, label %fallback_fail
+  store i64 4402012400, i64* %0, align 4
+  %16 = tail call i64 @c_eq_n_iloc(i64* nonnull %0, i64 %13, i64 1) #0
+  switch i64 %16, label %f9h_false [
+    i64 0, label %fallback_fail
+    i64 34, label %f9h_true
+  ]
 
 nonfixnum_false:                                  ; preds = %stack_ok
-  %20 = icmp eq i64 %14, 1
-  br i1 %20, label %continue.thread8, label %continue.thread
+  %17 = icmp eq i64 %13, 1
+  br i1 %17, label %f9h_false, label %fixnum_true
 
-continue.thread8:                                 ; preds = %nonfixnum_false
-  store i64 18, i64* %4, align 4
-  br label %f9h_false
-
-continue.thread:                                  ; preds = %nonfixnum_false
-  store i64 34, i64* %4, align 4
-  br label %f9h_true
-
-fallback_fail:                                    ; preds = %fallback, %nonfixnum_true
+fallback_fail:                                    ; preds = %nonfixnum_true, %fallback
   ret i64 3
 
-f9h_true:                                         ; preds = %continue.thread, %continue
-  %21 = load i64, i64* %13, align 4
-  %22 = and i64 %21, 1
-  %23 = icmp eq i64 %22, 0
-  br i1 %23, label %fallback, label %fixnum_true
+f9h_true:                                         ; preds = %nonfixnum_true
+  %.pre10 = load i64, i64* %12, align 4
+  %.pre11 = and i64 %.pre10, 1
+  %18 = icmp eq i64 %.pre11, 0
+  br i1 %18, label %fallback, label %fixnum_true
 
-f9h_false:                                        ; preds = %continue, %continue.thread8
-  %24 = getelementptr i64, i64* %12, i64 -1
-  %25 = load i64, i64* %24, align 4
-  store i64 %25, i64* %4, align 4
+f9h_false:                                        ; preds = %nonfixnum_false, %nonfixnum_true
+  %19 = getelementptr i64, i64* %11, i64 -1
+  %20 = load i64, i64* %19, align 4
+  %21 = getelementptr i64, i64* %0, i64 5
+  store i64 %20, i64* %21, align 4
   ret i64 1
 
-continue1:                                        ; preds = %fallback.continue1_crit_edge, %valid_true
-  %26 = phi i64 [ %.pre7, %fallback.continue1_crit_edge ], [ %46, %valid_true ]
-  %27 = load i64, i64* %13, align 4
-  %28 = inttoptr i64 %26 to i64*
-  store i64 %27, i64* %28, align 4
-  %29 = add i64 %26, 8
-  %30 = getelementptr i64, i64* %12, i64 -1
-  %31 = load i64, i64* %30, align 4
-  %32 = inttoptr i64 %29 to i64*
-  %33 = getelementptr i64, i64* %32, i64 -1
-  %34 = load i64, i64* %33, align 4
-  %35 = tail call i64 @c_make_pair(i64* nonnull %0, i64 %34, i64 %31) #0
-  store i64 %35, i64* %33, align 4
-  store i64 2, i64* %32, align 4
-  %36 = getelementptr i64, i64* %32, i64 1
-  store i64 0, i64* %36, align 4
-  %37 = add i64 %26, 24
-  %38 = ptrtoint i64* %36 to i64
-  store i64 4526881376, i64* %0, align 4
-  store i64 %37, i64* %5, align 4
-  store i64 %38, i64* %3, align 4
-  store i64 %37, i64* %1, align 4
+continue1:                                        ; preds = %fallback, %valid_true
+  %.05 = phi i64 [ %42, %valid_true ], [ %40, %fallback ]
+  %22 = load i64, i64* %2, align 4
+  %23 = inttoptr i64 %22 to i64*
+  store i64 %.05, i64* %23, align 4
+  %24 = add i64 %22, 8
+  %25 = load i64, i64* %12, align 4
+  %26 = inttoptr i64 %24 to i64*
+  store i64 %25, i64* %26, align 4
+  %27 = add i64 %22, 16
+  %28 = getelementptr i64, i64* %11, i64 -1
+  %29 = load i64, i64* %28, align 4
+  %30 = inttoptr i64 %27 to i64*
+  %31 = getelementptr i64, i64* %30, i64 -1
+  %32 = load i64, i64* %31, align 4
+  %33 = tail call i64 @c_make_pair(i64* nonnull %0, i64 %32, i64 %29) #0
+  store i64 %33, i64* %31, align 4
+  store i64 2, i64* %30, align 4
+  %34 = getelementptr i64, i64* %30, i64 1
+  store i64 0, i64* %34, align 4
+  %35 = add i64 %22, 32
+  %36 = ptrtoint i64* %34 to i64
+  store i64 4402012400, i64* %0, align 4
+  store i64 %35, i64* %4, align 4
+  store i64 %36, i64* %3, align 4
+  store i64 %35, i64* %2, align 4
   br label %tailrecurse
 
-fixnum_true:                                      ; preds = %f9h_true
-  %39 = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %21, i64 -2)
-  %40 = extractvalue { i64, i1 } %39, 1
-  br i1 %40, label %fallback, label %valid_true
+fixnum_true:                                      ; preds = %nonfixnum_false, %f9h_true
+  %37 = phi i64 [ %.pre10, %f9h_true ], [ %13, %nonfixnum_false ]
+  %38 = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %37, i64 -2)
+  %39 = extractvalue { i64, i1 } %38, 1
+  br i1 %39, label %fallback, label %valid_true
 
 fallback:                                         ; preds = %fixnum_true, %f9h_true
-  %41 = tail call i64 @c_push_nadd_iloc(i64* nonnull %0, i64 4526881968) #0
-  %42 = icmp eq i64 %41, 0
-  br i1 %42, label %fallback.continue1_crit_edge, label %fallback_fail
-
-fallback.continue1_crit_edge:                     ; preds = %fallback
-  %.pre7 = load i64, i64* %1, align 4
-  br label %continue1
+  %40 = tail call i64 @c_nadd_iloc(i64* nonnull %0, i64 4402012992) #0
+  %41 = icmp eq i64 %40, 0
+  br i1 %41, label %fallback_fail, label %continue1
 
 valid_true:                                       ; preds = %fixnum_true
-  %43 = extractvalue { i64, i1 } %39, 0
-  %44 = load i64, i64* %1, align 4
-  %45 = inttoptr i64 %44 to i64*
-  store i64 %43, i64* %45, align 4
-  %46 = add i64 %44, 8
-  store i64 %46, i64* %1, align 4
+  %42 = extractvalue { i64, i1 } %38, 0
   br label %continue1
 }
 
@@ -267,19 +253,19 @@ declare i64 @c_eq_n_iloc(i64*, i64, i64) local_unnamed_addr
 ; Function Attrs: nounwind readnone speculatable willreturn
 declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64) #1
 
-declare i64 @c_push_nadd_iloc(i64*, i64) local_unnamed_addr
+declare i64 @c_nadd_iloc(i64*, i64) local_unnamed_addr
 
 declare i64 @c_make_pair(i64*, i64, i64) local_unnamed_addr
 
 ; Function Attrs: nounwind
-define i64 @"051cca58-8c2c-49b9-9a86-c080a588ede6"(i64* noalias nocapture %0) local_unnamed_addr #0 {
+define i64 @e0da4e4c-b0ed-4cd5-84ca-e75dfcc365aa(i64* noalias nocapture %0) local_unnamed_addr #0 {
 entry:
-  %1 = getelementptr i64, i64* %0, i64 6
+  %1 = getelementptr i64, i64* %0, i64 7
   %2 = load i64, i64* %1, align 4
-  %3 = getelementptr i64, i64* %0, i64 7
+  %3 = getelementptr i64, i64* %0, i64 6
   %4 = load i64, i64* %3, align 4
-  %5 = add i64 %2, 152
-  %6 = icmp ult i64 %5, %4
+  %5 = add i64 %4, 152
+  %6 = icmp ult i64 %5, %2
   br i1 %6, label %stack_ok, label %stack_overflow
 
 stack_ok:                                         ; preds = %stack_overflow, %entry
@@ -304,9 +290,9 @@ taken_true:                                       ; preds = %stack_ok
   br i1 %16, label %taken_true1, label %taken_false2
 
 taken_false:                                      ; preds = %stack_ok
-  %18 = bitcast i64* %1 to i64**
+  %18 = bitcast i64* %3 to i64**
   %19 = load i64*, i64** %18, align 4
-  store i64 4526877856, i64* %19, align 4
+  store i64 4402013520, i64* %19, align 4
   %20 = getelementptr i64, i64* %19, i64 1
   store i64 82, i64* %20, align 4
   %21 = getelementptr i64, i64* %0, i64 2
@@ -316,7 +302,7 @@ taken_false:                                      ; preds = %stack_ok
   %24 = getelementptr i64, i64* %19, i64 3
   store i64 %8, i64* %24, align 4
   %25 = getelementptr i64, i64* %19, i64 4
-  store i64 ptrtoint (i64 (i64*)* @d070c580-04b2-414c-9f5a-37ef01b58089 to i64), i64* %25, align 4
+  store i64 ptrtoint (i64 (i64*)* @f58699b3-5194-4b6f-93e7-6bb290659cd4 to i64), i64* %25, align 4
   %26 = getelementptr i64, i64* %0, i64 4
   %27 = load i64, i64* %26, align 4
   %28 = getelementptr i64, i64* %19, i64 5
@@ -324,7 +310,7 @@ taken_false:                                      ; preds = %stack_ok
   %29 = getelementptr i64, i64* %19, i64 6
   %30 = ptrtoint i64* %29 to i64
   %31 = ptrtoint i64* %28 to i64
-  store i64 4526879136, i64* %29, align 4
+  store i64 4402014800, i64* %29, align 4
   %32 = getelementptr i64, i64* %19, i64 7
   store i64 82, i64* %32, align 4
   %33 = getelementptr i64, i64* %19, i64 8
@@ -332,7 +318,7 @@ taken_false:                                      ; preds = %stack_ok
   %34 = getelementptr i64, i64* %19, i64 9
   store i64 %8, i64* %34, align 4
   %35 = getelementptr i64, i64* %19, i64 10
-  store i64 ptrtoint (i64 (i64*)* @"44d6386f-e8e4-4381-9c0f-5ad845cc8da7" to i64), i64* %35, align 4
+  store i64 ptrtoint (i64 (i64*)* @"55da4216-bb21-4904-8e49-cf19daa1e6d5" to i64), i64* %35, align 4
   %36 = getelementptr i64, i64* %19, i64 11
   store i64 %31, i64* %36, align 4
   %37 = getelementptr i64, i64* %19, i64 12
@@ -368,21 +354,21 @@ pair_true:                                        ; preds = %cond1_true
   store i64 0, i64* %51, align 4
   %52 = add i64 %38, 40
   %53 = ptrtoint i64* %51 to i64
-  store i64 4526875280, i64* %0, align 4
+  store i64 4402017856, i64* %0, align 4
   store i64 %52, i64* %21, align 4
   store i64 %53, i64* %7, align 4
   store i64 %39, i64* %26, align 4
-  store i64 %52, i64* %1, align 4
-  %54 = musttail call i64 @b2c68e4c-59b7-4e71-9792-323c589decc3(i64* nonnull %0)
+  store i64 %52, i64* %3, align 4
+  %54 = musttail call i64 @e904a4d1-da3e-47ae-91f9-c4200c968fd6(i64* nonnull %0)
   ret i64 %54
 
 pair_false:                                       ; preds = %cond1_true, %taken_false
   store i64 %38, i64* %21, align 4
   store i64 %39, i64* %26, align 4
-  store i64 %38, i64* %1, align 4
+  store i64 %38, i64* %3, align 4
   %55 = getelementptr i64, i64* %0, i64 5
   store i64 %12, i64* %55, align 4
-  store i64 4526880320, i64* %0, align 4
+  store i64 4402015984, i64* %0, align 4
   tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %40) #0
   ret i64 3
 
@@ -395,7 +381,7 @@ cond1_true:                                       ; preds = %taken_false
 }
 
 ; Function Attrs: nounwind
-define i64 @d070c580-04b2-414c-9f5a-37ef01b58089(i64* noalias nocapture %0) #0 {
+define i64 @f58699b3-5194-4b6f-93e7-6bb290659cd4(i64* noalias nocapture %0) #0 {
 entry:
   %1 = getelementptr i64, i64* %0, i64 5
   %2 = load i64, i64* %1, align 4
@@ -405,7 +391,7 @@ entry:
   store i64 %2, i64* %5, align 4
   %6 = add i64 %4, 8
   %7 = inttoptr i64 %6 to i64*
-  store i64 4526877824, i64* %7, align 4
+  store i64 4402013488, i64* %7, align 4
   %8 = getelementptr i64, i64* %7, i64 1
   store i64 82, i64* %8, align 4
   %9 = getelementptr i64, i64* %0, i64 2
@@ -417,7 +403,7 @@ entry:
   %14 = getelementptr i64, i64* %7, i64 3
   store i64 %13, i64* %14, align 4
   %15 = getelementptr i64, i64* %7, i64 4
-  store i64 ptrtoint (i64 (i64*)* @"2caae3c4-0ae6-48d2-95c0-9b66d9c42ef2" to i64), i64* %15, align 4
+  store i64 ptrtoint (i64 (i64*)* @bcc11a66-4cf7-4d94-8d78-0b6ca647df24 to i64), i64* %15, align 4
   %16 = getelementptr i64, i64* %0, i64 4
   %17 = load i64, i64* %16, align 4
   %18 = getelementptr i64, i64* %7, i64 5
@@ -447,7 +433,7 @@ pair_false:                                       ; preds = %cond1_true, %entry
   store i64 %20, i64* %9, align 4
   store i64 %21, i64* %16, align 4
   store i64 %20, i64* %3, align 4
-  store i64 4526878336, i64* %0, align 4
+  store i64 4402014000, i64* %0, align 4
   tail call void @c_error_push_cdr_iloc(i64* nonnull %0, i64 %25) #0
   ret i64 3
 
@@ -479,19 +465,19 @@ pair_true1:                                       ; preds = %cond1_true3
   store i64 0, i64* %50, align 4
   %51 = add i64 %20, 40
   %52 = ptrtoint i64* %50 to i64
-  store i64 4526877904, i64* %0, align 4
+  store i64 4402013568, i64* %0, align 4
   store i64 %51, i64* %9, align 4
   store i64 %52, i64* %12, align 4
   store i64 %21, i64* %16, align 4
   store i64 %51, i64* %3, align 4
-  %53 = musttail call i64 @"051cca58-8c2c-49b9-9a86-c080a588ede6"(i64* nonnull %0)
+  %53 = musttail call i64 @e0da4e4c-b0ed-4cd5-84ca-e75dfcc365aa(i64* nonnull %0)
   ret i64 %53
 
 pair_false2:                                      ; preds = %cond1_true3, %pair_true
   store i64 %20, i64* %9, align 4
   store i64 %21, i64* %16, align 4
   store i64 %30, i64* %3, align 4
-  store i64 4526878320, i64* %0, align 4
+  store i64 4402013984, i64* %0, align 4
   tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %31) #0
   ret i64 3
 
@@ -504,7 +490,7 @@ cond1_true3:                                      ; preds = %pair_true
 }
 
 ; Function Attrs: nounwind
-define i64 @"44d6386f-e8e4-4381-9c0f-5ad845cc8da7"(i64* noalias nocapture %0) #0 {
+define i64 @"55da4216-bb21-4904-8e49-cf19daa1e6d5"(i64* noalias nocapture %0) #0 {
 entry:
   %1 = getelementptr i64, i64* %0, i64 5
   %2 = load i64, i64* %1, align 4
@@ -539,14 +525,14 @@ pair_true:                                        ; preds = %cond1_true
   %20 = inttoptr i64 %17 to i64*
   store i64 %19, i64* %20, align 4
   %21 = add i64 %15, 16
-  store i64 4526879248, i64* %0, align 4
-  %22 = tail call i64 inttoptr (i64 4404351056 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %15) #0
+  store i64 4402014912, i64* %0, align 4
+  %22 = tail call i64 inttoptr (i64 4358423904 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %15) #0
   store i64 %22, i64* %16, align 4
   %23 = icmp eq i64 %22, 66
   br i1 %23, label %undef_true, label %continue
 
 pair_false:                                       ; preds = %cond1_true, %f9h_false
-  store i64 4526879280, i64* %0, align 4
+  store i64 4402014944, i64* %0, align 4
   tail call void @c_error_push_cdr_iloc(i64* nonnull %0, i64 %9) #0
   ret i64 3
 
@@ -584,18 +570,18 @@ pair_true1:                                       ; preds = %cond1_true3
   store i64 0, i64* %39, align 4
   %40 = add i64 %15, 40
   %41 = ptrtoint i64* %39 to i64
-  store i64 4526877904, i64* %0, align 4
+  store i64 4402013568, i64* %0, align 4
   %42 = getelementptr i64, i64* %0, i64 2
   store i64 %40, i64* %42, align 4
   store i64 %41, i64* %4, align 4
   store i64 %40, i64* %14, align 4
-  %43 = musttail call i64 @"051cca58-8c2c-49b9-9a86-c080a588ede6"(i64* nonnull %0)
+  %43 = musttail call i64 @e0da4e4c-b0ed-4cd5-84ca-e75dfcc365aa(i64* nonnull %0)
   ret i64 %43
 
 pair_false2:                                      ; preds = %cond1_true3, %continue
   store i64 %21, i64* %14, align 4
   store i64 %22, i64* %1, align 4
-  store i64 4526879216, i64* %0, align 4
+  store i64 4402014880, i64* %0, align 4
   tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %28) #0
   ret i64 3
 
@@ -610,222 +596,229 @@ cond1_true3:                                      ; preds = %continue
 declare void @c_error_push_car_iloc(i64*, i64) local_unnamed_addr
 
 ; Function Attrs: nounwind
-define i64 @b2c68e4c-59b7-4e71-9792-323c589decc3(i64* noalias nocapture %0) local_unnamed_addr #0 {
+define i64 @e904a4d1-da3e-47ae-91f9-c4200c968fd6(i64* noalias nocapture %0) local_unnamed_addr #0 {
 entry:
-  %1 = getelementptr i64, i64* %0, i64 6
-  %2 = getelementptr i64, i64* %0, i64 7
+  %1 = getelementptr i64, i64* %0, i64 7
+  %2 = getelementptr i64, i64* %0, i64 6
   %3 = getelementptr i64, i64* %0, i64 3
-  %4 = getelementptr i64, i64* %0, i64 5
-  %5 = getelementptr i64, i64* %0, i64 2
-  %.pre = load i64, i64* %1, align 4
+  %4 = getelementptr i64, i64* %0, i64 2
+  %.pre = load i64, i64* %2, align 4
   br label %tailrecurse
 
 tailrecurse:                                      ; preds = %pair_true13, %entry
-  %6 = phi i64 [ %66, %pair_true13 ], [ %.pre, %entry ]
-  %7 = load i64, i64* %2, align 4
-  %8 = add i64 %6, 104
-  %9 = icmp ult i64 %8, %7
-  br i1 %9, label %stack_ok, label %stack_overflow
+  %5 = phi i64 [ %72, %pair_true13 ], [ %.pre, %entry ]
+  %6 = load i64, i64* %1, align 4
+  %7 = add i64 %5, 104
+  %8 = icmp ult i64 %7, %6
+  br i1 %8, label %stack_ok, label %stack_overflow
 
 stack_ok:                                         ; preds = %stack_overflow, %tailrecurse
-  %10 = load i64, i64* %3, align 4
-  %11 = add i64 %10, -8
-  %12 = inttoptr i64 %11 to i64*
-  %13 = getelementptr i64, i64* %12, i64 -1
-  %14 = load i64, i64* %13, align 4
-  %15 = icmp eq i64 %14, 50
-  br i1 %15, label %taken_true, label %taken_false
+  %9 = load i64, i64* %3, align 4
+  %10 = add i64 %9, -8
+  %11 = inttoptr i64 %10 to i64*
+  %12 = getelementptr i64, i64* %11, i64 -1
+  %13 = load i64, i64* %12, align 4
+  %14 = icmp eq i64 %13, 50
+  br i1 %14, label %taken_true, label %taken_false
 
 stack_overflow:                                   ; preds = %tailrecurse
   tail call void @c_collect_stack(i64* nonnull %0, i64 104) #0
   br label %stack_ok
 
 taken_true:                                       ; preds = %stack_ok
-  store i64 18, i64* %4, align 4
+  %15 = getelementptr i64, i64* %0, i64 5
+  store i64 18, i64* %15, align 4
   ret i64 1
 
 taken_false:                                      ; preds = %stack_ok
-  %16 = and i64 %14, 7
+  %16 = and i64 %13, 7
   %17 = icmp eq i64 %16, 0
   br i1 %17, label %cond1_true, label %pair_false
 
 pair_true:                                        ; preds = %cond1_true
-  %18 = load i64, i64* %1, align 4
+  %18 = load i64, i64* %2, align 4
   %19 = inttoptr i64 %18 to i64*
-  store i64 %31, i64* %19, align 4
+  store i64 %33, i64* %19, align 4
   %20 = add i64 %18, 8
-  %21 = getelementptr i64, i64* %12, i64 -3
+  %21 = getelementptr i64, i64* %11, i64 -3
   %22 = load i64, i64* %21, align 4
   %23 = inttoptr i64 %20 to i64*
   store i64 %22, i64* %23, align 4
   %24 = add i64 %18, 16
-  %25 = getelementptr i64, i64* %12, i64 -2
+  %25 = getelementptr i64, i64* %11, i64 -2
   %26 = load i64, i64* %25, align 4
   %27 = inttoptr i64 %24 to i64*
   store i64 %26, i64* %27, align 4
-  store i64 4526875200, i64* %0, align 4
-  %28 = tail call i64 inttoptr (i64 4404393696 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %20) #0
-  store i64 %28, i64* %23, align 4
-  %29 = icmp eq i64 %28, 66
-  br i1 %29, label %undef_true, label %continue
+  %28 = add i64 %18, 24
+  store i64 4402017776, i64* %0, align 4
+  %29 = tail call i64 inttoptr (i64 4358466544 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %20) #0
+  store i64 %29, i64* %23, align 4
+  %30 = icmp eq i64 %29, 66
+  br i1 %30, label %undef_true, label %continue
 
 pair_false:                                       ; preds = %cond1_true, %taken_false
-  store i64 18, i64* %4, align 4
-  store i64 4526875248, i64* %0, align 4
-  tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %14) #0
+  %31 = getelementptr i64, i64* %0, i64 5
+  store i64 18, i64* %31, align 4
+  store i64 4402017824, i64* %0, align 4
+  tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %13) #0
   ret i64 3
 
 cond1_true:                                       ; preds = %taken_false
-  %30 = inttoptr i64 %14 to i64*
-  %31 = load i64, i64* %30, align 4
-  %32 = and i64 %31, 15
-  %33 = icmp eq i64 %32, 10
-  br i1 %33, label %pair_false, label %pair_true
+  %32 = inttoptr i64 %13 to i64*
+  %33 = load i64, i64* %32, align 4
+  %34 = and i64 %33, 15
+  %35 = icmp eq i64 %34, 10
+  br i1 %35, label %pair_false, label %pair_true
 
 continue:                                         ; preds = %pair_true
-  store i64 4526875184, i64* %0, align 4
-  %34 = tail call i64 inttoptr (i64 4404389280 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %18) #0
-  switch i64 %34, label %value_nonfalse [
+  store i64 4402017760, i64* %0, align 4
+  %36 = tail call i64 inttoptr (i64 4358462128 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %18) #0
+  switch i64 %36, label %value_nonfalse [
     i64 66, label %undef_true2
     i64 34, label %value_false
   ]
 
 undef_true:                                       ; preds = %pair_true
-  store i64 66, i64* %4, align 4
+  %37 = getelementptr i64, i64* %0, i64 5
+  store i64 66, i64* %37, align 4
   ret i64 3
 
 undef_true2:                                      ; preds = %continue
-  store i64 66, i64* %4, align 4
+  %38 = getelementptr i64, i64* %0, i64 5
+  store i64 66, i64* %38, align 4
   ret i64 3
 
 value_false:                                      ; preds = %continue
-  %35 = load i64, i64* %13, align 4
-  %36 = and i64 %35, 7
-  %37 = icmp eq i64 %36, 0
-  br i1 %37, label %cond1_true5, label %pair_false4
+  %39 = load i64, i64* %12, align 4
+  %40 = and i64 %39, 7
+  %41 = icmp eq i64 %40, 0
+  br i1 %41, label %cond1_true5, label %pair_false4
 
 value_nonfalse:                                   ; preds = %continue
-  store i64 34, i64* %4, align 4
+  %42 = getelementptr i64, i64* %0, i64 5
+  store i64 34, i64* %42, align 4
   ret i64 1
 
 pair_true3:                                       ; preds = %cond1_true5
-  store i64 %43, i64* %19, align 4
-  %38 = load i64, i64* %21, align 4
-  store i64 %38, i64* %23, align 4
-  %39 = load i64, i64* %25, align 4
-  store i64 %39, i64* %27, align 4
-  store i64 4526875104, i64* %0, align 4
-  %40 = tail call i64 inttoptr (i64 4404394256 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %20) #0
-  store i64 %40, i64* %23, align 4
-  %41 = icmp eq i64 %40, 66
-  br i1 %41, label %undef_true7, label %continue6
+  store i64 %49, i64* %19, align 4
+  %43 = load i64, i64* %21, align 4
+  store i64 %43, i64* %23, align 4
+  %44 = load i64, i64* %25, align 4
+  store i64 %44, i64* %27, align 4
+  store i64 4402017680, i64* %0, align 4
+  %45 = tail call i64 inttoptr (i64 4358467104 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %20) #0
+  store i64 %45, i64* %23, align 4
+  %46 = icmp eq i64 %45, 66
+  br i1 %46, label %undef_true7, label %continue6
 
 pair_false4:                                      ; preds = %cond1_true5, %value_false
-  store i64 %18, i64* %1, align 4
-  store i64 34, i64* %4, align 4
-  store i64 4526875152, i64* %0, align 4
-  tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %35) #0
+  store i64 %18, i64* %2, align 4
+  %47 = getelementptr i64, i64* %0, i64 5
+  store i64 34, i64* %47, align 4
+  store i64 4402017728, i64* %0, align 4
+  tail call void @c_error_push_car_iloc(i64* nonnull %0, i64 %39) #0
   ret i64 3
 
 cond1_true5:                                      ; preds = %value_false
-  %42 = inttoptr i64 %35 to i64*
-  %43 = load i64, i64* %42, align 4
-  %44 = and i64 %43, 15
-  %45 = icmp eq i64 %44, 10
-  br i1 %45, label %pair_false4, label %pair_true3
+  %48 = inttoptr i64 %39 to i64*
+  %49 = load i64, i64* %48, align 4
+  %50 = and i64 %49, 15
+  %51 = icmp eq i64 %50, 10
+  br i1 %51, label %pair_false4, label %pair_true3
 
 continue6:                                        ; preds = %pair_true3
-  store i64 4526875088, i64* %0, align 4
-  %46 = tail call i64 inttoptr (i64 4404389280 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %18) #0
-  switch i64 %46, label %value_nonfalse11 [
+  store i64 4402017664, i64* %0, align 4
+  %52 = tail call i64 inttoptr (i64 4358462128 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %18) #0
+  switch i64 %52, label %value_nonfalse11 [
     i64 66, label %undef_true9
     i64 34, label %value_false10
   ]
 
 undef_true7:                                      ; preds = %pair_true3
-  store i64 66, i64* %4, align 4
+  %53 = getelementptr i64, i64* %0, i64 5
+  store i64 66, i64* %53, align 4
   ret i64 3
 
 undef_true9:                                      ; preds = %continue6
-  store i64 66, i64* %4, align 4
+  %54 = getelementptr i64, i64* %0, i64 5
+  store i64 66, i64* %54, align 4
   ret i64 3
 
 value_false10:                                    ; preds = %continue6
-  %47 = load i64, i64* %21, align 4
-  store i64 %47, i64* %19, align 4
-  %48 = load i64, i64* %25, align 4
-  %49 = and i64 %48, 1
-  %50 = icmp eq i64 %49, 0
-  br i1 %50, label %fallback, label %fixnum_true
+  %55 = load i64, i64* %21, align 4
+  store i64 %55, i64* %19, align 4
+  %56 = load i64, i64* %25, align 4
+  %57 = and i64 %56, 1
+  %58 = icmp eq i64 %57, 0
+  br i1 %58, label %fallback, label %fixnum_true
 
 value_nonfalse11:                                 ; preds = %continue6
-  store i64 34, i64* %4, align 4
+  %59 = getelementptr i64, i64* %0, i64 5
+  store i64 34, i64* %59, align 4
   ret i64 1
 
 continue12:                                       ; preds = %fallback, %valid_true
-  %51 = load i64, i64* %13, align 4
-  %52 = and i64 %51, 7
-  %53 = icmp eq i64 %52, 0
-  br i1 %53, label %cond1_true15, label %pair_false14
+  %.0 = phi i64 [ %67, %valid_true ], [ %65, %fallback ]
+  store i64 %.0, i64* %23, align 4
+  %60 = load i64, i64* %12, align 4
+  %61 = and i64 %60, 7
+  %62 = icmp eq i64 %61, 0
+  br i1 %62, label %cond1_true15, label %pair_false14
 
 fixnum_true:                                      ; preds = %value_false10
-  %54 = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %48, i64 2)
-  %55 = extractvalue { i64, i1 } %54, 1
-  br i1 %55, label %fallback, label %valid_true
+  %63 = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %56, i64 2)
+  %64 = extractvalue { i64, i1 } %63, 1
+  br i1 %64, label %fallback, label %valid_true
 
 fallback:                                         ; preds = %fixnum_true, %value_false10
-  store i64 %20, i64* %1, align 4
-  store i64 34, i64* %4, align 4
-  %56 = tail call i64 @c_push_nadd_iloc(i64* nonnull %0, i64 4526875936) #0
-  %57 = icmp eq i64 %56, 0
-  br i1 %57, label %continue12, label %fallback_fail
+  store i64 %20, i64* %2, align 4
+  %65 = tail call i64 @c_nadd_iloc(i64* nonnull %0, i64 4402018512) #0
+  %66 = icmp eq i64 %65, 0
+  br i1 %66, label %fallback_fail, label %continue12
 
 valid_true:                                       ; preds = %fixnum_true
-  %58 = extractvalue { i64, i1 } %54, 0
-  store i64 %58, i64* %23, align 4
-  store i64 %24, i64* %1, align 4
+  %67 = extractvalue { i64, i1 } %63, 0
   br label %continue12
 
 fallback_fail:                                    ; preds = %fallback
   ret i64 3
 
 pair_true13:                                      ; preds = %cond1_true15
-  %59 = getelementptr i64, i64* %68, i64 1
-  %60 = load i64, i64* %59, align 4
-  %61 = load i64, i64* %1, align 4
-  %62 = inttoptr i64 %61 to i64*
-  store i64 %60, i64* %62, align 4
-  %63 = add i64 %61, 8
-  %64 = inttoptr i64 %63 to i64*
-  store i64 3, i64* %64, align 4
-  %65 = getelementptr i64, i64* %64, i64 1
-  store i64 0, i64* %65, align 4
-  %66 = add i64 %61, 24
-  %67 = ptrtoint i64* %65 to i64
-  store i64 4526875280, i64* %0, align 4
-  store i64 %66, i64* %5, align 4
-  store i64 %67, i64* %3, align 4
-  store i64 %66, i64* %1, align 4
+  %68 = getelementptr i64, i64* %75, i64 1
+  %69 = load i64, i64* %68, align 4
+  store i64 %69, i64* %27, align 4
+  %70 = inttoptr i64 %28 to i64*
+  store i64 3, i64* %70, align 4
+  %71 = getelementptr i64, i64* %70, i64 1
+  store i64 0, i64* %71, align 4
+  %72 = add i64 %18, 40
+  %73 = ptrtoint i64* %71 to i64
+  store i64 4402017856, i64* %0, align 4
+  store i64 %72, i64* %4, align 4
+  store i64 %73, i64* %3, align 4
+  store i64 %72, i64* %2, align 4
   br label %tailrecurse
 
 pair_false14:                                     ; preds = %cond1_true15, %continue12
-  store i64 34, i64* %4, align 4
-  store i64 4526875008, i64* %0, align 4
-  tail call void @c_error_push_cdr_iloc(i64* nonnull %0, i64 %51) #0
+  store i64 %24, i64* %2, align 4
+  %74 = getelementptr i64, i64* %0, i64 5
+  store i64 %.0, i64* %74, align 4
+  store i64 4402017584, i64* %0, align 4
+  tail call void @c_error_push_cdr_iloc(i64* nonnull %0, i64 %60) #0
   ret i64 3
 
 cond1_true15:                                     ; preds = %continue12
-  %68 = inttoptr i64 %51 to i64*
-  %69 = load i64, i64* %68, align 4
-  %70 = and i64 %69, 15
-  %71 = icmp eq i64 %70, 10
-  br i1 %71, label %pair_false14, label %pair_true13
+  %75 = inttoptr i64 %60 to i64*
+  %76 = load i64, i64* %75, align 4
+  %77 = and i64 %76, 15
+  %78 = icmp eq i64 %77, 10
+  br i1 %78, label %pair_false14, label %pair_true13
 }
 
 declare void @c_error_push_cdr_iloc(i64*, i64) local_unnamed_addr
 
 ; Function Attrs: nounwind
-define i64 @"2caae3c4-0ae6-48d2-95c0-9b66d9c42ef2"(i64* noalias nocapture %0) #0 {
+define i64 @bcc11a66-4cf7-4d94-8d78-0b6ca647df24(i64* noalias nocapture %0) #0 {
 entry:
   %1 = getelementptr i64, i64* %0, i64 5
   %2 = load i64, i64* %1, align 4
@@ -835,8 +828,8 @@ entry:
   store i64 %2, i64* %5, align 4
   %6 = getelementptr i64, i64* %0, i64 2
   %7 = load i64, i64* %6, align 4
-  store i64 4526877808, i64* %0, align 4
-  %8 = tail call i64 inttoptr (i64 4404393696 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %7) #0
+  store i64 4402013472, i64* %0, align 4
+  %8 = tail call i64 inttoptr (i64 4358466544 to i64 (i64*, i64, i64)*)(i64* nonnull %0, i64 2, i64 %7) #0
   %9 = icmp eq i64 %8, 66
   store i64 %8, i64* %1, align 4
   %retval = select i1 %9, i64 3, i64 1

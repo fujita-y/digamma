@@ -66,124 +66,114 @@ extern "C" {
         return arith_add(vm->m_heap, obj, operands);
     }
 
-    intptr_t c_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    scm_obj_t c_lt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
-            vm->m_value = n_compare(vm->m_heap, obj, operands) < 0 ? scm_true : scm_false;
-            return 0;
+            return n_compare(vm->m_heap, obj, operands) < 0 ? scm_true : scm_false;
         }
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    scm_obj_t c_gt_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
-            vm->m_value = n_compare(vm->m_heap, obj, operands) > 0 ? scm_true : scm_false;
-            return 0;
+            return n_compare(vm->m_heap, obj, operands) > 0 ? scm_true : scm_false;
         }
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_le_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    scm_obj_t c_le_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
-            vm->m_value = n_compare(vm->m_heap, obj, operands) <= 0 ? scm_true : scm_false;
-            return 0;
+            return n_compare(vm->m_heap, obj, operands) <= 0 ? scm_true : scm_false;
         }
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_ge_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    scm_obj_t c_ge_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
-            vm->m_value = n_compare(vm->m_heap, obj, operands) >= 0 ? scm_true : scm_false;
-            return 0;
+            return n_compare(vm->m_heap, obj, operands) >= 0 ? scm_true : scm_false;
         }
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_eq_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
+    scm_obj_t c_eq_n_iloc(VM* vm, scm_obj_t obj, scm_obj_t operands) {
         if (real_pred(obj)) {
-            vm->m_value = n_compare(vm->m_heap, obj, operands) == 0 ? scm_true : scm_false;
-            return 0;
+            return n_compare(vm->m_heap, obj, operands) == 0 ? scm_true : scm_false;
         }
         scm_obj_t argv[2] = { obj, operands };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", 0, "real", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_gt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+    scm_obj_t c_gt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
-                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) > 0) ? scm_true : scm_false;
-                return 0;
+                return (n_compare(vm->m_heap, lhs, rhs) > 0) ? scm_true : scm_false;
             }
             bad = 1;
         }
         scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_lt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+    scm_obj_t c_lt_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
-                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) < 0) ? scm_true : scm_false;
-                return 0;
+                return (n_compare(vm->m_heap, lhs, rhs) < 0) ? scm_true : scm_false;
             }
             bad = 1;
         }
         scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_ge_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+    scm_obj_t c_ge_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
-                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) >= 0) ? scm_true : scm_false;
-                return 0;
+                return (n_compare(vm->m_heap, lhs, rhs) >= 0) ? scm_true : scm_false;
             }
             bad = 1;
         }
         scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_le_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+    scm_obj_t c_le_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
-                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) <= 0) ? scm_true : scm_false;
-                return 0;
+                return (n_compare(vm->m_heap, lhs, rhs) <= 0) ? scm_true : scm_false;
             }
             bad = 1;
         }
         scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-        return 1;
+        return NULL;
     }
 
-    intptr_t c_eq_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
+    scm_obj_t c_eq_iloc(VM* vm, scm_obj_t lhs, scm_obj_t rhs) {
         int bad = 0;
         if (real_pred(lhs)) {
             if (real_pred(rhs)) {
-                vm->m_value = (n_compare(vm->m_heap, lhs, rhs) == 0) ? scm_true : scm_false;
-                return 0;
+                return (n_compare(vm->m_heap, lhs, rhs) == 0) ? scm_true : scm_false;
             }
             bad = 1;
         }
         scm_obj_t argv[2] = { lhs, rhs };
         wrong_type_argument_violation(vm, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
-        return 1;
+        return NULL;
     }
 
     intptr_t c_number_pred(scm_obj_t obj)
@@ -225,22 +215,20 @@ extern "C" {
         vm->m_value = make_closure(vm->m_heap, operands, vm->m_env);
     }
 
-    intptr_t c_set_gloc(VM* vm, scm_closure_t operands) {
+    void c_set_gloc(VM* vm, scm_closure_t operands) {
         scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
         assert(GLOCP(gloc));
         vm->m_heap->write_barrier(vm->m_value);
         gloc->value = vm->m_value;
-        return 0;
     }
 
-    intptr_t c_set_iloc(VM* vm, scm_closure_t operands) {
+    void c_set_iloc(VM* vm, scm_closure_t operands) {
         scm_obj_t loc = CAR(operands);
         scm_obj_t* slot = c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
         if (!STACKP(slot)) {
             vm->m_heap->write_barrier(vm->m_value);
         }
         *slot = vm->m_value;
-        return 0;
     }
 
     void c_enclose(VM* vm, intptr_t argc) {
@@ -272,28 +260,14 @@ extern "C" {
         *slot = make_closure(vm->m_heap, (scm_closure_t)operands, vm->m_env);
     }
 
-    intptr_t c_push_nadd_iloc(VM* vm, scm_obj_t operands) {
+    scm_obj_t c_nadd_iloc(VM* vm, scm_obj_t operands) {
         scm_obj_t loc = CAR(operands);
         scm_obj_t obj = *c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
         if (number_pred(obj)) {
-            vm->m_sp[0] = arith_add(vm->m_heap, obj, CADR(operands));
-            vm->m_sp++;
-            return 0;
+            return arith_add(vm->m_heap, obj, CADR(operands));
         }
         scm_obj_t argv[2] = { obj, CADR(operands) };
         wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
-        return 1;
-    }
-
-    intptr_t c_nadd_iloc(VM* vm, scm_obj_t operands) {
-        scm_obj_t loc = CAR(operands);
-        scm_obj_t obj = *c_lookup_iloc(vm, FIXNUM(CAR(loc)), FIXNUM(CDR(loc)));
-        if (number_pred(obj)) {
-            vm->m_value = arith_add(vm->m_heap, obj, CADR(operands));
-            return 0;
-        }
-        scm_obj_t argv[2] = { obj, CADR(operands) };
-        wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
-        return 1;
+        return NULL;
     }
 }

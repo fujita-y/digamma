@@ -260,7 +260,7 @@ codegen_t::optimizeModule(ThreadSafeModule TSM)
     Module &M = *TSM.getModuleUnlocked();
     PassManagerBuilder B;
     B.OptLevel = 3;
-    // B.Inliner = createFunctionInliningPass(B.OptLevel, 0, false);
+    // B.Inliner = llvm::createFunctionInliningPass();
 
     legacy::FunctionPassManager FPM(&M);
     B.populateFunctionPassManager(FPM);
