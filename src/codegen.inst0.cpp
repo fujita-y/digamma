@@ -1,45 +1,10 @@
-/*
-Function*
-codegen_t::emit_define_prepare_call(context_t& ctx)
+llvm::AllocaInst*
+codegen_t::emit_alloca(context_t& ctx, llvm::Type* type)
 {
-    LLVMContext& C = ctx.m_llvm_context;
-    Module* M = ctx.m_module;
-
-    DECLEAR_COMMON_TYPES;
-
-    Function* F = Function::Create(FunctionType::get(VoidTy, {IntptrPtrTy, IntptrPtrTy}, false), Function::WeakAnyLinkage, "prepare_call", M);
-    F->setCallingConv(CallingConv::Fast);
-#if USE_LLVM_ATTRIBUTES
-    F->addFnAttr(Attribute::NoUnwind);
-    F->addParamAttr(0, Attribute::NoAlias);
-    F->addParamAttr(0, Attribute::NoCapture);
-    F->addParamAttr(1, Attribute::NoAlias);
-    F->addParamAttr(1, Attribute::NoCapture);
-#endif
-
-    IRBuilder<> IRB(BasicBlock::Create(C, "entry", F));
-    auto vm = F->arg_begin();
-    auto cont = F->arg_begin() + 1;
-
-    CREATE_STORE_CONT_REC(cont, trace, VALUE_INTPTR(scm_unspecified));
-    // cont->fp = m_fp;
-    CREATE_STORE_CONT_REC(cont, fp, CREATE_LOAD_VM_REG(vm, m_fp));
-    // cont->env = m_env;
-    CREATE_STORE_CONT_REC(cont, env, CREATE_LOAD_VM_REG(vm, m_env));
-    // cont->up = m_cont;
-    CREATE_STORE_CONT_REC(cont, up, CREATE_LOAD_VM_REG(vm, m_cont));
-    // m_sp = m_fp = (scm_obj_t*)(cont + 1);
-    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_sp, ea1);
-    CREATE_STORE_VM_REG(vm, m_fp, ea1);
-    // m_cont = &cont->up;
-    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
-    CREATE_STORE_VM_REG(vm, m_cont, ea2);
-    IRB.CreateRetVoid();
-
-    return F;
+    DECLEAR_CONTEXT_VARS;
+    IRBuilder<> TB(&F->getEntryBlock(), F->getEntryBlock().begin());
+    return TB.CreateAlloca(type);
 }
-*/
 
 Function*
 codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)

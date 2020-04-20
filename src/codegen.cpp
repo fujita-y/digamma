@@ -15,6 +15,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Utils.h>
+#include <llvm/Transforms/IPO.h>
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -257,17 +259,20 @@ codegen_t::optimizeModule(ThreadSafeModule TSM)
 {
     Module &M = *TSM.getModuleUnlocked();
     PassManagerBuilder B;
-    B.OptLevel = 2;
-    B.SizeLevel = 1;
+    B.OptLevel = 3;
+    // B.Inliner = createFunctionInliningPass(B.OptLevel, 0, false);
 
     legacy::FunctionPassManager FPM(&M);
     B.populateFunctionPassManager(FPM);
+    // FPM.add(llvm::createPromoteMemoryToRegisterPass());
+
     FPM.doInitialization();
     for (Function &F : M) FPM.run(F);
     FPM.doFinalization();
 
     legacy::PassManager MPM;
     B.populateModulePassManager(MPM);
+
     MPM.run(M);
 
 #if PRINT_IR

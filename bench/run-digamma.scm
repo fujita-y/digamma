@@ -127,7 +127,7 @@
 ;(closure-compile map)
 ;(closure-compile for-each)
 
-(format #t "\n\n;;  Setup...")
+(format #t "\n\n;;  Waiting for codegen queue empty ...~%~!")
 (wait-codegen-idle)
 
 (format #t "\n\n;;  GABRIEL\n")
