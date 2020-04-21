@@ -26,13 +26,6 @@ using namespace llvm::orc;
 
 static ExitOnError ExitOnErr;
 
-static int log2_of_intptr_size()
-{
-    if (sizeof(intptr_t) == 4) return 2;
-    if (sizeof(intptr_t) == 8) return 3;
-    return (int)log2(sizeof(intptr_t));
-}
-
 template<int byte_offset>
 llvm::Value* codegen_t::reg_cache_t<byte_offset>::load(llvm::Value* vm) {
 #if USE_REG_CACHE

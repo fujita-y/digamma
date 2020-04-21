@@ -70,6 +70,7 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     auto vm = F->arg_begin();
 
     ctx.reg_cache_clear();
+
     if (nbytes == 0) return;
     if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
 
@@ -85,31 +86,6 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     IRB.CreateBr(stack_ok);
 
     IRB.SetInsertPoint(stack_ok);
-
-/*
-    DECLEAR_CONTEXT_VARS;
-    DECLEAR_COMMON_TYPES;
-    auto vm = F->arg_begin();
-
-    if (nbytes) {
-        if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
-        auto sp = ctx.reg_sp.load(vm);
-        auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
-        BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
-        BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F);
-        Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(sp, VALUE_INTPTR(nbytes)), stack_limit);
-        IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow);
-
-        IRB.SetInsertPoint(stack_overflow);
-        ctx.reg_cache_copy(vm);
-        auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-        IRB.CreateCall(c_collect_stack, {vm, VALUE_INTPTR(nbytes)});
-        IRB.CreateBr(stack_ok);
-
-        IRB.SetInsertPoint(stack_ok);
-        ctx.reg_cache_clear();
-    }
-*/
 }
 
 Value*
@@ -119,35 +95,23 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
 
-    if (depth == 0) {
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(ctx.reg_env.load(vm), VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    } else if (depth == 1) {
-        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(ctx.reg_env.load(vm), IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk1, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    } else if (depth == 2) {
-        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(ctx.reg_env.load(vm), IntptrPtrTy));
-        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk2, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    } else if (depth == 3) {
-        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(ctx.reg_env.load(vm), IntptrPtrTy));
-        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
-        auto lnk3 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk2, IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk3, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
-    } else if (depth == 4) {
-        auto lnk1 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(ctx.reg_env.load(vm), IntptrPtrTy));
-        auto lnk2 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk1, IntptrPtrTy));
-        auto lnk3 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk2, IntptrPtrTy));
-        auto lnk4 = IRB.CreateLoad(IRB.CreateBitOrPointerCast(lnk3, IntptrPtrTy));
-        auto env = IRB.CreateBitOrPointerCast(IRB.CreateSub(lnk4, VALUE_INTPTR(offsetof(vm_env_rec_t, up))), IntptrPtrTy);
-        return env;
+    if (depth > 4) {
+        ctx.reg_env.writeback(vm);
+        auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
+        return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
     }
-    ctx.reg_env.writeback(vm);
-    auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
-    return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
+    Value* target;
+    auto env0 = ctx.reg_env.load(vm);
+    if (depth == 0) {
+        target = env0;
+    } else {
+        target = IRB.CreateLoad(IRB.CreateBitOrPointerCast(env0, IntptrPtrTy));
+        for (int i = 1; i < depth; i++) {
+            target = IRB.CreateLoad(IRB.CreateBitOrPointerCast(target, IntptrPtrTy));
+        }
+    }
+    auto env1 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(target, IntptrPtrTy), VALUE_INTPTR(- offsetof(vm_env_rec_t, up) / sizeof(intptr_t)));
+    return IRB.CreateBitOrPointerCast(env1, IntptrPtrTy);
 }
 
 Value*
@@ -194,7 +158,9 @@ codegen_t::emit_push_vm_stack(context_t& ctx, Value* val)
 
     auto sp = ctx.reg_sp.load(vm);
     IRB.CreateStore(val, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
-    ctx.reg_sp.store(vm, IRB.CreateAdd(sp, VALUE_INTPTR(sizeof(intptr_t))));
+    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(1));
+    auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
+    ctx.reg_sp.store(vm, ea1);
 }
 
 void
@@ -208,7 +174,8 @@ codegen_t::emit_prepair_apply(context_t& ctx, scm_closure_t closure)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
     CREATE_STORE_ENV_REC(env, up, VALUE_INTPTR(closure->env));
-    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));

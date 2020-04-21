@@ -849,7 +849,8 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, argc);
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -868,7 +869,8 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -938,7 +940,8 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
-        auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+        auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+        auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
         ctx.reg_sp.store(vm, ea1);
         ctx.reg_fp.store(vm, ea1);
         ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -951,7 +954,8 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
-        auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+        auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+        auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
         ctx.reg_sp.store(vm, ea1);
         ctx.reg_fp.store(vm, ea1);
         ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -1391,7 +1395,8 @@ codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea1 = IRB.CreateAdd(IRB.CreateBitOrPointerCast(env, IntptrTy), VALUE_INTPTR(sizeof(vm_env_rec_t)));
+    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -1751,15 +1756,14 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = ctx.reg_sp.load(vm);
-
-    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+    auto argv = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
+    auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
 
-    ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
+    ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(argv, IntptrTy));
     ctx.reg_value.store(vm, val);
     emit_push_vm_stack(ctx, val);
 
@@ -1809,15 +1813,15 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = ctx.reg_sp.load(vm);
-    auto argv = IRB.CreateSub(sp, VALUE_INTPTR(argc << log2_of_intptr_size()));
+    auto argv = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
-    auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
+    auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
     auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
 
+    ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(argv, IntptrTy));
     ctx.reg_value.store(vm, val);
-    ctx.reg_sp.store(vm, IRB.CreateSub(ctx.reg_sp.load(vm), VALUE_INTPTR(argc << log2_of_intptr_size())));
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
