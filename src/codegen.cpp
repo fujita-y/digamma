@@ -174,6 +174,13 @@ codegen_t::context_t::get_local_var_count(int depth)
     return 0;
 }
 
+llvm::MDNode*
+codegen_t::context_t::get_branch_weight(int n, int m)
+{
+    llvm::MDBuilder MDB(m_llvm_context);
+    return MDB.createBranchWeights(n, m);
+}
+
 codegen_t::codegen_t(VM* vm) : m_vm(vm), m_debug(false) { }
 
 void

@@ -78,7 +78,7 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
     BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F);
     Value* stack_cond = IRB.CreateICmpULT(IRB.CreateAdd(CREATE_LOAD_VM_REG(vm, m_sp), VALUE_INTPTR(nbytes)), stack_limit);
-    IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow);
+    IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow, ctx.likely_true);
 
     IRB.SetInsertPoint(stack_overflow);
     auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);

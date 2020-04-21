@@ -11,6 +11,7 @@
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
 
 #define USE_LLVM_ATTRIBUTES       1
@@ -55,6 +56,8 @@ class codegen_t {
         reg_cache_t<offsetof(VM, m_cont)> reg_cont;
         reg_cache_t<offsetof(VM, m_value)> reg_value;
         bool m_disable_reg_cache;
+        llvm::MDNode* likely_true;
+        llvm::MDNode* likely_false;
         void reg_cache_copy(llvm::Value* vm);
         void reg_cache_copy_only_value_and_cont(llvm::Value* vm);
         void reg_cache_copy_except_sp(llvm::Value* vm);
@@ -65,9 +68,18 @@ class codegen_t {
         void set_local_var_count(int depth, int count);
         void set_local_var_count(int depth, scm_closure_t closure);
         int get_local_var_count(int depth);
+        llvm::MDNode* get_branch_weight(int n, int m);
         context_t(llvm::LLVMContext& llvm_context, llvm::IRBuilder<>& irb)
           : m_llvm_context(llvm_context), m_irb(irb), m_argc(0), m_depth(0), m_disable_reg_cache(false),
-            reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this), reg_value(this) { }
+            reg_sp(this), reg_fp(this), reg_env(this), reg_cont(this), reg_value(this) {
+        #if ENABLE_BRANCH_WEIGHTS
+            likely_true = get_branch_weight(100, 1);
+            likely_false = get_branch_weight(1, 100);
+        #else
+            likely_true = get_branch_weight(50, 50);
+            likely_false = get_branch_weight(50, 50);
+        #endif
+        }
     };
     class reg_cache_synchronize {
         codegen_t::context_t& ctx;

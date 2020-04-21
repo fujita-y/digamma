@@ -362,7 +362,7 @@ codegen_t::emit_if_true(context_t& ctx, scm_obj_t inst)
     BasicBlock* f9h_true = BasicBlock::Create(C, "f9h_true", F);
     BasicBlock* f9h_false = BasicBlock::Create(C, "f9h_false", F);
     auto f9h_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(f9h_cond, f9h_true, f9h_false);
+    IRB.CreateCondBr(f9h_cond, f9h_true, f9h_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(f9h_false);
@@ -385,7 +385,7 @@ codegen_t::emit_if_nullp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -412,7 +412,7 @@ codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(val1, val2);
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -435,7 +435,7 @@ codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -507,7 +507,7 @@ codegen_t::emit_if_true_ret(context_t& ctx, scm_obj_t inst)
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse, ctx.likely_false);
 
     // pop
     IRB.SetInsertPoint(value_nonfalse);
@@ -531,7 +531,7 @@ codegen_t::emit_if_false_ret(context_t& ctx, scm_obj_t inst)
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse, ctx.likely_false);
 
     // pop
     IRB.SetInsertPoint(value_false);
@@ -555,7 +555,7 @@ codegen_t::emit_if_true_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse, ctx.likely_false);
 
     // pop
     IRB.SetInsertPoint(value_nonfalse);
@@ -598,14 +598,14 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
     BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
     BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
     auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(lhs, 1), VALUE_INTPTR(0));
-    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
+    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false, ctx.likely_false);
 
     // fixnum
     IRB.SetInsertPoint(nonfixnum_false);
     BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
     BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
     auto cond = emit_cmp_inst(ctx, cc, lhs, rhs);
-    IRB.CreateCondBr(cond, cond_true, cond_false);
+    IRB.CreateCondBr(cond, cond_true, cond_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(cond_true);
@@ -627,7 +627,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* c
     BasicBlock* fallback_success = BasicBlock::Create(C, "fallback_success", F);
     BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
     auto fallback_cond = IRB.CreateICmpNE(ans, VALUE_INTPTR(0));
-    IRB.CreateCondBr(fallback_cond, fallback_success, fallback_fail);
+    IRB.CreateCondBr(fallback_cond, fallback_success, fallback_fail, ctx.likely_true);
 
     IRB.SetInsertPoint(fallback_fail);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
@@ -688,14 +688,14 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
     BasicBlock* nonfixnum_true = BasicBlock::Create(C, "nonfixnum_true", F);
     BasicBlock* nonfixnum_false = BasicBlock::Create(C, "nonfixnum_false", F);
     auto nonfixnum_cond = IRB.CreateICmpEQ(IRB.CreateAnd(lhs, IRB.CreateAnd(rhs, 1)), VALUE_INTPTR(0));
-    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false);
+    IRB.CreateCondBr(nonfixnum_cond, nonfixnum_true, nonfixnum_false, ctx.likely_false);
 
     // fixnum
     IRB.SetInsertPoint(nonfixnum_false);
     BasicBlock* cond_true = BasicBlock::Create(C, "cond_true", F);
     BasicBlock* cond_false = BasicBlock::Create(C, "cond_false", F);
     auto cond = emit_cmp_inst(ctx, cc, lhs, rhs);
-    IRB.CreateCondBr(cond, cond_true, cond_false);
+    IRB.CreateCondBr(cond, cond_true, cond_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(cond_true);
@@ -717,7 +717,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfu
     BasicBlock* fallback_success = BasicBlock::Create(C, "fallback_success", F);
     BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
     auto fallback_cond = IRB.CreateICmpNE(ans, VALUE_INTPTR(0));
-    IRB.CreateCondBr(fallback_cond, fallback_success, fallback_fail);
+    IRB.CreateCondBr(fallback_cond, fallback_success, fallback_fail, ctx.likely_true);
 
     IRB.SetInsertPoint(fallback_fail);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
@@ -825,7 +825,7 @@ codegen_t::emit_if_false_call(context_t& ctx, scm_obj_t inst)
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(value_false);
@@ -1106,7 +1106,7 @@ codegen_t::emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(val1, val2);
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -1205,7 +1205,7 @@ codegen_t::emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpNE(val1, val2);
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -1254,7 +1254,7 @@ codegen_t::emit_if_false_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* value_false = BasicBlock::Create(C, "value_false", F);
     BasicBlock* value_nonfalse = BasicBlock::Create(C, "value_nonfalse", F);
     auto value_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_false));
-    IRB.CreateCondBr(value_cond, value_false, value_nonfalse);
+    IRB.CreateCondBr(value_cond, value_false, value_nonfalse, ctx.likely_false);
 
     // pop
     IRB.SetInsertPoint(value_false);
@@ -1279,7 +1279,7 @@ codegen_t::emit_ret_nullp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(value, VALUE_INTPTR(scm_nil));
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -1353,7 +1353,7 @@ codegen_t::emit_ret_eqp(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpEQ(val1, val2);
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -1600,7 +1600,7 @@ codegen_t::emit_if_not_nullp_ret_const(context_t& ctx, scm_obj_t inst)
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
     BasicBlock* taken_false = BasicBlock::Create(C, "taken_false", F);
     auto taken_cond = IRB.CreateICmpNE(value, VALUE_INTPTR(scm_nil));
-    IRB.CreateCondBr(taken_cond, taken_true, taken_false);
+    IRB.CreateCondBr(taken_cond, taken_true, taken_false, ctx.likely_false);
 
     // taken
     IRB.SetInsertPoint(taken_true);
@@ -1661,7 +1661,7 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     auto overflow = IRB.CreateExtractValue(rs, { 1 });
     auto valid_cond = IRB.CreateICmpEQ(overflow, IRB.getInt1(false));
     BasicBlock* valid_true = BasicBlock::Create(C, "valid_true", F);
-    IRB.CreateCondBr(valid_cond, valid_true, fallback);
+    IRB.CreateCondBr(valid_cond, valid_true, fallback, ctx.likely_true);
     IRB.SetInsertPoint(valid_true);
     IRB.CreateStore(ans, retval);
     IRB.CreateBr(CONTINUE);
@@ -1674,7 +1674,7 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     auto success_cond = IRB.CreateICmpNE(res, VALUE_INTPTR(0));
     BasicBlock* fallback_fail = BasicBlock::Create(C, "fallback_fail", F);
     BasicBlock* fallback_success = BasicBlock::Create(C, "fallback_success", F);
-    IRB.CreateCondBr(success_cond, fallback_success, fallback_fail);
+    IRB.CreateCondBr(success_cond, fallback_success, fallback_fail, ctx.likely_true);
 
     IRB.SetInsertPoint(fallback_fail);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
@@ -1769,7 +1769,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
+    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE, ctx.likely_false);
 
     // invalid
     IRB.SetInsertPoint(undef_true);
@@ -1825,7 +1825,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE);
+    IRB.CreateCondBr(undef_cond, undef_true, CONTINUE, ctx.likely_false);
 
     // invalid
     IRB.SetInsertPoint(undef_true);
@@ -1879,7 +1879,7 @@ codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
     BasicBlock* undef_false = BasicBlock::Create(C, "undef_false", F);
     auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
-    IRB.CreateCondBr(undef_cond, undef_true, undef_false);
+    IRB.CreateCondBr(undef_cond, undef_true, undef_false, ctx.likely_false);
 
     // valid
     IRB.SetInsertPoint(undef_false);
@@ -1922,11 +1922,11 @@ codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, Ba
 
     BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
     auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
-    IRB.CreateCondBr(cond1, cond1_true, pair_false);
+    IRB.CreateCondBr(cond1, cond1_true, pair_false, ctx.likely_true);
     IRB.SetInsertPoint(cond1_true);
     auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
     auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_ATTR_MASKBITS)), VALUE_INTPTR(HDR_ATTR_BOXED));
-    IRB.CreateCondBr(cond2, pair_true, pair_false);
+    IRB.CreateCondBr(cond2, pair_true, pair_false, ctx.likely_true);
 }
 
 void
@@ -1938,9 +1938,9 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
 
     BasicBlock* cond1_true = BasicBlock::Create(C, "cond1_true", F);
     auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
-    IRB.CreateCondBr(cond1, cond1_true, symbol_false);
+    IRB.CreateCondBr(cond1, cond1_true, symbol_false, ctx.likely_true);
     IRB.SetInsertPoint(cond1_true);
     auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
     auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
-    IRB.CreateCondBr(cond2, symbol_true, symbol_false);
+    IRB.CreateCondBr(cond2, symbol_true, symbol_false, ctx.likely_true);
 }
