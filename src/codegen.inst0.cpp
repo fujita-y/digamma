@@ -36,9 +36,10 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     Module* M = ctx.m_module;
 
     DECLEAR_COMMON_TYPES;
-    Function* F = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, function_id, M);
+    Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, function_id, M);
 #if USE_LLVM_ATTRIBUTES
     F->addFnAttr(Attribute::NoUnwind);
+    F->addFnAttr(Attribute::NoReturn);
     F->addParamAttr(0, Attribute::NoAlias);
     F->addParamAttr(0, Attribute::NoCapture);
 #endif
@@ -176,8 +177,8 @@ codegen_t::emit_prepair_apply(context_t& ctx, scm_closure_t closure)
     CREATE_STORE_ENV_REC(env, up, VALUE_INTPTR(closure->env));
     auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
-    ctx.reg_sp.store(vm, ea1);
-    ctx.reg_fp.store(vm, ea1);
-    ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(closure->pc));
+    ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
+    ctx.reg_fp.store(vm, ea1);
+    ctx.reg_sp.store(vm, ea1);
 }

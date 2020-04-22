@@ -771,9 +771,10 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     char cont_id[40];
     uuid_v4(cont_id, sizeof(cont_id));
 
-    Function* K = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::ExternalLinkage, cont_id, M);
+    Function* K = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, cont_id, M);
 #if USE_LLVM_ATTRIBUTES
     K->addFnAttr(Attribute::NoUnwind);
+    K->addFnAttr(Attribute::NoReturn);
     K->addParamAttr(0, Attribute::NoAlias);
     K->addParamAttr(0, Attribute::NoCapture);
 #endif
@@ -881,9 +882,10 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     // continue emit code in operands
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
-    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
+    Function* L = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, local_id, M);
 #if USE_LLVM_ATTRIBUTES
     L->addFnAttr(Attribute::NoUnwind);
+    L->addFnAttr(Attribute::NoReturn);
     L->addParamAttr(0, Attribute::NoAlias);
     L->addParamAttr(0, Attribute::NoCapture);
 #endif
@@ -1486,9 +1488,10 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     // continue emit code in operands
     char local_id[40];
     uuid_v4(local_id, sizeof(local_id));
-    Function* L = Function::Create(FunctionType::get(IntptrTy, {IntptrPtrTy}, false), Function::InternalLinkage, local_id, M);
+    Function* L = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, local_id, M);
 #if USE_LLVM_ATTRIBUTES
     L->addFnAttr(Attribute::NoUnwind);
+    L->addFnAttr(Attribute::NoReturn);
     L->addParamAttr(0, Attribute::NoAlias);
     L->addParamAttr(0, Attribute::NoCapture);
 #endif
@@ -1764,7 +1767,6 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
 
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(argv, IntptrTy));
-    ctx.reg_value.store(vm, val);
     emit_push_vm_stack(ctx, val);
 
     BasicBlock* undef_true = BasicBlock::Create(C, "undef_true", F);
@@ -1818,7 +1820,13 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, {vm, VALUE_INTPTR(argc), argv});
+    auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
+#if USE_LLVM_ATTRIBUTES
+    val->addParamAttr(0, Attribute::NoAlias);
+    val->addParamAttr(0, Attribute::NoCapture);
+    val->addParamAttr(2, Attribute::NoAlias);
+    val->addParamAttr(2, Attribute::NoCapture);
+#endif
 
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(argv, IntptrTy));
     ctx.reg_value.store(vm, val);
