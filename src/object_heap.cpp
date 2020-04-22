@@ -1660,12 +1660,12 @@ object_heap_t::init_architecture_feature()
             buf.sysname[i] = tolower(buf.sysname[i]);
             i++;
         }
-        ARCH_STRING(operating-system, buf.sysname);
+        ARCH_STRING(sysname, buf.sysname);
         while (buf.machine[i]) {
             buf.machine[i] = tolower(buf.machine[i]);
             i++;
         }
-        ARCH_STRING(machine-hardware, buf.machine);
+        ARCH_STRING(machine, buf.machine);
     }
 #undef ARCH_STRING
 
