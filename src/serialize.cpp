@@ -66,7 +66,7 @@ serializer_t::emit_u8(uint8_t octet)
 void
 serializer_t::emit_u32(uint32_t n)
 {
-#if ARCH_IA32 || ARCH_X64
+#if ARCH_LITTLE_ENDIAN
     assert(sizeof(uint32_t) <= MAX_BUNDLE_SIZE);
     *(uint32_t*)(m_buf + m_buf_mark) = n;
     m_buf_mark += sizeof(uint32_t);
@@ -82,7 +82,7 @@ serializer_t::emit_u32(uint32_t n)
 void
 serializer_t::emit_u64(uint64_t n)
 {
-#if ARCH_IA32 || ARCH_X64
+#if ARCH_LITTLE_ENDIAN
     assert(sizeof(uint64_t) <= MAX_BUNDLE_SIZE);
     *(uint64_t*)(m_buf + m_buf_mark) = n;
     m_buf_mark += sizeof(uint64_t);
@@ -635,7 +635,7 @@ deserializer_t::fetch_bytes(uint8_t* p, int n)
 uint32_t
 deserializer_t::fetch_u32()
 {
-#if ARCH_IA32 || ARCH_X64
+#if ARCH_LITTLE_ENDIAN
     uint32_t value = *(uint32_t*)m_buf;
     m_buf += sizeof(uint32_t);
     if (m_buf > m_buf_tail) throw true;
@@ -654,7 +654,7 @@ deserializer_t::fetch_u32()
 uint64_t
 deserializer_t::fetch_u64()
 {
-#if ARCH_IA32 || ARCH_X64
+#if ARCH_LITTLE_ENDIAN
     uint64_t value = *(uint64_t*)m_buf;
     m_buf += sizeof(uint64_t);
     if (m_buf > m_buf_tail) throw true;

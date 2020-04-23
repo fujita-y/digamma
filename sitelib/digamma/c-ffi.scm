@@ -12,7 +12,9 @@
           make-bytevector-mapping
           lookup-shared-object
           codegen-cdecl-callout
-          codegen-cdecl-callback)
+          codegen-cdecl-callback
+          c-main-argc
+          c-main-argv)
 
   (import (core)
           (digamma assert)

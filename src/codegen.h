@@ -14,7 +14,7 @@
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
 
-#define USE_LLVM_ATTRIBUTES       1
+#define USE_LLVM_ATTRIBUTES       0
 #define USE_LLVM_OPTIMIZE         1
 #define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             1
@@ -147,8 +147,8 @@ private:
     llvm::Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     llvm::Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
     llvm::Value* emit_cmp_inst(context_t& ctx, cc_t cc, llvm::Value* lhs, llvm::Value* rhs);
-    void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
-    void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, const char* cfunc);
+    void emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func);
+    void emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func);
     void emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);
     void emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr);

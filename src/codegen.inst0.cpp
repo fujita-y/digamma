@@ -38,10 +38,7 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
     Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, function_id, M);
 #if USE_LLVM_ATTRIBUTES
-    F->addFnAttr(Attribute::NoUnwind);
-    F->addFnAttr(Attribute::NoReturn);
-    F->addParamAttr(0, Attribute::NoAlias);
-    F->addParamAttr(0, Attribute::NoCapture);
+    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
 #endif
 
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
@@ -82,8 +79,10 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     IRB.CreateCondBr(stack_cond, stack_ok, stack_overflow, ctx.likely_true);
 
     IRB.SetInsertPoint(stack_overflow);
-    auto c_collect_stack = M->getOrInsertFunction("c_collect_stack", VoidTy, IntptrPtrTy, IntptrTy);
-    IRB.CreateCall(c_collect_stack, { vm, VALUE_INTPTR(nbytes) });
+    auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
+    auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_collect_stack), thunkType->getPointerTo());
+    IRB.CreateCall(thunk, { vm, VALUE_INTPTR(nbytes) });
+
     IRB.CreateBr(stack_ok);
 
     IRB.SetInsertPoint(stack_ok);
@@ -98,8 +97,9 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
 
     if (depth > 4) {
         ctx.reg_env.writeback(vm);
-        auto c_lookup_env = M->getOrInsertFunction("c_lookup_env", IntptrPtrTy, IntptrPtrTy, IntptrTy);
-        return IRB.CreateCall(c_lookup_env, { vm, VALUE_INTPTR(depth) });
+        auto thunkType = FunctionType::get(IntptrPtrTy, { IntptrPtrTy, IntptrTy }, false);
+        auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_lookup_env), thunkType->getPointerTo());
+        return IRB.CreateCall(thunk, { vm, VALUE_INTPTR(depth) });
     }
     Value* target;
     auto env0 = ctx.reg_env.load(vm);
@@ -140,8 +140,9 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
 #endif
     }
     ctx.reg_env.writeback(vm);
-    auto c_lookup_iloc = M->getOrInsertFunction("c_lookup_iloc", IntptrPtrTy, IntptrPtrTy, IntptrTy, IntptrTy);
-    return IRB.CreateCall(c_lookup_iloc, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
+    auto thunkType = FunctionType::get(IntptrPtrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
+    auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_lookup_iloc), thunkType->getPointerTo());
+    return IRB.CreateCall(thunk, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
 }
 
 Value*

@@ -6,7 +6,6 @@ PROG = digamma
 
 PREFIX = /usr/local
 
-# -DNDEBUG
 CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -DSYSTEM_EXTENSION_PATH='"$(DESTDIR)$(PREFIX)/lib/$(PROG)"'
 
 CXX = clang++
@@ -15,10 +14,10 @@ CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptio
 
 SRCS = file.cpp main.cpp object_heap_compact.cpp subr_flonum.cpp vm0.cpp vm1.cpp vm2.cpp vm3.cpp object_set.cpp \
        object_slab.cpp subr_list.cpp serialize.cpp vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp \
-			 subr_port.cpp subr_r5rs_arith.cpp equiv.cpp reader.cpp subr_base.cpp uuid.cpp subr_socket.cpp subr_hash.cpp \
+       subr_port.cpp subr_r5rs_arith.cpp equiv.cpp reader.cpp subr_base.cpp uuid.cpp subr_socket.cpp subr_hash.cpp \
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp subr_bvector.cpp \
-			 violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp object_heap.cpp subr_fixnum.cpp bit.cpp \
-			 list.cpp fasl.cpp socket.cpp subr_c_ffi.cpp subr_codegen.cpp codegen.cpp
+       violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp object_heap.cpp subr_fixnum.cpp bit.cpp \
+       list.cpp fasl.cpp socket.cpp subr_c_ffi.cpp subr_codegen.cpp codegen.cpp
 
 VPATH = src
 
@@ -35,31 +34,28 @@ ifndef DATAMODEL
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
-  CXXFLAGS += -O3 -pthread -fomit-frame-pointer
-  LDFLAGS = -fuse-ld=lld
-  LDLIBS = -Wl,--export-dynamic -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all)
   ifneq (,$(findstring arm, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=armv7-a
+      CXXFLAGS += -march=armv7-a -O3 -pthread
     else
-      CXXFLAGS += -march=armv8-a
+      CXXFLAGS += -march=armv8-a -O3 -pthread
     endif
   endif
   ifneq (,$(findstring x86, $(UNAME)))
-    CXXFLAGS += -momit-leaf-frame-pointer
     ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=x86
+      CXXFLAGS += -march=x86 -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
     else
-      CXXFLAGS += -march=x86-64
+      CXXFLAGS += -march=x86-64 -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
     endif
   endif
-  LDLIBS += -pthread -Wl,--no-as-needed -ldl
+  LDFLAGS = -fuse-ld=lld
+  LDLIBS = -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all) -pthread -Wl,--no-as-needed -ldl
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
   # CXXFLAGS += -O0 -glldb
   CXXFLAGS += -O3 -momit-leaf-frame-pointer
-  LDLIBS += $(shell llvm-config --ldflags --system-libs --libs all)
+  LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))

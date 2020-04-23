@@ -19,6 +19,11 @@ LLVM 10
 ./digamma --r7rs --top-level-program --disable-acc -- test/r7rs-sample.scm
 ```
 
+* To run FFI demo program (OpenGL, GLUT):
+```
+./digamma --r6rs --top-level-program demo/glut-demo.scm
+```
+
 ### Limitations and Notes
 
 * REPL start with '(import (core))' regardless what command line option is given.

@@ -170,6 +170,8 @@
     bytevector-uint-set!
     bytevector=?
     bytevector?
+    c-main-argc
+    c-main-argv
     caaaar
     caaadr
     caaar

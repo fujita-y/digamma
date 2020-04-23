@@ -1,5 +1,4 @@
 extern "C" {
-
     void c_collect_stack(VM* vm, intptr_t acquire) {
         vm->collect_stack(acquire);
     }

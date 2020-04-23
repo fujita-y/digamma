@@ -488,6 +488,8 @@
                         port-closed?
 
                         ; ffi
+                        c-main-argc
+                        c-main-argv
                         load-shared-object
                         lookup-shared-object
                         bytevector-c-short-ref bytevector-c-unsigned-short-ref bytevector-c-short-set!

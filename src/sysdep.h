@@ -39,24 +39,34 @@
 #endif
 #if defined(__x86_64__)
   #define ARCH_IA32                 0
-  #define ARCH_X64                  1
+  #define ARCH_AMD64                1
   #define ARCH_PPC                  0
-  #define ARCH_ARM                  0
+  #define ARCH_ARM32                0
+  #define ARCH_ARM64                0
 #elif defined(__i386__)
   #define ARCH_IA32                 1
-  #define ARCH_X64                  0
+  #define ARCH_AMD64                0
   #define ARCH_PPC                  0
-  #define ARCH_ARM                  0
+  #define ARCH_ARM32                0
+  #define ARCH_ARM64                0
 #elif defined(__powerpc__)
   #define ARCH_IA32                 0
-  #define ARCH_X64                  0
+  #define ARCH_AMD64                0
   #define ARCH_PPC                  1
-  #define ARCH_ARM                  0
+  #define ARCH_ARM32                0
+  #define ARCH_ARM64                0
 #elif defined(__arm__)
   #define ARCH_IA32                 0
-  #define ARCH_X64                  0
+  #define ARCH_AMD64                0
   #define ARCH_PPC                  0
-  #define ARCH_ARM                  1
+  #define ARCH_ARM32                1
+  #define ARCH_ARM64                0
+#elif defined(__aarch64__)
+  #define ARCH_IA32                 0
+  #define ARCH_AMD64                0
+  #define ARCH_PPC                  0
+  #define ARCH_ARM32                0
+  #define ARCH_ARM64                1
 #else
   #error unknown processor
 #endif
@@ -115,8 +125,10 @@ typedef int     fd_t;
 
 #if ARCH_PPC
   #define MEM_STORE_FENCE     __asm__ __volatile__ ("lwsync" ::: "memory")
-#elif ARCH_ARM
-  #define MEM_STORE_FENCE     __asm__ __volatile__ ("dsb" ::: "memory")
+#elif ARCH_ARM32
+  #define MEM_STORE_FENCE     __asm__ __volatile__ ("dsb sy" ::: "memory")
+#elif ARCH_ARM64
+  #define MEM_STORE_FENCE     __asm__ __volatile__ ("dsb sy" ::: "memory")
 #else
   #define MEM_STORE_FENCE     __asm__ __volatile__ ("sfence" ::: "memory")
 #endif
