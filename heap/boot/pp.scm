@@ -127,6 +127,8 @@
           (cond ((null? lst) '())
                 ((null? (cdr lst))
                  (list (parse (car lst))))
+                ((and (eq? (car lst) 'unquote) (pair? (cdr lst)) (null? (cddr lst)))
+                 (list "." #\; "," (parse (cadr lst))))
                 ((pair? (cdr lst))
                  (cons* (parse (car lst)) #\; (parse-list (cdr lst))))
                 (else
