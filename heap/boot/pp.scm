@@ -117,7 +117,7 @@
                        (print w k `((,i .&BREAK ,x) ,@z)))))
                 (((i m ('.&NEST j . x)) . z)
                  (print w k `((,(+ i j) ,m ,x) ,@z)))
-                (((i m (x . y)) . z)
+                (((i m (x . y)) . z)foo
                  (print w k `((,i ,m ,x) (,i ,m ,y) ,@z)))))))
       (define symbol->length
         (lambda (obj)

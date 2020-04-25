@@ -57,6 +57,18 @@ extern "C" {
         wrong_type_argument_violation(vm, "operator(+ -)", 0, "number", argv[0], 2, argv);
     }
 
+    void c_error_apply_gloc(VM* vm, scm_obj_t operands) {
+        undefined_violation(vm, ((scm_gloc_t)operands)->variable, NULL);
+    }
+
+    void c_error_push_gloc(VM* vm, scm_obj_t operands) {
+        undefined_violation(vm, ((scm_gloc_t)operands)->variable, NULL);
+    }
+
+    void c_error_gloc(VM* vm, scm_obj_t operands) {
+        undefined_violation(vm, ((scm_gloc_t)operands)->variable, NULL);
+    }
+
     scm_obj_t c_make_pair(VM* vm, scm_obj_t car, scm_obj_t cdr) {
         return make_pair(vm->m_heap, car, cdr);
     }

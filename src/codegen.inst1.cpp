@@ -65,6 +65,20 @@ codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst)
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
     auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+    if (((scm_gloc_t)operands)->value == scm_undef) {
+        BasicBlock* undef_true = BasicBlock::Create(C, "undef_ture", F);
+        BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+        auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+        IRB.CreateCondBr(undef_cond, undef_true, CONTINUE, ctx.likely_false);
+        IRB.SetInsertPoint(undef_true);
+        ctx.reg_cache_copy(vm);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+        auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
+        auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_error_push_gloc), thunkType->getPointerTo());
+        IRB.CreateCall(thunk, { vm, VALUE_INTPTR(operands) });
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+        IRB.SetInsertPoint(CONTINUE);
+    }
     emit_push_vm_stack(ctx, val);
 }
 
@@ -302,7 +316,22 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     }
 #endif
 
-    auto val = CREATE_LOAD_GLOC_REC(IRB.CreateBitOrPointerCast(VALUE_INTPTR(CAR(operands)), IntptrPtrTy), value);
+    auto val = CREATE_LOAD_GLOC_REC(IRB.CreateBitOrPointerCast(VALUE_INTPTR(gloc), IntptrPtrTy), value);
+    if (gloc->value == scm_undef) {
+        puts("###### emit_apply_gloc forward reference");
+        BasicBlock* undef_true = BasicBlock::Create(C, "undef_ture", F);
+        BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+        auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+        IRB.CreateCondBr(undef_cond, undef_true, CONTINUE, ctx.likely_false);
+        IRB.SetInsertPoint(undef_true);
+        ctx.reg_cache_copy(vm);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+        auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
+        auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_error_apply_gloc), thunkType->getPointerTo());
+        IRB.CreateCall(thunk, { vm, VALUE_INTPTR(gloc) });
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+        IRB.SetInsertPoint(CONTINUE);
+    }
     ctx.reg_value.store(vm, val);
     ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
@@ -1548,7 +1577,22 @@ codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst)
 #endif
 
     auto gloc = IRB.CreateBitOrPointerCast(VALUE_INTPTR(operands), IntptrPtrTy);
-    ctx.reg_value.store(vm, CREATE_LOAD_GLOC_REC(gloc, value));
+    auto val = CREATE_LOAD_GLOC_REC(gloc, value);
+    if (((scm_gloc_t)operands)->value == scm_undef) {
+        BasicBlock* undef_true = BasicBlock::Create(C, "undef_ture", F);
+        BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
+        auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
+        IRB.CreateCondBr(undef_cond, undef_true, CONTINUE, ctx.likely_false);
+        IRB.SetInsertPoint(undef_true);
+        ctx.reg_cache_copy(vm);
+        CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
+        auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
+        auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_error_gloc), thunkType->getPointerTo());
+        IRB.CreateCall(thunk, { vm, VALUE_INTPTR(operands) });
+        IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_resume_loop));
+        IRB.SetInsertPoint(CONTINUE);
+    }
+    ctx.reg_value.store(vm, val);
 }
 
 void
