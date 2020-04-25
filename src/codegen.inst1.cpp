@@ -318,7 +318,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
 
     auto val = CREATE_LOAD_GLOC_REC(IRB.CreateBitOrPointerCast(VALUE_INTPTR(gloc), IntptrPtrTy), value);
     if (gloc->value == scm_undef) {
-        puts("###### emit_apply_gloc forward reference");
         BasicBlock* undef_true = BasicBlock::Create(C, "undef_ture", F);
         BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
         auto undef_cond = IRB.CreateICmpEQ(val, VALUE_INTPTR(scm_undef));
