@@ -371,27 +371,31 @@ subr_codegen_cdecl_callout(VM* vm, int argc, scm_obj_t argv[])
         if (exact_non_negative_integer_pred(argv[0])) {
             uintptr_t adrs;
             exact_integer_to_uintptr(argv[0], &adrs);
-            if (STRINGP(argv[1])) {
-                const char* caller_signature = ((scm_string_t)argv[1])->name;
-                if (argc == 2) {
-                    void* thunk = compile_callout_thunk(adrs, caller_signature, caller_signature);
-                    char buf[32];
-                    snprintf(buf, sizeof(buf), "%p", thunk);
-                    return make_subr(vm->m_heap, (subr_proc_t)thunk, make_symbol(vm->m_heap, buf));
+            if (adrs) {
+                if (STRINGP(argv[1])) {
+                    const char* caller_signature = ((scm_string_t)argv[1])->name;
+                    if (argc == 2) {
+                        void* thunk = compile_callout_thunk(adrs, caller_signature, caller_signature);
+                        char buf[32];
+                        snprintf(buf, sizeof(buf), "%p", thunk);
+                        return make_subr(vm->m_heap, (subr_proc_t)thunk, make_symbol(vm->m_heap, buf));
+                    }
+                    if (STRINGP(argv[2])) {
+                        const char* callee_signature = ((scm_string_t)argv[2])->name;
+                        void* thunk = compile_callout_thunk(adrs, caller_signature, callee_signature);
+                        char buf[32];
+                        snprintf(buf, sizeof(buf), "%p", thunk);
+                        return make_subr(vm->m_heap, (subr_proc_t)thunk, make_symbol(vm->m_heap, buf));
+                    }
+                    wrong_type_argument_violation(vm, "codegen-cdecl-callout", 2, "string", argv[2], argc, argv);
+                    return scm_undef;
                 }
-                if (STRINGP(argv[2])) {
-                    const char* callee_signature = ((scm_string_t)argv[2])->name;
-                    void* thunk = compile_callout_thunk(adrs, caller_signature, callee_signature);
-                    char buf[32];
-                    snprintf(buf, sizeof(buf), "%p", thunk);
-                    return make_subr(vm->m_heap, (subr_proc_t)thunk, make_symbol(vm->m_heap, buf));
-                }
-                wrong_type_argument_violation(vm, "codegen-cdecl-callout", 2, "string", argv[2], argc, argv);
+                wrong_type_argument_violation(vm, "codegen-cdecl-callout", 1, "string", argv[1], argc, argv);
                 return scm_undef;
             }
-            wrong_type_argument_violation(vm, "codegen-cdecl-callout", 1, "string", argv[1], argc, argv);
+            wrong_type_argument_violation(vm, "codegen-cdecl-callout", 0, "c-function address", argv[1], argc, argv);
             return scm_undef;
-        }
+       }
         wrong_type_argument_violation(vm, "codegen-cdecl-callout", 0, "exact non-negative integer", argv[0], argc, argv);
         return scm_undef;
     }
