@@ -19,9 +19,10 @@ LLVM 10
 ./digamma --r7rs --top-level-program --disable-acc -- test/r7rs-sample.scm
 ```
 
-* To run FFI demo program (OpenGL, GLUT):
+* To run FFI demo program :
 ```
-./digamma --r6rs --top-level-program demo/glut-demo.scm
+./digamma --r6rs --top-level-program demo/glut-demo.scm # (OpenGL, GLUT)
+./digamma --r6rs --top-level-program demo/glfw-demo.scm # (OpenGL, GLFW)
 ```
 
 ### Limitations and Notes
