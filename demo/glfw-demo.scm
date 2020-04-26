@@ -1,5 +1,5 @@
 ;; Translated from C version at https://www.glfw.org/
-;; ./digamma --r6rs --top-level-program demo/glfw-gl-demo.scm
+;; ./digamma --r6rs --top-level-program demo/glfw-demo.scm
 
 (import (rnrs)
         (rnrs programs)
