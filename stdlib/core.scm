@@ -88,6 +88,7 @@
     break
     buffer-mode
     buffer-mode?
+    bytevector->c-void*
     bytevector->sint-list
     bytevector->string
     bytevector->u8-list
@@ -677,6 +678,21 @@
     make-weak-shared-core-hashtable
     make-who-condition
     map
+    mat4x4-add
+    mat4x4-dup
+    mat4x4-frustum
+    mat4x4-identity
+    mat4x4-invert
+    mat4x4-look-at
+    mat4x4-mul
+    mat4x4-ortho
+    mat4x4-orthonormalize
+    mat4x4-perspective
+    mat4x4-rotate
+    mat4x4-scale
+    mat4x4-sub
+    mat4x4-translate
+    mat4x4-transpose
     max
     member
     memp

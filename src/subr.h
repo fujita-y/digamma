@@ -8,8 +8,8 @@
 #include "object.h"
 #include "arith.h"
 
-void init_subr_ffi(object_heap_t* heap);
 void init_subr_c_ffi(object_heap_t* heap);
+void init_subr_linmath(object_heap_t* heap);
 void init_subr_base_arith(object_heap_t* heap);
 void init_subr_r5rs_arith(object_heap_t* heap);
 void init_subr_base(object_heap_t* heap);

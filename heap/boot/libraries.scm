@@ -450,6 +450,7 @@
                         current-after-expansion-hook
                         string-contains symbol-contains subr?
                         make-bytevector-mapping bytevector-mapping?
+                        bytevector->c-void*
                         scheme-library-exports
                         scheme-library-paths
                         scheme-load-paths
@@ -511,6 +512,22 @@
                         codegen-queue-push!
                         display-codegen-statistics
                         closure-codegen
+
+                        mat4x4-identity
+                        mat4x4-dup
+                        mat4x4-transpose
+                        mat4x4-invert
+                        mat4x4-orthonormalize
+                        mat4x4-add
+                        mat4x4-sub
+                        mat4x4-mul
+                        mat4x4-scale
+                        mat4x4-translate
+                        mat4x4-frustum
+                        mat4x4-ortho
+                        mat4x4-perspective
+                        mat4x4-look-at
+                        mat4x4-rotate
 
                         getenv
                         gethostname

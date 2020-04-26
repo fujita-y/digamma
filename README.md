@@ -21,8 +21,9 @@ LLVM 10
 
 * To run FFI demo program :
 ```
-./digamma --r6rs --top-level-program demo/glut-demo.scm # (OpenGL, GLUT)
-./digamma --r6rs --top-level-program demo/glfw-demo.scm # (OpenGL, GLFW)
+./digamma --r6rs --top-level-program demo/glut-demo.scm # (OpenGL 1.x, GLUT)
+./digamma --r6rs --top-level-program demo/glfw-demo.scm # (OpenGL 1.x, GLFW)
+./digamma --r6rs --top-level-program demo/glcorearb-demo.scm # (OpenGL Core Profile, GLFW)
 ```
 
 ### Limitations and Notes
