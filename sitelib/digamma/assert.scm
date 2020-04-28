@@ -23,6 +23,6 @@
                  #'(or (test variable) (assertion-violation 'who (format msg variable) . irritants))
                  #'(or test (assertion-violation 'who (format msg variable) . irritants))))))
         (_
-         (syntax-violation 'assert-argument "expected 5 clauses (assert-argument <position> <who> <variable> <expect> <test>)" x)))))
+         (syntax-violation 'assert-argument "expected 5 or more clauses (assert-argument <who> <position> <variable> <expect> <test>)" x)))))
 
   ) ;[end]
