@@ -125,6 +125,14 @@ relocate_collectible(void* obj, int size, void* desc)
                 }
             } break;
 
+            case TC_BVECTOR: {
+                scm_bvector_t bvector_from = (scm_bvector_t)from;
+                if (bvector_from->elts == (uint8_t*)((uintptr_t)bvector_from + sizeof(scm_bvector_rec_t))) {
+                    scm_bvector_t bvector_to = (scm_bvector_t)to;
+                    bvector_to->elts = (uint8_t*)((uintptr_t)bvector_to + sizeof(scm_bvector_rec_t));
+                }
+            } break;
+
             case TC_TUPLE: {
                 scm_tuple_t tuple_from = (scm_tuple_t)from;
                 if (tuple_from->elts == (scm_obj_t*)((uintptr_t)tuple_from + sizeof(scm_tuple_rec_t))) {
@@ -507,8 +515,10 @@ relocate_private(void* obj, int size, void* desc)
 
             case TC_BVECTOR: {
                 scm_bvector_t bvector = (scm_bvector_t)obj;
-                if (HDR_BVECTOR_MAPPING(bvector->hdr) == 0) {
-                    bvector->elts = (uint8_t*)copy_proc(heap, bvector->elts);
+                if (HDR_BVECTOR_MAPPING(bvector->hdr) == 0 && HDR_BVECTOR_PINNED(bvector->hdr) == 0) {
+                    if (bvector->elts != (uint8_t*)((uintptr_t)bvector + sizeof(scm_bvector_rec_t))) {
+                        bvector->elts = (uint8_t*)copy_proc(heap, bvector->elts);
+                    }
                 }
             } break;
 

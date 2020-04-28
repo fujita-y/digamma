@@ -11,7 +11,6 @@
 
 #define VERIFY_DATUM(x) do { assert(!CELLP(x) || heap->is_collectible(x)); } while(0)
 
-
 scm_symbol_t        make_symbol(object_heap_t* heap, const char* name);
 scm_symbol_t        make_symbol(object_heap_t* heap, const char* name, int len);
 scm_symbol_t        make_symbol_uninterned(object_heap_t* heap, const char* name, int len);
@@ -61,6 +60,8 @@ scm_port_t          make_temp_file_port(object_heap_t* heap, scm_obj_t name, int
 scm_socket_t        make_socket(object_heap_t* heap);
 scm_socket_t        make_socket(object_heap_t* heap, const char* node, const char* service, int family, int type, int protocol, int m_flags);
 
+void                pinning_bytevector(object_heap_t* heap, scm_bvector_t bvector);
+
 void    rehash_hashtable(object_heap_t* heap, scm_hashtable_t ht, int n);
 void    rehash_weakhashtable(object_heap_t* heap, scm_weakhashtable_t ht, int n);
 void    inplace_rehash_hashtable(object_heap_t* heap, scm_hashtable_t ht);
@@ -74,9 +75,11 @@ void*   new_heapcont_rec(object_heap_t* heap, size_t size);
 void    finalize(object_heap_t* heap, void* obj);
 void    renounce(void* obj, int size, void* refcon);
 
+
 scm_hashtable_t     copy_hashtable(object_heap_t* heap, scm_hashtable_t ht, bool immutable);
 scm_weakhashtable_t copy_weakhashtable(object_heap_t* heap, scm_weakhashtable_t ht, bool immutable);
 scm_weakhashtable_t clone_weakhashtable(object_heap_t* heap, scm_weakhashtable_t ht, bool immutable);
+
 
 inline void*
 new_heapenv_rec(object_heap_t* heap, size_t size)

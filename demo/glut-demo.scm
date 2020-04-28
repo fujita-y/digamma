@@ -1,5 +1,3 @@
-#!/usr/bin/env digamma
-
 #|
     GLUT, OpenGL, FFI, and Concurrent GC Stress Test
 

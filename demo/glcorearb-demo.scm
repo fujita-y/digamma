@@ -7,8 +7,7 @@
         (digamma glfw)
         (digamma c-ffi)
         (digamma c-types)
-        (only (core) format bytevector->c-void*
-                     mat4x4-identity mat4x4-rotate mat4x4-ortho mat4x4-mul))
+        (only (core) format mat4x4-identity mat4x4-rotate mat4x4-ortho mat4x4-mul))
 
 (define char*->string
   (lambda (p)
@@ -71,9 +70,9 @@
         (glBufferData GL_ARRAY_BUFFER (bytevector-length vertices) vertices GL_STATIC_DRAW)
         (let ((vertex_shader (glCreateShader GL_VERTEX_SHADER))
               (fragment_shader (glCreateShader GL_FRAGMENT_SHADER)))
-          (glShaderSource vertex_shader 1 (make-c-void* (bytevector->c-void* vertex_shader_text)) 0)
+          (glShaderSource vertex_shader 1 (make-c-void* (bytevector->pinned-c-void* vertex_shader_text)) 0)
           (glCompileShader vertex_shader)
-          (glShaderSource fragment_shader 1 (make-c-void* (bytevector->c-void* fragment_shader_text)) 0)
+          (glShaderSource fragment_shader 1 (make-c-void* (bytevector->pinned-c-void* fragment_shader_text)) 0)
           (glCompileShader fragment_shader)
           (let ((program (glCreateProgram)))
             (glAttachShader program vertex_shader)

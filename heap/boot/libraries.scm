@@ -450,7 +450,7 @@
                         current-after-expansion-hook
                         string-contains symbol-contains subr?
                         make-bytevector-mapping bytevector-mapping?
-                        bytevector->c-void*
+                        bytevector->pinned-c-void*
                         scheme-library-exports
                         scheme-library-paths
                         scheme-load-paths

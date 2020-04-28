@@ -465,13 +465,14 @@ struct vm_env_rec_t {           // record size is variable
 #define HDR_HASHTABLE_IMMUTABLE_SHIFT       11
 #define HDR_WEAKHASHTABLE_SHARED_SHIFT      10
 #define HDR_WEAKHASHTABLE_IMMUTABLE_SHIFT   11
-#define HDR_BVECTOR_MAPPING_SHIFT           10
 #define HDR_BIGNUM_SIGN_SHIFT               10
 #define HDR_BIGNUM_COUNT_SHIFT              16
 #define HDR_CLOSURE_ARGS_SHIFT              16
 #define HDR_FLONUM_32BIT_SHIFT              11
 #define HDR_VECTOR_LITERAL_SHIFT            11
+#define HDR_BVECTOR_MAPPING_SHIFT           10
 #define HDR_BVECTOR_LITERAL_SHIFT           11
+#define HDR_BVECTOR_PINNED_SHIFT            12
 #define HDR_GLOC_UNINTERNED_SHIFT           10
 #define HDR_CLOSURE_INSPECTED_SHIFT         11
 
@@ -487,7 +488,6 @@ struct vm_env_rec_t {           // record size is variable
 #define HDR_BIGNUM_COUNT(hdr)               (((uintptr_t)(hdr)) >> HDR_BIGNUM_COUNT_SHIFT)
 #define HDR_SYMBOL_SIZE(hdr)                (((uintptr_t)(hdr)) >> HDR_SYMBOL_SIZE_SHIFT)
 #define HDR_SYMBOL_CODE(hdr)                (((hdr) >> HDR_SYMBOL_CODE_SHIFT) & 0xff)
-#define HDR_BVECTOR_MAPPING(hdr)            (((hdr) >> HDR_BVECTOR_MAPPING_SHIFT) & 1)
 #define HDR_HASHTABLE_SHARED(hdr)           (((hdr) >> HDR_HASHTABLE_SHARED_SHIFT) & 1)
 #define HDR_HASHTABLE_IMMUTABLE(hdr)        (((hdr) >> HDR_HASHTABLE_IMMUTABLE_SHIFT) & 1)
 #define HDR_WEAKHASHTABLE_SHARED(hdr)       (((hdr) >> HDR_WEAKHASHTABLE_SHARED_SHIFT) & 1)
@@ -495,7 +495,9 @@ struct vm_env_rec_t {           // record size is variable
 #define HDR_BIGNUM_SIGN(hdr)                (((hdr) >> HDR_BIGNUM_SIGN_SHIFT) & 0x03)
 #define HDR_FLONUM_32BIT(hdr)               (((hdr) >> HDR_FLONUM_32BIT_SHIFT) & 1)
 #define HDR_VECTOR_LITERAL(hdr)             (((hdr) >> HDR_VECTOR_LITERAL_SHIFT) & 1)
+#define HDR_BVECTOR_MAPPING(hdr)            (((hdr) >> HDR_BVECTOR_MAPPING_SHIFT) & 1)
 #define HDR_BVECTOR_LITERAL(hdr)            (((hdr) >> HDR_BVECTOR_LITERAL_SHIFT) & 1)
+#define HDR_BVECTOR_PINNED(hdr)             (((hdr) >> HDR_BVECTOR_PINNED_SHIFT) & 1)
 
 #define HDR_SYMBOL_INHERENT_BIT             ((uintptr_t)1 << HDR_SYMBOL_INHERENT_SHIFT)
 #define HDR_SYMBOL_UNINTERNED_BIT           ((uintptr_t)1 << HDR_SYMBOL_UNINTERNED_SHIFT)

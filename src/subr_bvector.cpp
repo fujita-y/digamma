@@ -1749,19 +1749,20 @@ subr_bytevector_c_strlen(VM* vm, int argc, scm_obj_t argv[])
     return scm_undef;
 }
 
-// bytevector->c-void*
+// bytevector->pinned-c-void*
 scm_obj_t
-subr_bytevector_c_void(VM* vm, int argc, scm_obj_t argv[])
+subr_bytevector_pinned_c_void(VM* vm, int argc, scm_obj_t argv[])
 {
     if (argc == 1) {
         if (BVECTORP(argv[0])) {
             scm_bvector_t bvector = (scm_bvector_t)argv[0];
+            pinning_bytevector(vm->m_heap, bvector);
             return uintptr_to_integer(vm->m_heap, (uintptr_t)bvector->elts);
         }
-        wrong_type_argument_violation(vm, "bytevector->c-void*", 0, "bytevector", argv[0], argc, argv);
+        wrong_type_argument_violation(vm, "bytevector->pinned-c-void*", 0, "bytevector", argv[0], argc, argv);
         return scm_undef;
     }
-    wrong_number_of_arguments_violation(vm, "bytevector->c-void*", 1, 1, argc, argv);
+    wrong_number_of_arguments_violation(vm, "bytevector->pinned-c-void*", 1, 1, argc, argv);
     return scm_undef;
 }
 
@@ -1820,7 +1821,7 @@ void init_subr_bvector(object_heap_t* heap)
     DEFSUBR("utf8->string", subr_utf8_string);
     DEFSUBR("make-bytevector-mapping", subr_make_bytevector_mapping);
     DEFSUBR("bytevector-mapping?", subr_bytevector_mapping_pred);
-    DEFSUBR("bytevector->c-void*", subr_bytevector_c_void);
+    DEFSUBR("bytevector->pinned-c-void*", subr_bytevector_pinned_c_void);
     DEFSUBR("bytevector-c-short-ref", subr_bytevector_c_short_ref);
     DEFSUBR("bytevector-c-int-ref", subr_bytevector_c_int_ref);
     DEFSUBR("bytevector-c-long-ref", subr_bytevector_c_long_ref);

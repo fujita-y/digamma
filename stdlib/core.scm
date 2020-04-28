@@ -88,7 +88,7 @@
     break
     buffer-mode
     buffer-mode?
-    bytevector->c-void*
+    bytevector->pinned-c-void*
     bytevector->sint-list
     bytevector->string
     bytevector->u8-list

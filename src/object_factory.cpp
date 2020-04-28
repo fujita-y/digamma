@@ -219,10 +219,19 @@ scm_bvector_t
 make_bvector(object_heap_t* heap, int n)
 {
     if (n == 0) return (scm_bvector_t)heap->m_inherents[NIL_BVECTOR];
-    scm_bvector_t obj = (scm_bvector_t)heap->allocate_collectible(sizeof(scm_bvector_rec_t));
-    obj->hdr = scm_hdr_bvector;
-    obj->count = n;
-    obj->elts = (uint8_t*)heap->allocate_private(n);
+    int bytes = sizeof(scm_bvector_rec_t) + n;
+    scm_bvector_t obj;
+    if (bytes <= INTERNAL_PRIVATE_THRESHOLD) {
+        obj = (scm_bvector_t)heap->allocate_collectible(sizeof(scm_bvector_rec_t) + n);
+        obj->hdr = scm_hdr_bvector;
+        obj->count = n;
+        obj->elts = (uint8_t*)((uintptr_t)obj + sizeof(scm_bvector_rec_t));
+    } else {
+        obj = (scm_bvector_t)heap->allocate_collectible(sizeof(scm_bvector_rec_t));
+        obj->hdr = scm_hdr_bvector;
+        obj->count = n;
+        obj->elts = (uint8_t*)heap->allocate_private(n);
+    }
     memset(obj->elts, 0, n);
     return obj;
 }
@@ -703,6 +712,24 @@ make_list(object_heap_t* heap, int len, ...)
 }
 
 void
+pinning_bytevector(object_heap_t* heap, scm_bvector_t bvector)
+{
+    if (HDR_BVECTOR_PINNED(bvector->hdr) == 0) {
+        bvector->hdr = bvector->hdr | MAKEBITS(1, HDR_BVECTOR_PINNED_SHIFT);
+        uint8_t* pinned = (uint8_t*)malloc(bvector->count);
+        memcpy(pinned, bvector->elts, bvector->count);
+        if (bvector->elts != (uint8_t*)((uintptr_t)bvector + sizeof(scm_bvector_rec_t))) {
+            uint8_t* prev = bvector->elts;
+            bvector->elts = pinned;
+            MEM_STORE_FENCE;
+            heap->deallocate_private(prev);
+        } else {
+            bvector->elts = pinned;
+        }
+    }
+}
+
+void
 rehash_hashtable(object_heap_t* heap, scm_hashtable_t ht, int nsize)
 {
     assert(HASHTABLEP(ht));
@@ -934,7 +961,13 @@ finalize(object_heap_t* heap, void* obj)
         }
         case TC_BVECTOR: {
             scm_bvector_t bvector = (scm_bvector_t)obj;
-            if (HDR_BVECTOR_MAPPING(bvector->hdr) == 0) heap->deallocate_private(bvector->elts);
+            if (HDR_BVECTOR_MAPPING(bvector->hdr) == 0) {
+                if (HDR_BVECTOR_PINNED(bvector->hdr)) {
+                    free(bvector->elts);
+                } else if (bvector->elts != (uint8_t*)((uintptr_t)bvector + sizeof(scm_bvector_rec_t))) {
+                    heap->deallocate_private(bvector->elts);
+                }
+            }
             break;
         }
         case TC_TUPLE: {
