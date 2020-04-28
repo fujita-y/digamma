@@ -9,7 +9,7 @@
   (define unsupported-option
     (lambda (x)
       (syntax-case x ()
-        (name (error (syntax->datum #'name) "option not supported on this operating system")))))
+        (name (error (syntax->datum #'name) "option is not supported in this operating system")))))
 
   (define-syntax assert-argument
     (lambda (x)
@@ -23,6 +23,6 @@
                  #'(or (test variable) (assertion-violation 'who (format msg variable) . irritants))
                  #'(or test (assertion-violation 'who (format msg variable) . irritants))))))
         (_
-         (syntax-violation 'assert-arguemnt "expected 5 clauses (assert-arguemnt <position> <who> <variable> <expect> <test>)" x)))))
+         (syntax-violation 'assert-argument "expected 5 clauses (assert-argument <position> <who> <variable> <expect> <test>)" x)))))
 
   ) ;[end]
