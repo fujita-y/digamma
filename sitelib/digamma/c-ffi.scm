@@ -18,7 +18,6 @@
           c-main-argv)
 
   (import (core)
-          (digamma assert)
           (only (digamma c-types) sizeof:int sizeof:long sizeof:size_t sizeof:void*))
 
   (define c-type-class

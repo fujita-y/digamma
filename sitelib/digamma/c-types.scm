@@ -5,7 +5,6 @@
 (library (digamma c-types)
   (export define-c-enum
           define-c-typedef
-          define-c-struct-type
           define-c-struct-methods
           c-sizeof
           c-coerce-void*
@@ -481,13 +480,6 @@
       ((_ type ...)
        (begin
          (c-struct-methods-1 type) ...))))
-
-  (define-syntax define-c-struct-type
-    (syntax-rules ()
-      ((_ type field-specs ...)
-       (begin
-         (define-c-typedef type (struct field-specs ...))
-         (define-c-struct-methods type)))))
 
   (define-syntax c-sizeof
     (lambda (x)
