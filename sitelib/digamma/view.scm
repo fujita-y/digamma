@@ -1,6 +1,9 @@
 (library (digamma view)
   (export begin0 init-window init-program make-vao make-vbo enable-vertex-attribute
-          program-uniform-max4x4-set! program-uniform-vec2-set! program-uniform-integer-set!
+          program-uniform-max4x4-set!
+          program-uniform-vec4-set!
+          program-uniform-vec2-set!
+          program-uniform-integer-set!
           load-font-textures)
   (import (rnrs)
           (digamma glcorearb)
@@ -72,6 +75,11 @@
     (lambda (program name f1 f2)
       (let ((loc (glGetUniformLocation program (string->utf8/nul name))))
         (glUniform2f loc f1 f2))))
+
+  (define program-uniform-vec4-set!
+    (lambda (program name f1 f2 f3 f4)
+      (let ((loc (glGetUniformLocation program (string->utf8/nul name))))
+        (glUniform4f loc f1 f2 f3 f4))))
 
   (define make-vao
     (lambda ()
