@@ -26,7 +26,7 @@
             (mvp (make-bytevector 64))
             (width (make-c-int 0))
             (height (make-c-int 0))
-            (widget0 (make-text-widget "demo/Roboto-Regular.ttf" 300)))
+            (widget0 (make-text-widget "sandbox/Roboto-Regular.ttf" 300)))
           (glEnable GL_BLEND)
           (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
           (let loop ()
@@ -48,3 +48,5 @@
                    (glfwDestroyWindow window) (glfwTerminate) (exit 0))))))))
 
 (main)
+
+; digamma sandbox/main.scm
