@@ -1,6 +1,9 @@
 (library (digamma widget)
   (export make-text-widget)
   (import (rnrs)
+          (only (core) format)
+          (digamma c-types)
+          (digamma freetype)
           (digamma glcorearb)
           (digamma view))
 
@@ -49,13 +52,26 @@
     (define program (init-program vs-source fs-source))
     (define vao (make-vao))
     (define vbo (make-vbo vao vertices GL_ARRAY_BUFFER GL_STATIC_DRAW))
-    (define fonts
+    (define font-face #f)
+    (define font-texture
       (let ((ht (make-eq-hashtable)))
+        (let-values (((face glyphs) (load-font-textures font size)))
+        (set! font-face face)
         (begin0
           ht
           (for-each
-            (lambda (glyph) (hashtable-set! ht (car glyph) (apply make-Glyph glyph)))
-            (load-font-textures font size)))))
+            (lambda (glyph)
+              (hashtable-set! ht (car glyph) (apply make-Glyph glyph)))
+            glyphs)))))
+    (define lookup-kern-table
+      (lambda (prev ch)
+        (define-c-struct-methods FT_Vector)
+        (if prev
+            (let ((n0 (FT_Get_Char_Index font-face (char->integer prev))) (n1 (FT_Get_Char_Index font-face (char->integer ch))))
+                  (let ((delta (make-FT_Vector)))
+                    (FT_Get_Kerning font-face n0 n1 FT_KERNING_DEFAULT delta)
+                    (/ (FT_Vector-x delta) 64.0)))
+            0.0)))
     (enable-vertex-attribute program vao vbo GL_ARRAY_BUFFER "a_pos" 2 GL_FLOAT GL_FALSE 16 0)
     (enable-vertex-attribute program vao vbo GL_ARRAY_BUFFER "a_texcoord0" 2 GL_FLOAT GL_FALSE 16 8)
     (lambda (mvp r g b a x y scale text)
@@ -63,19 +79,19 @@
       (glBindVertexArray vao)
       (program-uniform-max4x4-set! program "u_mvp" mvp)
       (program-uniform-vec4-set! program "u_color" r g b a)
-      (let loop ((s (string->list text)) (x x) (y y))
+      (let loop ((s (string->list text)) (x x) (y y) (prev #f))
         (or (null? s)
-            (let* ((ch (car s)) (glyph (hashtable-ref fonts ch #f)))
+            (let* ((ch (car s)) (glyph (hashtable-ref font-texture ch #f)))
               (if glyph
-                  (let ((texture (Glyph-texture glyph)))
+                  (let ((texture (Glyph-texture glyph)) (kern (/ (lookup-kern-table prev ch) size)))
                     (glBindTexture GL_TEXTURE_2D texture)
                     (program-uniform-vec2-set! program "u_scale" (* scale (Glyph-size.x glyph)) (* scale (Glyph-size.y glyph)))
                     (program-uniform-vec2-set!
                       program
                       "u_offset"
-                      (+ x (* scale (Glyph-bearing.x glyph)))
+                      (+ x (* scale (+ kern (Glyph-bearing.x glyph))))
                       (- y (* scale (- (Glyph-size.y glyph) (Glyph-bearing.y glyph)))))
                     (glDrawArrays GL_TRIANGLES 0 6)
-                    (loop (cdr s) (+ x (* scale (Glyph-advance glyph))) y))
-                  (loop (cdr s) x y))))))))
+                    (loop (cdr s) (+ x (* scale (Glyph-advance glyph))) y ch))
+                  (loop (cdr s) x y ch))))))))
 ) ;[end]
