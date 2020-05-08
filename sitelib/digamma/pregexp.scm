@@ -776,8 +776,4 @@
                         (cons #\\ (cons c r))
                         (cons c r))))))))
 
-
-;(trace pregexp-read-pattern pregexp-read-char-list pregexp-read-piece)
-;eof
-
   ) ;[end]

@@ -1,3 +1,5 @@
+; digamma sandbox/main.scm
+
 (import (core)
         (digamma glcorearb)
         (digamma glfw)
@@ -48,5 +50,3 @@
                    (glfwDestroyWindow window) (glfwTerminate) (exit 0))))))))
 
 (main)
-
-; digamma sandbox/main.scm

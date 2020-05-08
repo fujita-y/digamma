@@ -1,3 +1,7 @@
+#!nobacktrace
+;;; Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
+
 (library (digamma view)
   (export begin0 init-window init-program make-vao make-vbo enable-vertex-attribute
           program-uniform-max4x4-set!
