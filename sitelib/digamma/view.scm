@@ -1,6 +1,13 @@
+#!nobacktrace
+;;; Copyright (c) 2004-2020 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
+
 (library (digamma view)
   (export begin0 init-window init-program make-vao make-vbo enable-vertex-attribute
-          program-uniform-max4x4-set! program-uniform-vec2-set! program-uniform-integer-set!
+          program-uniform-max4x4-set!
+          program-uniform-vec4-set!
+          program-uniform-vec2-set!
+          program-uniform-integer-set!
           load-font-textures)
   (import (rnrs)
           (digamma glcorearb)
@@ -73,6 +80,11 @@
       (let ((loc (glGetUniformLocation program (string->utf8/nul name))))
         (glUniform2f loc f1 f2))))
 
+  (define program-uniform-vec4-set!
+    (lambda (program name f1 f2 f3 f4)
+      (let ((loc (glGetUniformLocation program (string->utf8/nul name))))
+        (glUniform4f loc f1 f2 f3 f4))))
+
   (define make-vao
     (lambda ()
       (let ((vao (make-c-int 0)))
@@ -97,57 +109,61 @@
         (glEnableVertexAttribArray loc)
         (glVertexAttribPointer loc size type normalized stride pointer))))
 
+  (define load-freetype
+    (let ((memo #f))
+      (lambda ()
+        (or memo
+            (let ((ft (make-c-void* 0)))
+              (FT_Init_FreeType ft)
+              (begin0 memo (set! memo (c-void*-ref ft))))))))
+
   (define load-font-textures
     (lambda (font pixel-size)
-      (let ((ft (make-c-void* 0)))
-        (FT_Init_FreeType ft)
-        (let ((ft (c-void*-ref ft)) (face (make-c-void* 0)))
-          (FT_New_Face ft (string->utf8/nul font) 0 face)
-          (let ((face (c-void*-ref face)))
-            (FT_Set_Pixel_Sizes face 0 pixel-size)
-            (let loop ((codepoint 1) (acc '()))
-              (cond ((> codepoint 127)
-                    (glBindTexture GL_TEXTURE_2D 0)
-                    (FT_Done_Face face)
-                    (FT_Done_FreeType ft)
-                    (reverse acc))
-                    (else
-                      (FT_Load_Char face codepoint FT_LOAD_RENDER)
-                      (let ((face (make-bytevector-mapping face (c-sizeof FT_FaceRec))))
-                        (define-c-struct-methods FT_FaceRec FT_GlyphSlotRec FT_Bitmap FT_Vector)
-                        (let ((glyph
-                                (make-bytevector-mapping
-                                  (FT_FaceRec-glyph face)
-                                  (c-sizeof FT_GlyphSlotRec))))
-                          (let ((bitmap (FT_GlyphSlotRec-bitmap glyph))
-                                (advance (FT_GlyphSlotRec-advance glyph)))
-                            (let ((buffer (FT_Bitmap-buffer bitmap))
-                                  (size.x (FT_Bitmap-width bitmap))
-                                  (size.y (FT_Bitmap-rows bitmap))
-                                  (bearing.x (FT_GlyphSlotRec-bitmap_left glyph))
-                                  (bearing.y (FT_GlyphSlotRec-bitmap_top glyph))
-                                  (advance (/ (FT_Vector-x advance) 64.0)))
-                              (let ((texture (make-c-int 0)))
-                                (glPixelStorei GL_UNPACK_ALIGNMENT 1)
-                                (glGenTextures 1 texture)
-                                (let ((texture (c-int-ref texture)))
-                                  (glBindTexture GL_TEXTURE_2D texture)
-                                  (glTexImage2D GL_TEXTURE_2D 0 GL_RED size.x size.y 0 GL_RED GL_UNSIGNED_BYTE buffer)
-                                  (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-                                  (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-                                  (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-                                  (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-                                  (let ((deno (inexact pixel-size)))
-                                    (loop
-                                      (+ codepoint 1)
-                                      (cons (list
-                                              (integer->char codepoint)
-                                              texture
-                                              (/ size.x deno)
-                                              (/ size.y deno)
-                                              (/ bearing.x deno)
-                                              (/ bearing.y deno)
-                                              (/ advance deno))
-                                            acc)))))))))))))))))
+      (let ((ft (load-freetype)) (face (make-c-void* 0)))
+        (FT_New_Face ft (string->utf8/nul font) 0 face)
+        (let ((face (c-void*-ref face)))
+          (FT_Set_Pixel_Sizes face 0 pixel-size)
+          (let loop ((codepoint 1) (acc '()))
+            (cond ((> codepoint 127)
+                  (glBindTexture GL_TEXTURE_2D 0)
+                  (values face (reverse acc)))
+                  (else
+                    (FT_Load_Char face codepoint FT_LOAD_RENDER)
+                    (let ((face (make-bytevector-mapping face (c-sizeof FT_FaceRec))))
+                      (define-c-struct-methods FT_FaceRec FT_GlyphSlotRec FT_Bitmap FT_Vector)
+                      (let ((glyph
+                              (make-bytevector-mapping
+                                (FT_FaceRec-glyph face)
+                                (c-sizeof FT_GlyphSlotRec))))
+                        (let ((bitmap (FT_GlyphSlotRec-bitmap glyph))
+                              (advance (FT_GlyphSlotRec-advance glyph)))
+                          (let ((buffer (FT_Bitmap-buffer bitmap))
+                                (size.x (FT_Bitmap-width bitmap))
+                                (size.y (FT_Bitmap-rows bitmap))
+                                (bearing.x (FT_GlyphSlotRec-bitmap_left glyph))
+                                (bearing.y (FT_GlyphSlotRec-bitmap_top glyph))
+                                (advance (/ (FT_Vector-x advance) 64.0)))
+                            (let ((texture (make-c-int 0)))
+                              (glPixelStorei GL_UNPACK_ALIGNMENT 1)
+                              (glGenTextures 1 texture)
+                              (let ((texture (c-int-ref texture)))
+                                (glBindTexture GL_TEXTURE_2D texture)
+                                (glTexImage2D GL_TEXTURE_2D 0 GL_RED size.x size.y 0 GL_RED GL_UNSIGNED_BYTE buffer)
+                                (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+                                (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+                                (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+                                (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+                                (let ((deno (inexact pixel-size)))
+                                  (loop
+                                    (+ codepoint 1)
+                                    (cons (list
+                                            (integer->char codepoint)
+                                            texture
+                                            (/ size.x deno)
+                                            (/ size.y deno)
+                                            (/ bearing.x deno)
+                                            (/ bearing.y deno)
+                                            (/ advance deno))
+                                          acc))))))))))))))))
 
   ) ;[end]

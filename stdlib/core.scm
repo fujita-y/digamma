@@ -1004,6 +1004,4 @@
     (core hashtables)
     (core struct)
     (core enums)
-    (rnrs))
-
-  ) ;[end]
+    (rnrs)))
