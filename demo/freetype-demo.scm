@@ -59,11 +59,10 @@
     (define vbo (make-vbo vao vertices GL_ARRAY_BUFFER GL_STATIC_DRAW))
     (define fonts
       (let ((ht (make-eq-hashtable)))
-        (begin0
-          ht
-          (for-each
-            (lambda (glyph) (hashtable-set! ht (car glyph) (apply make-Glyph glyph)))
-            (load-font-textures "demo/Roboto-Regular.ttf" 300)))))
+        (let-values (((face glyphs) (load-font-textures "demo/Roboto-Regular.ttf" 300)))
+          (begin0
+            ht
+            (for-each (lambda (glyph) (hashtable-set! ht (car glyph) (apply make-Glyph glyph))) glyphs)))))
     (define renderer
       (lambda (mvp scale x y s)
         (glUseProgram program)
