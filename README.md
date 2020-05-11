@@ -25,6 +25,7 @@ LLVM 10
 ./digamma --r6rs --top-level-program demo/glfw-demo.scm # (OpenGL 1.x, GLFW)
 ./digamma --r6rs --top-level-program demo/glcorearb-demo.scm # (OpenGL Core Profile, GLFW)
 ./digamma --r6rs --top-level-program demo/freetype-demo.scm # (OpenGL Core Profile, GLFW, freetype)
+./digamma --r6rs --top-level-program demo/widget-demo.scm # (OpenGL Core Profile, GLFW, freetype)
 ```
 
 ### Limitations and Notes
