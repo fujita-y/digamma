@@ -200,22 +200,21 @@ static FunctionType* function_type(LLVMContext& C, const char* signature, bool v
     return FunctionType::get(builtin_type(C, signature[0]), paramTypes, variadic);
 }
 
+static llvm::FunctionCallee make_callee(IRBuilder<>& IRB, FunctionType* funcType, void* adrs)
+{
+    return FunctionCallee(funcType, ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), funcType->getPointerTo()));
+}
 
 #define THUNK_TO_LLVM(_NAME_, _TYPE_) \
-    ConstantExpr::getIntToPtr(VALUE_INTPTR(_NAME_), \
-      FunctionType::get(Type::get##_TYPE_(C), { IntptrTy, IntptrTy, IntptrTy }, false)->getPointerTo())
-
+    make_callee(IRB, FunctionType::get(Type::get##_TYPE_(C), { IntptrTy, IntptrTy, IntptrTy }, false), (void*)_NAME_)
 #define THUNK_RET_LLVM(_NAME_, _TYPE_) \
-    ConstantExpr::getIntToPtr(VALUE_INTPTR(_NAME_), \
-      FunctionType::get(Type::get##_TYPE_(C), { IntptrTy, IntptrTy }, false)->getPointerTo())
-
+    make_callee(IRB, FunctionType::get(Type::get##_TYPE_(C), { IntptrTy, IntptrTy }, false), (void*)_NAME_)
 #define THUNK_FROM_LLVM(_NAME_, _TYPE_) \
-    ConstantExpr::getIntToPtr(VALUE_INTPTR(_NAME_), \
-      FunctionType::get(IntptrTy, { IntptrTy, Type::get##_TYPE_(C) }, false)->getPointerTo())
+    make_callee(IRB, FunctionType::get(IntptrTy, { IntptrTy, Type::get##_TYPE_(C) }, false), (void*)_NAME_)
 
-static std::map<char,llvm::Constant*> create_thunk_to_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
+static std::map<char,FunctionCallee> create_thunk_to_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
 {
-    std::map<char,llvm::Constant*> to;
+    std::map<char,FunctionCallee> to;
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
     to['b'] = THUNK_TO_LLVM(c_ffi_to_llvm_Int1Ty, Int1Ty);
     to['u'] = THUNK_TO_LLVM(c_ffi_to_llvm_Int8Ty, Int8Ty);
@@ -227,9 +226,9 @@ static std::map<char,llvm::Constant*> create_thunk_to_map(Module* M, IRBuilder<>
     return to;
 }
 
-static std::map<char,llvm::Constant*> create_thunk_ret_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
+static std::map<char,FunctionCallee> create_thunk_ret_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
 {
-    std::map<char,llvm::Constant*> ret;
+    std::map<char,FunctionCallee> ret;
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
     ret['b'] = THUNK_RET_LLVM(c_ffi_ret_llvm_Int1Ty, Int1Ty);
     ret['u'] = THUNK_RET_LLVM(c_ffi_ret_llvm_Int8Ty, Int8Ty);
@@ -241,9 +240,9 @@ static std::map<char,llvm::Constant*> create_thunk_ret_map(Module* M, IRBuilder<
     return ret;
 }
 
-static std::map<char,llvm::Constant*> create_thunk_from_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
+static std::map<char,FunctionCallee> create_thunk_from_map(Module* M, IRBuilder<>& IRB, LLVMContext& C)
 {
-    std::map<char,llvm::Constant*> from;
+    std::map<char,FunctionCallee> from;
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
     from['b'] = THUNK_FROM_LLVM(c_ffi_from_llvm_Int1Ty, Int1Ty);
     from['u'] = THUNK_FROM_LLVM(c_ffi_from_llvm_Int8Ty, Int8Ty);
@@ -275,8 +274,8 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
     Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrTy, IntptrTy, IntptrTy }, false), Function::ExternalLinkage, function_id, M.get());
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
-    std::map<char,llvm::Constant*> thunk_to = create_thunk_to_map(M.get(), IRB, C);
-    std::map<char,llvm::Constant*> thunk_from = create_thunk_from_map(M.get(), IRB, C);
+    std::map<char,llvm::FunctionCallee> thunk_to = create_thunk_to_map(M.get(), IRB, C);
+    std::map<char,llvm::FunctionCallee> thunk_from = create_thunk_from_map(M.get(), IRB, C);
 
     auto vm = F->arg_begin();
     auto argv = F->arg_begin() + 2;
@@ -292,7 +291,7 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
 
     auto calloutFunctionType = function_type(C, callee_signature, strcmp(caller_signature, callee_signature) != 0);
     auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), calloutFunctionType->getPointerTo());
-    auto retval = IRB.CreateCall(func, args);
+    auto retval = IRB.CreateCall(calloutFunctionType, func, args);
     if (callee_signature[0] == 'i') {
         IRB.CreateRet(VALUE_INTPTR(scm_unspecified));
     } else {
@@ -327,8 +326,8 @@ compile_callback_thunk(VM* vm, uintptr_t trampoline_uid, const char* signature)
     Function* F = Function::Create(callbackFunctionType, Function::ExternalLinkage, function_id, M.get());
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
-    std::map<char,llvm::Constant*> thunk_ret = create_thunk_ret_map(M.get(), IRB, C);
-    std::map<char,llvm::Constant*> thunk_from = create_thunk_from_map(M.get(), IRB, C);
+    std::map<char,llvm::FunctionCallee> thunk_ret = create_thunk_ret_map(M.get(), IRB, C);
+    std::map<char,llvm::FunctionCallee> thunk_from = create_thunk_from_map(M.get(), IRB, C);
 
     std::vector<llvm::Value*> args;
     args.push_back(VALUE_INTPTR(vm));
@@ -344,7 +343,7 @@ compile_callback_thunk(VM* vm, uintptr_t trampoline_uid, const char* signature)
 
     auto thunkType = FunctionType::get(IntptrTy, { IntptrTy, IntptrTy, IntptrTy }, true);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_call_scheme), thunkType->getPointerTo());
-    Value* retval = IRB.CreateCall(thunk, args);
+    Value* retval = IRB.CreateCall(thunkType, thunk, args);
 
     if (signature[0] == 'i') {
         IRB.CreateRetVoid();

@@ -1875,7 +1875,8 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
     auto ptr = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), subrType->getPointerTo());
-    auto val = IRB.CreateCall(ptr, { vm, VALUE_INTPTR(argc), argv });
+    auto callee = FunctionCallee(subrType, ptr);
+    auto val = IRB.CreateCall(callee, { vm, VALUE_INTPTR(argc), argv });
 #if USE_LLVM_ATTRIBUTES
     for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
 #endif
