@@ -167,7 +167,6 @@ void init_c_ffi()
 void destroy_c_ffi()
 {
     if (s_c_ffi) {
-        ExitOnErr(s_c_ffi->runDestructors());
         delete s_c_ffi.release();
         s_c_ffi = NULL;
     }
@@ -289,9 +288,9 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
         args.push_back(value);
     }
 
-    auto calloutFunctionType = function_type(C, callee_signature, strcmp(caller_signature, callee_signature) != 0);
-    auto func = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), calloutFunctionType->getPointerTo());
-    auto retval = IRB.CreateCall(calloutFunctionType, func, args);
+    auto procType = function_type(C, callee_signature, strcmp(caller_signature, callee_signature) != 0);
+    auto proc = ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), procType->getPointerTo());
+    auto retval = IRB.CreateCall(procType, proc, args);
     if (callee_signature[0] == 'i') {
         IRB.CreateRet(VALUE_INTPTR(scm_unspecified));
     } else {

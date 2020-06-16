@@ -81,7 +81,7 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     IRB.SetInsertPoint(stack_overflow);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_collect_stack), thunkType->getPointerTo());
-    IRB.CreateCall(thunk, { vm, VALUE_INTPTR(nbytes) });
+    IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(nbytes) });
 
     IRB.CreateBr(stack_ok);
 
@@ -99,7 +99,7 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
         ctx.reg_env.writeback(vm);
         auto thunkType = FunctionType::get(IntptrPtrTy, { IntptrPtrTy, IntptrTy }, false);
         auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_lookup_env), thunkType->getPointerTo());
-        return IRB.CreateCall(thunk, { vm, VALUE_INTPTR(depth) });
+        return IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(depth) });
     }
     Value* target;
     auto env0 = ctx.reg_env.load(vm);
@@ -142,7 +142,7 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
     ctx.reg_env.writeback(vm);
     auto thunkType = FunctionType::get(IntptrPtrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_lookup_iloc), thunkType->getPointerTo());
-    return IRB.CreateCall(thunk, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
+    return IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(depth), VALUE_INTPTR(index) });
 }
 
 Value*
