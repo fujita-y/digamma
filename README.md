@@ -2,7 +2,9 @@
 
 R7RS/R6RS Scheme Implementation
 
-Digamma implements mostly concurrent garbage collector that achieves a remarkably short GC pause time, implements separate compilation thread to incrementally generate native code in background, implements on the fly FFI with LLVM.
+- Concurrent garbage collector that achieves a remarkably short GC pause time
+- Separate compilation thread to incrementally generate native code in background
+- On the fly FFI with native stub code generation
 
 Digamma is an experimental work and may change its design significantly.
 
