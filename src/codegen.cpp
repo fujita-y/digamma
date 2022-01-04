@@ -1153,12 +1153,15 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
       return search->second;
     }
 
+#if USE_ADDRESS_TO_FUNCTION
     if (is_compiled(closure)) {
-#if VERBOSE_CODEGEN
+ #if VERBOSE_CODEGEN
         puts(" + emit_inner_function: already compiled, return Function*");
-#endif
+ #endif
         return get_function(ctx, closure);
     }
+#endif
+
 #if VERBOSE_CODEGEN
     puts(" + generating native code for new lifted function");
 #endif
@@ -1559,6 +1562,7 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     scm_gloc_t gloc = (scm_gloc_t)CAR(operands);
+    scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
     scm_obj_t obj = gloc->value;
     if (obj == ctx.m_top_level_closure && HDR_CLOSURE_ARGS(ctx.m_top_level_closure->hdr) == ctx.m_argc) {
 #if VERBOSE_CODEGEN
@@ -1573,7 +1577,6 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
         return;
     }
     if (CLOSUREP(obj) && SYMBOLP(gloc->variable)) {
-        scm_symbol_t symbol = (scm_symbol_t)gloc->variable;
         scm_closure_t closure = (scm_closure_t)obj;
         if (strchr(symbol->name, IDENTIFIER_RENAME_DELIMITER)) {
 #if VERBOSE_CODEGEN

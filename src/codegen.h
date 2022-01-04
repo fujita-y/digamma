@@ -18,6 +18,7 @@
 #define USE_LLVM_OPTIMIZE         1
 #define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             1
+#define USE_ADDRESS_TO_FUNCTION   0
 
 #define PRINT_IR                  0
 #define DEBUG_CODEGEN             0
