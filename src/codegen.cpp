@@ -41,31 +41,31 @@ using namespace llvm::orc;
 #endif
 
 #define CREATE_LOAD_VM_REG(_VM_,_REG_) \
-    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, _VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
 
 #define CREATE_STORE_VM_REG(_VM_,_REG_,_VAL_) \
-    (IRB.CreateStore(_VAL_, IRB.CreateGEP(_VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
+    (IRB.CreateStore(_VAL_, IRB.CreateGEP(IntptrTy, _VM_, IRB.getInt32(offsetof(VM, _REG_) / sizeof(intptr_t)))))
 
 #define CREATE_LOAD_CONT_REC(_CONT_,_REC_) \
-    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_CONT_, IRB.getInt32(offsetof(vm_cont_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, _CONT_, IRB.getInt32(offsetof(vm_cont_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CREATE_STORE_CONT_REC(_CONT_,_REC_,_VAL_) \
-    (IRB.CreateStore(_VAL_, IRB.CreateGEP(_CONT_, IRB.getInt32(offsetof(vm_cont_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateStore(_VAL_, IRB.CreateGEP(IntptrTy, _CONT_, IRB.getInt32(offsetof(vm_cont_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CREATE_LOAD_GLOC_REC(_GLOC_,_REC_) \
-    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_GLOC_, IRB.getInt32(offsetof(scm_gloc_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, _GLOC_, IRB.getInt32(offsetof(scm_gloc_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CREATE_LOAD_ENV_REC(_ENV_,_REC_) \
-    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, _ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CREATE_STORE_ENV_REC(_ENV_,_REC_,_VAL_) \
-    (IRB.CreateStore(_VAL_, IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateStore(_VAL_, IRB.CreateGEP(IntptrTy, _ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CREATE_LEA_ENV_REC(_ENV_,_REC_) \
-    (IRB.CreateBitOrPointerCast(IRB.CreateGEP(_ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t))), IntptrTy))
+    (IRB.CreateBitOrPointerCast(IRB.CreateGEP(IntptrTy, _ENV_, IRB.getInt32(offsetof(vm_env_rec_t, _REC_) / sizeof(intptr_t))), IntptrTy))
 
 #define CREATE_LOAD_PAIR_REC(_PAIR_,_REC_) \
-    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(_PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
+    (IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, _PAIR_, IRB.getInt32(offsetof(scm_pair_rec_t, _REC_) / sizeof(intptr_t)))))
 
 #define CONS(a, d)      make_pair(vm->m_heap, (a), (d))
 #define LIST1(e1)       CONS((e1), scm_nil)
@@ -363,14 +363,14 @@ template<int byte_offset>
 llvm::Value* codegen_t::reg_cache_t<byte_offset>::load(llvm::Value* vm) {
 #if USE_REG_CACHE
     if (ctx->m_disable_reg_cache) {
-        return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
     }
     if (val) return val;
-    val = IRB.CreateLoad(IntptrTy, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    val = IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
     need_write_back = false;
     return val;
 #else
-    return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
 #endif
 }
 
@@ -378,13 +378,13 @@ template<int byte_offset>
 void codegen_t::reg_cache_t<byte_offset>::store(llvm::Value* vm, llvm::Value* rhs) {
 #if USE_REG_CACHE
     if (ctx->m_disable_reg_cache) {
-        IRB.CreateStore(rhs, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        IRB.CreateStore(rhs, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
         return;
     }
     need_write_back = true;
     val = rhs;
 #else
-    IRB.CreateStore(rhs, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+    IRB.CreateStore(rhs, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
 #endif
 }
 
@@ -401,7 +401,7 @@ void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
 #if USE_REG_CACHE
     if (ctx->m_disable_reg_cache) return;
     if (val && need_write_back) {
-        IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        IRB.CreateStore(val, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
     }
 #endif
 }
@@ -411,7 +411,7 @@ void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
 #if USE_REG_CACHE
     if (ctx->m_disable_reg_cache) return;
     if (val && need_write_back) {
-        IRB.CreateStore(val, IRB.CreateGEP(vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
+        IRB.CreateStore(val, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
         need_write_back = false;
     }
 #endif
@@ -1242,12 +1242,12 @@ codegen_t::emit_lookup_env(context_t& ctx, intptr_t depth)
     if (depth == 0) {
         target = env0;
     } else {
-        target = IRB.CreateLoad(IRB.CreateBitOrPointerCast(env0, IntptrPtrTy));
+        target = IRB.CreateLoad(IntptrTy, IRB.CreateBitOrPointerCast(env0, IntptrPtrTy));
         for (int i = 1; i < depth; i++) {
-            target = IRB.CreateLoad(IRB.CreateBitOrPointerCast(target, IntptrPtrTy));
+            target = IRB.CreateLoad(IntptrTy, IRB.CreateBitOrPointerCast(target, IntptrPtrTy));
         }
     }
-    auto env1 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(target, IntptrPtrTy), VALUE_INTPTR(- offsetof(vm_env_rec_t, up) / sizeof(intptr_t)));
+    auto env1 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(target, IntptrPtrTy), VALUE_INTPTR(- offsetof(vm_env_rec_t, up) / sizeof(intptr_t)));
     return IRB.CreateBitOrPointerCast(env1, IntptrPtrTy);
 }
 
@@ -1263,16 +1263,16 @@ codegen_t::emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index)
         int n = ctx.get_local_var_count(depth);
         if (n) {
             auto env = emit_lookup_env(ctx, depth);
-            return IRB.CreateGEP(env, VALUE_INTPTR(index - n));
+            return IRB.CreateGEP(IntptrTy, env, VALUE_INTPTR(index - n));
         }
         auto env = emit_lookup_env(ctx, depth);
         auto count = CREATE_LOAD_ENV_REC(env, count);
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+        return IRB.CreateGEP(IntptrTy, env, IRB.CreateSub(VALUE_INTPTR(index), count));
 #else
         auto env = emit_lookup_env(ctx, depth);
         auto count = CREATE_LOAD_ENV_REC(env, count);
-        if (index == 0) return IRB.CreateGEP(env, IRB.CreateNeg(count));
-        return IRB.CreateGEP(env, IRB.CreateSub(VALUE_INTPTR(index), count));
+        if (index == 0) return IRB.CreateGEP(IntptrTy, env, IRB.CreateNeg(count));
+        return IRB.CreateGEP(IntptrTy, env, IRB.CreateSub(VALUE_INTPTR(index), count));
 #endif
     }
     ctx.reg_env.writeback(vm);
@@ -1296,7 +1296,7 @@ codegen_t::emit_push_vm_stack(context_t& ctx, Value* val)
 
     auto sp = ctx.reg_sp.load(vm);
     IRB.CreateStore(val, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy));
-    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(1));
+    auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(1));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
 }
@@ -1312,7 +1312,7 @@ codegen_t::emit_prepair_apply(context_t& ctx, scm_closure_t closure)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
     CREATE_STORE_ENV_REC(env, up, VALUE_INTPTR(closure->env));
-    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(closure->pc));
     ctx.reg_env.store(vm, CREATE_LEA_ENV_REC(env, up));
@@ -1351,7 +1351,7 @@ codegen_t::emit_push_iloc0(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 0, FIXNUM(operands))));
 }
 
 void
@@ -1362,7 +1362,7 @@ codegen_t::emit_push_iloc1(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 1, FIXNUM(operands))));
 }
 
 void
@@ -1412,7 +1412,7 @@ codegen_t::emit_push_car_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1441,7 +1441,7 @@ codegen_t::emit_push_cdr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1470,7 +1470,7 @@ codegen_t::emit_push_cddr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1505,7 +1505,7 @@ codegen_t::emit_push_cadr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -1547,7 +1547,7 @@ codegen_t::emit_apply_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
     ctx.reg_value.store(vm, val);
     ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
@@ -1679,7 +1679,7 @@ codegen_t::emit_ret_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, operands));
     ctx.reg_value.store(vm, val);
     ctx.reg_cache_copy_only_value_and_cont(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_pop_cont));
@@ -1696,7 +1696,7 @@ codegen_t::emit_ret_cons(context_t& ctx, scm_obj_t inst)
     auto sp = ctx.reg_sp.load(vm);
     auto val = ctx.reg_value.load(vm);
 
-    auto sp_minus_1 = IRB.CreateLoad(IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
+    auto sp_minus_1 = IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1)));
     auto thunkType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_make_pair), thunkType->getPointerTo());
     ctx.reg_value.store(vm, IRB.CreateCall(thunkType, thunk, { vm, sp_minus_1, val }));
@@ -1759,9 +1759,9 @@ codegen_t::emit_if_eqp(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto sp = ctx.reg_sp.load(vm);
-    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto ea = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
-    auto val1 = IRB.CreateLoad(ea);
+    auto val1 = IRB.CreateLoad(IntptrTy, ea);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -1810,7 +1810,7 @@ codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, operands));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, operands));
     ctx.reg_value.store(vm, val);
 }
 
@@ -1822,7 +1822,7 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
     ctx.reg_value.store(vm, val);
 }
 
@@ -1834,7 +1834,7 @@ codegen_t::emit_iloc1(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
     ctx.reg_value.store(vm, val);
 }
 
@@ -1846,7 +1846,7 @@ codegen_t::emit_push_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    emit_push_vm_stack(ctx, IRB.CreateLoad(emit_lookup_iloc(ctx, operands)));
+    emit_push_vm_stack(ctx, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, operands)));
 }
 
 void
@@ -1944,7 +1944,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto lhs = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto lhs = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
     auto rhs = VALUE_INTPTR(CADR(operands));
 
     auto retval = emit_alloca(ctx, IntptrTy);
@@ -1993,7 +1993,7 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
-    ctx.reg_value.store(vm, IRB.CreateLoad(retval));
+    ctx.reg_value.store(vm, IRB.CreateLoad(IntptrTy, retval));
 }
 
 void
@@ -2035,7 +2035,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     auto vm = F->arg_begin();
 
     auto lhs = ctx.reg_value.load(vm);
-    auto rhs = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto rhs = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     auto retval = emit_alloca(ctx, IntptrTy);
 
@@ -2083,7 +2083,7 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
-    ctx.reg_value.store(vm, IRB.CreateLoad(retval));
+    ctx.reg_value.store(vm, IRB.CreateLoad(IntptrTy, retval));
 }
 
 void
@@ -2149,12 +2149,12 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
     // cont->up
     CREATE_STORE_CONT_REC(cont, up, ctx.reg_cont.load(vm));
     // m_sp
-    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
+    auto ea1 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(IntptrTy, cont, VALUE_INTPTR(sizeof(vm_cont_rec_t) / sizeof(intptr_t))), IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     // m_fp
     ctx.reg_fp.store(vm, ea1);
     // m_cont
-    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
+    auto ea2 = IRB.CreateBitOrPointerCast(IRB.CreateGEP(IntptrTy, cont, VALUE_INTPTR(offsetof(vm_cont_rec_t, up) / sizeof(intptr_t))), IntptrTy);
     ctx.reg_cont.store(vm, ea2);
 
     context_t ctx2 = ctx;
@@ -2203,7 +2203,7 @@ codegen_t::emit_extend(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, argc);
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
@@ -2223,7 +2223,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(1));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
@@ -2285,14 +2285,14 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
                 printf("hazard: emit_apply_iloc_local: ctx.m_local_functions[%d] == NULL\n", function_index);
             }
         }
-        CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(emit_lookup_iloc(ctx, level, index)));
+        CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, level, index)));
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
-        auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
+        auto obj = IRB.CreateLoad(IntptrTy, index == 0 ? IRB.CreateGEP(IntptrTy, env2, IRB.CreateNeg(count)) : IRB.CreateGEP(IntptrTy, env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
-        auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+        auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
         auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
         ctx.reg_sp.store(vm, ea1);
         ctx.reg_fp.store(vm, ea1);
@@ -2302,11 +2302,11 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
     } else {
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
-        auto obj = IRB.CreateLoad(index == 0 ? IRB.CreateGEP(env2, IRB.CreateNeg(count)) : IRB.CreateGEP(env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
+        auto obj = IRB.CreateLoad(IntptrTy, index == 0 ? IRB.CreateGEP(IntptrTy, env2, IRB.CreateNeg(count)) : IRB.CreateGEP(IntptrTy, env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
         auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
         CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(ctx.m_argc));
         CREATE_STORE_ENV_REC(env, up, CREATE_LEA_ENV_REC(env2, up));
-        auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+        auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
         auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
         ctx.reg_sp.store(vm, ea1);
         ctx.reg_fp.store(vm, ea1);
@@ -2333,8 +2333,8 @@ codegen_t::emit_push_cons(context_t& ctx, scm_obj_t inst)
     auto sp = ctx.reg_sp.load(vm);
     auto val = ctx.reg_value.load(vm);
 
-    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
-    auto sp_minus_1 = IRB.CreateLoad(ea);
+    auto ea = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto sp_minus_1 = IRB.CreateLoad(IntptrTy, ea);
     auto thunkType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_make_pair), thunkType->getPointerTo());
     IRB.CreateStore(IRB.CreateCall(thunkType, thunk, { vm, sp_minus_1, val }), ea);
@@ -2348,7 +2348,7 @@ codegen_t::emit_car_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2377,7 +2377,7 @@ codegen_t::emit_cdr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2452,10 +2452,10 @@ codegen_t::emit_if_eqp_ret_const(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto sp = ctx.reg_sp.load(vm);
-    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto ea = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
-    auto val1 = IRB.CreateLoad(ea);
+    auto val1 = IRB.CreateLoad(IntptrTy, ea);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -2481,7 +2481,7 @@ codegen_t::emit_cadr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2516,7 +2516,7 @@ codegen_t::emit_cddr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
-    auto pair = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2553,10 +2553,10 @@ codegen_t::emit_if_not_eqp_ret_const(context_t& ctx, scm_obj_t inst)
 
     auto sp = ctx.reg_sp.load(vm);
 
-    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto ea = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
-    auto val1 = IRB.CreateLoad(ea);
+    auto val1 = IRB.CreateLoad(IntptrTy, ea);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -2701,10 +2701,10 @@ codegen_t::emit_ret_eqp(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     auto sp = ctx.reg_sp.load(vm);
-    auto ea = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
+    auto ea = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-1));
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(ea, IntptrTy));
 
-    auto val1 = IRB.CreateLoad(ea);
+    auto val1 = IRB.CreateLoad(IntptrTy, ea);
     auto val2 = ctx.reg_value.load(vm);
 
     BasicBlock* taken_true = BasicBlock::Create(C, "taken_true", F);
@@ -2753,7 +2753,7 @@ codegen_t::emit_extend_unbound(context_t& ctx, scm_obj_t inst)
     auto env = IRB.CreateBitOrPointerCast(ctx.reg_sp.load(vm), IntptrPtrTy);
     CREATE_STORE_ENV_REC(env, count, VALUE_INTPTR(argc));
     CREATE_STORE_ENV_REC(env, up, ctx.reg_env.load(vm));
-    auto ea0 = IRB.CreateGEP(IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
+    auto ea0 = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(env, IntptrPtrTy), VALUE_INTPTR(sizeof(vm_env_rec_t) / sizeof(intptr_t)));
     auto ea1 = IRB.CreateBitOrPointerCast(ea0, IntptrTy);
     ctx.reg_sp.store(vm, ea1);
     ctx.reg_fp.store(vm, ea1);
@@ -3024,7 +3024,7 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* fixnum_true = BasicBlock::Create(C, "fixnum_true", F);
     BasicBlock* fallback = BasicBlock::Create(C, "fallback", F);
-    auto val = IRB.CreateLoad(emit_lookup_iloc(ctx, CAR(operands)));
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
     auto fixnum_cond = IRB.CreateICmpNE(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
     IRB.CreateCondBr(fixnum_cond, fixnum_true, fallback);
 
@@ -3062,7 +3062,7 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     IRB.CreateBr(CONTINUE);
 
     IRB.SetInsertPoint(CONTINUE);
-    ctx.reg_value.store(vm, IRB.CreateLoad(retval));
+    ctx.reg_value.store(vm, IRB.CreateLoad(IntptrTy, retval));
 }
 
 void
@@ -3134,7 +3134,7 @@ codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = ctx.reg_sp.load(vm);
-    auto argv = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
+    auto argv = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto procType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
@@ -3190,7 +3190,7 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
 
     intptr_t argc = FIXNUM(CADR(operands));
     auto sp = ctx.reg_sp.load(vm);
-    auto argv = IRB.CreateGEP(IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
+    auto argv = IRB.CreateGEP(IntptrTy, IRB.CreateBitOrPointerCast(sp, IntptrPtrTy), VALUE_INTPTR(-argc));
 
     CREATE_STORE_VM_REG(vm, m_pc, VALUE_INTPTR(inst));
     auto procType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
@@ -3305,7 +3305,7 @@ codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, Ba
     auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
     IRB.CreateCondBr(cond1, cond1_true, pair_false, ctx.likely_true);
     IRB.SetInsertPoint(cond1_true);
-    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto hdr = IRB.CreateLoad(IntptrTy, IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
     auto cond2 = IRB.CreateICmpNE(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_ATTR_MASKBITS)), VALUE_INTPTR(HDR_ATTR_BOXED));
     IRB.CreateCondBr(cond2, pair_true, pair_false, ctx.likely_true);
 }
@@ -3321,7 +3321,7 @@ codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol_true
     auto cond1 = IRB.CreateICmpEQ(IRB.CreateAnd(obj, VALUE_INTPTR(0x7)), VALUE_INTPTR(0x0));
     IRB.CreateCondBr(cond1, cond1_true, symbol_false, ctx.likely_true);
     IRB.SetInsertPoint(cond1_true);
-    auto hdr = IRB.CreateLoad(IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
+    auto hdr = IRB.CreateLoad(IntptrTy, IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
     auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
     IRB.CreateCondBr(cond2, symbol_true, symbol_false, ctx.likely_true);
 }
