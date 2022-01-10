@@ -643,7 +643,7 @@ object_heap_t::synchronized_collect(object_heap_t& heap)
     assert(heap.m_mutator_stopped == false);
     heap.m_root_snapshot = ROOT_SNAPSHOT_EVERYTHING;
     heap.m_stop_the_world = true;
-    GC_TRACE(";; [collector: stop-the-world]\n");
+    GC_TRACE(";; [collector: stop-the-world phase 1]\n");
     while (!heap.m_mutator_stopped) {
         heap.m_collector_wake.wait(heap.m_collector_lock);
         if (!heap.m_mutator_stopped) {

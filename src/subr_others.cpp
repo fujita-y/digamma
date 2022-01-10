@@ -778,8 +778,6 @@ subr_collect(VM* vm, int argc, scm_obj_t argv[])
                 usleep(100);
             } while (vm->m_heap->m_collector_kicked);
 #if ENABLE_LLVM_JIT
-            assert(vm->m_id == 0);
-            assert(vm->m_vmm->live_thread_count() == 1);
             vm->m_codegen->destroy();
             delete vm->m_codegen;
             vm->m_codegen = NULL;

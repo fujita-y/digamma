@@ -111,7 +111,7 @@ check: all
 	@./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/arith.scm
 	@echo '----------------------------------------'
 	@echo 'r5rs_pitfall.scm:'
-	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r5rs_pitfall.scm
+	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r5rs-pitfall.scm
 	@echo '----------------------------------------'
 	@echo 'r6rs.scm:'
 	@./$(PROG) --r6rs --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib ./test/r6rs.scm

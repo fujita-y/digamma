@@ -27,6 +27,9 @@
 *.out
 *.app
 
+# CMake
+build/
+
 # Misc
 *.d
 *.sublime-project
@@ -35,3 +38,6 @@ spheres.pgm
 .vscode
 /digamma
 /heap/debug-*.vmi
+test/tmp1
+test/tmp2
+test/tmp3
