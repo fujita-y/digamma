@@ -8,15 +8,13 @@
 #include "uuid.h"
 #include "port.h"
 
+#include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/Error.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Utils.h>
-#include <llvm/Transforms/IPO.h>
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -580,6 +578,9 @@ codegen_t::compile_thread(void* param)
             }
         } while (!codegen.m_compile_thread_ready);
     }
+ #if LLVM_VERSION_MAJOR >= 12
+    ExitOnErr(codegen.m_jit->getExecutionSession().endSession());
+ #endif
     codegen.m_compile_thread_lock.unlock();
     codegen.m_compile_thread_terminating = false;
     return NULL;
@@ -590,23 +591,22 @@ ThreadSafeModule
 codegen_t::optimizeModule(ThreadSafeModule TSM)
 {
     Module &M = *TSM.getModuleUnlocked();
-    PassManagerBuilder B;
-    B.OptLevel = 3;
-    B.SizeLevel = 1;
-    // B.Inliner = llvm::createFunctionInliningPass();
 
-    legacy::FunctionPassManager FPM(&M);
-    B.populateFunctionPassManager(FPM);
-    // FPM.add(llvm::createPromoteMemoryToRegisterPass());
+    LoopAnalysisManager LAM; 
+    FunctionAnalysisManager FAM;
+    CGSCCAnalysisManager CGAM;
+    ModuleAnalysisManager MAM;
+    PassBuilder PB;
 
-    FPM.doInitialization();
-    for (Function &F : M) FPM.run(F);
-    FPM.doFinalization();
-
-    legacy::PassManager MPM;
-    B.populateModulePassManager(MPM);
-
-    MPM.run(M);
+    FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+    ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
+    
+    MPM.run(M, MAM);
 
 #if PRINT_IR
     puts(";*** IR after optimize ***");
