@@ -14,7 +14,7 @@
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
 
-#define USE_LLVM_ATTRIBUTES       0
+#define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
 #define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             1

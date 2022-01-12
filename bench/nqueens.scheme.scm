@@ -17,9 +17,16 @@
              (ok? row (+ dist 1) (cdr placed)))))
   (my-try (|1-to| n) '() '()))
 
-;; warmup
-(nqueens 8) (collect) (usleep 2000000)
+(define wait-codegen-idle
+  (lambda ()
+    (let loop ()
+      (usleep 100000)
+      (cond ((= (codegen-queue-count) 0))
+            (else (loop))))))
+
+;; warmup and wait for codegen queue empty
+(nqueens 8) (collect) (wait-codegen-idle)
 
 (time (nqueens 12))
-;; interpreted => 2.867542 real    2.972887 user    0.003328 sys (#define ENABLE_LLVM_JIT 0)
-;; jit enabled => 0.819963 real    0.930319 user    0.002824 sys (#define ENABLE_LLVM_JIT 1)
+;; interpreted => 1.110873 real    1.146198 user    0.000000 sys (#define ENABLE_LLVM_JIT 0)
+;; jit enabled => 0.515772 real    0.881979 user    0.008091 sys (#define ENABLE_LLVM_JIT 1)

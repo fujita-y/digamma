@@ -1070,11 +1070,13 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
             scoped_lock lock(vm->m_current_output->lock);
             port_flush_output(vm->m_current_output);
         }
+#if ENABLE_LLVM_JIT
         if (vm->m_codegen) {
             vm->m_codegen->destroy();
             delete vm->m_codegen;
             vm->m_codegen = NULL;
         }
+#endif
         if (argv[0] == scm_false) {
             exit(EXIT_FAILURE);
         }

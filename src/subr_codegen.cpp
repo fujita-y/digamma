@@ -85,14 +85,14 @@ subr_codegen_queue_count(VM* vm, int argc, scm_obj_t argv[])
         if (vm->m_codegen) {
             return MAKEFIXNUM(vm->m_codegen->m_compile_queue.size());
         } else {
-            implementation_restriction_violation(vm, "codegen-queue-size", "codegen not available on this vm", scm_undef, argc, argv);
+            implementation_restriction_violation(vm, "codegen-queue-count", "not available on this vm", scm_undef, argc, argv);
             return scm_undef;
         }
     }
-    wrong_number_of_arguments_violation(vm, "codegen-queue-size", 0, 0, argc, argv);
+    wrong_number_of_arguments_violation(vm, "codegen-queue-count", 0, 0, argc, argv);
     return scm_undef;
 #else
-    implementation_restriction_violation(vm, "codegen-queue-size", "not available on this vm", scm_undef, argc, argv);
+    implementation_restriction_violation(vm, "codegen-queue-count", "not available on this vm", scm_undef, argc, argv);
     return scm_undef;
 #endif
 }
