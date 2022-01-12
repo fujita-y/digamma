@@ -791,7 +791,9 @@ subr_list_string(VM* vm, int argc, scm_obj_t argv[])
                     return scm_undef;
                 }
             }
-            return port_get_string(vm->m_heap, port);
+            scm_string_t string = port_get_string(vm->m_heap, port);
+            port_close(port);
+            return string;
         }
         wrong_type_argument_violation(vm, "list->string", 0, "proper list", argv[0], argc, argv);
         return scm_undef;

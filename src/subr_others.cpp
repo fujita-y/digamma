@@ -1056,19 +1056,26 @@ subr_tuple_list(VM* vm, int argc, scm_obj_t argv[])
 scm_obj_t
 subr_exit(VM* vm, int argc, scm_obj_t argv[])
 {
-    if (argc == 0) {
+    if (argc == 0 || argc == 1) {
 #if PROFILE_OPCODE
         vm->display_opcode_profile();
 #endif
 #if PROFILE_SUBR
         vm->display_subr_profile();
 #endif
-        exit(EXIT_SUCCESS);
-    }
-    if (argc == 1) {
+        if (PORTP(vm->m_current_input)) {
+            scoped_lock lock(vm->m_current_input->lock);
+            port_discard_buffer(vm->m_current_input);
+        }
         if (PORTP(vm->m_current_output)) {
             scoped_lock lock(vm->m_current_output->lock);
             port_flush_output(vm->m_current_output);
+            port_discard_buffer(vm->m_current_output);
+        }
+        if (PORTP(vm->m_current_error)) {
+            scoped_lock lock(vm->m_current_error->lock);
+            port_flush_output(vm->m_current_error);
+            port_discard_buffer(vm->m_current_error);
         }
 #if ENABLE_LLVM_JIT
         if (vm->m_codegen) {
@@ -1077,6 +1084,9 @@ subr_exit(VM* vm, int argc, scm_obj_t argv[])
             vm->m_codegen = NULL;
         }
 #endif
+        if (argc == 0) {
+            exit(EXIT_SUCCESS);
+        }
         if (argv[0] == scm_false) {
             exit(EXIT_FAILURE);
         }

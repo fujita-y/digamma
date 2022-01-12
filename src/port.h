@@ -88,6 +88,7 @@ void port_make_transcoded_port(scm_obj_t name, scm_port_t binary, scm_port_t tex
 void port_open_temp_file(scm_port_t port, scm_obj_t name, int buffer_mode, scm_obj_t transcoder);
 void port_flush_output(scm_port_t port);
 void port_shutdown_output(scm_port_t port);
+void port_discard_buffer(scm_port_t port);
 void port_close(scm_port_t port);
 bool port_nonblock_byte_ready(scm_port_t port);
 bool port_eof(scm_port_t port);

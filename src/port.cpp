@@ -662,20 +662,28 @@ port_flush_output(scm_port_t port)
 }
 
 void
+port_discard_buffer(scm_port_t port)
+{
+    assert(PORTP(port));
+    port->lock.verify_locked();
+    if (port->buf) {
+        free(port->buf);
+        port->buf = NULL;
+        port->buf_head = NULL;
+        port->buf_tail = NULL;
+        port->buf_size = 0;
+        port->buf_state = SCM_PORT_BUF_STATE_UNSPECIFIED;
+    }
+}
+
+void
 port_close(scm_port_t port)
 {
     assert(PORTP(port));
     port->lock.verify_locked();
     if (port->opened) {
-        if (port->buf) {
-            port_flush_output(port);
-            free(port->buf);
-            port->buf = NULL;
-            port->buf_head = NULL;
-            port->buf_tail = NULL;
-            port->buf_size = 0;
-            port->buf_state = SCM_PORT_BUF_STATE_UNSPECIFIED;
-        }
+        port_flush_output(port);
+        port_discard_buffer(port);
         device_close(port);
         port->opened = false;
     }
