@@ -23,16 +23,14 @@ separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
 set(CMAKE_CXX_COMPILER "clang++")
-add_link_options("-fuse-ld=lld")
-
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
 set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address")
+add_link_options("-fuse-ld=lld")
 
 set(DIGAMMA_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/digamma)
 set(DIGAMMA_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/digamma)
 add_compile_definitions(SYSTEM_SHARE_PATH="${DIGAMMA_SHARE_DIRECTORY}")
 add_compile_definitions(SYSTEM_EXTENSION_PATH="${DIGAMMA_EXTENSION_DIRECTORY}")
-
 add_compile_definitions(DEFAULT_HEAP_LIMIT=128)
 
 add_executable(
@@ -94,7 +92,6 @@ set(DIGAMMA_SITELIB_DIRECTORY ${DIGAMMA_SHARE_DIRECTORY}/sitelib)
 install(DIRECTORY sitelib/ DESTINATION ${DIGAMMA_SITELIB_DIRECTORY})
 
 enable_testing()
-
 set(DIGAMMA_COMMON_TEST_OPTIONS --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib)
 add_test(
   NAME r4rstest
