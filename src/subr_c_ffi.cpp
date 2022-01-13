@@ -16,12 +16,10 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/Support/InitLLVM.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/Error.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Support/InitLLVM.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/TargetSelect.h>
 
 #if INTPTR_MAX == INT32_MAX
     #define VALUE_INTPTR(_VAL_) IRB.getInt32((intptr_t)(_VAL_))
