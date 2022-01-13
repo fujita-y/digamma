@@ -26,7 +26,7 @@ cmake --install .
 
 ### Run
 
-* To run R7RS script from project root, try following from project root:
+* To run R7RS sample script, try following from project root:
 ```
 digamma --r7rs --top-level-program --disable-acc -- test/r7rs-sample.scm
 ```
