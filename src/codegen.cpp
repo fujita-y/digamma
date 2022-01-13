@@ -718,8 +718,8 @@ codegen_t::compile_each(scm_closure_t closure)
     m_lifted_functions.clear();
 }
 
-Function*
-codegen_t::get_function(context_t& ctx, scm_closure_t closure)
+Value*
+codegen_t::get_function_address(context_t& ctx, scm_closure_t closure)
 {
     DECLEAR_CONTEXT_VARS;
     DECLEAR_COMMON_TYPES;
@@ -727,8 +727,7 @@ codegen_t::get_function(context_t& ctx, scm_closure_t closure)
     if (!is_compiled(closure)) fatal("%s:%u closure is not compiled", __FILE__, __LINE__);
     intptr_t (*adrs)(intptr_t) = (intptr_t (*)(intptr_t))(closure->code);
     auto subrType = FunctionType::get(IntptrTy, { IntptrPtrTy }, false);
-    Function* func = (Function*)ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
-    return func;
+    return ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
 }
 
 int
@@ -1125,10 +1124,10 @@ codegen_t::display_codegen_statistics(scm_port_t port)
     port_format(port, "top-level apply interned : %d\n", m_usage.globals);
     port_format(port, "top-level apply lifted   : %d\n", m_usage.inners);
     port_format(port, "top-level reference      : %d\n", m_usage.refs);
-    port_format(port, "local loop               : %d\n", m_usage.locals);
     port_format(port, "closure template         : %d\n", m_usage.templates);
+    port_format(port, "local loop               : %d\n", m_usage.locals);
     port_format(port, "on demand                : %d\n", m_usage.on_demand);
-    port_format(port, "native code space range  : %.2fM\n\n", (m_usage.max_sym - m_usage.min_sym) / (1024.0 * 1024));
+    port_format(port, "native code location     : %x - %x\n\n", m_usage.min_sym, m_usage.max_sym);
     port_flush_output(port);
 }
 
@@ -1140,7 +1139,7 @@ codegen_t::emit_alloca(context_t& ctx, llvm::Type* type)
     return TB.CreateAlloca(type);
 }
 
-Function*
+Value*
 codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
@@ -1158,7 +1157,7 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
  #if VERBOSE_CODEGEN
         puts(" + emit_inner_function: already compiled, return Function*");
  #endif
-        return get_function(ctx, closure);
+        return get_function_address(ctx, closure);
     }
 #endif
 
@@ -1583,12 +1582,12 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             printf("emit_apply_gloc: uninterned gloc: %s\n", symbol->name);
 #endif
             if (closure->env == NULL) {
-                Function* F2 = emit_inner_function(ctx, closure);
+                Value* F2 = emit_inner_function(ctx, closure);
                 if (F2 == NULL) fatal("%s:%u inconsistent state", __FILE__, __LINE__);
                 m_usage.inners++;
                 emit_prepair_apply(ctx, closure);
                 ctx.reg_cache_copy_except_value(vm);
-                auto call2 = IRB.CreateCall(F2, { vm });
+                auto call2 = IRB.CreateCall(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), F2, { vm });
                 call2->setTailCallKind(CallInst::TCK_MustTail);
                 IRB.CreateRet(call2);
                 return;

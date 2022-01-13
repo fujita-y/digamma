@@ -18,7 +18,7 @@
 #define USE_LLVM_OPTIMIZE         1
 #define USE_ILOC_OPTIMIZE         1
 #define USE_REG_CACHE             1
-#define USE_ADDRESS_TO_FUNCTION   0
+#define USE_ADDRESS_TO_FUNCTION   1
 
 #define PRINT_IR                  0
 #define DEBUG_CODEGEN             0
@@ -110,7 +110,7 @@ class codegen_t {
     llvm::orc::ThreadSafeModule optimizeModule(llvm::orc::ThreadSafeModule TSM);
     void define_prepare_call();
     void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
-    llvm::Function* get_function(context_t& ctx, scm_closure_t closure);
+    llvm::Value* get_function_address(context_t& ctx, scm_closure_t closure);
 public:
     codegen_t(VM* vm);
     void init();
@@ -143,7 +143,7 @@ private:
     void emit_prepair_apply(context_t& ctx, scm_closure_t closure);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
-    llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
+    llvm::Value* emit_inner_function(context_t& ctx, scm_closure_t closure);
     llvm::Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     llvm::Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     llvm::Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
