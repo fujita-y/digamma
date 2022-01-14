@@ -143,7 +143,7 @@ private:
     void emit_prepair_apply(context_t& ctx, scm_closure_t closure);
     void emit_cond_pairp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* pair_true, llvm::BasicBlock* pair_false);
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
-    llvm::Value* emit_inner_function(context_t& ctx, scm_closure_t closure);
+    llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
     llvm::Value* emit_lookup_env(context_t& ctx, intptr_t depth);
     llvm::Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     llvm::Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);

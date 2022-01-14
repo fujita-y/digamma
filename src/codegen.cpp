@@ -594,7 +594,7 @@ codegen_t::optimizeModule(ThreadSafeModule TSM)
 {
     Module &M = *TSM.getModuleUnlocked();
 
-    LoopAnalysisManager LAM; 
+    LoopAnalysisManager LAM;
     FunctionAnalysisManager FAM;
     CGSCCAnalysisManager CGAM;
     ModuleAnalysisManager MAM;
@@ -607,7 +607,7 @@ codegen_t::optimizeModule(ThreadSafeModule TSM)
     PB.registerLoopAnalyses(LAM);
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
     ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
-    
+
     MPM.run(M, MAM);
 
 #if PRINT_IR
@@ -687,7 +687,14 @@ codegen_t::compile_each(scm_closure_t closure)
     M->setDataLayout(m_jit->getDataLayout());
     Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::ExternalLinkage, function_id, M.get());
 #if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    F->addFnAttr(Attribute::ArgMemOnly);
+    F->addFnAttr(Attribute::NoUnwind);
+    F->addFnAttr(Attribute::WillReturn);
+    for (Argument& argument : F->args()) {
+        argument.addAttr(Attribute::NoAlias);
+        argument.addAttr(Attribute::NoCapture);
+        argument.addAttr(Attribute::NoFree);
+    }
 #endif
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
     IRBuilder<> IRB(ENTRY);
@@ -1143,32 +1150,10 @@ codegen_t::emit_alloca(context_t& ctx, llvm::Type* type)
     return TB.CreateAlloca(type);
 }
 
-Value*
+Function*
 codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
 {
     VM* vm = m_vm;
-
-    auto search = m_lifted_functions.find(closure);
-    if (search != m_lifted_functions.end()) {
-#if VERBOSE_CODEGEN
-      puts(" + found in m_lifted_functions, return Function*");
-#endif
-      return search->second;
-    }
-
-#if USE_ADDRESS_TO_FUNCTION
-    if (is_compiled(closure)) {
- #if VERBOSE_CODEGEN
-        puts(" + emit_inner_function: already compiled, return Function*");
- #endif
-        return get_function_address(ctx, closure);
-    }
-#endif
-
-#if VERBOSE_CODEGEN
-    puts(" + generating native code for new lifted function");
-#endif
-
     char function_id[40];
     uuid_v4(function_id, sizeof(function_id));
 
@@ -1178,7 +1163,14 @@ codegen_t::emit_inner_function(context_t& ctx, scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
     Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, function_id, M);
 #if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    F->addFnAttr(Attribute::ArgMemOnly);
+    F->addFnAttr(Attribute::NoUnwind);
+    F->addFnAttr(Attribute::WillReturn);
+    for (Argument& argument : F->args()) {
+        argument.addAttr(Attribute::NoAlias);
+        argument.addAttr(Attribute::NoCapture);
+        argument.addAttr(Attribute::NoFree);
+    }
 #endif
 
     BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
@@ -1586,12 +1578,46 @@ codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst)
             printf("emit_apply_gloc: uninterned gloc: %s\n", symbol->name);
 #endif
             if (closure->env == NULL) {
-                Value* F2 = emit_inner_function(ctx, closure);
+                auto found = m_lifted_functions.find(closure);
+                if (found != m_lifted_functions.end()) {
+#if VERBOSE_CODEGEN
+                    puts("emit_apply_gloc: found in m_lifted_functions, reuse Function*");
+#endif
+                    Function* F2 = found->second;
+                    if (F2 == NULL) fatal("%s:%u inconsistent state", __FILE__, __LINE__);
+                    m_usage.inners++;
+                    emit_prepair_apply(ctx, closure);
+                    ctx.reg_cache_copy_except_value(vm);
+                    auto call2 = IRB.CreateCall(F2, { vm });
+                    call2->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call2);
+                    return;
+                }
+#if USE_ADDRESS_TO_FUNCTION
+                if (is_compiled(closure)) {
+ #if VERBOSE_CODEGEN
+                    puts("emit_apply_gloc: closure already compiled, reuse native code");
+ #endif
+                    Value* F2 = get_function_address(ctx, closure);
+                    if (F2 == NULL) fatal("%s:%u inconsistent state", __FILE__, __LINE__);
+                    m_usage.inners++;
+                    emit_prepair_apply(ctx, closure);
+                    ctx.reg_cache_copy_except_value(vm);
+                    auto call2 = IRB.CreateCall(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), F2, { vm });
+                    call2->setTailCallKind(CallInst::TCK_MustTail);
+                    IRB.CreateRet(call2);
+                    return;
+                }
+#endif
+#if VERBOSE_CODEGEN
+                puts("emit_apply_gloc: generate new native code for inner function");
+#endif
+                Function* F2 = emit_inner_function(ctx, closure);
                 if (F2 == NULL) fatal("%s:%u inconsistent state", __FILE__, __LINE__);
                 m_usage.inners++;
                 emit_prepair_apply(ctx, closure);
                 ctx.reg_cache_copy_except_value(vm);
-                auto call2 = IRB.CreateCall(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), F2, { vm });
+                auto call2 = IRB.CreateCall(F2, { vm });
                 call2->setTailCallKind(CallInst::TCK_MustTail);
                 IRB.CreateRet(call2);
                 return;
@@ -2132,7 +2158,14 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     Function* K = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, cont_id, M);
 #if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    K->addFnAttr(Attribute::ArgMemOnly);
+    K->addFnAttr(Attribute::NoUnwind);
+    K->addFnAttr(Attribute::WillReturn);
+    for (Argument& argument : K->args()) {
+        argument.addAttr(Attribute::NoAlias);
+        argument.addAttr(Attribute::NoCapture);
+        argument.addAttr(Attribute::NoFree);
+    }
 #endif
 
     BasicBlock* RETURN = BasicBlock::Create(C, "entry", K);
@@ -2240,7 +2273,14 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     uuid_v4(local_id, sizeof(local_id));
     Function* L = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, local_id, M);
 #if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    L->addFnAttr(Attribute::ArgMemOnly);
+    L->addFnAttr(Attribute::NoUnwind);
+    L->addFnAttr(Attribute::WillReturn);
+    for (Argument& argument : L->args()) {
+        argument.addAttr(Attribute::NoAlias);
+        argument.addAttr(Attribute::NoCapture);
+        argument.addAttr(Attribute::NoFree);
+    }
 #endif
 
     BasicBlock* LOOP = BasicBlock::Create(C, "entry", L);
@@ -2853,8 +2893,16 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     uuid_v4(local_id, sizeof(local_id));
     Function* L = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::PrivateLinkage, local_id, M);
 #if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
+    L->addFnAttr(Attribute::ArgMemOnly);
+    L->addFnAttr(Attribute::NoUnwind);
+    L->addFnAttr(Attribute::WillReturn);
+    for (Argument& argument : L->args()) {
+        argument.addAttr(Attribute::NoAlias);
+        argument.addAttr(Attribute::NoCapture);
+        argument.addAttr(Attribute::NoFree);
+    }
 #endif
+
     BasicBlock* LOCAL = BasicBlock::Create(C, "entry", L);
     int function_index = ctx.m_depth - 1 + (ctx.m_argc << 16);
     ctx.m_local_functions[function_index] = L;
@@ -3199,9 +3247,6 @@ codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr)
     auto procType = FunctionType::get(IntptrTy, { IntptrPtrTy, IntptrTy, IntptrPtrTy }, false);
     auto proc = ConstantExpr::getIntToPtr(VALUE_INTPTR(subr->adrs), procType->getPointerTo());
     auto val = IRB.CreateCall(procType, proc, { vm, VALUE_INTPTR(argc), argv });
-#if USE_LLVM_ATTRIBUTES
-    for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
-#endif
 
     ctx.reg_sp.store(vm, IRB.CreateBitOrPointerCast(argv, IntptrTy));
     ctx.reg_value.store(vm, val);
