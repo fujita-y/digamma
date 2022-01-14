@@ -11,13 +11,15 @@
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/Error.h>
 
 using namespace llvm;
 using namespace llvm::orc;
+using namespace llvm::sys;
 
 #define DECLEAR_COMMON_TYPES \
     auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C)); \
@@ -681,6 +683,8 @@ codegen_t::compile_each(scm_closure_t closure)
     DECLEAR_COMMON_TYPES;
 
     auto M = std::make_unique<Module>(module_id, C);
+    M->setTargetTriple(getDefaultTargetTriple());
+    M->setDataLayout(m_jit->getDataLayout());
     Function* F = Function::Create(FunctionType::get(IntptrTy, { IntptrPtrTy }, false), Function::ExternalLinkage, function_id, M.get());
 #if USE_LLVM_ATTRIBUTES
     for (Argument& argument : F->args()) { argument.addAttr(Attribute::NoAlias); argument.addAttr(Attribute::NoCapture); }
