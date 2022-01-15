@@ -485,6 +485,19 @@ codegen_t::context_t::reg_cache_copy_only_value_and_cont(llvm::Value* vm)
     reg_value.copy(vm);
 }
 
+
+int
+codegen_t::calc_iloc_index(context_t& ctx, intptr_t depth, intptr_t index)
+{
+    return ((depth - (ctx.m_depth - 1)) << 16) | (index & 0xffff);
+}
+
+int
+codegen_t::calc_iloc_index(context_t& ctx, scm_obj_t operands)
+{
+    return calc_iloc_index(ctx, FIXNUM(CAAR(operands)), (FIXNUM(CDAR(operands))));
+}
+
 void
 codegen_t::context_t::set_local_var_count(int depth, int count)
 {
@@ -900,7 +913,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_apply(ctx, inst);
             } break;
             case VMOP_EXTEND: {
@@ -909,7 +922,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_EXTEND_ENCLOSE: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_extend_enclose(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;
@@ -925,7 +938,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_PUSH_CLOSE: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -934,7 +947,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_ENCLOSE: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_enclose(ctx, inst);
                 ctx.m_argc = 0;
             } break;
@@ -1019,15 +1032,15 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_not_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_CLOSE: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_close(ctx, inst);
             } break;
             case VMOP_SET_GLOC: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_set_gloc(ctx, inst);
             } break;
             case VMOP_SET_ILOC: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_set_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_CONS: {
@@ -1116,7 +1129,7 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_subr_gloc_of(ctx, inst);
             } break;
             case VMOP_VM_ESCAPE: {
-                reg_cache_synchronize sync(ctx);
+                reg_cache_synchronize reg(ctx);
                 emit_escape(ctx, inst);
             } break;
             default:
@@ -1198,10 +1211,11 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     DECLEAR_COMMON_TYPES;
     auto vm = F->arg_begin();
 
-    ctx.reg_cache_clear();
-
     if (nbytes == 0) return;
     if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
+
+    ctx.reg_cache_clear();
+    ctx.m_iloc_cache.clear();
 
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
     BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
@@ -1831,6 +1845,26 @@ codegen_t::emit_if_nullp_ret_const(context_t& ctx, scm_obj_t inst)
     IRB.SetInsertPoint(taken_false);
 }
 
+Value*
+codegen_t::emit_load_iloc(context_t& ctx, scm_obj_t operands)
+{
+   return emit_load_iloc(ctx, FIXNUM(CAR(operands)), (FIXNUM(CDR(operands))));
+}
+
+Value*
+codegen_t::emit_load_iloc(context_t& ctx, intptr_t depth, intptr_t index)
+{
+    DECLEAR_CONTEXT_VARS;
+    DECLEAR_COMMON_TYPES;
+
+    int iloc_index = calc_iloc_index(ctx, depth, index);
+    auto cached = ctx.m_iloc_cache[iloc_index];
+    if (cached) return cached;
+    auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, depth, index));
+    ctx.m_iloc_cache[iloc_index] = val;
+    return val;
+}
+
 void
 codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
 {
@@ -1839,7 +1873,12 @@ codegen_t::emit_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto val = emit_load_iloc(ctx, operands);
+#else
     auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, operands));
+#endif
+
     ctx.reg_value.store(vm, val);
 }
 
@@ -1851,7 +1890,11 @@ codegen_t::emit_iloc0(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto val = emit_load_iloc(ctx, 0, FIXNUM(operands));
+#else
     auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 0, FIXNUM(operands)));
+#endif
     ctx.reg_value.store(vm, val);
 }
 
@@ -1863,7 +1906,11 @@ codegen_t::emit_iloc1(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto val = emit_load_iloc(ctx, 1, FIXNUM(operands));
+#else
     auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, 1, FIXNUM(operands)));
+#endif
     ctx.reg_value.store(vm, val);
 }
 
@@ -1874,8 +1921,11 @@ codegen_t::emit_push_iloc(context_t& ctx, scm_obj_t inst)
     DECLEAR_COMMON_TYPES;
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
-
+#if USE_ILOC_CACHE
+    emit_push_vm_stack(ctx, emit_load_iloc(ctx, operands));
+#else
     emit_push_vm_stack(ctx, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, operands)));
+#endif
 }
 
 void
@@ -1973,7 +2023,11 @@ codegen_t::emit_cc_n_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto lhs = emit_load_iloc(ctx, CAR(operands));
+#else
     auto lhs = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
     auto rhs = VALUE_INTPTR(CADR(operands));
 
     auto retval = emit_alloca(ctx, IntptrTy);
@@ -2064,8 +2118,11 @@ codegen_t::emit_cc_iloc(context_t& ctx, scm_obj_t inst, cc_t cc, void* c_func)
     auto vm = F->arg_begin();
 
     auto lhs = ctx.reg_value.load(vm);
+#if USE_ILOC_CACHE
+    auto rhs = emit_load_iloc(ctx, CAR(operands));
+#else
     auto rhs = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
-
+#endif
     auto retval = emit_alloca(ctx, IntptrTy);
 
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
@@ -2199,6 +2256,7 @@ codegen_t::emit_call(context_t& ctx, scm_obj_t inst)
 
     IRB.SetInsertPoint(RETURN);
     ctx.reg_cache_clear();
+    ctx.m_iloc_cache.clear();
     return K;
 }
 
@@ -2298,6 +2356,7 @@ codegen_t::emit_extend_enclose_local(context_t& ctx, scm_obj_t inst)
     ctx2.m_depth += 2;
     ctx2.m_argc = 0;
     ctx2.reg_cache_clear();
+    ctx2.m_iloc_cache.clear();
 
     IRB.SetInsertPoint(LOOP);
     transform(ctx2, CDR(operands), true);
@@ -2328,7 +2387,11 @@ codegen_t::emit_apply_iloc_local(context_t& ctx, scm_obj_t inst)
                 printf("hazard: emit_apply_iloc_local: ctx.m_local_functions[%d] == NULL\n", function_index);
             }
         }
+#if USE_ILOC_CACHE
+        CREATE_STORE_VM_REG(vm, m_pc, emit_load_iloc(ctx, level, index));
+#else
         CREATE_STORE_VM_REG(vm, m_pc, IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, level, index)));
+#endif
         auto env2 = emit_lookup_env(ctx, level);
         auto count = CREATE_LOAD_ENV_REC(env2, count);
         auto obj = IRB.CreateLoad(IntptrTy, index == 0 ? IRB.CreateGEP(IntptrTy, env2, IRB.CreateNeg(count)) : IRB.CreateGEP(IntptrTy, env2, IRB.CreateSub(VALUE_INTPTR(index), count)));
@@ -2391,7 +2454,11 @@ codegen_t::emit_car_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto pair = emit_load_iloc(ctx, CAR(operands));
+#else
     auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2420,7 +2487,11 @@ codegen_t::emit_cdr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto pair = emit_load_iloc(ctx, CAR(operands));
+#else
     auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2524,7 +2595,11 @@ codegen_t::emit_cadr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto pair = emit_load_iloc(ctx, CAR(operands));
+#else
     auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2559,7 +2634,11 @@ codegen_t::emit_cddr_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+#if USE_ILOC_CACHE
+    auto pair = emit_load_iloc(ctx, CAR(operands));
+#else
     auto pair = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
 
     // check if pair
     BasicBlock* pair_true = BasicBlock::Create(C, "pair_true", F);
@@ -2776,6 +2855,8 @@ codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.m_iloc_cache.erase(calc_iloc_index(ctx, operands));
+
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_set_iloc), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
@@ -2919,6 +3000,7 @@ codegen_t::emit_push_close_local(context_t& ctx, scm_obj_t inst)
     ctx2.m_depth++;
     ctx2.m_argc = 0;
     ctx2.reg_cache_clear();
+    ctx2.m_iloc_cache.clear();
 
     IRB.SetInsertPoint(LOCAL);
     transform(ctx2, CDR(operands), true);
@@ -3075,7 +3157,11 @@ codegen_t::emit_nadd_iloc(context_t& ctx, scm_obj_t inst)
     BasicBlock* CONTINUE = BasicBlock::Create(C, "continue", F);
     BasicBlock* fixnum_true = BasicBlock::Create(C, "fixnum_true", F);
     BasicBlock* fallback = BasicBlock::Create(C, "fallback", F);
+#if USE_ILOC_CACHE
+    auto val = emit_load_iloc(ctx, CAR(operands));
+#else
     auto val = IRB.CreateLoad(IntptrTy, emit_lookup_iloc(ctx, CAR(operands)));
+#endif
     auto fixnum_cond = IRB.CreateICmpNE(IRB.CreateAnd(val, 1), VALUE_INTPTR(0));
     IRB.CreateCondBr(fixnum_cond, fixnum_true, fallback);
 

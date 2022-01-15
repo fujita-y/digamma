@@ -34,11 +34,11 @@ ifndef DATAMODEL
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
-  ifneq (,$(findstring arm, $(UNAME)))
+  ifneq (,$(findstring aarch64, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=armv7-a -O3 -pthread
+      CXXFLAGS += -march=armv7-a -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
     else
-      CXXFLAGS += -march=armv8-a -O3 -pthread
+      CXXFLAGS += -march=armv8-a -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
     endif
   endif
   ifneq (,$(findstring x86, $(UNAME)))

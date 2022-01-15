@@ -16,9 +16,10 @@
 
 #define USE_LLVM_ATTRIBUTES       1
 #define USE_LLVM_OPTIMIZE         1
-#define USE_ILOC_OPTIMIZE         1
-#define USE_REG_CACHE             1
 #define USE_ADDRESS_TO_FUNCTION   1
+#define USE_ILOC_OPTIMIZE         1
+#define USE_ILOC_CACHE            1
+#define USE_REG_CACHE             1
 
 #define PRINT_IR                  0
 #define DEBUG_CODEGEN             0
@@ -51,6 +52,7 @@ class codegen_t {
         std::vector<int> m_local_var_count;
         int m_argc;
         int m_depth;
+        std::map<int, llvm::Value*> m_iloc_cache;
         reg_cache_t<offsetof(VM, m_sp)> reg_sp;
         reg_cache_t<offsetof(VM, m_fp)> reg_fp;
         reg_cache_t<offsetof(VM, m_env)> reg_env;
@@ -135,8 +137,10 @@ public:
     } m_usage;
     void display_codegen_statistics(scm_port_t port);
 private:
-    void compile_each(scm_closure_t closure);
     int calc_stack_size(scm_obj_t inst);
+    int calc_iloc_index(context_t& ctx, scm_obj_t operand);
+    int calc_iloc_index(context_t& ctx, intptr_t depth, intptr_t index);
+    void compile_each(scm_closure_t closure);
     llvm::AllocaInst* emit_alloca(context_t& ctx, llvm::Type* type);
     void emit_stack_overflow_check(context_t& ctx, int nbytes);
     void emit_push_vm_stack(context_t& ctx, llvm::Value* val);
@@ -145,6 +149,8 @@ private:
     void emit_cond_symbolp(context_t& ctx, llvm::Value* obj, llvm::BasicBlock* symbol_true, llvm::BasicBlock* symbol_false);
     llvm::Function* emit_inner_function(context_t& ctx, scm_closure_t closure);
     llvm::Value* emit_lookup_env(context_t& ctx, intptr_t depth);
+    llvm::Value* emit_load_iloc(context_t& ctx, scm_obj_t operand);
+    llvm::Value* emit_load_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     llvm::Value* emit_lookup_iloc(context_t& ctx, intptr_t depth, intptr_t index);
     llvm::Value* emit_lookup_iloc(context_t& ctx, scm_obj_t inst);
     llvm::Value* emit_cmp_inst(context_t& ctx, cc_t cc, llvm::Value* lhs, llvm::Value* rhs);
