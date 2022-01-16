@@ -28,7 +28,6 @@
 class codegen_t {
     struct context_t;
     template<int byte_offset> struct reg_cache_t {
-        codegen_t::context_t* ctx;
         llvm::Value* val;
         bool need_write_back;
         llvm::IntegerType* IntptrTy;
@@ -62,12 +61,21 @@ class codegen_t {
         llvm::MDNode* likely_true;
         llvm::MDNode* likely_false;
         void reg_cache_copy(llvm::Value* vm);
+        void reg_cache_copy_only_value(llvm::Value* vm);
+        void reg_cache_copy_only_value_and_env(llvm::Value* vm);
         void reg_cache_copy_only_value_and_cont(llvm::Value* vm);
+        void reg_cache_copy_only_env_and_cont(llvm::Value* vm);
+        void reg_cache_copy_only_env_and_fp(llvm::Value* vm);
         void reg_cache_copy_except_sp(llvm::Value* vm);
         void reg_cache_copy_except_value(llvm::Value* vm);
         void reg_cache_copy_except_value_and_sp(llvm::Value* vm);
+        void reg_cache_copy_except_value_and_fp(llvm::Value* vm);
         void reg_cache_clear();
-        void update_reg_cache_context();
+        void reg_cache_clear_only_value();
+        void reg_cache_clear_only_env_and_value();
+        void reg_cache_clear_only_sp();
+        void reg_cache_clear_only_env_and_sp();
+        void reg_cache_clear_except_value_and_cont();
         void set_local_var_count(int depth, int count);
         void set_local_var_count(int depth, scm_closure_t closure);
         int get_local_var_count(int depth);
@@ -82,20 +90,6 @@ class codegen_t {
             likely_true = get_branch_weight(50, 50);
             likely_false = get_branch_weight(50, 50);
         #endif
-        }
-    };
-    class reg_cache_synchronize {
-        codegen_t::context_t& ctx;
-        bool previous;
-    public:
-        reg_cache_synchronize(codegen_t::context_t& context) : ctx(context), previous(ctx.m_disable_reg_cache) {
-            auto vm = ctx.m_function->arg_begin();
-            ctx.reg_cache_copy(vm);
-            ctx.reg_cache_clear();
-            ctx.m_disable_reg_cache = true;
-        }
-        ~reg_cache_synchronize() {
-            ctx.m_disable_reg_cache = previous;
         }
     };
     enum cc_t { LT, GT, LE, GE, EQ, };

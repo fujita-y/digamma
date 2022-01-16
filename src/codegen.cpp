@@ -362,9 +362,6 @@ static ExitOnError ExitOnErr;
 template<int byte_offset>
 llvm::Value* codegen_t::reg_cache_t<byte_offset>::load(llvm::Value* vm) {
 #if USE_REG_CACHE
-    if (ctx->m_disable_reg_cache) {
-        return IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
-    }
     if (val) return val;
     val = IRB.CreateLoad(IntptrTy, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
     need_write_back = false;
@@ -377,10 +374,6 @@ llvm::Value* codegen_t::reg_cache_t<byte_offset>::load(llvm::Value* vm) {
 template<int byte_offset>
 void codegen_t::reg_cache_t<byte_offset>::store(llvm::Value* vm, llvm::Value* rhs) {
 #if USE_REG_CACHE
-    if (ctx->m_disable_reg_cache) {
-        IRB.CreateStore(rhs, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
-        return;
-    }
     need_write_back = true;
     val = rhs;
 #else
@@ -399,7 +392,6 @@ void codegen_t::reg_cache_t<byte_offset>::clear() {
 template<int byte_offset>
 void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
 #if USE_REG_CACHE
-    if (ctx->m_disable_reg_cache) return;
     if (val && need_write_back) {
         IRB.CreateStore(val, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
     }
@@ -409,7 +401,6 @@ void codegen_t::reg_cache_t<byte_offset>::copy(llvm::Value* vm) {
 template<int byte_offset>
 void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
 #if USE_REG_CACHE
-    if (ctx->m_disable_reg_cache) return;
     if (val && need_write_back) {
         IRB.CreateStore(val, IRB.CreateGEP(IntptrTy, vm, IRB.getInt32(byte_offset / sizeof(intptr_t))));
         need_write_back = false;
@@ -419,10 +410,11 @@ void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
 
 template<int byte_offset>
 codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
-  : ctx(context), val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
+  : /* ctx(context), */ val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
     IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
 }
 
+/*
 void
 codegen_t::context_t::update_reg_cache_context()
 {
@@ -432,6 +424,7 @@ codegen_t::context_t::update_reg_cache_context()
     reg_value.ctx = this;
     reg_env.ctx = this;
 }
+*/
 
 void
 codegen_t::context_t::reg_cache_clear()
@@ -441,6 +434,40 @@ codegen_t::context_t::reg_cache_clear()
     reg_cont.clear();
     reg_sp.clear();
     reg_value.clear();
+}
+
+void
+codegen_t::context_t::reg_cache_clear_only_value()
+{
+    reg_value.clear();
+}
+
+void
+codegen_t::context_t::reg_cache_clear_only_sp()
+{
+    reg_sp.clear();
+}
+
+void
+codegen_t::context_t::reg_cache_clear_only_env_and_value()
+{
+    reg_env.clear();
+    reg_value.clear();
+}
+
+void
+codegen_t::context_t::reg_cache_clear_only_env_and_sp()
+{
+    reg_env.clear();
+    reg_sp.clear();
+}
+
+void
+codegen_t::context_t::reg_cache_clear_except_value_and_cont()
+{
+    reg_sp.clear();
+    reg_fp.clear();
+    reg_env.clear();
 }
 
 void
@@ -479,12 +506,46 @@ codegen_t::context_t::reg_cache_copy_except_value_and_sp(llvm::Value* vm)
 }
 
 void
+codegen_t::context_t::reg_cache_copy_except_value_and_fp(llvm::Value* vm)
+{
+    reg_sp.copy(vm);
+    reg_env.copy(vm);
+    reg_cont.copy(vm);
+}
+
+void
+codegen_t::context_t::reg_cache_copy_only_value(llvm::Value* vm)
+{
+    reg_value.copy(vm);
+}
+
+void
+codegen_t::context_t::reg_cache_copy_only_value_and_env(llvm::Value* vm)
+{
+    reg_env.copy(vm);
+    reg_value.copy(vm);
+}
+
+void
 codegen_t::context_t::reg_cache_copy_only_value_and_cont(llvm::Value* vm)
 {
     reg_cont.copy(vm);
     reg_value.copy(vm);
 }
 
+void
+codegen_t::context_t::reg_cache_copy_only_env_and_cont(llvm::Value* vm)
+{
+    reg_cont.copy(vm);
+    reg_env.copy(vm);
+}
+
+void
+codegen_t::context_t::reg_cache_copy_only_env_and_fp(llvm::Value* vm)
+{
+    reg_fp.copy(vm);
+    reg_env.copy(vm);
+}
 
 int
 codegen_t::calc_iloc_index(context_t& ctx, intptr_t depth, intptr_t index)
@@ -844,7 +905,6 @@ codegen_t::calc_stack_size(scm_obj_t inst)
 void
 codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
 {
-    ctx.update_reg_cache_context();
     if (insert_stack_check) emit_stack_overflow_check(ctx, calc_stack_size(inst));
     while (inst != scm_nil) {
         switch (VM::instruction_to_opcode(CAAR(inst))) {
@@ -913,7 +973,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_apply_iloc_local(ctx, inst);
             } break;
             case VMOP_APPLY: {
-                reg_cache_synchronize reg(ctx);
                 emit_apply(ctx, inst);
             } break;
             case VMOP_EXTEND: {
@@ -922,7 +981,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_EXTEND_ENCLOSE: {
-                reg_cache_synchronize reg(ctx);
                 emit_extend_enclose(ctx, inst);
                 ctx.m_argc = 0;
                 ctx.m_depth++;
@@ -938,7 +996,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_depth++;
             } break;
             case VMOP_PUSH_CLOSE: {
-                reg_cache_synchronize reg(ctx);
                 emit_push_close(ctx, inst);
                 ctx.m_argc++;
             } break;
@@ -947,7 +1004,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 ctx.m_argc++;
             } break;
             case VMOP_ENCLOSE: {
-                reg_cache_synchronize reg(ctx);
                 emit_enclose(ctx, inst);
                 ctx.m_argc = 0;
             } break;
@@ -1032,15 +1088,12 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_if_not_symbolp_ret_const(ctx, inst);
             } break;
             case VMOP_CLOSE: {
-                reg_cache_synchronize reg(ctx);
                 emit_close(ctx, inst);
             } break;
             case VMOP_SET_GLOC: {
-                reg_cache_synchronize reg(ctx);
                 emit_set_gloc(ctx, inst);
             } break;
             case VMOP_SET_ILOC: {
-                reg_cache_synchronize reg(ctx);
                 emit_set_iloc(ctx, inst);
             } break;
             case VMOP_PUSH_CONS: {
@@ -1129,7 +1182,6 @@ codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check)
                 emit_ret_subr_gloc_of(ctx, inst);
             } break;
             case VMOP_VM_ESCAPE: {
-                reg_cache_synchronize reg(ctx);
                 emit_escape(ctx, inst);
             } break;
             default:
@@ -1214,9 +1266,6 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     if (nbytes == 0) return;
     if (nbytes >= VM_STACK_BYTESIZE) fatal("%s:%u vm stack size too small", __FILE__, __LINE__);
 
-    ctx.reg_cache_clear();
-    ctx.m_iloc_cache.clear();
-
     auto stack_limit = CREATE_LOAD_VM_REG(vm, m_stack_limit);
     BasicBlock* stack_ok = BasicBlock::Create(C, "stack_ok", F);
     BasicBlock* stack_overflow = BasicBlock::Create(C, "stack_overflow", F);
@@ -1231,6 +1280,9 @@ codegen_t::emit_stack_overflow_check(context_t& ctx, int nbytes)
     IRB.CreateBr(stack_ok);
 
     IRB.SetInsertPoint(stack_ok);
+
+    ctx.reg_cache_clear();
+    ctx.m_iloc_cache.clear();
 }
 
 Value*
@@ -2520,6 +2572,7 @@ codegen_t::emit_set_gloc(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy_only_value(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_set_gloc), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
@@ -2857,6 +2910,7 @@ codegen_t::emit_set_iloc(context_t& ctx, scm_obj_t inst)
 
     ctx.m_iloc_cache.erase(calc_iloc_index(ctx, operands));
 
+    ctx.reg_cache_copy_only_value_and_env(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_set_iloc), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
@@ -2895,9 +2949,12 @@ codegen_t::emit_enclose(context_t& ctx, scm_obj_t inst)
     auto vm = F->arg_begin();
 
     int argc = FIXNUM(operands);
+
+    ctx.reg_cache_copy_only_env_and_fp(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_enclose), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(argc) });
+    ctx.reg_cache_clear_only_sp();
 }
 
 void
@@ -2913,9 +2970,11 @@ codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst)
     m_usage.templates++;
 #endif
 
+    ctx.reg_cache_copy_except_value_and_fp(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_push_close), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
+    ctx.reg_cache_clear_only_env_and_sp();
 }
 
 void
@@ -2951,9 +3010,11 @@ codegen_t::emit_close(context_t& ctx, scm_obj_t inst)
     m_usage.templates++;
 #endif
 
+    ctx.reg_cache_copy_only_env_and_cont(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_close), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
+    ctx.reg_cache_clear_only_env_and_value();
 }
 
 void
@@ -3210,10 +3271,12 @@ codegen_t::emit_extend_enclose(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy_except_value(vm);
     auto thunkType = FunctionType::get(VoidTy, { IntptrPtrTy, IntptrTy }, false);
     auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_extend_enclose), thunkType->getPointerTo());
     IRB.CreateCall(thunkType, thunk, { vm, VALUE_INTPTR(operands) });
     ctx.set_local_var_count(ctx.m_depth, 1);
+    ctx.reg_cache_clear_except_value_and_cont();
 }
 
 void
@@ -3245,6 +3308,7 @@ codegen_t::emit_apply(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy(vm);
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_apply));
 }
 
@@ -3256,6 +3320,8 @@ codegen_t::emit_escape(context_t& ctx, scm_obj_t inst)
     scm_obj_t operands = CDAR(inst);
     auto vm = F->arg_begin();
 
+    ctx.reg_cache_copy(vm);
+    ctx.reg_cache_clear();
     IRB.CreateRet(VALUE_INTPTR(VM::native_thunk_escape));
 }
 

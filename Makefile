@@ -26,28 +26,29 @@ UNAME = $(shell uname -a)
 ifndef DATAMODEL
   ifeq (,$(shell echo | $(CXX) -E -dM - | grep '__LP64__'))
     DATAMODEL = ILP32
-    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=32
+    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=64
   else
     DATAMODEL = LP64
-    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=64
+    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=128
   endif
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
   ifneq (,$(findstring aarch64, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=armv7-a -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
+      CXXFLAGS += -march=armv7-a
     else
-      CXXFLAGS += -march=armv8-a -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
+      CXXFLAGS += -march=armv8-a
     endif
   endif
   ifneq (,$(findstring x86, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=x86 -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
+      CXXFLAGS += -march=x86
     else
-      CXXFLAGS += -march=x86-64 -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
+      CXXFLAGS += -march=x86-64
     endif
   endif
+  CXXFLAGS += -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
   LDFLAGS = -fuse-ld=lld
   LDLIBS = -Wl,--as-needed $(shell llvm-config --ldflags --system-libs --libs all) -pthread -Wl,--no-as-needed -ldl
 endif
