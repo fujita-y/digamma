@@ -43,10 +43,10 @@ static int opt_heap_limit(int argc, const char** argv)
         }
         if (param) {
             int tmp;
-            if ((sscanf(param, "%d", &tmp) == 1) && (tmp >= 16) && (tmp < 2048)) {
+            if ((sscanf(param, "%d", &tmp) == 1) && (tmp >= 16)) {
                 value = tmp;
             } else {
-                fprintf(stderr, "** ERROR in option '--heap-limit=%s': parameter must be in the range [16 .. 2047]\n", param);
+                fprintf(stderr, "** ERROR in option '--heap-limit=%s': parameter must be a positive integer greater than 15\n", param);
                 exit(EXIT_FAILURE);
             }
         }
@@ -171,10 +171,10 @@ int main(int argc, const char** argv)
 #if defined(NO_TLS)
     MTVERIFY(pthread_key_create(&s_current_vm, NULL));
 #endif
-    int heap_limit = opt_heap_limit(argc, argv) * 1024 * 1024;
-    int heap_init = 4 * 1024 * 1024;
+    size_t heap_limit = (size_t)opt_heap_limit(argc, argv) * 1024 * 1024;
+    size_t heap_init = 4 * 1024 * 1024;
 #ifndef NDEBUG
-    printf("heap_limit %d heap_init %d\n", heap_limit, heap_init);
+    printf("heap_limit %zu heap_init %zu\n", heap_limit, heap_init);
 #endif
     object_heap_t* heap = new object_heap_t;
     heap->init(heap_limit, heap_init);

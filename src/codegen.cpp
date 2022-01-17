@@ -410,21 +410,9 @@ void codegen_t::reg_cache_t<byte_offset>::writeback(llvm::Value* vm) {
 
 template<int byte_offset>
 codegen_t::reg_cache_t<byte_offset>::reg_cache_t(codegen_t::context_t* context)
-  : /* ctx(context), */ val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
+  : val(NULL), need_write_back(false), C(context->m_llvm_context), IRB(context->m_irb) {
     IntptrTy = (sizeof(intptr_t) == 4 ? llvm::Type::getInt32Ty(C) : llvm::Type::getInt64Ty(C));
 }
-
-/*
-void
-codegen_t::context_t::update_reg_cache_context()
-{
-    reg_cont.ctx = this;
-    reg_fp.ctx = this;
-    reg_sp.ctx = this;
-    reg_value.ctx = this;
-    reg_env.ctx = this;
-}
-*/
 
 void
 codegen_t::context_t::reg_cache_clear()
