@@ -410,8 +410,8 @@ END;
 #undef OBJECT_ALIGNED
 #undef END
 
-struct vm_cont_rec_t {  // record size is variable
-                        // scm_obj_t   args[argc];
+struct vm_cont_rec_t {
+  // scm_obj_t args[argc];
   scm_obj_t pc;
   scm_obj_t trace;
   scm_obj_t* fp;
@@ -420,8 +420,8 @@ struct vm_cont_rec_t {  // record size is variable
   void* up;  // 'm_cont' and 'up' point here
 };
 
-struct vm_env_rec_t {  // record size is variable
-                       // scm_obj_t   vars[count];
+struct vm_env_rec_t {
+  // scm_obj_t vars[count];
   intptr_t count;
   void* up;  // 'm_env' and 'up' point here
 };
