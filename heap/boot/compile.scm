@@ -103,7 +103,6 @@
     (or (fixnum? x) (char? x) (boolean? x) (null? x)
         (and (pair? x) (eq? (car x) 'quote) (symbol? (cadr x))))))
 
-;; todo: record local defined symbol to reduce touch
 (define compile-touch
   (lambda (e cte)
     (cond ((and (symbol? e) (not (top-level-bound? e)) (not (iloc? e cte))) `((touch.gloc.of ,e)))

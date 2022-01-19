@@ -7,7 +7,7 @@
 #include "core.h"
 #include "object.h"
 
-scm_obj_t file_size_in_bytes(VM *vm, scm_string_t path);
+scm_obj_t file_size_in_bytes(VM* vm, scm_string_t path);
 scm_obj_t file_regular(VM* vm, scm_string_t path);
 scm_obj_t file_directory(VM* vm, scm_string_t path);
 scm_obj_t file_symbolic_link(VM* vm, scm_string_t path);

@@ -8,29 +8,22 @@
 #include "mutex.h"
 
 class cond_t {
-    cond_t(const cond_t&);
-    cond_t& operator=(const cond_t&);
+  cond_t(const cond_t&);
+  cond_t& operator=(const cond_t&);
 
-public:
-    pthread_cond_t  cv;
+ public:
+  pthread_cond_t cv;
 
-    cond_t() { /* should be blank */ }
+  cond_t() { /* should be blank */
+  }
 
-    void init() {
-        MTVERIFY(pthread_cond_init(&cv, NULL));
-    }
+  void init() { MTVERIFY(pthread_cond_init(&cv, NULL)); }
 
-    void destroy() {
-        MTVERIFY(pthread_cond_destroy(&cv));
-    }
+  void destroy() { MTVERIFY(pthread_cond_destroy(&cv)); }
 
-    void signal() {
-        MTVERIFY(pthread_cond_signal(&cv));
-    }
+  void signal() { MTVERIFY(pthread_cond_signal(&cv)); }
 
-    void wait(mutex_t& mutex) {
-        MTVERIFY(pthread_cond_wait(&cv, &mutex.mutex));
-    }
+  void wait(mutex_t& mutex) { MTVERIFY(pthread_cond_wait(&cv, &mutex.mutex)); }
 };
 
 #endif

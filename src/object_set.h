@@ -7,29 +7,30 @@
 #include "core.h"
 #include "object.h"
 
+class object_heap_t;
+
 class object_set_t {
-public:
-    mutex_t         m_lock;
-    object_heap_t*  m_heap;
-    scm_obj_t*      m_elts;
-    int             m_count;
-    int             m_live;
+  mutex_t m_lock;
+  object_heap_t* m_heap;
+  scm_obj_t* m_elts;
+  int m_count;
+  int m_live;
 
-    void            rehash(int ncount);
+  void rehash(int ncount);
 
-public:
-                    object_set_t();
-                    ~object_set_t();
-    void            init(object_heap_t* heap);
-    scm_obj_t       get(const char* name, int len);
-    void            put(scm_obj_t obj);
-    void            remove(scm_obj_t obj);
-    void            lock();
-    void            unlock();
-    void            sweep();
-    void            inplace_rehash();
-    void            resolve();
-    void            relocate(bool every);
+ public:
+  object_set_t();
+  ~object_set_t();
+  void init(object_heap_t* heap);
+  scm_obj_t get(const char* name, int len);
+  void put(scm_obj_t obj);
+  void remove(scm_obj_t obj);
+  void lock();
+  void unlock();
+  void sweep();
+  void inplace_rehash();
+  void resolve();
+  void relocate(bool every);
 };
 
 #endif

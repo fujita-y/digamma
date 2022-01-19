@@ -7,6 +7,8 @@
 #include "core.h"
 #include "object.h"
 
+class object_heap_t;
+
 bool eqv_pred(scm_obj_t obj1, scm_obj_t obj2);
 bool r5rs_equal_pred(scm_obj_t lst1, scm_obj_t lst2);
 bool equal_pred(object_heap_t* heap, scm_hashtable_t visited, scm_obj_t lst1, scm_obj_t lst2);

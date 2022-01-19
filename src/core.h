@@ -8,59 +8,59 @@
   #define __STDC_LIMIT_MACROS
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <stdarg.h>
+#include <assert.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <float.h>
 #include <limits.h>
-#include <string.h>
-#include <assert.h>
-#include <wctype.h>
 #include <math.h>
-#include <time.h>
-#include <fcntl.h>
 #include <signal.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <wctype.h>
 
 #ifndef DEFAULT_HEAP_LIMIT
-  #define DEFAULT_HEAP_LIMIT        32 // MB
+  #define DEFAULT_HEAP_LIMIT 32  // MB
 #endif
 
-#define UNBOUND_GLOC_RETURN_UNSPEC  0  // default: 0
+#define UNBOUND_GLOC_RETURN_UNSPEC 0  // default: 0
 
-#define ENABLE_LLVM_JIT             1
+#define ENABLE_LLVM_JIT            1
 
 #if ENABLE_LLVM_JIT
-  #define ENABLE_COMPILE_GLOC       1
-  #define ENABLE_COMPILE_DEFERRED   1
-  #define ENABLE_COMPILE_REFERENCE  1
-  #define ENABLE_COMPILE_THREAD     1
-  #define ENABLE_BRANCH_WEIGHTS     1
+  #define ENABLE_COMPILE_GLOC      1
+  #define ENABLE_COMPILE_DEFERRED  1
+  #define ENABLE_COMPILE_REFERENCE 1
+  #define ENABLE_COMPILE_THREAD    1
+  #define ENABLE_BRANCH_WEIGHTS    1
 #else
-  #define ENABLE_COMPILE_GLOC       0
-  #define ENABLE_COMPILE_DEFERRED   0
-  #define ENABLE_COMPILE_REFERENCE  0
-  #define ENABLE_COMPILE_THREAD     0
-  #define ENABLE_BRANCH_WEIGHTS     0
+  #define ENABLE_COMPILE_GLOC      0
+  #define ENABLE_COMPILE_DEFERRED  0
+  #define ENABLE_COMPILE_REFERENCE 0
+  #define ENABLE_COMPILE_THREAD    0
+  #define ENABLE_BRANCH_WEIGHTS    0
 #endif
 
 #ifdef NDEBUG
-    #define MTDEBUG                 0
-    #define GCDEBUG                 0
-    #define SCDEBUG                 0
-    #define STDEBUG                 0
-    #define WBDEBUG                 0
-    #define HPDEBUG                 0
-    #define ASDEBUG                 0
+  #define MTDEBUG 0
+  #define GCDEBUG 0
+  #define SCDEBUG 0
+  #define STDEBUG 0
+  #define WBDEBUG 0
+  #define HPDEBUG 0
+  #define ASDEBUG 0
 #else
-    #define MTDEBUG                 1
-    #define GCDEBUG                 1
-    #define SCDEBUG                 1
-    #define STDEBUG                 1
-    #define WBDEBUG                 1
-    #define HPDEBUG                 1
-    #define ASDEBUG                 0
+  #define MTDEBUG 1
+  #define GCDEBUG 1
+  #define SCDEBUG 1
+  #define STDEBUG 1
+  #define WBDEBUG 1
+  #define HPDEBUG 1
+  #define ASDEBUG 0
 #endif
 
 #define PROFILE_OPCODE              0
@@ -87,31 +87,29 @@
 #define USE_MULTIBYTE_WRITE         1
 
 #if defined(FD_CLOEXEC)
-  #define USE_CLOEXEC               1
+  #define USE_CLOEXEC 1
 #else
-  #define USE_CLOEXEC               0
+  #define USE_CLOEXEC 0
 #endif
 
 #ifndef SYSTEM_SHARE_PATH
-  #define SYSTEM_SHARE_PATH         "/usr/local/share/digamma"
+  #define SYSTEM_SHARE_PATH "/usr/local/share/digamma"
 #endif
 
 #ifndef SYSTEM_EXTENSION_PATH
-  #define SYSTEM_EXTENSION_PATH     "/usr/local/lib/digamma"
+  #define SYSTEM_EXTENSION_PATH "/usr/local/lib/digamma"
 #endif
 
-//#define MAX_VIRTUAL_MACHINE         32
-
-#define array_sizeof(a) ((int)(sizeof(a)/sizeof(a[0])))
+#define array_sizeof(a) ((int)(sizeof(a) / sizeof(a[0])))
 
 class VM;
 
 #include "sysdep.h"
 
-extern int          main_command_line_argc;
+extern int main_command_line_argc;
 extern const char** main_command_line_argv;
-extern void         fatal(const char* fmt, ...) ATTRIBUTE(noreturn);
-extern void         warning(const char* fmt, ...);
-extern void         trace(const char* fmt, ...);
+extern void fatal(const char* fmt, ...) ATTRIBUTE(noreturn);
+extern void warning(const char* fmt, ...);
+extern void trace(const char* fmt, ...);
 
 #endif

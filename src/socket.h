@@ -8,9 +8,11 @@
 #include "object.h"
 #include "ioerror.h"
 
-#define SCM_SOCKET_MODE_NONE    0
-#define SCM_SOCKET_MODE_CLIENT  1
-#define SCM_SOCKET_MODE_SERVER  2
+class object_heap_t;
+
+#define SCM_SOCKET_MODE_NONE   0
+#define SCM_SOCKET_MODE_CLIENT 1
+#define SCM_SOCKET_MODE_SERVER 2
 
 void socket_open(scm_socket_t s, const char* node, const char* service, int family, int type, int protocol, int m_flags);
 void socket_close(scm_socket_t s);
