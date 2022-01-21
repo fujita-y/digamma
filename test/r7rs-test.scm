@@ -2477,5 +2477,5 @@
             (delete-file " no such file "))))
 
 (test-end)
-
+(collect #t) ;; finalize string port to evade leak detection
 #;(test-end)
