@@ -645,14 +645,12 @@ void VM::stop() {
       m_heap->enqueue_root(OBJECT_SLAB_TRAITS_OF(m_env)->cache->lookup(m_env));
     }
   }
-#if ENABLE_COMPILE_THREAD
   if (m_codegen) {
     scoped_lock lock(m_codegen->m_compile_queue_lock);
     for (scm_closure_t closure : m_codegen->m_compile_queue) {
       m_heap->enqueue_root(closure);
     }
   }
-#endif
   m_heap->m_collector_lock.lock();
   while (m_heap->m_stop_the_world) {
     m_heap->m_mutator_stopped = true;

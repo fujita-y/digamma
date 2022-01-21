@@ -23,25 +23,21 @@
 #include <time.h>
 #include <wctype.h>
 
+#define UNBOUND_GLOC_RETURN_UNSPEC 0  // default: 0
+
 #ifndef DEFAULT_HEAP_LIMIT
   #define DEFAULT_HEAP_LIMIT 32  // MB
 #endif
-
-#define UNBOUND_GLOC_RETURN_UNSPEC 0  // default: 0
 
 #define ENABLE_LLVM_JIT            1
 
 #if ENABLE_LLVM_JIT
   #define ENABLE_COMPILE_GLOC      1
-  #define ENABLE_COMPILE_DEFERRED  1
   #define ENABLE_COMPILE_REFERENCE 1
-  #define ENABLE_COMPILE_THREAD    1
   #define ENABLE_BRANCH_WEIGHTS    1
 #else
   #define ENABLE_COMPILE_GLOC      0
-  #define ENABLE_COMPILE_DEFERRED  0
   #define ENABLE_COMPILE_REFERENCE 0
-  #define ENABLE_COMPILE_THREAD    0
   #define ENABLE_BRANCH_WEIGHTS    0
 #endif
 

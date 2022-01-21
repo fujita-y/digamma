@@ -497,22 +497,14 @@ llvm::MDNode* codegen_t::context_t::get_branch_weight(int n, int m) {
 codegen_t::codegen_t(VM* vm) : m_vm(vm), m_debug(false) {}
 
 void codegen_t::init() {
-  auto J = ExitOnErr(LLJITBuilder().create());
-  auto D = J->getDataLayout();
-  auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
-  J->getMainJITDylib().addGenerator(std::move(G));
-  m_jit = std::move(J);
-#if ENABLE_COMPILE_THREAD
   m_compile_thread_terminating = false;
   m_compile_thread_lock.init();
   m_compile_thread_wake.init();
   m_compile_queue_lock.init();
   thread_start(compile_thread, this);
-#endif
 }
 
 void codegen_t::destroy() {
-#if ENABLE_COMPILE_THREAD
   m_compile_thread_terminating = true;
   {
     scoped_lock lock(m_compile_thread_lock);
@@ -522,77 +514,75 @@ void codegen_t::destroy() {
   m_compile_thread_lock.destroy();
   m_compile_thread_wake.destroy();
   m_compile_queue_lock.destroy();
-#endif
 }
 
-#if ENABLE_COMPILE_THREAD
 thread_main_t codegen_t::compile_thread(void* param) {
   codegen_t& codegen = *(codegen_t*)param;
   codegen.m_compile_thread_lock.lock();
-  codegen.m_compile_thread_ready = true;
-  while (!codegen.m_compile_thread_terminating) {
-    codegen.m_compile_thread_wake.wait(codegen.m_compile_thread_lock);
-    codegen.m_compile_thread_ready = false;
-    do {
-      if (codegen.m_compile_thread_terminating) break;
-      scm_closure_t closure = NULL;
-      {
-        scoped_lock lock(codegen.m_compile_queue_lock);
-        if (codegen.m_compile_queue.size()) {
-          closure = codegen.m_compile_queue.back();
+  {
+    auto J = ExitOnErr(LLJITBuilder().create());
+    auto D = J->getDataLayout();
+    auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
+    J->getMainJITDylib().addGenerator(std::move(G));
+    codegen.m_jit = std::move(J);
+    codegen.m_compile_thread_ready = true;
+    while (!codegen.m_compile_thread_terminating) {
+      codegen.m_compile_thread_wake.wait(codegen.m_compile_thread_lock);
+      codegen.m_compile_thread_ready = false;
+      while (!codegen.m_compile_thread_terminating) {
+        scm_closure_t closure = NULL;
+        {
+          scoped_lock lock(codegen.m_compile_queue_lock);
+          if (codegen.m_compile_queue.size()) {
+            closure = codegen.m_compile_queue.back();
+          }
         }
-      }
-      // printf("compile thread: closure %p\n", closure);
-      if (closure) codegen.compile_each(closure);
-      {
-        scoped_lock lock(codegen.m_compile_queue_lock);
-        codegen.m_compile_queue.erase(std::remove(codegen.m_compile_queue.begin(), codegen.m_compile_queue.end(), closure),
-                                      codegen.m_compile_queue.end());
-        int n_more = codegen.m_compile_queue.size();
-        if (n_more == 0) {
-          codegen.m_compile_thread_ready = true;
+        if (closure) codegen.compile_each(closure);
+        {
+          scoped_lock lock(codegen.m_compile_queue_lock);
+          codegen.m_compile_queue.erase(std::remove(codegen.m_compile_queue.begin(), codegen.m_compile_queue.end(), closure),
+                                        codegen.m_compile_queue.end());
+          if (codegen.m_compile_queue.size() == 0) {
+            codegen.m_compile_thread_ready = true;
+          }
         }
+        if (codegen.m_compile_thread_ready) break;
       }
-    } while (!codegen.m_compile_thread_ready);
+    }
+#if LLVM_VERSION_MAJOR >= 12
+    ExitOnErr(codegen.m_jit->getExecutionSession().endSession());
+#endif
   }
-  #if LLVM_VERSION_MAJOR >= 12
-  ExitOnErr(codegen.m_jit->getExecutionSession().endSession());
-  #endif
-  codegen.m_compile_thread_lock.unlock();
   codegen.m_compile_thread_terminating = false;
+  codegen.m_compile_thread_lock.unlock();
   return NULL;
 }
-#endif
 
 ThreadSafeModule codegen_t::optimizeModule(ThreadSafeModule TSM) {
-  Module& M = *TSM.getModuleUnlocked();
-
-  LoopAnalysisManager LAM;
-  FunctionAnalysisManager FAM;
-  CGSCCAnalysisManager CGAM;
-  ModuleAnalysisManager MAM;
-  PassBuilder PB;
-
-  FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-  ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
-
-  MPM.run(M, MAM);
-
+  TSM.withModuleDo([&](Module& M) {
+    LoopAnalysisManager LAM;
+    FunctionAnalysisManager FAM;
+    CGSCCAnalysisManager CGAM;
+    ModuleAnalysisManager MAM;
+    PassBuilder PB;
+    FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+    ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
+    MPM.run(M, MAM);
 #if PRINT_IR
-  puts(";*** IR after optimize ***");
-  M.print(outs(), nullptr);
-#else
-  if (m_debug) {
     puts(";*** IR after optimize ***");
     M.print(outs(), nullptr);
-  }
+#else
+    if (m_debug) {
+      puts(";*** IR after optimize ***");
+      M.print(outs(), nullptr);
+    }
 #endif
-
+  });
   return std::move(TSM);
 }
 
@@ -602,7 +592,6 @@ bool codegen_t::is_compiled(scm_closure_t closure) {
 }
 
 void codegen_t::compile(scm_closure_t closure) {
-#if ENABLE_COMPILE_THREAD
   if (m_compile_thread_terminating) return;
   {
     scoped_lock lock(m_compile_queue_lock);
@@ -613,20 +602,6 @@ void codegen_t::compile(scm_closure_t closure) {
     scoped_lock lock(m_compile_thread_lock);
     m_compile_thread_wake.signal();
   }
-#elif ENABLE_COMPILE_DEFERRED
-  if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) == m_compile_queue.end()) {
-    m_compile_queue.push_back(closure);
-    while (m_compile_queue.size()) {
-      scm_closure_t closure = m_compile_queue.back();
-      // printer_t prt(m_vm, m_vm->m_current_output);
-      // prt.format("deferred compile closure: ~s~&~!", closure->doc);
-      compile_each(closure);
-      m_compile_queue.erase(std::remove(m_compile_queue.begin(), m_compile_queue.end(), closure), m_compile_queue.end());
-    }
-  }
-#else
-  compile_each(closure);
-#endif
 }
 
 void codegen_t::compile_each(scm_closure_t closure) {
@@ -1287,7 +1262,7 @@ void codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst) {
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
 
-#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+#if ENABLE_COMPILE_REFERENCE
   scm_obj_t obj = ((scm_gloc_t)operands)->value;
   if (CLOSUREP(obj)) {
     scm_closure_t closure = (scm_closure_t)obj;
@@ -1561,7 +1536,7 @@ void codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst) {
     }
   }
 
-#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+#if ENABLE_COMPILE_REFERENCE
   if (CLOSUREP(obj)) {
     scm_closure_t closure = (scm_closure_t)obj;
     if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
@@ -2684,12 +2659,8 @@ void codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-
-#if ENABLE_COMPILE_DEFERRED
   m_compile_queue.push_back((scm_closure_t)operands);
   m_usage.templates++;
-#endif
-
   ctx.reg_cache_copy_except_value_and_fp(vm);
   auto thunkType = FunctionType::get(VoidTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_push_close), thunkType->getPointerTo());
@@ -2702,12 +2673,8 @@ void codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-
-#if ENABLE_COMPILE_DEFERRED
   m_compile_queue.push_back((scm_closure_t)operands);
   m_usage.templates++;
-#endif
-
   ctx.reg_cache_copy(vm);
   auto thunkType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_ret_close), thunkType->getPointerTo());
@@ -2720,12 +2687,8 @@ void codegen_t::emit_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-
-#if ENABLE_COMPILE_DEFERRED
   m_compile_queue.push_back((scm_closure_t)operands);
   m_usage.templates++;
-#endif
-
   ctx.reg_cache_copy_only_env_and_cont(vm);
   auto thunkType = FunctionType::get(VoidTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_close), thunkType->getPointerTo());
@@ -2789,7 +2752,7 @@ void codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst) {
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
 
-#if ENABLE_COMPILE_REFERENCE && ENABLE_COMPILE_DEFERRED
+#if ENABLE_COMPILE_REFERENCE
   scm_obj_t obj = ((scm_gloc_t)operands)->value;
   if (CLOSUREP(obj)) {
     scm_closure_t closure = (scm_closure_t)obj;

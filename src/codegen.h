@@ -112,13 +112,11 @@ class codegen_t {
   VM* m_vm;
   std::unique_ptr<llvm::orc::LLJIT> m_jit;
   std::map<scm_closure_t, llvm::Function*> m_lifted_functions;
-#if ENABLE_COMPILE_THREAD
   mutex_t m_compile_thread_lock;
   cond_t m_compile_thread_wake;
   bool m_compile_thread_ready;
   bool m_compile_thread_terminating;
   static thread_main_t compile_thread(void* param);
-#endif
   llvm::orc::ThreadSafeModule optimizeModule(llvm::orc::ThreadSafeModule TSM);
   void define_prepare_call();
   void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
@@ -132,10 +130,8 @@ class codegen_t {
   bool is_compiled(scm_closure_t closure);
   void display_codegen_statistics(scm_port_t port);
   bool m_debug;
-#if ENABLE_COMPILE_DEFERRED
   std::vector<scm_closure_t> m_compile_queue;
   mutex_t m_compile_queue_lock;
-#endif
 
   struct usage_t {
     int globals;

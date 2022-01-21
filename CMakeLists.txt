@@ -23,9 +23,11 @@ separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
 set(CMAKE_CXX_COMPILER "clang++")
+add_link_options("-fuse-ld=lld")
+set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
+set (CMAKE_LINKER_FLAGS_RELEASE "${CMAKE_LINKER_FLAGS_RELEASE} -flto")
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
 set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address")
-add_link_options("-fuse-ld=lld")
 
 set(DIGAMMA_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/digamma)
 set(DIGAMMA_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/digamma)
