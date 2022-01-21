@@ -558,32 +558,29 @@ thread_main_t codegen_t::compile_thread(void* param) {
   return NULL;
 }
 
-ThreadSafeModule codegen_t::optimizeModule(ThreadSafeModule TSM) {
-  TSM.withModuleDo([&](Module& M) {
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-    PassBuilder PB;
-    FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-    ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
-    MPM.run(M, MAM);
+void codegen_t::optimizeModule(Module& M) {
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+  PassBuilder PB;
+  FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O2);
+  MPM.run(M, MAM);
 #if PRINT_IR
+  puts(";*** IR after optimize ***");
+  M.print(outs(), nullptr);
+#else
+  if (m_debug) {
     puts(";*** IR after optimize ***");
     M.print(outs(), nullptr);
-#else
-    if (m_debug) {
-      puts(";*** IR after optimize ***");
-      M.print(outs(), nullptr);
-    }
+  }
 #endif
-  });
-  return std::move(TSM);
 }
 
 bool codegen_t::is_compiled(scm_closure_t closure) {
@@ -636,25 +633,21 @@ void codegen_t::compile_each(scm_closure_t closure) {
 #endif
   BasicBlock* ENTRY = BasicBlock::Create(C, "entry", F);
   IRBuilder<> IRB(ENTRY);
-
-  context_t context(C, IRB);
-  context.m_module = M.get();
-  context.m_function = F;
-  context.m_top_level_closure = closure;
-  context.m_top_level_function = F;
-  context.set_local_var_count(0, closure);
-  context.m_depth = 1;
-
-  transform(context, closure->pc, true);
-
+  {
+    context_t context(C, IRB);
+    context.m_module = M.get();
+    context.m_function = F;
+    context.m_top_level_closure = closure;
+    context.m_top_level_function = F;
+    context.set_local_var_count(0, closure);
+    context.m_depth = 1;
+    transform(context, closure->pc, true);
+  }
   if (verifyModule(*M, &outs())) fatal("%s:%u verify module failed", __FILE__, __LINE__);
-
 #if USE_LLVM_OPTIMIZE
-  ExitOnErr(m_jit->addIRModule(optimizeModule(std::move(ThreadSafeModule(std::move(M), std::move(Context))))));
-#else
-  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
+  optimizeModule(*M);
 #endif
-
+  ExitOnErr(m_jit->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
   // m_jit->getMainJITDylib().dump(llvm::outs());
 
   auto symbol = ExitOnErr(m_jit->lookup(function_id));

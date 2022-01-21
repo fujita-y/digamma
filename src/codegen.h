@@ -117,8 +117,7 @@ class codegen_t {
   bool m_compile_thread_ready;
   bool m_compile_thread_terminating;
   static thread_main_t compile_thread(void* param);
-  llvm::orc::ThreadSafeModule optimizeModule(llvm::orc::ThreadSafeModule TSM);
-  void define_prepare_call();
+  void optimizeModule(llvm::Module& M);
   void transform(context_t ctx, scm_obj_t inst, bool insert_stack_check);
   llvm::Value* get_function_address(context_t& ctx, scm_closure_t closure);
 
