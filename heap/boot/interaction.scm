@@ -369,7 +369,7 @@
         (format #t "  --version              prints version and exit~%")
         (format #t "  --help                 prints help and exit~%")
         (format #t "  --                     indicates no more option to proceed~%")))
-    (define show-banner (lambda () (format #t "digamma 0.1.~a~%" (architecture-feature 'program-revision))))
+    (define show-banner (lambda () (format #t "digamma 0.2.~a~%" (architecture-feature 'program-revision))))
     (define show-info
       (lambda ()
         (show-banner)
