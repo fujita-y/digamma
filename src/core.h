@@ -29,7 +29,7 @@
   #define DEFAULT_HEAP_LIMIT 32  // MB
 #endif
 
-#define ENABLE_LLVM_JIT            1
+#define ENABLE_LLVM_JIT 1
 
 #if ENABLE_LLVM_JIT
   #define ENABLE_COMPILE_GLOC      1
