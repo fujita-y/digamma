@@ -14,7 +14,7 @@
 #include "heap.h"
 #include "object_factory.h"
 #include "port.h"
-#include "revision.h"
+#include "version.h"
 #include "subr.h"
 
 #if GCDEBUG
@@ -1605,6 +1605,8 @@ void object_heap_t::init_architecture_feature() {
     n = offsetof(x, z);          \
     ARCH_FIXNUM(name, n);        \
   }
+  ARCH_FIXNUM("program-version-major", PROGRAM_VERSION_MAJOR);
+  ARCH_FIXNUM("program-version-minor", PROGRAM_VERSION_MINOR);
   ARCH_FIXNUM("program-revision", PROGRAM_REVISION);
   ARCH_FIXNUM("sizeof:bool", sizeof(bool));
   ARCH_FIXNUM("sizeof:short", sizeof(short));

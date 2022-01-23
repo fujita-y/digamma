@@ -1,7 +1,13 @@
 ;;; Copyright (c) 2004-2022 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define auto-compile-cache-validation-signature (string->symbol (format "digamma-0.1.~a" (architecture-feature 'program-revision))))
+(define auto-compile-cache-validation-signature
+  (string->symbol
+    (format
+      "digamma-~a.~a.~a"
+      (architecture-feature 'program-version-major)
+      (architecture-feature 'program-version-minor)
+      (architecture-feature 'program-revision))))
 (define auto-compile-verbose (make-parameter #f))
 (define scheme-load-verbose (make-parameter #f))
 (define scheme-load-paths (make-parameter '()))
