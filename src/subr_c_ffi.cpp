@@ -17,6 +17,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Error.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
@@ -30,10 +31,12 @@
 #endif
 
 using namespace llvm;
+using namespace llvm::orc;
+using namespace llvm::sys;
 
 static mutex_t s_compile_lock;
 static std::map<std::string, void*> s_callout_cache;
-static std::unique_ptr<orc::LLJIT> s_c_ffi;
+static std::unique_ptr<LLJIT> s_c_ffi;
 static std::atomic<uintptr_t> s_trampoline_uid;
 
 static ExitOnError ExitOnErr;
@@ -153,9 +156,9 @@ extern "C" {
 
 void init_c_ffi() {
   s_compile_lock.init();
-  auto J = ExitOnErr(orc::LLJITBuilder().create());
+  auto J = ExitOnErr(LLJITBuilder().create());
   auto D = J->getDataLayout();
-  auto G = ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
+  auto G = ExitOnErr(DynamicLibrarySearchGenerator::GetForCurrentProcess(D.getGlobalPrefix()));
   J->getMainJITDylib().addGenerator(std::move(G));
   s_c_ffi = std::move(J);
 }
@@ -263,6 +266,9 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
   auto Context = std::make_unique<LLVMContext>();
   LLVMContext& C = *Context;
   auto M = std::make_unique<Module>(module_id, C);
+  M->setTargetTriple(getDefaultTargetTriple());
+  M->setDataLayout(s_c_ffi->getDataLayout());
+
   auto IntptrTy = (sizeof(intptr_t) == 4 ? Type::getInt32Ty(C) : Type::getInt64Ty(C));
   auto IntptrPtrTy = sizeof(intptr_t) == 4 ? Type::getInt32PtrTy(C) : Type::getInt64PtrTy(C);
 
@@ -297,7 +303,7 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
   }
 
   if (verifyModule(*M, &outs())) fatal("%s:%u verify module failed", __FILE__, __LINE__);
-  ExitOnErr(s_c_ffi->addIRModule(std::move(orc::ThreadSafeModule(std::move(M), std::move(Context)))));
+  ExitOnErr(s_c_ffi->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
   auto symbol = ExitOnErr(s_c_ffi->lookup(function_id));
   void* ptr = (void*)symbol.getAddress();
   s_callout_cache[cache_key] = ptr;
@@ -351,7 +357,7 @@ static void* compile_callback_thunk(VM* vm, uintptr_t trampoline_uid, const char
 
   // M->print(outs(), nullptr);
 
-  ExitOnErr(s_c_ffi->addIRModule(std::move(orc::ThreadSafeModule(std::move(M), std::move(Context)))));
+  ExitOnErr(s_c_ffi->addIRModule(std::move(ThreadSafeModule(std::move(M), std::move(Context)))));
   auto symbol = ExitOnErr(s_c_ffi->lookup(function_id));
   return (void*)symbol.getAddress();
 }
