@@ -96,7 +96,7 @@ set(DIGAMMA_SITELIB_DIRECTORY ${DIGAMMA_SHARE_DIRECTORY}/sitelib)
 install(DIRECTORY sitelib/ DESTINATION ${DIGAMMA_SITELIB_DIRECTORY})
 
 enable_testing()
-set(DIGAMMA_COMMON_TEST_OPTIONS --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib)
+set(DIGAMMA_COMMON_TEST_OPTIONS --heap-limit=128 --acc=/tmp --sitelib=./test:./sitelib)
 add_test(
   NAME r4rstest
   COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/r4rstest.scm
