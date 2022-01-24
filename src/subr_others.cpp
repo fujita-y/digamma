@@ -431,7 +431,6 @@ scm_obj_t subr_top_level_value(VM* vm, int argc, scm_obj_t argv[]) {
       printf("** warning: top-level-value reference unbound symbol %s, return unspecified\n", symbol->name);
       return scm_unspecified;
 #else
-      printf("** internal error: top-level-value reference unbound symbol %s\n", symbol->name);
       invalid_object_violation(vm, "top-level-value", "bound symbol", argv[0], argc, argv);
       return scm_undef;
 #endif
