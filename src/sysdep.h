@@ -88,6 +88,7 @@ extern void fatal(const char* fmt, ...) ATTRIBUTE(noreturn);
 #include <netdb.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/poll.h>

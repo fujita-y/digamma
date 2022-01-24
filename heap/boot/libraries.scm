@@ -548,6 +548,9 @@
                         decode-microsecond
                         encode-microsecond
 
+                        acquire-lockfile
+                        release-lockfile
+
                         file-size-in-bytes
                         file-regular?
                         file-directory?

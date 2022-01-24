@@ -14,8 +14,8 @@
 #include "heap.h"
 #include "object_factory.h"
 #include "port.h"
-#include "version.h"
 #include "subr.h"
+#include "version.h"
 
 #if GCDEBUG
   #define GC_TRACE(fmt) \

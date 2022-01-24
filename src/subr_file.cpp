@@ -76,6 +76,33 @@ scm_obj_t subr_directory_list(VM* vm, int argc, scm_obj_t argv[]) {
   return scm_undef;
 }
 
+// acquire-lockfile
+scm_obj_t subr_acquire_lockfile(VM* vm, int argc, scm_obj_t argv[]) {
+  if (argc == 1) {
+    if (STRINGP(argv[0])) {
+      scm_string_t string = (scm_string_t)argv[0];
+      return acquire_lockfile(vm, string);
+    }
+    wrong_type_argument_violation(vm, "acquire-lockfile", 0, "string", argv[0], argc, argv);
+    return scm_undef;
+  }
+  wrong_number_of_arguments_violation(vm, "acquire-lockfile", 1, 1, argc, argv);
+  return scm_undef;
+}
+
+// release-lockfile
+scm_obj_t subr_release_lockfile(VM* vm, int argc, scm_obj_t argv[]) {
+  if (argc == 1) {
+    if (integer_pred(argv[0])) {
+      return release_lockfile(vm, argv[0]);
+    }
+    wrong_type_argument_violation(vm, "release-lockfile", 0, "integer", argv[0], argc, argv);
+    return scm_undef;
+  }
+  wrong_number_of_arguments_violation(vm, "release-lockfile", 1, 1, argc, argv);
+  return scm_undef;
+}
+
 // file-size-in-bytes
 scm_obj_t subr_file_size_in_bytes(VM* vm, int argc, scm_obj_t argv[]) {
   if (argc == 1) {
@@ -362,13 +389,15 @@ scm_obj_t subr_lookup_shared_object(VM* vm, int argc, scm_obj_t argv[]) {
 void init_subr_file(object_heap_t* heap) {
 #define DEFSUBR(SYM, FUNC) heap->intern_system_subr(SYM, FUNC)
 
+  DEFSUBR("acquire-lockfile", subr_acquire_lockfile);
+  DEFSUBR("release-lockfile", subr_release_lockfile);
   DEFSUBR("current-directory", subr_current_directory);
   DEFSUBR("create-directory", subr_create_directory);
   DEFSUBR("file-exists?", subr_file_exists_pred);
   DEFSUBR("delete-file", subr_delete_file);
   DEFSUBR("directory-list", subr_directory_list);
-  DEFSUBR("file-size-in-bytes", subr_file_size_in_bytes);
   DEFSUBR("file-regular?", subr_file_regular_pred);
+  DEFSUBR("file-size-in-bytes", subr_file_size_in_bytes);
   DEFSUBR("file-directory?", subr_file_directory_pred);
   DEFSUBR("file-symbolic-link?", subr_file_symbolic_link_pred);
   DEFSUBR("file-readable?", subr_file_readable_pred);

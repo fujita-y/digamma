@@ -43,6 +43,7 @@
     _
     abs
     acos
+    acquire-lockfile
     add-library-path
     add-load-path
     and
@@ -813,6 +814,7 @@
     record-type-uid
     record-type?
     record?
+    release-lockfile
     remainder
     remove
     remove-duplicate-symbols

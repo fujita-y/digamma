@@ -141,6 +141,29 @@ scm_obj_t create_directory(VM* vm, scm_string_t path) {
   return scm_unspecified;
 }
 
+scm_obj_t acquire_lockfile(VM* vm, scm_string_t path) {
+  int fd = open(path->name, O_CREAT, S_IRUSR | S_IWUSR);
+  if (fd < 0) {
+    raise_io_error(vm, "acquire_lockfile", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, path);
+    return scm_undef;
+  }
+  if (flock(fd, LOCK_EX) < 0) {
+    raise_io_error(vm, "acquire_lockfile", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, path);
+    return scm_undef;
+  }
+  return intptr_to_integer(vm->m_heap, fd);
+}
+
+scm_obj_t release_lockfile(VM* vm, scm_obj_t descriptor) {
+  int fd = coerce_exact_integer_to_intptr(descriptor);
+  if (flock(fd, LOCK_UN) < 0) {
+    raise_io_error(vm, "release_lockfile", SCM_PORT_OPERATION_OPEN, strerror(errno), errno, scm_false, descriptor);
+    return scm_undef;
+  }
+  close(fd);
+  return scm_unspecified;
+}
+
 scm_obj_t current_directory(VM* vm) {
   char buf[MAXPATHLEN];
   if (getcwd(buf, MAXPATHLEN) == NULL) {

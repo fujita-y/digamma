@@ -19,6 +19,8 @@ scm_obj_t file_stat_mtime(VM* vm, scm_string_t path);
 scm_obj_t file_stat_atime(VM* vm, scm_string_t path);
 scm_obj_t create_symbolic_link(VM* vm, scm_string_t old_path, scm_string_t new_path);
 scm_obj_t create_hard_link(VM* vm, scm_string_t old_path, scm_string_t new_path);
+scm_obj_t acquire_lockfile(VM* vm, scm_string_t path);
+scm_obj_t release_lockfile(VM* vm, scm_obj_t descriptor);
 scm_obj_t rename_file(VM* vm, scm_string_t old_path, scm_string_t new_path);
 scm_obj_t change_file_mode(VM* vm, scm_string_t path, int mode);
 
