@@ -53,11 +53,9 @@
   (define-syntax autoload
     (syntax-rules ()
       ((_ var init)
-       (begin
-         (define var
-           (lambda ()
-             (let ((value init))
-               (set! var (lambda () value)) value)))))))
+       (define var
+         (let ((cache #f))
+           (lambda () (or cache (begin (set! cache init) cache))))))))
 
   (autoload
    general-category-table-1
