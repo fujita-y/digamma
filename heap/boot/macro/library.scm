@@ -620,21 +620,35 @@
         imports)
       (import-top-level-bindings (core-hashtable->alist ht-bindings)))))
 
-(set-top-level-value!
-  '|.require-scheme-library|
+(define count-pending-import
+  (lambda ()
+    (length
+      (filter
+        (lambda (e) (eq? e 'pending))
+        (map cdr (core-hashtable->alist (scheme-library-exports)))))))
+
+(set-top-level-value! '|.require-scheme-library|
   (lambda (ref)
     (let ((library-id (generate-library-id ref)))
       (let ((exports (core-hashtable-ref (scheme-library-exports) library-id #f)))
+        (define lock-fd #f)
         (cond ((eq? exports 'pending)
                (core-hashtable-set! (scheme-library-exports) library-id #f)
                (syntax-violation 'library "encountered cyclic dependencies" ref))
               ((eq? exports #f)
                (dynamic-wind
-                 (lambda () (core-hashtable-set! (scheme-library-exports) library-id 'pending))
+                 (lambda ()
+                   (and (auto-compile-cache)
+                        (= (count-pending-import) 0)
+                        (set! lock-fd (acquire-lockfile (auto-compile-cache-lock-path))))
+                   (core-hashtable-set! (scheme-library-exports) library-id 'pending))
                  (lambda () (load-scheme-library ref #f))
                  (lambda ()
                    (and (eq? (core-hashtable-ref (scheme-library-exports) library-id #f) 'pending)
-                        (core-hashtable-set! (scheme-library-exports) library-id #f))))))))
+                        (core-hashtable-set! (scheme-library-exports) library-id #f))
+                   (and (auto-compile-cache)
+                        (= (count-pending-import) 0)
+                        (release-lockfile lock-fd))))))))
     (unspecified)))
 
 (define unify-import-bindings

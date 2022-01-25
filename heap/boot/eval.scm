@@ -8,6 +8,10 @@
       (architecture-feature 'program-version-major)
       (architecture-feature 'program-version-minor)
       (architecture-feature 'program-revision))))
+(define auto-compile-cache-lock-path
+  (lambda ()
+    (and (auto-compile-cache)
+         (format "~a/digamma-auto-compile-cache.lock" (auto-compile-cache)))))
 (define auto-compile-verbose (make-parameter #f))
 (define scheme-load-verbose (make-parameter #f))
 (define scheme-load-paths (make-parameter '()))
@@ -133,26 +137,24 @@
 
 (define load
   (lambda (path)
-    (cond ((list? path) (auto-compile-cache-update) (load-scheme-library path))
-          (else
-            (let ((abs-path (locate-load-file path)))
-              (and (scheme-load-verbose) (format #t "~&;; loading ~s~%~!" abs-path))
-              (let ((port (open-script-input-port abs-path)))
-                (with-exception-handler
-                  (lambda (c) (cond ((serious-condition? c) (close-port port) (raise c)) (else (raise-continuable c))))
-                  (lambda ()
-                    (parameterize ((current-source-comments (current-source-comments))
-                                   (current-temporaries (current-temporaries))
-                                   (current-environment (current-environment))
-                                   (lexical-syntax-version (lexical-syntax-version))
-                                   (mutable-literals (mutable-literals))
-                                   (backtrace (backtrace)))
-                      (current-temporaries (make-core-hashtable 'string=?))
-                      (current-rename-count 0)
-                      (let loop ()
-                        (current-source-comments (and (backtrace) (make-core-hashtable)))
-                        (let ((form (core-read port (current-source-comments) 'load)))
-                          (cond ((eof-object? form) (close-port port)) (else (interpret form) (loop))))))))))))))
+    (let ((abs-path (locate-load-file path)))
+      (and (scheme-load-verbose) (format #t "~&;; loading ~s~%~!" abs-path))
+      (let ((port (open-script-input-port abs-path)))
+        (with-exception-handler
+          (lambda (c) (cond ((serious-condition? c) (close-port port) (raise c)) (else (raise-continuable c))))
+          (lambda ()
+            (parameterize ((current-source-comments (current-source-comments))
+                            (current-temporaries (current-temporaries))
+                            (current-environment (current-environment))
+                            (lexical-syntax-version (lexical-syntax-version))
+                            (mutable-literals (mutable-literals))
+                            (backtrace (backtrace)))
+              (current-temporaries (make-core-hashtable 'string=?))
+              (current-rename-count 0)
+              (let loop ()
+                (current-source-comments (and (backtrace) (make-core-hashtable)))
+                (let ((form (core-read port (current-source-comments) 'load)))
+                  (cond ((eof-object? form) (close-port port)) (else (interpret form) (loop))))))))))))
 
 (define load-top-level-program
   (lambda (path)
@@ -318,7 +320,7 @@
                                  (get-datum timestamp-port)
                                  (get-datum timestamp-port)
                                  (cond ((equal? source-path (get-datum timestamp-port)) cache-path)
-                                       (else (close-port timestamp-port) (auto-compile-cache-clean) #f))))))
+                                       (else (close-port timestamp-port) (cache-clean) #f))))))
                       cache-path)))))
       (define reorder-scheme-library-paths
         (lambda (top-path)
@@ -384,7 +386,7 @@
               (let ((form (core-read port #f 'load)))
                 (cond ((eof-object? form) (close-port port)) (else (run-vmi (cons '(1 . 0) form)) (loop)))))))))))
 
-(define auto-compile-cache-delete-files
+(define cache-delete-files
   (lambda (cache-lst)
     (for-each
       (lambda (cache-name)
@@ -395,7 +397,7 @@
           (and (auto-compile-verbose) (format #t "~&;; clean ~s~%" cache-path))))
       cache-lst)))
 
-(define auto-compile-cache-clean
+(define cache-clean
   (lambda ()
     (cond
       ((auto-compile-cache)
@@ -407,14 +409,14 @@
                      (let ((p (string-contains s ".cache")))
                        (and p (= (string-contains s ".cache") (- (string-length s) 6)))))
                    (directory-list path))))
-           (auto-compile-cache-delete-files cache-lst)))))))
+           (cache-delete-files cache-lst)))))))
 
-(define auto-compile-cache-update
+(define cache-update
   (lambda ()
     (define inconsistent-cache-state
       (lambda (cache-lst)
         (and (auto-compile-verbose) (format (current-error-port) "~&;; reset ~s~%" (auto-compile-cache)))
-        (auto-compile-cache-delete-files cache-lst)))
+        (cache-delete-files cache-lst)))
     (cond ((auto-compile-cache)
            =>
            (lambda (path)
@@ -497,3 +499,19 @@
                                    (and (auto-compile-verbose) (format #t "~&;; clean ~s~%" cache-path))
                                    (loop (cdr lst) expiration))))))))))
           (else (unspecified)))))
+
+(define auto-compile-cache-clean
+  (lambda ()
+    (define lock-fd #f)
+    (dynamic-wind
+      (lambda () (and (auto-compile-cache) (set! lock-fd (acquire-lockfile (auto-compile-cache-lock-path)))))
+      (lambda () (cache-clean))
+      (lambda () (and (auto-compile-cache) (release-lockfile lock-fd))))))
+
+(define auto-compile-cache-update
+  (lambda ()
+    (define lock-fd #f)
+    (dynamic-wind
+      (lambda () (and (auto-compile-cache) (set! lock-fd (acquire-lockfile (auto-compile-cache-lock-path)))))
+      (lambda () (cache-update))
+      (lambda () (and (auto-compile-cache) (release-lockfile lock-fd))))))
