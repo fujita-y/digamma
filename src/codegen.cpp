@@ -317,7 +317,9 @@ extern "C" {
     vm->update_cont(vm->m_cont);
     env = (vm_env_t)((intptr_t)vm->m_env - offsetof(vm_env_rec_t, up));
     scm_obj_t* slot = (scm_obj_t*)env - 1;
-    *slot = make_closure(vm->m_heap, (scm_closure_t)operands, vm->m_env);
+    scm_closure_t closure = make_closure(vm->m_heap, (scm_closure_t)operands, vm->m_env);
+    vm->m_heap->write_barrier(closure);
+    *slot = closure;
   }
 
   scm_obj_t c_nadd_iloc(VM* vm, scm_obj_t operands) {
