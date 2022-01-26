@@ -584,11 +584,6 @@ void codegen_t::optimizeModule(Module& M) {
 #endif
 }
 
-bool codegen_t::is_compiled(scm_closure_t closure) {
-  VM* vm = m_vm;
-  return closure->code != NULL;
-}
-
 void codegen_t::compile(scm_closure_t closure) {
   if (m_compile_thread_terminating) return;
   {
@@ -602,9 +597,19 @@ void codegen_t::compile(scm_closure_t closure) {
   }
 }
 
+bool codegen_t::maybe_compile(scm_closure_t closure) {
+  if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
+    scoped_lock lock(m_compile_queue_lock);
+    closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
+    m_compile_queue.push_back(closure);
+    return true;
+  }
+  return false;
+}
+
 void codegen_t::compile_each(scm_closure_t closure) {
   VM* vm = m_vm;
-  if (is_compiled(closure)) return;
+  if (closure->code != NULL) return;
 #if VERBOSE_CODEGEN
   printer_t prt(vm, vm->m_current_output);
   prt.format("generating native code: ~s~&", closure->doc);
@@ -665,7 +670,7 @@ Value* codegen_t::get_function_address(context_t& ctx, scm_closure_t closure) {
   DECLEAR_CONTEXT_VARS;
   DECLEAR_COMMON_TYPES;
 
-  if (!is_compiled(closure)) fatal("%s:%u closure is not compiled", __FILE__, __LINE__);
+  if (closure->code == NULL) fatal("%s:%u closure is not compiled", __FILE__, __LINE__);
   intptr_t (*adrs)(intptr_t) = (intptr_t(*)(intptr_t))(closure->code);
   auto subrType = FunctionType::get(IntptrTy, {IntptrPtrTy}, false);
   return ConstantExpr::getIntToPtr(VALUE_INTPTR(adrs), subrType->getPointerTo());
@@ -1245,15 +1250,7 @@ void codegen_t::emit_push_gloc(context_t& ctx, scm_obj_t inst) {
 #if ENABLE_COMPILE_REFERENCE
   scm_obj_t obj = ((scm_gloc_t)operands)->value;
   if (CLOSUREP(obj)) {
-    scm_closure_t closure = (scm_closure_t)obj;
-    if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
-      closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
-      {
-        scoped_lock lock(m_compile_queue_lock);
-        m_compile_queue.push_back((scm_closure_t)obj);
-      }
-      m_usage.refs++;
-    }
+    if (maybe_compile((scm_closure_t)obj)) m_usage.refs++;
   }
 #endif
 
@@ -1457,7 +1454,7 @@ void codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst) {
           return;
         }
 #if USE_ADDRESS_TO_FUNCTION
-        if (is_compiled(closure)) {
+        if (closure->code != NULL) {
   #if VERBOSE_CODEGEN
           puts("emit_apply_gloc: closure already compiled, reuse native code");
   #endif
@@ -1521,15 +1518,7 @@ void codegen_t::emit_apply_gloc(context_t& ctx, scm_obj_t inst) {
 
 #if ENABLE_COMPILE_REFERENCE
   if (CLOSUREP(obj)) {
-    scm_closure_t closure = (scm_closure_t)obj;
-    if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
-      closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
-      {
-        scoped_lock lock(m_compile_queue_lock);
-        m_compile_queue.push_back((scm_closure_t)obj);
-      }
-      m_usage.refs++;
-    }
+    if (maybe_compile((scm_closure_t)obj)) m_usage.refs++;
   }
 #endif
 
@@ -2645,11 +2634,9 @@ void codegen_t::emit_push_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-  {
-    scoped_lock lock(m_compile_queue_lock);
-    m_compile_queue.push_back((scm_closure_t)operands);
-  }
-  m_usage.templates++;
+
+  if (maybe_compile((scm_closure_t)operands)) m_usage.templates++;
+
   ctx.reg_cache_copy_except_value_and_fp(vm);
   auto thunkType = FunctionType::get(VoidTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_push_close), thunkType->getPointerTo());
@@ -2662,11 +2649,9 @@ void codegen_t::emit_ret_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-  {
-    scoped_lock lock(m_compile_queue_lock);
-    m_compile_queue.push_back((scm_closure_t)operands);
-  }
-  m_usage.templates++;
+
+  if (maybe_compile((scm_closure_t)operands)) m_usage.templates++;
+
   ctx.reg_cache_copy(vm);
   auto thunkType = FunctionType::get(IntptrTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_ret_close), thunkType->getPointerTo());
@@ -2679,11 +2664,9 @@ void codegen_t::emit_close(context_t& ctx, scm_obj_t inst) {
   DECLEAR_COMMON_TYPES;
   scm_obj_t operands = CDAR(inst);
   auto vm = F->arg_begin();
-  {
-    scoped_lock lock(m_compile_queue_lock);
-    m_compile_queue.push_back((scm_closure_t)operands);
-  }
-  m_usage.templates++;
+
+  if (maybe_compile((scm_closure_t)operands)) m_usage.templates++;
+
   ctx.reg_cache_copy_only_env_and_cont(vm);
   auto thunkType = FunctionType::get(VoidTy, {IntptrPtrTy, IntptrTy}, false);
   auto thunk = ConstantExpr::getIntToPtr(VALUE_INTPTR(c_close), thunkType->getPointerTo());
@@ -2750,15 +2733,7 @@ void codegen_t::emit_gloc(context_t& ctx, scm_obj_t inst) {
 #if ENABLE_COMPILE_REFERENCE
   scm_obj_t obj = ((scm_gloc_t)operands)->value;
   if (CLOSUREP(obj)) {
-    scm_closure_t closure = (scm_closure_t)obj;
-    if (closure->code == NULL && !HDR_CLOSURE_INSPECTED(closure->hdr)) {
-      closure->hdr = closure->hdr | MAKEBITS(1, HDR_CLOSURE_INSPECTED_SHIFT);
-      {
-        scoped_lock lock(m_compile_queue_lock);
-        m_compile_queue.push_back((scm_closure_t)obj);
-      }
-      m_usage.refs++;
-    }
+    if (maybe_compile((scm_closure_t)obj)) m_usage.refs++;
   }
 #endif
 

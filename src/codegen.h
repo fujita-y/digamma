@@ -126,7 +126,6 @@ class codegen_t {
   void init();
   void destroy();
   void compile(scm_closure_t closure);
-  bool is_compiled(scm_closure_t closure);
   void display_codegen_statistics(scm_port_t port);
   bool m_debug;
   std::vector<scm_closure_t> m_compile_queue;
@@ -148,6 +147,7 @@ class codegen_t {
   int calc_stack_size(scm_obj_t inst);
   int calc_iloc_index(context_t& ctx, scm_obj_t operand);
   int calc_iloc_index(context_t& ctx, intptr_t depth, intptr_t index);
+  bool maybe_compile(scm_closure_t closure);
   void compile_each(scm_closure_t closure);
   llvm::AllocaInst* emit_alloca(context_t& ctx, llvm::Type* type);
   void emit_stack_overflow_check(context_t& ctx, int nbytes);

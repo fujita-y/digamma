@@ -33,7 +33,7 @@ scm_obj_t subr_closure_codegen(VM* vm, int argc, scm_obj_t argv[]) {
       if (vm->m_codegen) {
         vm->m_codegen->m_debug = true;
         vm->m_codegen->compile(closure);
-        while (!vm->m_codegen->is_compiled(closure)) usleep(1000);
+        while (closure->code == NULL) usleep(1000);
         vm->m_codegen->m_debug = false;
         return scm_unspecified;
       } else {
