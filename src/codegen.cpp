@@ -426,6 +426,7 @@ void codegen_t::context_t::reg_cache_copy_except_sp(llvm::Value* vm) {
   reg_cont.copy(vm);
   reg_value.copy(vm);
 }
+
 void codegen_t::context_t::reg_cache_copy_except_value(llvm::Value* vm) {
   reg_fp.copy(vm);
   reg_env.copy(vm);
@@ -1015,22 +1016,6 @@ void codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check
       } break;
       case VMOP_GE_ILOC: {
         emit_ge_iloc(ctx, inst);
-      } break;
-      case VMOP_TOUCH_GLOC: {
-        // nop
-      } break;
-      case VMOP_SUBR_GLOC_OF: {
-        emit_subr_gloc_of(ctx, inst);
-        intptr_t argc = FIXNUM(CADR(CDAR(inst)));
-        ctx.m_argc = ctx.m_argc - argc;
-      } break;
-      case VMOP_PUSH_SUBR_GLOC_OF: {
-        emit_push_subr_gloc_of(ctx, inst);
-        intptr_t argc = FIXNUM(CADR(CDAR(inst)));
-        ctx.m_argc = ctx.m_argc - argc + 1;
-      } break;
-      case VMOP_RET_SUBR_GLOC_OF: {
-        emit_ret_subr_gloc_of(ctx, inst);
       } break;
       case VMOP_VM_ESCAPE: {
         emit_escape(ctx, inst);
@@ -3034,15 +3019,6 @@ void codegen_t::emit_push_subr(context_t& ctx, scm_obj_t inst) {
   emit_push_subr(ctx, inst, (scm_subr_t)CAR(operands));
 }
 
-void codegen_t::emit_push_subr_gloc_of(context_t& ctx, scm_obj_t inst) {
-  DECLEAR_CONTEXT_VARS;
-  DECLEAR_COMMON_TYPES;
-  scm_obj_t operands = CDAR(inst);
-  auto vm = F->arg_begin();
-
-  emit_push_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
-}
-
 void codegen_t::emit_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr) {
   DECLEAR_CONTEXT_VARS;
   DECLEAR_COMMON_TYPES;
@@ -3082,15 +3058,6 @@ void codegen_t::emit_subr(context_t& ctx, scm_obj_t inst) {
   auto vm = F->arg_begin();
 
   emit_subr(ctx, inst, (scm_subr_t)CAR(operands));
-}
-
-void codegen_t::emit_subr_gloc_of(context_t& ctx, scm_obj_t inst) {
-  DECLEAR_CONTEXT_VARS;
-  DECLEAR_COMMON_TYPES;
-  scm_obj_t operands = CDAR(inst);
-  auto vm = F->arg_begin();
-
-  emit_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
 }
 
 void codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst, scm_subr_t subr) {
@@ -3133,15 +3100,6 @@ void codegen_t::emit_ret_subr(context_t& ctx, scm_obj_t inst) {
   auto vm = F->arg_begin();
 
   emit_ret_subr(ctx, inst, (scm_subr_t)CAR(operands));
-}
-
-void codegen_t::emit_ret_subr_gloc_of(context_t& ctx, scm_obj_t inst) {
-  DECLEAR_CONTEXT_VARS;
-  DECLEAR_COMMON_TYPES;
-  scm_obj_t operands = CDAR(inst);
-  auto vm = F->arg_begin();
-
-  emit_ret_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
 }
 
 void codegen_t::emit_cond_pairp(context_t& ctx, Value* obj, BasicBlock* pair_true, BasicBlock* pair_false) {
