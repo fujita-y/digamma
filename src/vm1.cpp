@@ -848,8 +848,8 @@ loop:
         for (intptr_t i = 0; i < argc; i++) dst[i] = m_fp[i];
       } else {
         for (intptr_t i = 0; i < argc; i++) {
-          dst[i] = m_fp[i];
           m_heap->write_barrier(m_fp[i]);
+          dst[i] = m_fp[i];
         }
       }
       m_sp = m_fp;
@@ -1360,57 +1360,6 @@ loop:
       }
       goto FALLBACK_GE_ILOC;
     }
-    /*
-    CASE(VMOP_PUSH_VECTREF_ILOC) {
-        obj = *lookup_iloc(CAR(OPERANDS));
-        if (VECTORP(obj)) {
-            scm_vector_t vect = (scm_vector_t)obj;
-            if (FIXNUMP(m_sp[-1])) {
-                uintptr_t n = FIXNUM(m_sp[-1]);
-                if (n < (uintptr_t)vect->count) {
-                    m_sp[-1] = vect->elts[n];
-                    m_pc = CDR(m_pc);
-                    goto loop;
-                }
-             }
-        }
-        goto ERROR_PUSH_VECTREF_ILOC;
-    }
-
-    CASE(VMOP_VECTREF_ILOC) {
-        obj = *lookup_iloc(CAR(OPERANDS));
-        if (VECTORP(obj)) {
-            scm_vector_t vect = (scm_vector_t)obj;
-            if (FIXNUMP(m_value)) {
-                uintptr_t n = FIXNUM(m_value);
-                if (n < (uintptr_t)vect->count) {
-                    m_value = vect->elts[n];
-                    m_pc = CDR(m_pc);
-                    goto loop;
-                }
-            }
-        }
-        goto ERROR_VECTREF_ILOC;
-    }
-    */
-    /*
-    CASE(VMOP_NATIVE) {
-        fatal("%s:%u VMOP_NATIVE deprecated", __FILE__, __LINE__);
-        m_trace = m_trace_tail = scm_unspecified;
-        operand_trace = scm_nil;
-        scm_bvector_t bv = (scm_bvector_t)OPERANDS;
-        intptr_t (*thunk)(intptr_t) = (intptr_t (*)(intptr_t))(*(intptr_t*)bv->elts);
-        if (thunk) {
-          static int c1;
-            printf(" # 1> %d\n", c1++);
-            intptr_t n = (*thunk)((intptr_t)this);
-            NATIVE_THUNK_POST_DISPATCH(n);
-        } else {
-            m_pc = CDR(m_pc);
-            goto loop;
-        }
-    }
-    */
 
     CASE(VMOP_TOUCH_GLOC) { goto THUNK_TOUCH_GLOC_OF; }
 

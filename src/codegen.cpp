@@ -298,8 +298,8 @@ extern "C" {
       for (intptr_t i = 0; i < argc; i++) dst[i] = vm->m_fp[i];
     } else {
       for (intptr_t i = 0; i < argc; i++) {
-        dst[i] = vm->m_fp[i];
         vm->m_heap->write_barrier(vm->m_fp[i]);
+        dst[i] = vm->m_fp[i];
       }
     }
     vm->m_sp = vm->m_fp;
