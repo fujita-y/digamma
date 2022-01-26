@@ -1361,7 +1361,7 @@ loop:
       goto FALLBACK_GE_ILOC;
     }
 
-    CASE(VMOP_TOUCH_GLOC) { goto THUNK_TOUCH_GLOC_OF; }
+    CASE(VMOP_TOUCH_GLOC) { goto THUNK_TOUCH_GLOC; }
 
     CASE(VMOP_SUBR_GLOC_OF) { goto THUNK_SUBR_GLOC_OF; }
 
@@ -1703,7 +1703,7 @@ FALLBACK_GE_ILOC : {
   goto RESUME_LOOP;
 }
 
-THUNK_TOUCH_GLOC_OF : {
+THUNK_TOUCH_GLOC : {
   assert(GLOCP(OPERANDS));
   if (((scm_gloc_t)OPERANDS)->value != scm_undef) {
     m_heap->write_barrier(CADR(m_pc));
