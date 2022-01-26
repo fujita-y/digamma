@@ -1020,6 +1020,8 @@ void codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check
       case VMOP_VM_ESCAPE: {
         emit_escape(ctx, inst);
       } break;
+      case VMOP_TOUCH_GLOC:
+        break;
       default:
         fatal("%s:%u encounter unsupported instruction %s", __FILE__, __LINE__, ((scm_symbol_t)CAAR(inst))->name);
         break;

@@ -1706,11 +1706,16 @@ FALLBACK_GE_ILOC : {
 THUNK_TOUCH_GLOC : {
   assert(GLOCP(OPERANDS));
   if (((scm_gloc_t)OPERANDS)->value != scm_undef) {
+#if ENABLE_LLVM_JIT
+    m_pc = CDR(m_pc);
+    goto loop;
+#else
     m_heap->write_barrier(CADR(m_pc));
     m_heap->write_barrier(CDDR(m_pc));
     CAR(m_pc) = CADR(m_pc);
     CDR(m_pc) = CDDR(m_pc);
     goto loop;
+#endif
   }
   goto ERROR_TOUCH_GLOC;
 }
