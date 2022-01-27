@@ -588,6 +588,17 @@ void codegen_t::optimizeModule(Module& M) {
 
 void codegen_t::compile(scm_closure_t closure) {
   if (m_compile_thread_terminating) return;
+  if (m_vm->contain_subr_forward_reference(closure->pc)) {
+#if VERBOSE_CODEGEN
+    if (SYMBOLP(closure->doc)) {
+      scm_symbol_t symbol = (scm_symbol_t)closure->doc;
+      printf("#<closure %s> contain subr forward reference, codegen skipped\n", symbol->name);
+    } else {
+      printf("#<closure 0x%lx> contain subr forward reference, codegen skipped\n", (intptr_t)closure);
+    }
+#endif
+    return;
+  }
   {
     scoped_lock lock(m_compile_queue_lock);
     if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) != m_compile_queue.end()) return;

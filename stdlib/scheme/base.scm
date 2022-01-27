@@ -430,15 +430,15 @@
       (lambda (obj)
         (i/o-filename-error? obj)))
 
-    (define floor/
-      (lambda (n m)
-        (values (floor-quotient n m) (floor-remainder n m))))
+    (define floor-remainder modulo)
 
     (define floor-quotient
       (lambda (n m)
         (floor (/ n m))))
 
-    (define floor-remainder modulo)
+    (define floor/
+      (lambda (n m)
+        (values (floor-quotient n m) (modulo n m))))
 
     (define get-output-bytevector
       (lambda (port)
@@ -547,13 +547,13 @@
         (let-optionals options ((start 0) (end (string-length str)))
           (apply vector (string->list (substring str start end))))))
 
-    (define truncate/
-      (lambda (n m)
-        (values (truncate-quotient n m) (truncate-remainder n m))))
-
     (define truncate-quotient quotient)
 
     (define truncate-remainder remainder)
+
+    (define truncate/
+      (lambda (n m)
+        (values (quotient n m) (remainder n m))))
 
     (define u8-ready?
       (lambda options
