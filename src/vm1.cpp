@@ -1361,13 +1361,101 @@ loop:
       goto FALLBACK_GE_ILOC;
     }
 
-    CASE(VMOP_TOUCH_GLOC) { goto THUNK_TOUCH_GLOC; }
+    CASE(VMOP_TOUCH_GLOC) {
+      assert(GLOCP(OPERANDS));
+      if (((scm_gloc_t)OPERANDS)->value != scm_undef) {
+#if ENABLE_LLVM_JIT
+        m_pc = CDR(m_pc);
+        goto loop;
+#else
+        m_heap->write_barrier(CADR(m_pc));
+        m_heap->write_barrier(CDDR(m_pc));
+        CAR(m_pc) = CADR(m_pc);
+        CDR(m_pc) = CDDR(m_pc);
+        goto loop;
+#endif
+      }
+      goto ERROR_TOUCH_GLOC;
+    }
 
-    CASE(VMOP_SUBR_GLOC_OF) { goto THUNK_SUBR_GLOC_OF; }
+    CASE(VMOP_SUBR_GLOC) {
+      assert(GLOCP(CAR(OPERANDS)));
+      scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+      if (SUBRP(subr)) {
+#if ENABLE_LLVM_JIT
+  #if PROFILE_SUBR
+        subr->c_load++;
+  #endif
+        assert(SUBRP(subr));
+        intptr_t argc = FIXNUM(CADR(OPERANDS));
+        m_value = (*subr->adrs)(this, argc, m_sp - argc);
+        m_sp = m_sp - argc;
+        assert(m_sp >= m_fp);
+        m_pc = CDR(m_pc);
+        goto loop;
+#else
+        m_heap->write_barrier(subr);
+        CAAR(m_pc) = opcode_to_instruction(VMOP_SUBR);
+        CAR(OPERANDS) = subr;
+        goto loop;
+#endif
+      }
+      system_error("system error: inconsistent instruction use (subr.gloc)");
+    }
 
-    CASE(VMOP_PUSH_SUBR_GLOC_OF) { goto THUNK_PUSH_SUBR_GLOC_OF; }
+    CASE(VMOP_PUSH_SUBR_GLOC) {
+      assert(GLOCP(CAR(OPERANDS)));
+      scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+      if (SUBRP(subr)) {
+#if ENABLE_LLVM_JIT
+  #if PROFILE_SUBR
+        subr->c_push++;
+  #endif
+        assert(SUBRP(subr));
+        intptr_t argc = FIXNUM(CADR(OPERANDS));
+        assert(argc > 0);
+        m_value = (*subr->adrs)(this, argc, m_sp - argc);
+        m_sp = m_sp - argc;
+        assert(m_sp >= m_fp);
+        if (m_value != scm_undef) {
+          m_sp[0] = m_value;
+          m_sp++;
+        }
+        m_pc = CDR(m_pc);
+        goto loop;
+#else
+        m_heap->write_barrier(subr);
+        CAAR(m_pc) = opcode_to_instruction(VMOP_PUSH_SUBR);
+        CAR(OPERANDS) = subr;
+        goto loop;
+#endif
+      }
+      system_error("system error: inconsistent instruction use (push.subr.gloc)");
+    }
 
-    CASE(VMOP_RET_SUBR_GLOC_OF) { goto THUNK_RET_SUBR_GLOC_OF; }
+    CASE(VMOP_RET_SUBR_GLOC) {
+      assert(GLOCP(CAR(OPERANDS)));
+      scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
+      if (SUBRP(subr)) {
+#if ENABLE_LLVM_JIT
+  #if PROFILE_SUBR
+        subr->c_apply++;
+  #endif
+        operand_trace = CDR(OPERANDS);
+        intptr_t argc = m_sp - m_fp;
+        m_value = (*subr->adrs)(this, argc, m_fp);
+        assert(m_value != scm_undef || ((m_value == scm_undef) && (CAR(m_pc) == scm_unspecified)));
+        if (m_value == scm_undef) goto BACK_TO_TRACE_N_LOOP;
+        goto pop_cont;
+#else
+        m_heap->write_barrier(subr);
+        CAAR(m_pc) = opcode_to_instruction(VMOP_RET_SUBR);
+        CAR(OPERANDS) = subr;
+        goto loop;
+#endif
+      }
+      system_error("system error: inconsistent instruction use (ret.subr.gloc)");
+    }
 
     CASE(VMOP_VM_ESCAPE) { return; }
 
@@ -1701,59 +1789,6 @@ FALLBACK_GE_ILOC : {
   scm_obj_t argv[2] = {m_value, obj};
   wrong_type_argument_violation(this, "comparison(< > <= >=)", bad, "number", argv[bad], 2, argv);
   goto RESUME_LOOP;
-}
-
-THUNK_TOUCH_GLOC : {
-  assert(GLOCP(OPERANDS));
-  if (((scm_gloc_t)OPERANDS)->value != scm_undef) {
-#if ENABLE_LLVM_JIT
-    m_pc = CDR(m_pc);
-    goto loop;
-#else
-    m_heap->write_barrier(CADR(m_pc));
-    m_heap->write_barrier(CDDR(m_pc));
-    CAR(m_pc) = CADR(m_pc);
-    CDR(m_pc) = CDDR(m_pc);
-    goto loop;
-#endif
-  }
-  goto ERROR_TOUCH_GLOC;
-}
-
-THUNK_SUBR_GLOC_OF : {
-  assert(GLOCP(CAR(OPERANDS)));
-  scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-  if (SUBRP(subr)) {
-    m_heap->write_barrier(subr);
-    CAAR(m_pc) = opcode_to_instruction(VMOP_SUBR);
-    CAR(OPERANDS) = subr;
-    goto loop;
-  }
-  system_error("system error: inconsistent code in auto compile cache");
-}
-
-THUNK_PUSH_SUBR_GLOC_OF : {
-  assert(GLOCP(CAR(OPERANDS)));
-  scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-  if (SUBRP(subr)) {
-    m_heap->write_barrier(subr);
-    CAAR(m_pc) = opcode_to_instruction(VMOP_PUSH_SUBR);
-    CAR(OPERANDS) = subr;
-    goto loop;
-  }
-  system_error("system error: inconsistent code in auto compile cache");
-}
-
-THUNK_RET_SUBR_GLOC_OF : {
-  assert(GLOCP(CAR(OPERANDS)));
-  scm_subr_t subr = (scm_subr_t)(((scm_gloc_t)CAR(OPERANDS))->value);
-  if (SUBRP(subr)) {
-    m_heap->write_barrier(subr);
-    CAAR(m_pc) = opcode_to_instruction(VMOP_RET_SUBR);
-    CAR(OPERANDS) = subr;
-    goto loop;
-  }
-  system_error("system error: inconsistent code in auto compile cache");
 }
 
 ERROR_NADD_ILOC:

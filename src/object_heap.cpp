@@ -1255,6 +1255,7 @@ void object_heap_t::init_inherents() {
   make_symbol_inherent(this, "touch.gloc.of", VMOP_TOUCH_GLOC_OF);
   make_symbol_inherent(this, "touch.gloc", VMOP_TOUCH_GLOC);
   make_symbol_inherent(this, "subr.gloc.of", VMOP_SUBR_GLOC_OF);
+  make_symbol_inherent(this, "subr.gloc", VMOP_SUBR_GLOC);
   make_symbol_inherent(this, "subr", VMOP_SUBR);
   make_symbol_inherent(this, "extend.unbound", VMOP_EXTEND_UNBOUND);
   make_symbol_inherent(this, "extend.enclose", VMOP_EXTEND_ENCLOSE);
@@ -1265,9 +1266,11 @@ void object_heap_t::init_inherents() {
   make_symbol_inherent(this, "iloc.0", VMOP_ILOC0);
   make_symbol_inherent(this, "iloc.1", VMOP_ILOC1);
   make_symbol_inherent(this, "ret.subr.gloc.of", VMOP_RET_SUBR_GLOC_OF);
+  make_symbol_inherent(this, "ret.subr.gloc", VMOP_RET_SUBR_GLOC);
   make_symbol_inherent(this, "ret.subr", VMOP_RET_SUBR);
   make_symbol_inherent(this, "push.subr", VMOP_PUSH_SUBR);
   make_symbol_inherent(this, "push.subr.gloc.of", VMOP_PUSH_SUBR_GLOC_OF);
+  make_symbol_inherent(this, "push.subr.gloc", VMOP_PUSH_SUBR_GLOC);
   make_symbol_inherent(this, "if.null?", VMOP_IF_NULLP);
   make_symbol_inherent(this, "if.null?.ret.const", VMOP_IF_NULLP_RET_CONST);
   make_symbol_inherent(this, "if.not.null?.ret.const", VMOP_IF_NOT_NULLP_RET_CONST);

@@ -588,17 +588,6 @@ void codegen_t::optimizeModule(Module& M) {
 
 void codegen_t::compile(scm_closure_t closure) {
   if (m_compile_thread_terminating) return;
-  if (m_vm->contain_subr_forward_reference(closure->pc)) {
-#if VERBOSE_CODEGEN
-    if (SYMBOLP(closure->doc)) {
-      scm_symbol_t symbol = (scm_symbol_t)closure->doc;
-      printf("#<closure %s> contain subr forward reference, codegen skipped\n", symbol->name);
-    } else {
-      printf("#<closure 0x%lx> contain subr forward reference, codegen skipped\n", (intptr_t)closure);
-    }
-#endif
-    return;
-  }
   {
     scoped_lock lock(m_compile_queue_lock);
     if (std::find(m_compile_queue.begin(), m_compile_queue.end(), closure) != m_compile_queue.end()) return;
@@ -707,6 +696,7 @@ int codegen_t::calc_stack_size(scm_obj_t inst) {
       } break;
       case VMOP_PUSH_GLOC:
       case VMOP_PUSH_SUBR:
+      case VMOP_PUSH_SUBR_GLOC:
       case VMOP_PUSH_CAR_ILOC:
       case VMOP_PUSH_CDR_ILOC:
       case VMOP_PUSH_ILOC0:
@@ -1034,6 +1024,19 @@ void codegen_t::transform(context_t ctx, scm_obj_t inst, bool insert_stack_check
       } break;
       case VMOP_GE_ILOC: {
         emit_ge_iloc(ctx, inst);
+      } break;
+      case VMOP_SUBR_GLOC: {
+        emit_subr_gloc(ctx, inst);
+        intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+        ctx.m_argc = ctx.m_argc - argc;
+      } break;
+      case VMOP_PUSH_SUBR_GLOC: {
+        emit_push_subr_gloc(ctx, inst);
+        intptr_t argc = FIXNUM(CADR(CDAR(inst)));
+        ctx.m_argc = ctx.m_argc - argc + 1;
+      } break;
+      case VMOP_RET_SUBR_GLOC: {
+        emit_ret_subr_gloc(ctx, inst);
       } break;
       case VMOP_VM_ESCAPE: {
         emit_escape(ctx, inst);
@@ -3118,4 +3121,31 @@ void codegen_t::emit_cond_symbolp(context_t& ctx, Value* obj, BasicBlock* symbol
   auto hdr = IRB.CreateLoad(IntptrTy, IRB.CreateBitOrPointerCast(obj, IntptrPtrTy));
   auto cond2 = IRB.CreateICmpEQ(IRB.CreateAnd(hdr, VALUE_INTPTR(HDR_TYPE_MASKBITS)), VALUE_INTPTR(scm_hdr_symbol));
   IRB.CreateCondBr(cond2, symbol_true, symbol_false, ctx.likely_true);
+}
+
+void codegen_t::emit_subr_gloc(context_t& ctx, scm_obj_t inst) {
+  DECLEAR_CONTEXT_VARS;
+  DECLEAR_COMMON_TYPES;
+  scm_obj_t operands = CDAR(inst);
+  auto vm = F->arg_begin();
+
+  emit_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}
+
+void codegen_t::emit_push_subr_gloc(context_t& ctx, scm_obj_t inst) {
+  DECLEAR_CONTEXT_VARS;
+  DECLEAR_COMMON_TYPES;
+  scm_obj_t operands = CDAR(inst);
+  auto vm = F->arg_begin();
+
+  emit_push_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
+}
+
+void codegen_t::emit_ret_subr_gloc(context_t& ctx, scm_obj_t inst) {
+  DECLEAR_CONTEXT_VARS;
+  DECLEAR_COMMON_TYPES;
+  scm_obj_t operands = CDAR(inst);
+  auto vm = F->arg_begin();
+
+  emit_ret_subr(ctx, inst, (scm_subr_t)(((scm_gloc_t)CAR(operands))->value));
 }

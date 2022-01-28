@@ -190,6 +190,7 @@ void VM::prebind_list(scm_obj_t code) {
           m_heap->write_barrier(gloc->value);
           CAR(operands) = gloc->value;
         } else {
+          CAAR(code) = m_heap->inherent_symbol(VMOP_PUSH_SUBR_GLOC);
           scm_subr_t subr = make_subr(m_heap, subr_inconsistent_definition, scm_unspecified);
           m_heap->write_barrier(subr);
           gloc->value = subr;
@@ -214,6 +215,7 @@ void VM::prebind_list(scm_obj_t code) {
           m_heap->write_barrier(gloc->value);
           CAR(operands) = gloc->value;
         } else {
+          CAAR(code) = m_heap->inherent_symbol(VMOP_SUBR_GLOC);
           scm_subr_t subr = make_subr(m_heap, subr_inconsistent_definition, scm_unspecified);
           m_heap->write_barrier(subr);
           gloc->value = subr;
@@ -238,6 +240,7 @@ void VM::prebind_list(scm_obj_t code) {
           m_heap->write_barrier(gloc->value);
           CAR(operands) = gloc->value;
         } else {
+          CAAR(code) = m_heap->inherent_symbol(VMOP_RET_SUBR_GLOC);
           scm_subr_t subr = make_subr(m_heap, subr_inconsistent_definition, scm_unspecified);
           m_heap->write_barrier(subr);
           gloc->value = subr;
@@ -307,51 +310,3 @@ void VM::prebind_list(scm_obj_t code) {
 }
 
 void VM::prebind(scm_obj_t code) { prebind_list(code); }
-
-bool VM::contain_subr_forward_reference(scm_obj_t code) {
-  while (PAIRP(code)) {
-    scm_symbol_t symbol = (scm_symbol_t)CAAR(code);
-    assert(INHERENTSYMBOLP(symbol));
-    int opcode = HDR_SYMBOL_CODE(symbol->hdr);
-    assert(opcode < VMOP_MNEMNIC_COUNT);
-    scm_obj_t operands = (scm_obj_t)CDAR(code);
-    switch (opcode) {
-      case VMOP_GLOC_OF:
-      case VMOP_RET_GLOC_OF:
-      case VMOP_PUSH_GLOC_OF:
-      case VMOP_SET_GLOC_OF:
-      case VMOP_APPLY_GLOC_OF:
-      case VMOP_TOUCH_GLOC_OF:
-      case VMOP_PUSH_SUBR_GLOC_OF:
-      case VMOP_SUBR_GLOC_OF:
-      case VMOP_RET_SUBR_GLOC_OF: {
-        return true;
-      } break;
-      case VMOP_PUSH_CLOSE_LOCAL:
-      case VMOP_EXTEND_ENCLOSE_LOCAL: {
-        //      if (SYMBOLP(CAAR(operands))) break;
-        if (contain_subr_forward_reference(CDR(operands))) return true;
-      } break;
-      case VMOP_CLOSE:
-      case VMOP_RET_CLOSE:
-      case VMOP_PUSH_CLOSE:
-      case VMOP_EXTEND_ENCLOSE: {
-        if (CLOSUREP(operands)) break;
-        if (contain_subr_forward_reference(CDR(operands))) return true;
-      } break;
-      case VMOP_IF_TRUE:
-      case VMOP_IF_FALSE_CALL:
-      case VMOP_IF_NULLP:
-      case VMOP_IF_PAIRP:
-      case VMOP_IF_SYMBOLP:
-      case VMOP_IF_EQP:
-      case VMOP_CALL: {
-        if (contain_subr_forward_reference(operands)) return true;
-        break;
-      }
-    }
-    CAAR(code) = symbol_to_instruction(CAAR(code));
-    code = CDR(code);
-  }
-  return false;
-}

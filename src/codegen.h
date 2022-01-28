@@ -244,6 +244,9 @@ class codegen_t {
   void emit_nadd_iloc(context_t& ctx, scm_obj_t inst);
   void emit_apply(context_t& ctx, scm_obj_t inst);
   void emit_escape(context_t& ctx, scm_obj_t inst);
+  void emit_push_subr_gloc(context_t& ctx, scm_obj_t inst);
+  void emit_subr_gloc(context_t& ctx, scm_obj_t inst);
+  void emit_ret_subr_gloc(context_t& ctx, scm_obj_t inst);
 };
 
 #endif
