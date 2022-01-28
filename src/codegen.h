@@ -109,7 +109,6 @@ class codegen_t {
     EQ,
   };
 
-  VM* m_vm;
   std::unique_ptr<llvm::orc::LLJIT> m_jit;
   std::map<scm_closure_t, llvm::Function*> m_lifted_functions;
   mutex_t m_compile_thread_lock;
@@ -122,7 +121,7 @@ class codegen_t {
   llvm::Value* get_function_address(context_t& ctx, scm_closure_t closure);
 
  public:
-  codegen_t(VM* vm);
+  codegen_t();
   void init();
   void destroy();
   void compile(scm_closure_t closure);

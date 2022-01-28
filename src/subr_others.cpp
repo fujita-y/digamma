@@ -738,7 +738,7 @@ scm_obj_t subr_collect(VM* vm, int argc, scm_obj_t argv[]) {
       vm->m_heap->resolve(info);
       vm->m_heap->compact_pool();
 #if ENABLE_LLVM_JIT
-      vm->m_codegen = new codegen_t(vm);
+      vm->m_codegen = new codegen_t();
       vm->m_codegen->init();
 #endif
       return scm_unspecified;

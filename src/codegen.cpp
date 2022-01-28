@@ -497,7 +497,7 @@ llvm::MDNode* codegen_t::context_t::get_branch_weight(int n, int m) {
   return MDB.createBranchWeights(n, m);
 }
 
-codegen_t::codegen_t(VM* vm) : m_vm(vm), m_debug(false) {}
+codegen_t::codegen_t() : m_debug(false) {}
 
 void codegen_t::init() {
   m_compile_thread_terminating = false;

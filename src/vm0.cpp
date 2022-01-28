@@ -79,7 +79,7 @@ bool VM::init(object_heap_t* heap) {
     m_flags.record_print_nesting_limit = MAKEFIXNUM(2);
     m_flags.warning_level = scm_false;
 #if ENABLE_LLVM_JIT
-    m_codegen = new codegen_t(this);
+    m_codegen = new codegen_t();
     m_codegen->init();
 #endif
     return true;
