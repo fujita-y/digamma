@@ -660,7 +660,7 @@ void codegen_t::compile_each(scm_closure_t closure) {
   auto symbol = ExitOnErr(m_jit->lookup(function_id));
   intptr_t (*thunk)(intptr_t) = (intptr_t(*)(intptr_t))symbol.getAddress();
 
-  if (m_usage.min_sym > (uintptr_t)thunk) m_usage.min_sym = (uintptr_t)thunk;
+  if (m_usage.min_sym == 0 || m_usage.min_sym > (uintptr_t)thunk) m_usage.min_sym = (uintptr_t)thunk;
   if (m_usage.max_sym < (uintptr_t)thunk) m_usage.max_sym = (uintptr_t)thunk;
 
   closure->code = (void*)thunk;
@@ -1058,8 +1058,9 @@ void codegen_t::display_codegen_statistics(scm_port_t port) {
   port_format(port, "top-level reference      : %d\n", m_usage.refs);
   port_format(port, "closure template         : %d\n", m_usage.templates);
   port_format(port, "local loop               : %d\n", m_usage.locals);
-  port_format(port, "on demand                : %d\n", m_usage.on_demand);
-  port_format(port, "native code location     : %x - %x\n\n", m_usage.min_sym, m_usage.max_sym);
+  port_format(port, "explicit                 : %d\n", m_usage.on_demand);
+  port_format(port, "skipped                  : %d\n", m_usage.skipped);
+  port_format(port, "native code location     : %lx - %lx\n\n", m_usage.min_sym, m_usage.max_sym);
   port_flush_output(port);
 }
 

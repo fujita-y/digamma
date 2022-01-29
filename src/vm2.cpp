@@ -9,6 +9,42 @@
 
 #define CONS(a, d) make_pair(m_heap, (a), (d))
 
+bool VM::self_modifying(scm_gloc_t gloc, scm_obj_t code) {
+  while (PAIRP(code)) {
+    scm_symbol_t symbol = (scm_symbol_t)CAAR(code);
+    assert(INHERENTSYMBOLP(symbol));
+    int opcode = HDR_SYMBOL_CODE(symbol->hdr);
+    assert(opcode < VMOP_MNEMNIC_COUNT);
+    scm_obj_t operands = (scm_obj_t)CDAR(code);
+    switch (opcode) {
+      case VMOP_SET_GLOC: {
+        if (gloc == (scm_gloc_t)CAR(operands)) return true;
+      } break;
+      case VMOP_PUSH_CLOSE_LOCAL:
+      case VMOP_EXTEND_ENCLOSE_LOCAL: {
+        case VMOP_CLOSE:
+        case VMOP_RET_CLOSE:
+        case VMOP_PUSH_CLOSE:
+        case VMOP_EXTEND_ENCLOSE:
+          if (self_modifying(gloc, CDR(operands))) return true;
+      } break;
+      case VMOP_IF_TRUE:
+      case VMOP_IF_FALSE_CALL:
+      case VMOP_IF_NULLP:
+      case VMOP_IF_PAIRP:
+      case VMOP_IF_SYMBOLP:
+      case VMOP_IF_EQP:
+      case VMOP_CALL: {
+        if (self_modifying(gloc, operands)) return true;
+        break;
+      }
+    }
+    CAAR(code) = symbol_to_instruction(CAAR(code));
+    code = CDR(code);
+  }
+  return false;
+}
+
 #if USE_CONST_LITERAL
 scm_obj_t VM::prebind_literal(scm_obj_t datum) {
   if (PAIRP(datum)) {

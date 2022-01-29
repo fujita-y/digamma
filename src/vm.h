@@ -94,6 +94,8 @@ class VM {
   scm_gloc_t prebind_gloc(scm_obj_t variable);
   void prebind_list(scm_obj_t code);
 
+  bool self_modifying(scm_gloc_t gloc, scm_obj_t code);
+
   void backtrace_each(printer_t* prt, int n, scm_obj_t note);
   scm_obj_t backtrace_fetch(const char* name, int line, int column);
   void backtrace_seek_make_cont(scm_obj_t note);
