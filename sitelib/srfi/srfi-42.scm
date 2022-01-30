@@ -1,6 +1,4 @@
 #!nobacktrace
-;;; porting srfi-42 reference implementation
-
 (library (srfi srfi-42)
   (export do-ec list-ec append-ec string-ec string-append-ec vector-ec vector-of-length-ec
           sum-ec product-ec min-ec max-ec any?-ec every?-ec first-ec last-ec fold-ec fold3-ec
@@ -8,62 +6,64 @@
           :let :parallel :while :until :)
   (import (core))
 
-; <PLAINTEXT>
-; Eager Comprehensions in [outer..inner|expr]-Convention
-; ======================================================
-;
-; sebastian.egner@philips.com, Eindhoven, The Netherlands, 25-Apr-2005
-; Scheme R5RS (incl. macros), SRFI-23 (error).
-;
-; Loading the implementation into Scheme48 0.57:
-;   ,open srfi-23
-;   ,load ec.scm
-;
-; Loading the implementation into PLT/DrScheme 202:
-;   ; File > Open ... "ec.scm", click Execute
-;
-; Loading the implementation into SCM 5d7:
-;   (require 'macro) (require 'record)
-;   (load "ec.scm")
-;
-; Implementation comments:
-;   * All local (not exported) identifiers are named ec-<something>.
-;   * This implementation focuses on portability, performance,
-;     readability, and simplicity roughly in this order. Design
-;     decisions related to performance are taken for Scheme48.
-;   * Alternative implementations, Comments and Warnings are
-;     mentioned after the definition with a heading.
+  ;;; based on srfi-42 reference implementation
+
+  ; <PLAINTEXT>
+  ; Eager Comprehensions in [outer..inner|expr]-Convention
+  ; ======================================================
+  ;
+  ; sebastian.egner@philips.com, Eindhoven, The Netherlands, 25-Apr-2005
+  ; Scheme R5RS (incl. macros), SRFI-23 (error).
+  ;
+  ; Loading the implementation into Scheme48 0.57:
+  ;   ,open srfi-23
+  ;   ,load ec.scm
+  ;
+  ; Loading the implementation into PLT/DrScheme 202:
+  ;   ; File > Open ... "ec.scm", click Execute
+  ;
+  ; Loading the implementation into SCM 5d7:
+  ;   (require 'macro) (require 'record)
+  ;   (load "ec.scm")
+  ;
+  ; Implementation comments:
+  ;   * All local (not exported) identifiers are named ec-<something>.
+  ;   * This implementation focuses on portability, performance,
+  ;     readability, and simplicity roughly in this order. Design
+  ;     decisions related to performance are taken for Scheme48.
+  ;   * Alternative implementations, Comments and Warnings are
+  ;     mentioned after the definition with a heading.
 
 
-; ==========================================================================
-; The fundamental comprehension do-ec
-; ==========================================================================
-;
-; All eager comprehensions are reduced into do-ec and
-; all generators are reduced to :do.
-;
-; We use the following short names for syntactic variables
-;   q    - qualifier
-;   cc   - current continuation, thing to call at the end;
-;          the CPS is (m (cc ...) arg ...) -> (cc ... expr ...)
-;   cmd  - an expression being evaluated for its side-effects
-;   expr - an expression
-;   gen  - a generator of an eager comprehension
-;   ob   - outer binding
-;   oc   - outer command
-;   lb   - loop binding
-;   ne1? - not-end1? (before the payload)
-;   ib   - inner binding
-;   ic   - inner command
-;   ne2? - not-end2? (after the payload)
-;   ls   - loop step
-;   etc  - more arguments of mixed type
+  ; ==========================================================================
+  ; The fundamental comprehension do-ec
+  ; ==========================================================================
+  ;
+  ; All eager comprehensions are reduced into do-ec and
+  ; all generators are reduced to :do.
+  ;
+  ; We use the following short names for syntactic variables
+  ;   q    - qualifier
+  ;   cc   - current continuation, thing to call at the end;
+  ;          the CPS is (m (cc ...) arg ...) -> (cc ... expr ...)
+  ;   cmd  - an expression being evaluated for its side-effects
+  ;   expr - an expression
+  ;   gen  - a generator of an eager comprehension
+  ;   ob   - outer binding
+  ;   oc   - outer command
+  ;   lb   - loop binding
+  ;   ne1? - not-end1? (before the payload)
+  ;   ib   - inner binding
+  ;   ic   - inner command
+  ;   ne2? - not-end2? (after the payload)
+  ;   ls   - loop step
+  ;   etc  - more arguments of mixed type
 
 
-; (do-ec q ... cmd)
-;   handles nested, if/not/and/or, begin, :let, and calls generator
-;   macros in CPS to transform them into fully decorated :do.
-;   The code generation for a :do is delegated to do-ec:do.
+  ; (do-ec q ... cmd)
+  ;   handles nested, if/not/and/or, begin, :let, and calls generator
+  ;   macros in CPS to transform them into fully decorated :do.
+  ;   The code generation for a :do is delegated to do-ec:do.
 
   (define-syntax do-ec
     (syntax-rules (nested if not and or begin :do let)

@@ -1,6 +1,4 @@
 #!nobacktrace
-;;; porting srfi-14 reference implementation
-
 (library (srfi srfi-14)
   (export
    ;; predicates & comparison
@@ -35,6 +33,8 @@
    char-set:hex-digit char-set:blank char-set:ascii
    char-set:empty char-set:full)
   (import (core))
+
+  ;;; based on srfi-14 reference implementation
 
   (define %latin1->char integer->char)
 

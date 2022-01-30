@@ -1,6 +1,4 @@
 #!nobacktrace
-;;; porting srfi-19 reference implementation
-
 (library (srfi srfi-19)
   (export time-duration
           time-monotonic
@@ -81,6 +79,8 @@
           date->string
           string->date)
   (import (core) (srfi srfi-6))
+
+  ;;; based on srfi-19 reference implementation
 
   (define-record-type time
     (fields

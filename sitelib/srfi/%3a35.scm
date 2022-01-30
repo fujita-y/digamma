@@ -1,5 +1,5 @@
 #!nobacktrace
-(library (srfi :35 conditions)
+(library (srfi :35)
   (export make-condition-type
           condition-type?
           make-condition

@@ -1,9 +1,4 @@
 #!nobacktrace
-;;; porting srfi-13 reference implementation
-;;; list of identifiers conflict with r6rs ->
-;;;   string-copy string-for-each string-hash string-upcase string-downcase
-;;;   string-titlecase string-fill! string->list
-
 (library (srfi srfi-13)
   (export
    ;; predicates
@@ -75,6 +70,8 @@
    substring-spec-ok?
    make-kmp-restart-vector kmp-step string-kmp-partial-search)
   (import (core) (srfi srfi-8) (srfi srfi-14))
+
+  ;;; based on srfi-13 reference implementation
 
   (define-syntax check-arg
     (syntax-rules ()
