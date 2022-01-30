@@ -22,7 +22,7 @@
 
 (define generate-library-id
   (lambda (name)
-    (library-name->id #f name)))
+    (string->symbol (id-list->string name (format "~a" (current-library-infix))))))
 
 (define library-name->id
   (lambda (form name)
