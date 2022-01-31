@@ -185,7 +185,7 @@
 (define encode-library-ref
   (lambda (library-name)
     (map (lambda (s)
-           (let ((utf8 (string->utf8 (symbol->string s))))
+           (let ((utf8 (string->utf8 (if (symbol? s) (symbol->string s) (number->string s)))))
              (let ((buf (make-string-output-port)) (end (bytevector-length utf8)))
                (let loop ((i 0))
                  (if (= i end)
@@ -205,7 +205,7 @@
 (define locate-include-file
   (lambda (library-name path who)
     (if library-name
-        (let ((subdir (destructuring-match library-name ((_) "") ((base ... _) (symbol-list->string base "/")))))
+        (let ((subdir (destructuring-match library-name ((_) "") ((base ... _) (id-list->string base "/")))))
           (or (any1
                 (lambda (base)
                   (let ((maybe-include-path (format "~a/~a/~a" base subdir path)))
@@ -216,7 +216,7 @@
 
 (define locate-library-file
   (lambda (library-name)
-    (let ((path (symbol-list->string (encode-library-ref library-name) "/")))
+    (let ((path (id-list->string (encode-library-ref library-name) "/")))
       (any1
         (lambda (base)
           (any1
@@ -285,7 +285,7 @@
             cyclic-code)))
       (define locate-file
         (lambda (ref)
-          (let ((path (symbol-list->string ref "/")))
+          (let ((path (id-list->string ref "/")))
             (any1
               (lambda (base)
                 (any1
@@ -310,7 +310,7 @@
         (lambda (ref source-path)
           (and (auto-compile-cache)
                (let ((cache-path
-                       (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string (encode-library-ref ref) "."))))
+                       (format "~a/~a.cache" (auto-compile-cache) (id-list->string (encode-library-ref ref) "."))))
                  (and (file-exists? cache-path)
                       (let ((timestamp-path (string-append cache-path ".time")))
                         (and (file-exists? timestamp-path)
@@ -344,7 +344,7 @@
                      (if cache-path
                          (load-cache cache-path)
                          (let ((ref (encode-library-ref ref)) (library-id (generate-library-id ref)))
-                           (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (symbol-list->string ref "."))))
+                           (let ((cache-path (format "~a/~a.cache" (auto-compile-cache) (id-list->string ref "."))))
                              (and (auto-compile-verbose) (format #t "~&;; compile ~s~%~!" source-path))
                              (if (make-cache source-path cache-path ref (file-stat-mtime source-path))
                                  (and (auto-compile-verbose) (format #t "~&;; delete ~s~%~!" cache-path))

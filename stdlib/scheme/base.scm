@@ -663,16 +663,29 @@
 
     (define-syntax define-record-type
       (lambda (x)
-        (define parse
-          (lambda (stx)
-            (syntax-case stx ()
-              ((e1 e2) #'(immutable e1 e2))
-              ((e1 e2 e3) #'(mutable e1 e2 e3)))))
+        (define parse-spec
+          (lambda (spec)
+            (syntax-case spec ()
+              ((x y) (syntax (immutable x y)))
+              ((x y z) (syntax (mutable x y z))))))
         (syntax-case x ()
-          ((_ type (ctor _ ...)
-              pred
-              spec ...)
-           (with-syntax (((spec ...) (map parse #'(spec ...))))
-             #'(r6rs:define-record-type (type ctor pred)
-                                        (fields spec ...)))))))
-    ))
+          ((_ type (ctor constructor-tag ...) pred spec ...)
+           (with-syntax ((((field-tag _ ...) ...)
+                          (syntax (spec ...)))
+                         ((r6rs:field-spec ...)
+                          (map parse-spec (syntax (spec ...)))))
+             (let ((ctags (syntax (constructor-tag ...))))
+               (with-syntax (((constructor-arg ...)
+                              (map (lambda (ftag)
+                                     (if (find (lambda (e) (bound-identifier=? e ftag)) ctags)
+                                         ftag
+                                         (syntax (unspecified))))
+                                   (syntax (field-tag ...)))))
+                 (syntax
+                   (r6rs:define-record-type
+                     (type ctor pred)
+                     (protocol
+                       (lambda (ctor)
+                         (lambda (constructor-tag ...)
+                           (ctor constructor-arg ...))))
+                     (fields r6rs:field-spec ...))))))))))))

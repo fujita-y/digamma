@@ -68,7 +68,7 @@
           (n-more-lines (and (pretty-print-maximum-lines) (- (pretty-print-maximum-lines) 1))))
       (define indent-type1?
         (lambda (id)
-          (memq id '(library define define-syntax define-macro define-inline define-constant
+          (memq id '(library define-library define define-syntax define-macro define-inline define-constant
                      syntax-rules syntax-case
                      with-syntax lambda let-syntax letrec-syntax
                      let letrec let* letrec letrec* let-values let*-values

@@ -5,7 +5,9 @@
 (define scheme-library-exports (make-parameter (make-core-hashtable)))
 (define scheme-library-versions (make-parameter (make-core-hashtable)))
 
-(define symbol-list->string
+(define exact-nonnegative-integer? (lambda (obj) (and (integer? obj) (exact? obj) (>= obj 0))))
+
+(define id-list->string
   (lambda (ref infix)
     (apply
       string-append
@@ -13,14 +15,14 @@
         (let loop ((lst ref))
           (cond ((null? lst) '())
                 ((symbol? (car lst))
-                 (cons infix
-                       (cons (symbol->string (car lst))
-                             (loop (cdr lst)))))
+                 (cons infix (cons (symbol->string (car lst)) (loop (cdr lst)))))
+                ((number? (car lst))
+                 (cons infix (cons (number->string (car lst)) (loop (cdr lst)))))
                 (else (loop (cdr lst)))))))))
 
 (define generate-library-id
   (lambda (name)
-    (library-name->id #f name)))
+    (string->symbol (id-list->string name (format "~a" (current-library-infix))))))
 
 (define library-name->id
   (lambda (form name)
@@ -30,12 +32,15 @@
             (syntax-violation 'library "malformed library name" (abbreviated-take-form form 4 8) name)
             (syntax-violation 'library "malformed library name" name))))
     (if (and (list? name) (not (null? name)))
-        (if (every1 symbol? name)
-            (string->symbol (symbol-list->string name (format "~a" (current-library-infix))))
-            (let ((body (list-head name (- (length name) 1))))
-              (if (every1 symbol? body)
-                  (string->symbol (symbol-list->string body (format "~a" (current-library-infix))))
-                  (malformed-name))))
+        (cond ((every1 symbol? name) (string->symbol (id-list->string name (format "~a" (current-library-infix)))))
+              ((and (>= (lexical-syntax-version) 7)
+                    (every1 (lambda (e) (or (symbol? e) (exact-nonnegative-integer? e))) name))
+               (string->symbol (id-list->string name (format "~a" (current-library-infix)))))
+              (else
+                (let ((body (list-head name (- (length name) 1))))
+                  (if (every1 symbol? body)
+                      (string->symbol (id-list->string body (format "~a" (current-library-infix))))
+                      (malformed-name)))))
         (malformed-name))))
 
 (define library-name->version
@@ -45,9 +50,9 @@
         (if (pair? form)
             (syntax-violation 'library "malformed library version" (abbreviated-take-form form 4 8) name)
             (syntax-violation 'library "malformed library version" name))))
-    (define exact-nonnegative-integer? (lambda (obj) (and (integer? obj) (exact? obj) (>= obj 0))))
     (if (and (list? name) (not (null? name)))
         (cond ((every1 symbol? name) #f)
+              ((and (>= (lexical-syntax-version) 7) (every1 (lambda (e) (or (symbol? e) (exact-nonnegative-integer? e))) name)) #f)
               (else
                 (let ((tail (car (list-tail name (- (length name) 1)))))
                   (cond ((null? tail) #f)
@@ -63,6 +68,7 @@
             (syntax-violation 'library "malformed library name" (abbreviated-take-form form 4 8) lst)
             (syntax-violation 'library "malformed library name" lst))))
     (cond ((every1 symbol? lst) lst)
+          ((and (>= (lexical-syntax-version) 7) (every1 (lambda (e) (or (symbol? e) (exact-nonnegative-integer? e))) lst)) lst)
           (else
             (let ((body (list-head lst (- (length lst) 1))))
               (cond ((every1 symbol? body) body) (else (malformed-name))))))))
@@ -85,9 +91,8 @@
             (syntax-violation 'import "malformed library version" lst))))
     (if (and (list? lst) (not (null? lst)))
         (cond ((every1 symbol? lst) #f)
-              (else
-                (let ((tail (car (list-tail lst (- (length lst) 1)))))
-                  (cond ((list? tail) tail) (else (malformed-version))))))
+              ((and (>= (lexical-syntax-version) 7) (every1 (lambda (e) (or (symbol? e) (exact-nonnegative-integer? e))) lst)) #f)
+              (else (let ((tail (car (list-tail lst (- (length lst) 1))))) (cond ((list? tail) tail) (else (malformed-version))))))
         (malformed-version))))
 
 (define test-library-versions
@@ -298,69 +303,59 @@
           (cond ((null? lst) (append bounds unbounds))
                 ((unbound? (cdar lst)) (loop (cdr lst) bounds (cons (car lst) unbounds)))
                 (else (loop (cdr lst) (cons (car lst) bounds) unbounds))))))
-    (destructuring-match form
-      ((_ library-name ('export export-spec ...) ('import import-spec ...) body ...)
-       (let ((library-id (library-name->id form library-name))
-             (library-version (library-name->version form library-name)))
-         (and library-version (core-hashtable-set! (scheme-library-versions) library-id library-version))
-         (parameterize ((current-include-files (make-core-hashtable)))
-           (let ((coreform
-                   (let ((exports (parse-exports form export-spec))
-                         (imports (parse-imports form import-spec))
-                         (depends (parse-depends form import-spec))
-                         (ht-immutables (make-core-hashtable))
-                         (ht-imports (make-core-hashtable))
-                         (ht-publics (make-core-hashtable)))
-                     (for-each
-                       (lambda (a)
-                         (and (core-hashtable-ref ht-publics (cdr a) #f)
-                              (syntax-violation
-                                'library
-                                "duplicate export identifiers"
-                                (abbreviated-take-form form 4 8)
-                                (cdr a)))
-                         (core-hashtable-set! ht-publics (cdr a) #t)
-                         (core-hashtable-set! ht-immutables (car a) #t))
-                       exports)
-                     (for-each
-                       (lambda (a)
-                         (core-hashtable-set! ht-immutables (car a) #t)
-                         (cond ((core-hashtable-ref ht-imports (car a) #f)
-                                =>
-                                (lambda (deno)
-                                  (or (eq? deno (cdr a))
-                                      (syntax-violation
-                                        'library
-                                        "duplicate import identifiers"
-                                        (abbreviated-take-form form 4 8)
-                                        (car a)))))
-                               (else (core-hashtable-set! ht-imports (car a) (cdr a)))))
-                       imports)
-                     (let ((ht-env (make-shield-id-table body)) (ht-libenv (make-core-hashtable)))
+    (parameterize ((lexical-syntax-version 6))
+      (destructuring-match form
+        ((_ library-name ('export export-spec ...) ('import import-spec ...) body ...)
+         (let ((library-id (library-name->id form library-name)) (library-version (library-name->version form library-name)))
+           (and library-version (core-hashtable-set! (scheme-library-versions) library-id library-version))
+           (parameterize ((current-include-files (make-core-hashtable)))
+             (let ((coreform
+                     (let ((exports (parse-exports form export-spec))
+                           (imports (parse-imports form import-spec))
+                           (depends (parse-depends form import-spec))
+                           (ht-immutables (make-core-hashtable))
+                           (ht-imports (make-core-hashtable))
+                           (ht-publics (make-core-hashtable)))
                        (for-each
                          (lambda (a)
-                           (core-hashtable-set! ht-env (car a) (cdr a))
-                           (core-hashtable-set! ht-libenv (car a) (cdr a)))
-                         (core-hashtable->alist ht-imports))
-                       (parameterize ((current-immutable-identifiers ht-immutables))
-                         (expand-library-body
-                           form
-                           library-id
-                           library-version
-                           body
-                           exports
-                           imports
-                           depends
-                           (extend-env private-primitives-environment (permute-env ht-env))
-                           (permute-env ht-libenv)))))))
-             (or (= (core-hashtable-size (current-include-files)) 0)
-                 (core-hashtable-set! library-include-dependencies library-id (current-include-files)))
-             coreform))))
-      (_
-        (syntax-violation
-          'library
-          "expected library name, export spec, and import spec"
-          (abbreviated-take-form form 4 8))))))
+                           (and (core-hashtable-ref ht-publics (cdr a) #f)
+                                (syntax-violation 'library "duplicate export identifiers" (abbreviated-take-form form 4 8) (cdr a)))
+                           (core-hashtable-set! ht-publics (cdr a) #t)
+                           (core-hashtable-set! ht-immutables (car a) #t))
+                         exports)
+                       (for-each
+                         (lambda (a)
+                           (core-hashtable-set! ht-immutables (car a) #t)
+                           (cond ((core-hashtable-ref ht-imports (car a) #f)
+                                  =>
+                                  (lambda (deno)
+                                    (or (eq? deno (cdr a))
+                                        (syntax-violation
+                                          'library
+                                          "duplicate import identifiers"
+                                          (abbreviated-take-form form 4 8)
+                                          (car a)))))
+                                 (else (core-hashtable-set! ht-imports (car a) (cdr a)))))
+                         imports)
+                       (let ((ht-env (make-shield-id-table body)) (ht-libenv (make-core-hashtable)))
+                         (for-each
+                           (lambda (a) (core-hashtable-set! ht-env (car a) (cdr a)) (core-hashtable-set! ht-libenv (car a) (cdr a)))
+                           (core-hashtable->alist ht-imports))
+                         (parameterize ((current-immutable-identifiers ht-immutables))
+                           (expand-library-body
+                             form
+                             library-id
+                             library-version
+                             body
+                             exports
+                             imports
+                             depends
+                             (extend-env private-primitives-environment (permute-env ht-env))
+                             (permute-env ht-libenv)))))))
+               (or (= (core-hashtable-size (current-include-files)) 0)
+                   (core-hashtable-set! library-include-dependencies library-id (current-include-files)))
+               coreform))))
+        (_ (syntax-violation 'library "expected library name, export spec, and import spec" (abbreviated-take-form form 4 8)))))))
 
 (define expand-library-body
   (lambda (form library-id library-version body exports imports depends env libenv)
