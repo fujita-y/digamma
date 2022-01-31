@@ -1,4 +1,4 @@
-# Digamma
+# Digamma (will be merged to Ypsilon soon)
 
 Derived from Ypsilon (fujita-y/ypsilon) for experimental research
 
@@ -6,7 +6,7 @@ Derived from Ypsilon (fujita-y/ypsilon) for experimental research
 * Separate compilation thread to incrementally generate native code in background
 * On the fly FFI with native stub code generation
 
-Digamma is an experimental work and may change its design significantly. Research results will be applied to Ypsilon (fujita-y/ypsilon) in the future.
+Digamma is an experimental work and may change its design significantly.
 
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
 
