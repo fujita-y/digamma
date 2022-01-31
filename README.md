@@ -1,12 +1,12 @@
 # Digamma
 
-R7RS/R6RS Scheme Implementation
+R7RS/R6RS Scheme Implementation derived from Ypsilon (fujita-y/ypsilon) for experimental research
 
 * Concurrent garbage collector that achieves a remarkably short GC pause time
 * Separate compilation thread to incrementally generate native code in background
 * On the fly FFI with native stub code generation
 
-Digamma is an experimental work and may change its design significantly.
+Digamma is an experimental work and may change its design significantly. Research results will be applied to Ypsilon (fujita-y/ypsilon) in the future.
 
 See [LICENSE](https://github.com/fujita-y/digamma/blob/master/LICENSE) file for terms and conditions of use.
 
