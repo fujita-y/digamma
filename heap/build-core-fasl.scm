@@ -148,6 +148,7 @@
       "./scheme/file.scm"
       "./scheme/inexact.scm"
       "./scheme/lazy.scm"
+      "./scheme/list.scm"
       "./scheme/load.scm"
       "./scheme/process-context.scm"
       "./scheme/r5rs.scm"
