@@ -1,4 +1,4 @@
 #!nobacktrace
-(define-library (srfi srfi-39)
-  (import (srfi 39))
+(define-library (srfi 39)
+  (import (core))
   (export make-parameter parameterize))

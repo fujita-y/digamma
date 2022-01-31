@@ -1,6 +1,6 @@
 #!nobacktrace
-(define-library (srfi srfi-41)
-  (import (srfi 41))
+(define-library (srfi 41)
+  (import (digamma streams))
   (export stream-null stream-cons stream? stream-null? stream-pair? stream-car
           stream-cdr stream-lambda define-stream list->stream port->stream stream
           stream->list stream-append stream-concat stream-constant stream-drop
