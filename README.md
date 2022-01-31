@@ -1,6 +1,6 @@
 # Digamma
 
-R7RS/R6RS Scheme Implementation derived from Ypsilon (fujita-y/ypsilon) for experimental research
+Derived from Ypsilon (fujita-y/ypsilon) for experimental research
 
 * Concurrent garbage collector that achieves a remarkably short GC pause time
 * Separate compilation thread to incrementally generate native code in background
