@@ -1,4 +1,4 @@
-# Digamma (will be merged to Ypsilon soon)
+# Digamma is integrated into Ypsilon and retired
 
 Derived from Ypsilon (fujita-y/ypsilon) for experimental research
 
