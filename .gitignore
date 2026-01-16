@@ -34,6 +34,7 @@ build/
 *.d
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
 spheres.pgm
 .vscode
 /digamma

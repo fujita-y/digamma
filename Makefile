@@ -2,7 +2,7 @@
 #   Requirements: GNU Make, llvm-10
 #   Options: DESTDIR, PREFIX, DATAMODEL(ILP32/LP64)
 
-PROG = digamma
+PROG = ypsilon
 
 PREFIX = /usr/local
 
@@ -10,14 +10,14 @@ CPPFLAGS = -DNDEBUG -DSYSTEM_SHARE_PATH='"$(DESTDIR)$(PREFIX)/share/$(PROG)"' -D
 
 CXX = clang++
 
-CXXFLAGS = -pipe -fstrict-aliasing -fPIC `llvm-config --cxxflags` -fcxx-exceptions
+CXXFLAGS = `llvm-config --cxxflags` -fcxx-exceptions -Wundef -Werror
 
-SRCS = file.cpp main.cpp object_heap_compact.cpp subr_flonum.cpp vm0.cpp vm1.cpp vm2.cpp vm3.cpp object_set.cpp \
-       object_slab.cpp subr_list.cpp serialize.cpp vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp \
+SRCS = concurrent_pool.cpp concurrent_heap.cpp file.cpp main.cpp object_heap_compact.cpp subr_flonum.cpp vm0.cpp vm1.cpp vm2.cpp vm3.cpp object_set.cpp \
+       concurrent_slab.cpp subr_list.cpp serialize.cpp vm3.cpp port.cpp subr_others.cpp arith.cpp printer.cpp \
        subr_port.cpp subr_r5rs_arith.cpp equiv.cpp reader.cpp subr_base.cpp uuid.cpp subr_socket.cpp subr_hash.cpp \
        subr_unicode.cpp hash.cpp subr_base_arith.cpp ucs4.cpp ioerror.cpp subr_bitwise.cpp utf8.cpp subr_bvector.cpp \
        violation.cpp object_factory.cpp subr_file.cpp subr_process.cpp object_heap.cpp subr_fixnum.cpp bit.cpp \
-       list.cpp fasl.cpp socket.cpp subr_c_ffi.cpp subr_codegen.cpp codegen.cpp subr_linmath.cpp
+       list.cpp fasl.cpp socket.cpp subr_c_ffi.cpp subr_codegen.cpp digamma.cpp subr_linmath.cpp
 
 VPATH = src
 
@@ -26,26 +26,22 @@ UNAME = $(shell uname -a)
 ifndef DATAMODEL
   ifeq (,$(shell echo | $(CXX) -E -dM - | grep '__LP64__'))
     DATAMODEL = ILP32
-    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=64
   else
     DATAMODEL = LP64
-    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=128
   endif
 endif
 
 ifneq (,$(findstring Linux, $(UNAME)))
   ifneq (,$(findstring aarch64, $(UNAME)))
-    ifeq ($(DATAMODEL), ILP32)
-      CXXFLAGS += -march=armv7-a
-    else
-      CXXFLAGS += -march=armv8-a
-    endif
+    CPPFLAGS += -DDEFAULT_HEAP_LIMIT=2048
   endif
   ifneq (,$(findstring x86, $(UNAME)))
     ifeq ($(DATAMODEL), ILP32)
       CXXFLAGS += -march=x86
+      CPPFLAGS += -DDEFAULT_HEAP_LIMIT=512
     else
       CXXFLAGS += -march=x86-64
+      CPPFLAGS += -DDEFAULT_HEAP_LIMIT=2048
     endif
   endif
   CXXFLAGS += -O3 -pthread -fomit-frame-pointer -momit-leaf-frame-pointer
@@ -54,8 +50,8 @@ ifneq (,$(findstring Linux, $(UNAME)))
 endif
 
 ifneq (,$(findstring Darwin, $(UNAME)))
-  # CXXFLAGS += -O0 -glldb
   CXXFLAGS += -O3 -momit-leaf-frame-pointer
+  CPPFLAGS += -DDEFAULT_HEAP_LIMIT=2048
   LDLIBS = $(shell llvm-config --ldflags --system-libs --libs all)
 endif
 
@@ -65,12 +61,12 @@ DEPS = $(patsubst %.cpp, %.d, $(filter %.cpp, $(SRCS)))
 .PHONY: all install uninstall sitelib stdlib extension check bench clean distclean
 
 all: $(PROG) $(EXTS)
-	@mkdir -p -m755 $(HOME)/.digamma
+	@mkdir -p -m755 $(HOME)/.ypsilon
 
 $(PROG): $(OBJS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-install: all stdlib sitelib extension
+install: all sitelib
 	mkdir -p -m755 $(DESTDIR)$(PREFIX)/bin
 	cp $(PROG) $(DESTDIR)$(PREFIX)/bin/$(PROG)
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(PROG)
@@ -139,14 +135,15 @@ eval: all
 	./$(PROG) --verbose --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./sitelib
 
 bench: all
-	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib -- bench/run-digamma.scm
+	./$(PROG) --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib --loadpath=bench/gambit-benchmarks -- bench/run-ypsilon.scm
 
 clean:
 	rm -f *.o *.d *.dylib
-	rm -f $(HOME)/.digamma/*.cache
-	rm -f $(HOME)/.digamma/*.time
+	rm -f $(HOME)/.ypsilon/*.cache
+	rm -f $(HOME)/.ypsilon/*.time
 
 distclean: clean
+	rm -f *.out
 	rm -f tmp1 tmp2 tmp3 spheres.pgm
 	rm -f ./test/tmp*
 	rm -f ./bench/gambit-benchmarks/tmp*

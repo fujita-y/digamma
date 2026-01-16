@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(Digamma)
+
+project(Ypsilon)
 
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release) # Debug Release RelWithDebInfo MinSizeRel
@@ -22,27 +23,45 @@ include_directories(${LLVM_INCLUDE_DIRS})
 separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-add_link_options("-fuse-ld=lld")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
-set(CMAKE_LINKER_FLAGS_RELEASE "${CMAKE_LINKER_FLAGS_RELEASE} -flto")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
-set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
-set(CMAKE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_LINKER_FLAGS_RELWITHDEBINFO} -fsanitize=address")
+if (${LLVM_PACKAGE_VERSION} VERSION_GREATER_EQUAL 16.0.0)
+  set(CMAKE_C_COMPILER "${LLVM_DIR}/../../../bin/clang")
+  set(CMAKE_CXX_COMPILER "${LLVM_DIR}/../../../bin/clang++")
+else()
+  set(CMAKE_C_COMPILER "clang")
+  set(CMAKE_CXX_COMPILER "clang++")
+endif()
 
-set(DIGAMMA_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/digamma)
-set(DIGAMMA_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/digamma)
-add_compile_definitions(SYSTEM_SHARE_PATH="${DIGAMMA_SHARE_DIRECTORY}")
-add_compile_definitions(SYSTEM_EXTENSION_PATH="${DIGAMMA_EXTENSION_DIRECTORY}")
-add_compile_definitions(DEFAULT_HEAP_LIMIT=128)
+
+if(NOT APPLE)
+  add_link_options("-fuse-ld=lld")
+endif(NOT APPLE)
+
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wundef -Werror -flto")
+set(CMAKE_LINKER_FLAGS_RELEASE "${CMAKE_LINKER_FLAGS_RELEASE} -Wundef -Werror -flto")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wundef -Werror -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -Wundef -Werror -fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -Wundef -Werror -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
+set(CMAKE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_LINKER_FLAGS_RELWITHDEBINFO} -Wundef -Werror -fsanitize=address")
+
+set(YPSILON_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/ypsilon)
+set(YPSILON_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/ypsilon)
+add_compile_definitions(SYSTEM_SHARE_PATH="${YPSILON_SHARE_DIRECTORY}")
+add_compile_definitions(SYSTEM_EXTENSION_PATH="${YPSILON_EXTENSION_DIRECTORY}")
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  add_compile_definitions(DEFAULT_HEAP_LIMIT=512)
+else()
+  add_compile_definitions(DEFAULT_HEAP_LIMIT=2048)
+endif()
 
 add_executable(
-  digamma
+  ypsilon
   src/arith.cpp
   src/bit.cpp
-  src/codegen.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/digamma.cpp
   src/equiv.cpp
   src/fasl.cpp
   src/file.cpp
@@ -54,7 +73,6 @@ add_executable(
   src/object_heap_compact.cpp
   src/object_heap.cpp
   src/object_set.cpp
-  src/object_slab.cpp
   src/port.cpp
   src/printer.cpp
   src/reader.cpp
@@ -86,55 +104,67 @@ add_executable(
   src/vm1.cpp
   src/vm2.cpp
   src/vm3.cpp)
+
 execute_process(
   COMMAND llvm-config --libs all
   OUTPUT_VARIABLE llvm_libs
   OUTPUT_STRIP_TRAILING_WHITESPACE)
-target_link_libraries(digamma ${llvm_libs} -pthread -ldl)
-install(TARGETS digamma DESTINATION bin)
+target_link_libraries(ypsilon ${llvm_libs} -pthread -ldl)
 
-set(DIGAMMA_SITELIB_DIRECTORY ${DIGAMMA_SHARE_DIRECTORY}/sitelib)
-install(DIRECTORY sitelib/ DESTINATION ${DIGAMMA_SITELIB_DIRECTORY})
+if(APPLE)
+  execute_process(
+    COMMAND llvm-config --ldflags
+    OUTPUT_VARIABLE llvm_ldflags
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  target_link_libraries(ypsilon ${llvm_ldflags})
+endif(APPLE)
+
+file(MAKE_DIRECTORY $ENV{HOME}/.ypsilon)
+
+set(YPSILON_SITELIB_DIRECTORY ${YPSILON_SHARE_DIRECTORY}/sitelib)
+install(CODE "execute_process(COMMAND rm -rf ${YPSILON_SITELIB_DIRECTORY})")
+install(DIRECTORY sitelib/ DESTINATION ${YPSILON_SITELIB_DIRECTORY})
+install(TARGETS ypsilon DESTINATION bin)
 
 enable_testing()
-set(DIGAMMA_COMMON_TEST_OPTIONS --heap-limit=128 --acc=/tmp --clean-acc --sitelib=./test:./sitelib)
+set(YPSILON_COMMON_TEST_OPTIONS --sitelib=./test:./sitelib)
 add_test(
   NAME r4rstest
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/r4rstest.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} ./test/r4rstest.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME tspl
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/tspl.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} ./test/tspl.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME arith
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/arith.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} ./test/arith.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME r5rs-pitfall
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} --r6rs ./test/r5rs-pitfall.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} --r6rs ./test/r5rs-pitfall.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME r6rs
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME r6rs-lib
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs-lib.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs-lib.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME r6rs-more
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs-more.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} --r6rs ./test/r6rs-more.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME r7rs-test
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} --r7rs ./test/r7rs-test.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} --r7rs ./test/r7rs-test.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME c-ffi-test
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/c-ffi-test.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} ./test/c-ffi-test.scm
   WORKING_DIRECTORY ..)
 add_test(
   NAME syntax-rule-stress-test
-  COMMAND $<TARGET_FILE:digamma> ${DIGAMMA_COMMON_TEST_OPTIONS} ./test/syntax-rule-stress-test.scm
+  COMMAND $<TARGET_FILE:ypsilon> ${YPSILON_COMMON_TEST_OPTIONS} ./test/syntax-rule-stress-test.scm
   WORKING_DIRECTORY ..)

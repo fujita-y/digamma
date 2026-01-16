@@ -1,1 +1,0 @@
-(define f (lambda (x) (g (* x x))))
