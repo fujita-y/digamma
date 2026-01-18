@@ -160,7 +160,7 @@ void* concurrent_slab_t::new_collectible_object() {
 
 void* concurrent_slab_t::new_object() {
   assert(m_concurrent_heap);
-  assert(m_bitmap_size == 0);
+  if (m_bitmap_size != 0) return new_collectible_object();
   m_lock.lock();
   if (m_vacant) {
     slab_traits_t* traits = m_vacant;

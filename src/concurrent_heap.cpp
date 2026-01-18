@@ -56,6 +56,12 @@ void concurrent_heap_t::terminate() {
   m_collector_wake.signal();
   m_collector_lock.unlock();
   MTVERIFY(pthread_join(m_collector_thread, NULL));
+  m_shade_queue.destroy();
+  m_collector_lock.destroy();
+  m_collector_wake.destroy();
+  m_mutator_wake.destroy();
+  if (m_mark_stack) free(m_mark_stack);
+  m_mark_stack = NULL;
 }
 
 void concurrent_heap_t::collect() {

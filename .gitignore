@@ -29,8 +29,10 @@
 
 # CMake
 build/
+CMakeFiles/
 
 # Misc
+*.cache
 *.d
 *.sublime-project
 *.sublime-workspace

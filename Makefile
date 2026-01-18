@@ -58,7 +58,13 @@ endif
 OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRCS))) $(patsubst %.s, %.o, $(filter %.s, $(SRCS)))
 DEPS = $(patsubst %.cpp, %.d, $(filter %.cpp, $(SRCS)))
 
-.PHONY: all install uninstall sitelib stdlib extension check bench clean distclean
+MYSCHEME_SRCS = scheme.cpp concurrent_heap.cpp concurrent_pool.cpp concurrent_slab.cpp reader.cpp printer.cpp
+MYSCHEME_OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(MYSCHEME_SRCS)))
+
+myscheme: $(MYSCHEME_OBJS)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+.PHONY: all install uninstall sitelib stdlib extension check bench clean distclean myscheme
 
 all: $(PROG) $(EXTS)
 	@mkdir -p -m755 $(HOME)/.ypsilon

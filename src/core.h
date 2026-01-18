@@ -12,7 +12,7 @@
 
 #define UNBOUND_GLOC_RETURN_UNSPEC 0  // default: 0
 
-#define ENABLE_LLVM_JIT            1
+#define ENABLE_LLVM_JIT            0
 
 #define COMPILE_THREAD_COUNT       4
 
