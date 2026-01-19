@@ -31,9 +31,22 @@ static bool test_flonum(double d) {
   return true;
 }
 
+static bool test_symbol(const char* name) {
+  scm_obj_t x1 = make_symbol(name);
+  uint8_t* x2 = symbol_name(x1);
+  if (strcmp(name, (const char*)x2) != 0) {
+    printf("\033[31m###### symbol failed: %s != %s\033[0m\n", name, (const char*)x2);
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32msymbol passed: %s\033[0m\n", name);
+  return true;
+}
+
 int main(int argc, char** argv) {
   object_heap_t heap;
-  heap.init(1024 * 1024, 1024 * 256);
+  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  heap.m_collect_trip_bytes = 1024 * 512;
 
   test_fixnum_in_range(-1);
   test_fixnum_in_range(0);
@@ -52,6 +65,9 @@ int main(int argc, char** argv) {
   test_flonum(6.80564733841877985e+38);  // 0x4800000000000007 long
   test_flonum(1.3e-100);
   test_flonum(1.3e+100);
+
+  test_symbol("foobar");
+  test_symbol("hogehoge");
 
   heap.destroy();
 

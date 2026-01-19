@@ -15,11 +15,14 @@
 /*
 
 |<                               fixnum 63bit                                 >1| fixnum
-|---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .000| cons (pointer)
-|-< tc6 >- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .010| heap object (pointer)
-|<                               61bit flonum                               >100| short flonum (immediate)
-|.... .... .... .... .... .... .... .... .... .... .... .... ..< tc6 > 0000 .110| heap tag (immediate)
-|<               ucs4                  > .... .... .... .... .... .... 0001 .110| char (immediate)
+|---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .000| cons pointer
+|-< tc6 >- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .010| tc6 heap object pointer
+|<                               61bit flonum                               >100| short flonum
+|.... .... .... .... .... .... .... .... .... .... .... .... ..< tc6 > 0000 .110| tc6 heap object tag
+|.... .... .... .... .... .... .... .... .... .... .... .... ..00 0000 0000 .110| tc6: symbol
+|.... .... .... .... .... .... .... .... .... .... .... .... ..00 0001 0000 .110| tc6: string
+|.... .... .... .... .... .... .... .... .... .... .... .... ..00 0010 0000 .110| tc6: bignum
+|<               ucs4                  > .... .... .... .... .... .... 0001 .110| char
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 0010 .110| scm_true
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 0011 .110| scm_false
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 0100 .110| scm_nil
@@ -32,18 +35,10 @@
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1011 .110| scm_proc_callcc
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1100 .110| scm_proc_apply_values
 
-|.... .... .... .... .... .... .... .... .... .... .... .... .000 000. 0000 .110| heap tag: symbol
-|.... .... .... .... .... .... .... .... .... .... .... .... .000 001. 0000 .110| heap tag: string
-|.... .... .... .... .... .... .... .... .... .... .... .... .000 010. 0000 .110| heap tag: bignum
-
 */
 
-typedef void* scm_obj_t;
-typedef uintptr_t scm_hdr_t;
-typedef scm_obj_t scm_char_t;
-typedef scm_obj_t scm_fixnum_t;
-typedef scm_obj_t scm_short_flonum_t;
-typedef scm_obj_t scm_long_flonum_t;
+typedef uintptr_t scm_obj_t;
+typedef uintptr_t scm_tc6_t;
 
 constexpr uintptr_t tc6_symbol = 0;
 constexpr uintptr_t tc6_string = 1;
@@ -68,7 +63,7 @@ constexpr uintptr_t tc6_weakmapping = 19;
 constexpr uintptr_t tc6_environment = 20;
 constexpr uintptr_t tc6_socket = 21;
 
-inline scm_obj_t singleton(uintptr_t val) { return (scm_obj_t)((val << 4) | 0x06); }
+inline scm_obj_t singleton(uintptr_t val) { return (val << 4) | 0x06; }
 
 const scm_obj_t scm_true = singleton(2);
 const scm_obj_t scm_false = singleton(3);
@@ -90,32 +85,40 @@ struct scm_pair_rec_t {
 };
 
 struct scm_long_flonum_rec_t {
-  scm_hdr_t hdr;
+  scm_tc6_t tag;
   double value;
+};
+
+struct scm_symbol_rec_t {
+  scm_tc6_t tag;
+  uint8_t* name;  // uninterned symbol contains <prefix-size> after '\0'
 };
 
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #if USE_TBI
-  uint64_t bits = __builtin_rotateleft64((uintptr_t)x, 7);
+  uint64_t bits = __builtin_rotateleft64(x, 7);
   return (bits & 0x1bf) == (0x100 + tc6);
 #else
-  if (((uintptr_t)x & 0x07) != 0x02) return false;
-  scm_hdr_t hdr = *(scm_hdr_t*)((uintptr_t)x & ~0x07);
-  return ((hdr >> 8) & 0x3f) == tc6;
+  if ((x & 0x07) != 0x02) return false;
+  scm_tc6_t tag = *(scm_tc6_t*)(x & ~0x07);
+  return ((tag >> 8) & 0x3f) == tc6;
 #endif
 }
 
-inline bool is_fixnum(scm_obj_t x) { return ((uintptr_t)x & 0x01) == 0x01; }
-inline bool is_char(scm_obj_t x) { return ((uintptr_t)x & 0x17) == 0x16; }
-inline bool is_short_flonum(scm_obj_t x) { return ((uintptr_t)x & 0x07) == 0x04; }
+inline bool is_fixnum(scm_obj_t x) { return (x & 0x01) == 0x01; }
+inline bool is_char(scm_obj_t x) { return (x & 0x17) == 0x16; }
+inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
 inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
+inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 
-inline scm_fixnum_t make_fixnum(int64_t i64) { return (scm_fixnum_t)((i64 << 1) | 0x01); }
-inline scm_char_t make_char(uintptr_t ucs4) { return (scm_char_t)((ucs4 << 32) | 0x16); }
+inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
+inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 
 scm_obj_t make_flonum(double d);
-double flonum(scm_obj_t x);
+scm_obj_t make_symbol(const char* name);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
+double flonum(scm_obj_t x);
+uint8_t* symbol_name(scm_obj_t x);
 
 #endif

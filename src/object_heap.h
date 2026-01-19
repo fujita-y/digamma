@@ -14,8 +14,13 @@ class object_heap_t {
   thread_local static object_heap_t* s_current;
   concurrent_pool_t m_concurrent_pool;
   concurrent_heap_t m_concurrent_heap;
-  int64_t m_trip_bytes;
+  concurrent_slab_t m_cons;
+  concurrent_slab_t m_flonums;
+  concurrent_slab_t m_symbols;
+  concurrent_slab_t m_privates[8];  // 16-32-64-128-256-512-1024-2048
+  uint64_t m_trip_bytes;
 
+  void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void trace(void* obj);
   void finalize(void* obj);
@@ -29,8 +34,12 @@ class object_heap_t {
  public:
   void init(size_t pool_size, size_t init_size);
   void destroy();
-  concurrent_slab_t m_cons;
-  concurrent_slab_t m_flonums;
+
+  void* alloc_flonum() { return alloc_object(m_flonums); }
+  void* alloc_symbol() { return alloc_object(m_symbols); }
+  void* alloc_private(size_t size);
+
+  uint64_t m_collect_trip_bytes;
 
   object_heap_t() {};
   ~object_heap_t() {};

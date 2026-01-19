@@ -6,11 +6,31 @@
 #include "object_heap.h"
 #include "bit.h"
 
+inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
+{
+  assert(x >= 16);  // (1 << 4)
+  uint32_t n = 0;
+  uint32_t c = 16;
+  x = x - 1;
+  do {
+    uint32_t y = x >> c;
+    if (y != 0) {
+      n = n + c;
+      x = y;
+    }
+    c = c >> 1;
+  } while (c != 0);
+  return n + x - 4;
+}
+
 thread_local object_heap_t* object_heap_t::s_current;
 
 void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_pool.init(pool_size, init_size);
   m_concurrent_heap.init(&m_concurrent_pool);
+
+  m_trip_bytes = 0;
+  m_collect_trip_bytes = init_size / 8;
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });
@@ -24,6 +44,8 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
 
   m_cons.init(&m_concurrent_heap, clp2(sizeof(scm_pair_rec_t)), true, false);
   m_flonums.init(&m_concurrent_heap, clp2(sizeof(scm_long_flonum_rec_t)), true, false);
+  m_symbols.init(&m_concurrent_heap, clp2(sizeof(scm_symbol_rec_t)), true, true);
+  for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
 }
@@ -38,6 +60,38 @@ void object_heap_t::destroy() {
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
   m_concurrent_pool.destroy();
+}
+
+void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
+  m_trip_bytes += slab.m_object_size;
+  if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
+  do {
+    void* obj = slab.new_collectible_object();
+    if (obj) return obj;
+  } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
+  fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+  return NULL;
+}
+
+void* object_heap_t::alloc_private(size_t size) {
+  m_trip_bytes += size;
+  if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
+  int bucket = 0;
+  if (size > 16) bucket = bytes_to_bucket(size);
+  if (bucket < array_sizeof(m_privates)) {
+    do {
+      void* obj = m_privates[bucket].new_object();
+      if (obj) return obj;
+    } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
+    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+  } else {
+    do {
+      void* obj = m_concurrent_pool.allocate(size, false, false);
+      if (obj) return obj;
+    } while (m_concurrent_pool.extend_pool(size));
+    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+  }
+  return NULL;
 }
 
 void object_heap_t::trace(void* obj) {}

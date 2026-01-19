@@ -101,7 +101,7 @@ void concurrent_slab_t::unload_filled(slab_traits_t* traits) {
 void* concurrent_slab_t::new_collectible_object() {
   assert(m_concurrent_heap);
   assert(m_bitmap_size != 0);
-  bool synchronize = (m_concurrent_heap->m_alloc_barrier != 0);
+  bool synchronize = m_concurrent_heap->m_alloc_barrier;
   if (synchronize) {
 #if LOCKFREE_ALLOC && THREAD_LOCAL_SLAB_CACHE
     slab_traits_t* traits = m_vacant;
@@ -160,7 +160,7 @@ void* concurrent_slab_t::new_collectible_object() {
 
 void* concurrent_slab_t::new_object() {
   assert(m_concurrent_heap);
-  if (m_bitmap_size != 0) return new_collectible_object();
+  assert(m_bitmap_size == 0);
   m_lock.lock();
   if (m_vacant) {
     slab_traits_t* traits = m_vacant;
