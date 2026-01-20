@@ -69,6 +69,7 @@ class concurrent_heap_t {
   void dequeue_root();
   void enqueue_root(void* obj);
   void write_barrier(void* rhs);
+  void safepoint();
 
   concurrent_queue_t<void*> m_shade_queue;
   collector_usage_t m_usage;
@@ -150,8 +151,8 @@ class concurrent_heap_t {
   bool m_collector_ready;
   bool m_collector_terminating;
   bool m_alloc_barrier;
-  void* allocate(size_t size, bool slab, bool gc);
-  void deallocate(void* p);
+  void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
+  void deallocate(void* p) { m_concurrent_pool->deallocate(p); }
 };
 
 #endif

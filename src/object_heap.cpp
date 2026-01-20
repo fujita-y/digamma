@@ -45,6 +45,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_cons.init(&m_concurrent_heap, clp2(sizeof(scm_cons_rec_t)), true, false);
   m_flonums.init(&m_concurrent_heap, clp2(sizeof(scm_long_flonum_rec_t)), true, false);
   m_symbols.init(&m_concurrent_heap, clp2(sizeof(scm_symbol_rec_t)), true, true);
+  m_strings.init(&m_concurrent_heap, clp2(sizeof(scm_string_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
@@ -69,7 +70,7 @@ void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
     void* obj = slab.new_collectible_object();
     if (obj) return obj;
   } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
-  fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+  fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
   return NULL;
 }
 
@@ -83,13 +84,13 @@ void* object_heap_t::alloc_private(size_t size) {
       void* obj = m_privates[bucket].new_object();
       if (obj) return obj;
     } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
-    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+    fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
   } else {
     do {
       void* obj = m_concurrent_pool.allocate(size, false, false);
       if (obj) return obj;
     } while (m_concurrent_pool.extend_pool(size));
-    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+    fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
   }
   return NULL;
 }

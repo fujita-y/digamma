@@ -85,6 +85,21 @@ uint8_t* symbol_name(scm_obj_t x) {
   return ((scm_symbol_rec_t*)to_address(x))->name;
 }
 
+scm_obj_t make_string(const char* name) {
+  void* obj = object_heap_t::current()->alloc_string();
+  int n = strlen(name) + 1;
+  uint8_t* datum = (uint8_t*)object_heap_t::current()->alloc_private(n);
+  memcpy(datum, name, n);
+  ((scm_string_rec_t*)obj)->tag = tc6_tag(tc6_string);
+  ((scm_string_rec_t*)obj)->name = datum;
+  return tc6_pointer(obj, tc6_string);
+}
+
+uint8_t* string_name(scm_obj_t x) {
+  if (!is_string(x)) fatal("%s:%u internal error: string expected.", __FILE__, __LINE__);
+  return ((scm_string_rec_t*)to_address(x))->name;
+}
+
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr) {
   scm_cons_rec_t* obj = (scm_cons_rec_t*)object_heap_t::current()->alloc_cons();
   obj->car = car;

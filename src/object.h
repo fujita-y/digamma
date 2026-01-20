@@ -94,6 +94,11 @@ struct scm_symbol_rec_t {
   uint8_t* name;  // uninterned symbol contains <prefix-size> after '\0'
 };
 
+struct scm_string_rec_t {
+  scm_tc6_t tag;
+  uint8_t* name;
+};
+
 inline bool is_heap_pointer(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
@@ -118,6 +123,7 @@ inline bool is_char(scm_obj_t x) { return (x & 0x17) == 0x16; }
 inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
 inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
 inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
+inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
@@ -126,9 +132,11 @@ scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
 scm_obj_t make_list(int len, ...);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
+scm_obj_t make_string(const char* name);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
 uint8_t* symbol_name(scm_obj_t x);
+uint8_t* string_name(scm_obj_t x);
 
 #endif

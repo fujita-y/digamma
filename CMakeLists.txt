@@ -81,6 +81,22 @@ add_test(
   COMMAND $<TARGET_FILE:test_object>
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_executable(
+  test_gc
+  tests/test_gc.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp)
+target_link_libraries(test_gc ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_gc
+  COMMAND $<TARGET_FILE:test_gc>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 if(APPLE)
 
   execute_process(

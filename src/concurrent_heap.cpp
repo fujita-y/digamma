@@ -46,11 +46,8 @@ void concurrent_heap_t::init(concurrent_pool_t* pool) {
   MTVERIFY(pthread_create(&m_collector_thread, NULL, (void* (*)(void*))collector_thread, this));
 }
 
-void* concurrent_heap_t::allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
-
-void concurrent_heap_t::deallocate(void* p) { m_concurrent_pool->deallocate(p); }
-
 void concurrent_heap_t::terminate() {
+  GCTRACE(";; [collector: terminating]\n");
   m_collector_lock.lock();
   m_collector_terminating = true;
   m_collector_wake.signal();
@@ -62,6 +59,21 @@ void concurrent_heap_t::terminate() {
   m_mutator_wake.destroy();
   if (m_mark_stack) free(m_mark_stack);
   m_mark_stack = NULL;
+  GCTRACE(";; [collector: terminated]\n");
+}
+
+void concurrent_heap_t::safepoint() {
+  while (m_stop_the_world) {
+    m_collector_lock.lock();
+    while (m_stop_the_world) {
+      m_mutator_stopped = true;
+      m_collector_wake.signal();
+      m_mutator_wake.wait(m_collector_lock);
+      m_mutator_stopped = false;
+    }
+    m_collector_wake.signal();
+    m_collector_lock.unlock();
+  }
 }
 
 void concurrent_heap_t::collect() {
@@ -86,6 +98,7 @@ void concurrent_heap_t::synchronized_collect() {
   m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world phase 1]\n");
   while (!m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
     if (!m_mutator_stopped) {
       dequeue_root();
@@ -106,6 +119,7 @@ void concurrent_heap_t::synchronized_collect() {
 
   slab_traits_t* traits = SLAB_TRAITS_OF(m_concurrent_pool->m_pool);
   for (int i = 0; i < m_concurrent_pool->m_pool_watermark; i++) {
+    if (m_collector_terminating) return;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       uint8_t* slab = m_concurrent_pool->m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT);
       traits->cache->sweep(slab);
@@ -118,6 +132,7 @@ void concurrent_heap_t::synchronized_collect() {
   m_sweep_wavefront = (uint8_t*)m_concurrent_pool->m_pool + m_concurrent_pool->m_pool_size;
   m_mutator_wake.signal();
   while (m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
 
@@ -141,6 +156,7 @@ void concurrent_heap_t::concurrent_collect() {
   m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world]\n");
   while (!m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
     if (!m_mutator_stopped) {
       dequeue_root();
@@ -154,6 +170,7 @@ void concurrent_heap_t::concurrent_collect() {
   m_mutator_wake.signal();
   GCTRACE(";; [collector: start-the-world phase 1]\n");
   while (m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
   double t2 = msec();
@@ -170,6 +187,7 @@ void concurrent_heap_t::concurrent_collect() {
   m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world phase 2]\n");
   while (!m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
     if (!m_mutator_stopped) {
       dequeue_root();
@@ -183,6 +201,7 @@ fallback:
   m_mutator_wake.signal();
   GCTRACE(";; [collector: start-the-world phase 2]\n");
   while (m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
   GCTRACE(";; [collector: concurrent-mark phase 2]\n");
@@ -199,6 +218,7 @@ fallback:
   GCTRACE(";; [collector: stop-the-world final]\n");
 
   while (!m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
     if (!m_mutator_stopped) {
       dequeue_root();
@@ -231,6 +251,7 @@ fallback:
   m_stop_the_world = false;
   m_mutator_wake.signal();
   while (m_mutator_stopped) {
+    if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);  // to make mutator run now
   }
   GCTRACE(";; [collector: start-the-world]\n");
@@ -244,6 +265,7 @@ fallback:
   uint8_t* slab = m_concurrent_pool->m_pool;
   int i = 0;
   while (i < capacity) {
+    if (m_collector_terminating) return;
     int memo = m_concurrent_pool->m_pool_usage;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       if (SLAB_TRAITS_OF(slab)->cache == NULL) {

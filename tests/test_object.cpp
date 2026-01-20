@@ -42,6 +42,18 @@ static bool test_symbol(const char* name) {
   return true;
 }
 
+static bool test_string(const char* name) {
+  scm_obj_t x1 = make_string(name);
+  uint8_t* x2 = string_name(x1);
+  if (strcmp(name, (const char*)x2) != 0) {
+    printf("\033[31m###### string failed: %s != %s\033[0m\n", name, (const char*)x2);
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32msymbol passed: %s\033[0m\n", name);
+  return true;
+}
+
 int main(int argc, char** argv) {
   object_heap_t heap;
   heap.init(1024 * 1024 * 2, 1024 * 1024);
@@ -67,6 +79,9 @@ int main(int argc, char** argv) {
 
   test_symbol("foobar");
   test_symbol("hogehoge");
+
+  test_string("quick brown fox");
+  test_string("jump over lazy dog");
 
   heap.destroy();
 
