@@ -79,7 +79,7 @@ const scm_obj_t scm_proc_apply = singleton(12);
 const scm_obj_t scm_proc_callcc = singleton(13);
 const scm_obj_t scm_proc_apply_values = singleton(14);
 
-struct scm_pair_rec_t {
+struct scm_cons_rec_t {
   scm_obj_t car;
   scm_obj_t cdr;
 };
@@ -94,17 +94,25 @@ struct scm_symbol_rec_t {
   uint8_t* name;  // uninterned symbol contains <prefix-size> after '\0'
 };
 
+inline bool is_heap_pointer(scm_obj_t x) { return (x & 0x07) == 0x02; }
+
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #if USE_TBI
   uint64_t bits = __builtin_rotateleft64(x, 7);
   return (bits & 0x1bf) == (0x100 + tc6);
 #else
-  if ((x & 0x07) != 0x02) return false;
+  if (!is_heap_pointer(x)) return false;
   scm_tc6_t tag = *(scm_tc6_t*)(x & ~0x07);
   return ((tag >> 8) & 0x3f) == tc6;
 #endif
 }
 
+inline void* to_address(scm_obj_t x) {
+  assert((x & 0x07) == 0x02);
+  return (void*)(x & ~0x07);
+}
+
+inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_fixnum(scm_obj_t x) { return (x & 0x01) == 0x01; }
 inline bool is_char(scm_obj_t x) { return (x & 0x17) == 0x16; }
 inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
@@ -114,6 +122,8 @@ inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 
+scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
+scm_obj_t make_list(int len, ...);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
 

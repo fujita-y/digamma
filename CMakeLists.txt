@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
 
-project(Ypsilon)
+project(Nanos)
 
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release) # Debug Release RelWithDebInfo MinSizeRel
@@ -37,10 +37,10 @@ set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -Wundef -Werror -fsani
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -Wundef -Werror -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=hwaddress")
 set(CMAKE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_LINKER_FLAGS_RELWITHDEBINFO} -Wundef -Werror")
 
-set(YPSILON_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/ypsilon)
-set(YPSILON_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/ypsilon)
-add_compile_definitions(SYSTEM_SHARE_PATH="${YPSILON_SHARE_DIRECTORY}")
-add_compile_definitions(SYSTEM_EXTENSION_PATH="${YPSILON_EXTENSION_DIRECTORY}")
+set(NANOS_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/nanos)
+set(NANOS_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/nanos)
+add_compile_definitions(SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}")
+add_compile_definitions(SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}")
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
   add_compile_definitions(DEFAULT_HEAP_LIMIT=512)
@@ -63,6 +63,7 @@ execute_process(
   OUTPUT_VARIABLE llvm_libs
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 target_link_libraries(nanos ${llvm_libs} -pthread -ldl)
+
 
 add_executable(
   test_object
@@ -91,9 +92,9 @@ endif(APPLE)
 
 file(MAKE_DIRECTORY $ENV{HOME}/.nanos)
 
-set(YPSILON_SITELIB_DIRECTORY ${YPSILON_SHARE_DIRECTORY}/sitelib)
-install(CODE "execute_process(COMMAND rm -rf ${YPSILON_SITELIB_DIRECTORY})")
-install(DIRECTORY sitelib/ DESTINATION ${YPSILON_SITELIB_DIRECTORY})
+set(NANOS_SITELIB_DIRECTORY ${NANOS_SHARE_DIRECTORY}/sitelib)
+install(CODE "execute_process(COMMAND rm -rf ${NANOS_SITELIB_DIRECTORY})")
+install(DIRECTORY sitelib/ DESTINATION ${NANOS_SITELIB_DIRECTORY})
 install(TARGETS nanos DESTINATION bin)
 
 enable_testing()

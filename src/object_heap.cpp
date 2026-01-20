@@ -42,7 +42,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_heap.set_debug_check_slab_proc([this](void* slab) { this->validate_concurrent_slab(slab); });
 #endif
 
-  m_cons.init(&m_concurrent_heap, clp2(sizeof(scm_pair_rec_t)), true, false);
+  m_cons.init(&m_concurrent_heap, clp2(sizeof(scm_cons_rec_t)), true, false);
   m_flonums.init(&m_concurrent_heap, clp2(sizeof(scm_long_flonum_rec_t)), true, false);
   m_symbols.init(&m_concurrent_heap, clp2(sizeof(scm_symbol_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
@@ -94,8 +94,39 @@ void* object_heap_t::alloc_private(size_t size) {
   return NULL;
 }
 
-void object_heap_t::trace(void* obj) {}
-void object_heap_t::finalize(void* obj) {}
+void object_heap_t::delete_private(void* obj) {
+  assert(m_concurrent_pool.is_not_collectible(obj));
+  slab_traits_t* traits = SLAB_TRAITS_OF(obj);
+  traits->cache->delete_object(obj);
+}
+
+void object_heap_t::shade(scm_obj_t obj) {
+  if (!is_heap_pointer(obj)) return;
+  // TODO: add additional early return if TBI enabled
+  m_concurrent_heap.shade(to_address(obj));
+}
+
+void object_heap_t::trace(void* obj) {
+  assert(m_concurrent_pool.is_collectible(obj));
+  slab_traits_t* traits = SLAB_TRAITS_OF(obj);
+  if (traits->cache->test_and_set_mark(obj)) return;
+  if (traits->cache == &m_cons) {
+    scm_cons_rec_t* rec = (scm_cons_rec_t*)obj;
+    shade(rec->car);
+    shade(rec->cdr);
+    return;
+  }
+}
+
+void object_heap_t::finalize(void* obj) {
+  assert(m_concurrent_pool.is_collectible(obj));
+  slab_traits_t* traits = SLAB_TRAITS_OF(obj);
+  if (traits->cache == &m_symbols) {
+    scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
+    delete_private(rec->name);
+  }
+}
+
 void object_heap_t::snapshot_root() {}
 void object_heap_t::update_weak_reference() {}
 #if HPDEBUG

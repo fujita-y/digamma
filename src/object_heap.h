@@ -5,6 +5,7 @@
 #define OBJECT_HEAP_H_INCLUDED
 
 #include "core.h"
+#include "object.h"
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -22,10 +23,12 @@ class object_heap_t {
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
+  void shade(scm_obj_t obj);
   void trace(void* obj);
   void finalize(void* obj);
   void snapshot_root();
   void update_weak_reference();
+  void delete_private(void* obj);
 #if HPDEBUG
   void consistency_check();
   void validate_concurrent_slab(void* slab);
@@ -35,6 +38,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
 
+  void* alloc_cons() { return alloc_object(m_cons); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
   void* alloc_symbol() { return alloc_object(m_symbols); }
   void* alloc_private(size_t size);

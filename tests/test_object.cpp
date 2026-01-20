@@ -1,7 +1,6 @@
-#include "core.h"
-
-#include "object.h"
-#include "object_heap.h"
+#include "../src/core.h"
+#include "../src/object.h"
+#include "../src/object_heap.h"
 
 static bool some_test_failed = false;
 

@@ -5,11 +5,6 @@
 #include "object.h"
 #include "object_heap.h"
 
-inline void* to_address(scm_obj_t x) {
-  assert((x & 0x07) == 0x02);
-  return (void*)(x & ~0x07);
-}
-
 inline scm_obj_t tc6_pointer(void* x, uintptr_t tc6_num) {
   assert(((uintptr_t)x & 0x07) == 0);
 #if USE_TBI
@@ -88,4 +83,26 @@ scm_obj_t make_symbol(const char* name) {
 uint8_t* symbol_name(scm_obj_t x) {
   if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
   return ((scm_symbol_rec_t*)to_address(x))->name;
+}
+
+scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr) {
+  scm_cons_rec_t* obj = (scm_cons_rec_t*)object_heap_t::current()->alloc_cons();
+  obj->car = car;
+  obj->cdr = cdr;
+  return (scm_obj_t)obj;
+}
+
+scm_obj_t make_list(int len, ...) {
+  va_list ap;
+  va_start(ap, len);
+  if (len == 0) return scm_nil;
+  scm_cons_rec_t* obj = (scm_cons_rec_t*)make_cons(va_arg(ap, scm_obj_t), scm_nil);
+  scm_cons_rec_t* tail = obj;
+  for (int i = 1; i < len; i++) {
+    scm_cons_rec_t* e = (scm_cons_rec_t*)make_cons(va_arg(ap, scm_obj_t), scm_nil);
+    tail->cdr = (scm_obj_t)e;
+    tail = e;
+  }
+  va_end(ap);
+  return (scm_obj_t)obj;
 }
