@@ -116,7 +116,7 @@ inline bool is_heap_pointer(scm_obj_t x) { return (x & 0x07) == 0x02; }
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #if USE_TBI
   uint64_t bits = __builtin_rotateleft64(x, 7);
-  return (bits & 0x1bf) == (0x100 + tc6);
+  return (bits & 0x3bf) == (0x100 + tc6);
 #else
   if (!is_heap_pointer(x)) return false;
   scm_tc6_t tag = *(scm_tc6_t*)(x & ~0x07);
