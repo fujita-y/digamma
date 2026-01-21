@@ -54,6 +54,46 @@ static bool test_string(const char* name) {
   return true;
 }
 
+static bool test_vector(int nsize) {
+  scm_obj_t x1 = make_vector(nsize, make_fixnum(nsize));
+  int n = vector_nsize(x1);
+  if (n != nsize) {
+    printf("\033[31m###### vector count failed: %d != %d\033[0m\n", nsize, n);
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t* elts = vector_elts(x1);
+  while (n-- > 0) {
+    if (elts[n] != make_fixnum(nsize)) {
+      printf("\033[31m###### vector elts failed: %d != %ld\033[0m\n", nsize, fixnum(elts[n]));
+      some_test_failed = true;
+      return false;
+    }
+  }
+  printf("\033[32mvector passed: %d\033[0m\n", nsize);
+  return true;
+}
+
+static bool test_u8vector(int nsize) {
+  scm_obj_t x1 = make_u8vector(nsize);
+  int n = u8vector_nsize(x1);
+  if (n != nsize) {
+    printf("\033[31m###### u8vector count failed: %d != %d\033[0m\n", nsize, n);
+    some_test_failed = true;
+    return false;
+  }
+  uint8_t* elts = u8vector_elts(x1);
+  while (n-- > 0) {
+    if (elts[n] != 0) {
+      printf("\033[31m###### u8vector elts failed: %d != %d\033[0m\n", 0, elts[n]);
+      some_test_failed = true;
+      return false;
+    }
+  }
+  printf("\033[32mu8vector passed: %d\033[0m\n", nsize);
+  return true;
+}
+
 int main(int argc, char** argv) {
   object_heap_t heap;
   heap.init(1024 * 1024 * 2, 1024 * 1024);
@@ -82,6 +122,12 @@ int main(int argc, char** argv) {
 
   test_string("quick brown fox");
   test_string("jump over lazy dog");
+
+  test_vector(16);
+  test_vector(65);
+
+  test_u8vector(97);
+  test_u8vector(122);
 
   heap.destroy();
 

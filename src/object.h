@@ -54,7 +54,7 @@ constexpr uintptr_t tc6_hashtable = 10;
 constexpr uintptr_t tc6_gloc = 11;
 constexpr uintptr_t tc6_tuple = 12;
 constexpr uintptr_t tc6_weakhashtable = 13;
-constexpr uintptr_t tc6_bvector = 14;
+constexpr uintptr_t tc6_u8vector = 14;
 constexpr uintptr_t tc6_complex = 15;
 constexpr uintptr_t tc6_rational = 16;
 constexpr uintptr_t tc6_heapenv = 17;
@@ -99,6 +99,18 @@ struct scm_string_rec_t {
   uint8_t* name;
 };
 
+struct scm_vector_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t* elts;
+  int nsize;
+};
+
+struct scm_u8vector_rec_t {
+  scm_tc6_t tag;
+  uint8_t* elts;
+  int nsize;
+};
+
 inline bool is_heap_pointer(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
@@ -124,7 +136,8 @@ inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
 inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
 inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
-
+inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
+inline bool is_u8vector(scm_obj_t x) { return is_tc6(x, tc6_u8vector); }
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 
@@ -133,10 +146,17 @@ scm_obj_t make_list(int len, ...);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
 scm_obj_t make_string(const char* name);
+scm_obj_t make_vector(int nsize, scm_obj_t init);
+scm_obj_t make_u8vector(int nsize);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
 uint8_t* symbol_name(scm_obj_t x);
 uint8_t* string_name(scm_obj_t x);
+
+inline int vector_nsize(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->nsize; }
+inline scm_obj_t* vector_elts(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->elts; }
+inline int u8vector_nsize(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->nsize; }
+inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->elts; }
 
 #endif

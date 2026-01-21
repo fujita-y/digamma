@@ -4,15 +4,15 @@
 
 static bool some_test_failed = false;
 
-static bool test_gc_allocation() {
+static bool test_gc_allocation(int num_loops) {
   object_heap_t heap;
 
   heap.init(1024 * 256, 1024 * 64);
 
   // Allocate enough objects to potentially trigger GC or just verify allocation works
-  for (int i = 0; i < 10000; i++) {
-    scm_obj_t obj = make_cons(make_symbol("foo"),
-                              make_list(2, make_cons(make_fixnum(1), make_fixnum(2)), make_cons(make_symbol("bar"), make_string("baz"))));
+  for (int i = 0; i < num_loops; i++) {
+    scm_obj_t obj = make_cons(make_symbol("foo"), make_list(3, make_cons(make_fixnum(1), make_fixnum(2)),
+                                                            make_cons(make_symbol("bar"), make_string("baz")), make_u8vector(122)));
     usleep(1);
     heap.safepoint();
     if (!is_cons(obj)) {
@@ -29,7 +29,11 @@ static bool test_gc_allocation() {
 }
 
 int main(int argc, char** argv) {
-  test_gc_allocation();
+  int num_loops = 10000;
+  if (argc > 1) {
+    num_loops = atoi(argv[1]);
+  }
+  test_gc_allocation(num_loops);
   return some_test_failed ? 1 : 0;
 }
 

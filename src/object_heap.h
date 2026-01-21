@@ -19,6 +19,8 @@ class object_heap_t {
   concurrent_slab_t m_flonums;
   concurrent_slab_t m_symbols;
   concurrent_slab_t m_strings;
+  concurrent_slab_t m_vectors;
+  concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_privates[8];  // 16-32-64-128-256-512-1024-2048
   uint64_t m_trip_bytes;
 
@@ -43,6 +45,8 @@ class object_heap_t {
   void* alloc_flonum() { return alloc_object(m_flonums); }
   void* alloc_symbol() { return alloc_object(m_symbols); }
   void* alloc_string() { return alloc_object(m_strings); }
+  void* alloc_vector() { return alloc_object(m_vectors); }
+  void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_private(size_t size);
 
   uint64_t m_collect_trip_bytes;

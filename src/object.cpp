@@ -95,6 +95,27 @@ scm_obj_t make_string(const char* name) {
   return tc6_pointer(obj, tc6_string);
 }
 
+scm_obj_t make_vector(int nsize, scm_obj_t init) {
+  void* obj = object_heap_t::current()->alloc_vector();
+  ((scm_vector_rec_t*)obj)->tag = tc6_tag(tc6_vector);
+  ((scm_vector_rec_t*)obj)->elts = (scm_obj_t*)object_heap_t::current()->alloc_private(nsize * sizeof(scm_obj_t));
+  ((scm_vector_rec_t*)obj)->nsize = nsize;
+  for (int i = 0; i < nsize; i++) {
+    ((scm_vector_rec_t*)obj)->elts[i] = init;
+  }
+  return tc6_pointer(obj, tc6_vector);
+}
+
+scm_obj_t make_u8vector(int nsize) {
+  void* obj = object_heap_t::current()->alloc_u8vector(nsize);
+  uint8_t* elts = (uint8_t*)object_heap_t::current()->alloc_private(nsize * sizeof(uint8_t));
+  memset(elts, 0, nsize * sizeof(uint8_t));
+  ((scm_u8vector_rec_t*)obj)->tag = tc6_tag(tc6_u8vector);
+  ((scm_u8vector_rec_t*)obj)->elts = elts;
+  ((scm_u8vector_rec_t*)obj)->nsize = nsize;
+  return tc6_pointer(obj, tc6_u8vector);
+}
+
 uint8_t* string_name(scm_obj_t x) {
   if (!is_string(x)) fatal("%s:%u internal error: string expected.", __FILE__, __LINE__);
   return ((scm_string_rec_t*)to_address(x))->name;
