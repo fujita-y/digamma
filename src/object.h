@@ -42,19 +42,20 @@ typedef uintptr_t scm_tc6_t;
 
 constexpr uintptr_t tc6_symbol = 0;
 constexpr uintptr_t tc6_string = 1;
-constexpr uintptr_t tc6_bignum = 2;
-constexpr uintptr_t tc6_long_flonum = 3;
-constexpr uintptr_t tc6_cont = 4;
-constexpr uintptr_t tc6_closure = 5;
-constexpr uintptr_t tc6_subr = 6;
-constexpr uintptr_t tc6_vector = 7;
-constexpr uintptr_t tc6_port = 8;
-constexpr uintptr_t tc6_values = 9;
-constexpr uintptr_t tc6_hashtable = 10;
-constexpr uintptr_t tc6_gloc = 11;
-constexpr uintptr_t tc6_tuple = 12;
-constexpr uintptr_t tc6_weakhashtable = 13;
-constexpr uintptr_t tc6_u8vector = 14;
+constexpr uintptr_t tc6_long_flonum = 2;
+constexpr uintptr_t tc6_vector = 3;
+constexpr uintptr_t tc6_u8vector = 4;
+/*
+constexpr uintptr_t tc6_bignum = 5;
+constexpr uintptr_t tc6_cont = 6;
+constexpr uintptr_t tc6_closure = 7;
+constexpr uintptr_t tc6_subr = 8;
+constexpr uintptr_t tc6_port = 9;
+constexpr uintptr_t tc6_values = 10;
+constexpr uintptr_t tc6_hashtable = 11;
+constexpr uintptr_t tc6_gloc = 12;
+constexpr uintptr_t tc6_tuple = 13;
+constexpr uintptr_t tc6_weakhashtable = 14;
 constexpr uintptr_t tc6_complex = 15;
 constexpr uintptr_t tc6_rational = 16;
 constexpr uintptr_t tc6_heapenv = 17;
@@ -62,8 +63,12 @@ constexpr uintptr_t tc6_heapcont = 18;
 constexpr uintptr_t tc6_weakmapping = 19;
 constexpr uintptr_t tc6_environment = 20;
 constexpr uintptr_t tc6_socket = 21;
+*/
 
-inline scm_obj_t singleton(uintptr_t val) { return (val << 4) | 0x06; }
+inline scm_obj_t singleton(uintptr_t val) {
+  assert(val >= 2 && val <= 15);
+  return (val << 4) | 0x06;
+}
 
 const scm_obj_t scm_true = singleton(2);
 const scm_obj_t scm_false = singleton(3);
@@ -71,6 +76,7 @@ const scm_obj_t scm_nil = singleton(4);
 const scm_obj_t scm_undef = singleton(5);
 const scm_obj_t scm_unspecified = singleton(6);
 const scm_obj_t scm_eof = singleton(7);
+/*
 const scm_obj_t scm_timeout = singleton(8);
 const scm_obj_t scm_shutdown = singleton(9);
 const scm_obj_t scm_hash_free = singleton(10);
@@ -78,6 +84,7 @@ const scm_obj_t scm_hash_deleted = singleton(11);
 const scm_obj_t scm_proc_apply = singleton(12);
 const scm_obj_t scm_proc_callcc = singleton(13);
 const scm_obj_t scm_proc_apply_values = singleton(14);
+*/
 
 struct scm_cons_rec_t {
   scm_obj_t car;

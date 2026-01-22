@@ -41,7 +41,12 @@
   #include <spawn.h>
 #endif
 
+#include <cctype>
+#include <cstdlib>
 #include <functional>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #if defined(NO_TLS)
   #undef NO_TLS

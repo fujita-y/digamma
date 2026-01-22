@@ -2,6 +2,30 @@
 #include "../src/object.h"
 #include "../src/object_heap.h"
 
+void fatal(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+void warning(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+}
+
+void trace(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+}
+
 static bool some_test_failed = false;
 
 static bool test_gc_allocation(int num_loops) {
@@ -35,28 +59,4 @@ int main(int argc, char** argv) {
   }
   test_gc_allocation(num_loops);
   return some_test_failed ? 1 : 0;
-}
-
-void fatal(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  fprintf(stderr, "\n");
-  exit(1);
-}
-
-void warning(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  fprintf(stderr, "\n");
-}
-
-void trace(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
 }

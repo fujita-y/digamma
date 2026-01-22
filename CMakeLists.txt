@@ -56,7 +56,10 @@ add_executable(
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
-  src/nanos.cpp)
+  src/reader.cpp
+  src/printer.cpp
+  src/nanos.cpp
+  src/utf8.cpp)
 
 execute_process(
   COMMAND llvm-config --libs all
@@ -73,7 +76,8 @@ add_executable(
   src/object.cpp
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
-  src/concurrent_slab.cpp)
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
 target_link_libraries(test_object ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -89,12 +93,69 @@ add_executable(
   src/object.cpp
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
-  src/concurrent_slab.cpp)
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
 target_link_libraries(test_gc ${llvm_libs} -pthread -ldl)
 
 add_test(
   NAME test_gc
   COMMAND $<TARGET_FILE:test_gc>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(
+  test_printer
+  tests/test_printer.cpp
+  src/printer.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
+target_link_libraries(test_printer ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_printer
+  COMMAND $<TARGET_FILE:test_printer>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(
+  test_reader
+  tests/test_reader.cpp
+  src/reader.cpp
+  src/printer.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
+target_link_libraries(test_reader ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_reader
+  COMMAND $<TARGET_FILE:test_reader>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(
+  test_r7rs
+  tests/test_r7rs.cpp
+  src/reader.cpp
+  src/printer.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
+target_link_libraries(test_r7rs ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_r7rs
+  COMMAND $<TARGET_FILE:test_r7rs>
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(APPLE)
@@ -114,3 +175,22 @@ install(DIRECTORY sitelib/ DESTINATION ${NANOS_SITELIB_DIRECTORY})
 install(TARGETS nanos DESTINATION bin)
 
 enable_testing()
+
+add_executable(
+  test_radix
+  tests/test_radix.cpp
+  src/reader.cpp
+  src/printer.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
+target_link_libraries(test_radix ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_radix
+  COMMAND $<TARGET_FILE:test_radix>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
