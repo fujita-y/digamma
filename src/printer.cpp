@@ -15,7 +15,7 @@ void printer_t::format(scm_obj_t obj) {
     return;
   }
 
-  if (is_heap_pointer(obj)) {
+  if (is_heap_object(obj)) {
     if (is_symbol(obj)) {
       std::string s = (char*)symbol_name(obj);
       bool special = false;

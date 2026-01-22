@@ -104,7 +104,7 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::shade(scm_obj_t obj) {
-  if (!is_heap_pointer(obj)) return;
+  if (!is_heap_object(obj)) return;
   // TODO: add additional early return if TBI enabled
   m_concurrent_heap.shade(to_address(obj));
 }

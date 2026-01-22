@@ -14,10 +14,10 @@
 
 /*
 
-|<                               fixnum 63bit                                 >1| fixnum
+|<                                fixnum 63bit                                >1| fixnum
 |---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .000| cons pointer
 |-< tc6 >- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- .010| tc6 heap object pointer
-|<                               61bit flonum                               >100| short flonum
+|<                                flonum 61bit                              >100| short flonum
 |.... .... .... .... .... .... .... .... .... .... .... .... ..< tc6 > 0000 .110| tc6 heap object tag
 |.... .... .... .... .... .... .... .... .... .... .... .... ..00 0000 0000 .110| tc6: symbol
 |.... .... .... .... .... .... .... .... .... .... .... .... ..00 0001 0000 .110| tc6: string
@@ -118,22 +118,22 @@ struct scm_u8vector_rec_t {
   int nsize;
 };
 
-inline bool is_heap_pointer(scm_obj_t x) { return (x & 0x07) == 0x02; }
+inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #if USE_TBI
   uint64_t bits = __builtin_rotateleft64(x, 7);
   return (bits & 0x3bf) == (0x100 + tc6);
 #else
-  if (!is_heap_pointer(x)) return false;
-  scm_tc6_t tag = *(scm_tc6_t*)(x & ~0x07);
+  if (!is_heap_object(x)) return false;
+  scm_tc6_t tag = *(scm_tc6_t*)(x - 2);
   return ((tag >> 8) & 0x3f) == tc6;
 #endif
 }
 
 inline void* to_address(scm_obj_t x) {
-  assert((x & 0x07) == 0x02);
-  return (void*)(x & ~0x07);
+  assert(is_heap_object(x));
+  return (void*)(x - 2);
 }
 
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
