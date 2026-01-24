@@ -1,7 +1,7 @@
 ;; syntax_rules.scm
-;; R7RS-style syntax-rules implementation (simplified research version)
-
-;; This module provides the core pattern matching and template expansion logic.
+;; R7RS-compatible syntax-rules implementation for research.
+;; Provides pattern matching against syntax-rules patterns and
+;; template substitution with ellipsis expansion and hygiene support.
 
 
 
@@ -10,8 +10,8 @@
   (if (= n 0) '() (cons (car list) (take (cdr list) (- n 1)))))
 
 
-
-;; Analyze pattern to determine depth of each variable
+;; Analyze pattern to compute nesting depth of each pattern variable.
+;; Returns an alist mapping variable names to their ellipsis depth.
 (define (analyze-pattern-vars pattern literals ellipsis depth)
   (cond
    ((and (symbol? pattern) 
@@ -33,7 +33,8 @@
     
    (else '())))
 
-;; Exported main function
+;; Main entry point: match input against rules and expand the matching template.
+;; rename is a function that renames introduced identifiers for hygiene.
 (define (apply-syntax-rules literals rules input rename ellipsis)
   ;; input is (macro-name arg ...)
   (let loop ((rules rules))
@@ -48,18 +49,17 @@
                 (subst-template template bindings rename ellipsis meta-env 0 literals))
               (loop (cdr rules)))))))
 
+;; Check if input matches the given pattern.
 (define (syntax-match? literals pattern input ellipsis)
   (cond
-    ;; 1. Literal identifier match
+    ;; Literal identifier: must match exactly
     ((and (symbol? pattern) (memq pattern literals))
      (and (symbol? input) (eq? pattern input)))
     
-    ;; 2. Pattern Variable (underscore is always a wildcard)
-    ((symbol? pattern)
-     (and (not (memq pattern literals))
-          (or (eq? pattern '_) #t))) ;; binds anything
+    ;; Pattern variable: matches anything (including underscore wildcard)
+    ((symbol? pattern) #t)
     
-    ;; 3. Lists with ellipsis
+    ;; Ellipsis pattern (P ... rest): match zero or more P, then match rest
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
      (and (list? input)
           (let loop ((xs input))
@@ -70,20 +70,22 @@
                     (and (syntax-match? literals (car pattern) (car xs) ellipsis)
                          (loop (cdr xs))))))))
     
-    ;; 4. Pairs
+    ;; Pair: recursively match car and cdr
     ((pair? pattern)
      (and (pair? input)
           (syntax-match? literals (car pattern) (car input) ellipsis)
           (syntax-match? literals (cdr pattern) (cdr input) ellipsis)))
     
-    ;; 5. Vectors
+    ;; Vector: convert to list and match
     ((vector? pattern)
      (and (vector? input)
           (syntax-match? literals (vector->list pattern) (vector->list input) ellipsis)))
     
-    ;; 6. Constants
+    ;; Constant datum: compare for equality
     (else (equal? pattern input))))
 
+;; Extract bindings from input based on the pattern.
+;; For ellipsis patterns, variables are bound to lists of matched values.
 (define (syntax-bind literals pattern input ellipsis)
   (cond
     ((and (symbol? pattern) (memq pattern literals)) '())
@@ -117,6 +119,7 @@
      
     (else '())))
 
+;; Collect all pattern variable names from a pattern.
 (define (pattern-vars pattern literals ellipsis)
   (cond
    ((and (symbol? pattern) 
@@ -129,44 +132,49 @@
             (pattern-vars (cdr pattern) literals ellipsis)))
    (else '())))
 
+;; Filter elements of lst satisfying pred (R5RS-compatible helper).
 (define (my-filter pred lst)
   (cond ((null? lst) '())
         ((pred (car lst)) (cons (car lst) (my-filter pred (cdr lst))))
         (else (my-filter pred (cdr lst)))))
 
+;; Substitute bindings into the template, handling ellipsis expansion.
+;; meta-env maps pattern variables to their ellipsis depth.
+;; depth tracks current expansion level for proper ellipsis driver selection.
 (define (subst-template template env rename ellipsis meta-env depth literals)
   (cond
+   ;; Symbol: look up in bindings, or rename if unbound (hygiene)
    ((symbol? template)
     (let ((val (assq template env)))
       (if val 
           (cdr val) 
           (rename template))))
    
-    ((and (pair? template) (eq? (car template) ellipsis))
-     (if (and (pair? (cdr template)) (null? (cddr template)))
-         ;; (... <tmpl>) -> substitution disabled for ellipsis identifier
-         (subst-template (cadr template) env rename (gensym "no-ellipsis") meta-env depth literals)
-         (rename (car template))))
+   ;; Escaped ellipsis: (... <tmpl>) disables ellipsis processing for <tmpl>
+   ((and (pair? template) (eq? (car template) ellipsis))
+    (if (and (pair? (cdr template)) (null? (cddr template)))
+        (subst-template (cadr template) env rename (gensym "no-ellipsis") meta-env depth literals)
+        (rename (car template))))
 
+   ;; Ellipsis expansion: (sub-templ ... . rest)
+   ;; Find driver variables (those at sufficient depth) and iterate over them.
    ((and (pair? template) (pair? (cdr template)) (eq? (cadr template) ellipsis))
-    ;; (sub-templ ... . rest)
     (let* ((p (car template))
            (all-vars (pattern-vars p '() ellipsis)) 
-           ;; Filter: var is driver iff (depth-in-pattern >= depth-in-template + 1)
-           ;; Actually, we are entering ellipsis level 'depth + 1'.
+           ;; Driver variables: those bound at ellipsis depth >= current depth + 1
            (vars (my-filter (lambda (v) 
                               (let ((pair (assq v meta-env)))
                                 (and pair (>= (cdr pair) (+ depth 1))))) 
                             all-vars))
-           
+           ;; Determine iteration count from first driver variable's binding length
            (len (if (null? vars) 
-                    (let ((p-vars (pattern-vars p literals ellipsis))) ;; Check if P has ANY vars
+                    (let ((p-vars (pattern-vars p literals ellipsis)))
                        (if (null? p-vars)
                            0 
                            (error "too few ellipsis in pattern for template" template)))
                     (let ((binding (assq (car vars) env)))
                       (if binding (length (cdr binding)) 0))))
-           
+           ;; Build per-iteration environments by extracting i-th element from each driver
            (new-envs (map (lambda (i)
                             (map (lambda (v)
                                    (cons v (list-ref (cdr (assq v env)) i)))
@@ -176,12 +184,15 @@
                      (subst-template p (append sub-env env) rename ellipsis meta-env (+ depth 1) literals)) 
                    new-envs)
               (subst-template (cddr template) env rename ellipsis meta-env depth literals))))
-              
+               
+   ;; Pair: recursively substitute car and cdr
    ((pair? template)
     (cons (subst-template (car template) env rename ellipsis meta-env depth literals)
           (subst-template (cdr template) env rename ellipsis meta-env depth literals)))
           
+   ;; Vector: convert to list, substitute, convert back
    ((vector? template)
     (list->vector (subst-template (vector->list template) env rename ellipsis meta-env depth literals)))
-    
+   
+   ;; Constant datum: return as-is
    (else template)))

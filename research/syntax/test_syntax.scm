@@ -10,39 +10,10 @@
              (display "  Expected: ") (display expected) (newline)
              (display "  Actual:   ") (display actual) (newline))))
 
-(define (my-every? pred lst)
-  (if (null? lst) #t
-      (and (pred (car lst)) (my-every? pred (cdr lst)))))
-
-(define (strip-suffix str)
-  (let loop ((chars (reverse (string->list str))) (suffix '()))
-    (if (null? chars)
-        str
-        (if (char=? (car chars) #\.)
-            ;; Found dot from right
-            (if (and (not (null? suffix)) (my-every? char-numeric? suffix))
-                (strip-suffix (list->string (reverse (cdr chars))))
-                (if (and (not (null? suffix)))
-                    (let ((stripped (list->string (reverse (cdr chars)))))
-                      ;; Recurse to strip more suffixes (e.g. .10.11 -> .10 -> "")
-                      (strip-suffix stripped))
-                    str))
-            (loop (cdr chars) (cons (car chars) suffix))))))
-
-(define (strip-renames expr)
-  (cond
-   ((symbol? expr)
-    (string->symbol (strip-suffix (symbol->string expr))))
-   ((pair? expr)
-    (cons (strip-renames (car expr))
-          (strip-renames (cdr expr))))
-   ((vector? expr)
-    (list->vector (map strip-renames (vector->list expr))))
-   (else expr)))
 
 (define (test expected expr msg)
-  (let ((expanded (expand expr)))
-    (if (equal? expected (strip-renames expanded))
+  (let ((expanded (macroexpand expr)))
+    (if (equal? expected expanded)
         (begin
           (display "PASS: ")
           (display msg)
@@ -56,9 +27,6 @@
           (newline)
           (display "  Actual:   ")
           (display expanded)
-          (newline)
-          (display "  Stripped: ")
-          (display (strip-renames expanded))
           (newline)))))
 
 (display "\n>>> macroexpand\n")
@@ -188,9 +156,9 @@
 
 ;; let*-syntax scoping
 (test '(begin (begin (begin (begin 1 2))))
-      '(let*-syntax ((a (syntax-rules () ((_) (b))))
-                      (b (syntax-rules () ((_) (begin 1 2)))))
-         (a))
+      '(let*-syntax ((a (syntax-rules () ((_) (begin 1 2))))
+                      (b (syntax-rules () ((_) (a)))))
+         (b))
       "let*-syntax sequential visibility")
 
 ;; let*-syntax shadowing
@@ -252,7 +220,7 @@
       "Gauche let-syntax multi")
 
 ;; let-syntax (nest)
-(test '(begin (begin 2))
+(test '(begin (begin (+ 9 10)))
       '(let-syntax ((a (syntax-rules () ((_ ?x ...) (+ ?x ...)))))
           (let-syntax ((a (syntax-rules ()
                              ((_ ?x ?y ...) (a ?y ...))
@@ -299,7 +267,7 @@
       "Pitfall 3.4: let-syntax with no clauses")
 
 ;; Pitfall 8.1
-(test '((letrec ((- (lambda (n) n))) -) (- 1))
+(test '((letrec* ((- (lambda (n) n))) -) (- 1))
       '(let - ((n (- 1))) n)
       "Pitfall 8.1: named let with name -")
 
@@ -573,3 +541,35 @@
 
 (test ''arrow '(symbol-literal =>) "symbol literal match")
 (test ''not-arrow '(symbol-literal other) "symbol literal non-match")
+
+(display "\n>>> local syntax scoping\n")
+
+;; User Case 1: letrec-syntax scoping
+(test '(let ((f (lambda (x) (+ x 1))))
+         (begin
+           (list 1 1)))
+      '(let ((f (lambda (x) (+ x 1)))) ; an outer variable binding for 'f'
+         (letrec-syntax ((f (syntax-rules () ((_ x) x))) ; local macro 'f'
+                         (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
+           (list (f 1) (g 1))))
+      "User requested: letrec-syntax scoping case")
+
+;; User Case 2: let-syntax scoping
+(test '(let ((f (lambda (x) (+ x 1))))
+         (begin
+           (list 1 (f 1))))
+      '(let ((f (lambda (x) (+ x 1)))) ; an outer variable binding for 'f'
+         (let-syntax ((f (syntax-rules () ((_ x) x))) ; local macro 'f'
+                         (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
+           (list (f 1) (g 1))))
+      "User requested: let-syntax scoping case")
+
+(display "\n>>> let* and letrec*\n")
+
+(test '(let ((x 1)) (let ((y (+ x 1))) (+ x y)))
+      '(let* ((x 1) (y (+ x 1))) (+ x y))
+      "let* sequential binding")
+
+(test '(letrec* ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))) (f 5))
+      '(letrec ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))) (f 5))
+      "letrec* sequential recursive binding")
