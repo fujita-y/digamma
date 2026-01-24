@@ -111,13 +111,7 @@
       (let ((head (car expr)))
         (if (symbol? head)
             ;; Check if it's a macro (and not shadowed)
-            ;; Note: head must be resolved regarding rename-env first?
-            ;; If 'head' is 'x', and 'x' is renamed to 'x.1', we should check 'x.1'?
-            ;; No, if x is renamed, it refers to a variable, not a macro (unless macro was passed as arg?)
-            ;; But macros are usually top-level or let-syntax.
-            ;; let-syntax names are NOT renamed in key lookup usually.
-            ;; But if we rename 'let' vars, we should be consistent.
-            ;; Simplified: Check simple head. 
+            ;; We look up the original name in the macro environment. 
             (let ((transformer (if (memq head shadowed-env) #f (lookup-macro head macro-env))))
               (if transformer
                   (expand (transformer expr) macro-env shadowed-env rename-env)
@@ -175,19 +169,46 @@
                          ,@(map-improper (lambda (x) (expand x macro-env new-shadowed new-renames)) (cddr expr)))))
                    
                    ((core-form? head 'let shadowed-env)
+                    (if (symbol? (cadr expr))
+                        ;; Named let: (let name bindings body...)
+                        (let ((name (cadr expr))
+                              (bindings (caddr expr))
+                              (body (cdddr expr)))
+                           (let* ((vars (map car bindings))
+                                  (vals (map cadr bindings)))
+                             ;; Transform to ((letrec ((name (lambda vars body...))) name) vals...)
+                             (expand `((letrec ((,name (lambda ,vars ,@body)))
+                                         ,name)
+                                       ,@vals)
+                                     macro-env shadowed-env rename-env)))
+                        ;; Standard let
+                        (let* ((bindings (cadr expr))
+                               (vars (map car bindings))
+                               (vals (map cadr bindings))
+                               ;; Vals expanded in CURRENT env
+                               (expanded-vals (map (lambda (x) (expand x macro-env shadowed-env rename-env)) vals))
+                               ;; Alpha-conversion
+                               (new-vars (map (lambda (v) (rename-symbol v (fresh-suffix))) vars))
+                               (new-renames (append (map cons vars new-vars) rename-env))
+                               (new-shadowed (append vars shadowed-env))
+                               (new-bindings (map list new-vars expanded-vals)))
+                          `(let ,new-bindings
+                             ,@(map-improper (lambda (x) (expand x macro-env new-shadowed new-renames)) (cddr expr))))))
+                   
+                   ((core-form? head 'letrec shadowed-env)
                     (let* ((bindings (cadr expr))
                            (vars (map car bindings))
                            (vals (map cadr bindings))
-                           ;; Vals expanded in CURRENT env
-                           (expanded-vals (map (lambda (x) (expand x macro-env shadowed-env rename-env)) vals))
-                           ;; Alpha-conversion
+                           ;; Alpha-conversion first
                            (new-vars (map (lambda (v) (rename-symbol v (fresh-suffix))) vars))
                            (new-renames (append (map cons vars new-vars) rename-env))
                            (new-shadowed (append vars shadowed-env))
+                           ;; Vals expanded in NEW env (recursive)
+                           (expanded-vals (map (lambda (x) (expand x macro-env new-shadowed new-renames)) vals))
                            (new-bindings (map list new-vars expanded-vals)))
-                      `(let ,new-bindings
+                      `(letrec ,new-bindings
                          ,@(map-improper (lambda (x) (expand x macro-env new-shadowed new-renames)) (cddr expr)))))
-                   
+
                    ((core-form? head 'set! shadowed-env)
                     ;; target var might be renamed
                     (let* ((var (cadr expr))
