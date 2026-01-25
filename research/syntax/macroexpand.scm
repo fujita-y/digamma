@@ -524,6 +524,6 @@
 
     ;; Expand the expression.
     ;; Pass 'no-strip as optional argument to preserve rename suffixes.
-    (if (and (pair? opt) (eq? (car opt) 'no-strip))
-        (expand expr '() '() '())
-        (strip-renames (expand expr '() '() '())))))
+    (if (and (pair? opt) (eq? (car opt) 'strip))
+        (strip-renames (expand expr '() '() '()))
+        (expand expr '() '() '()))))

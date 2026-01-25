@@ -22,7 +22,7 @@
 
 
 (define (test expected expr msg)
-  (let ((expanded (macroexpand expr)))
+  (let ((expanded (macroexpand expr 'strip)))
     (if (equal? expected expanded)
         (begin
           (display "PASS: ")
@@ -115,7 +115,7 @@
                 (set! b temp))))))
 
 (define result (macroexpand '(let ((temp 1) (other 2))
-                          (swap temp other)) 'no-strip))
+                          (swap temp other))))
 
 (display "Expansion result: ")
 (display result)
