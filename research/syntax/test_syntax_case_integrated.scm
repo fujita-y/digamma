@@ -192,4 +192,40 @@
       (macroexpand '(nested-with 99) 'strip)
       '(list 99 inner-sym))
 
+;; quasisyntax test
+(macroexpand
+ '(define-syntax test-quasisyntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (quasisyntax (list (unsyntax (syntax val)) (unsyntax (+ (syntax->datum (syntax val)) 1)))))))))
+
+(test "quasisyntax-basic"
+      (macroexpand '(test-quasisyntax 10) 'strip)
+      '(list 10 11))
+
+;; quasisyntax with unsyntax-splicing
+(macroexpand
+ '(define-syntax test-unsyntax-splicing
+    (lambda (x)
+      (syntax-case x ()
+        ((_ vals)
+         (quasisyntax (list (unsyntax-splicing (syntax->datum (syntax vals))))))))))
+
+(test "quasisyntax-splicing"
+      (macroexpand '(test-unsyntax-splicing (1 2 3)) 'strip)
+      '(list 1 2 3))
+
+;; Nested quasisyntax
+(macroexpand
+ '(define-syntax nested-quasisyntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (quasisyntax (list (unsyntax (quasisyntax (list (unsyntax (syntax val))))))))))))
+
+(test "quasisyntax-nested"
+      (macroexpand '(nested-quasisyntax 42) 'strip)
+      '(list (list 42)))
+
 (display "Done.\n")

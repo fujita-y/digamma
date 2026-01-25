@@ -144,6 +144,8 @@
 ;; SECTION 4: Syntax Template Expansion
 ;;=============================================================================
 
+(define *syntax-temp-counter* 0)
+
 (define (syntax-depth-map pattern literals ellipsis depth)
   (cond
     ((and (symbol? pattern) (not (member pattern literals)) (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
@@ -189,6 +191,47 @@
     (else template)))
 
 ;;=============================================================================
+;; SECTION 4.5: Quasisyntax Support
+;;=============================================================================
+
+(define (extract-quasisyntax x depth literals)
+  (cond
+    ((pair? x)
+     (cond
+       ((and (eq? (car x) 'quasisyntax) (pair? (cdr x)) (null? (cddr x)))
+        (let ((res (extract-quasisyntax (cadr x) (+ depth 1) literals)))
+          (cons `(quasisyntax ,(car res)) (cdr res))))
+       ((and (eq? (car x) 'unsyntax) (pair? (cdr x)) (null? (cddr x)))
+        (if (= depth 0)
+            (let ((tmp (string->symbol (string-append "unsyntax." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
+              (cons (list '**splice-unsyntax** tmp) (list (list tmp (cadr x)))))
+            (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
+              (cons `(unsyntax ,(car res)) (cdr res)))))
+       ((and (eq? (car x) 'unsyntax-splicing) (pair? (cdr x)) (null? (cddr x)))
+        (if (= depth 0)
+            (let ((tmp (string->symbol (string-append "unsyntax-splicing." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
+              (cons (list '**splice-unsyntax-splicing** tmp) (list (list (list tmp '...) (cadr x)))))
+            (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
+              (cons `(unsyntax-splicing ,(car res)) (cdr res)))))
+       (else
+        (let ((car-res (extract-quasisyntax (car x) depth literals))
+              (cdr-res (extract-quasisyntax (cdr x) depth literals)))
+          (let ((car-tmpl (car car-res))
+                (cdr-tmpl (car cdr-res))
+                (bindings (append (cdr car-res) (cdr cdr-res))))
+            (cond
+              ((and (pair? car-tmpl) (eq? (car car-tmpl) '**splice-unsyntax**))
+               (cons (cons (cadr car-tmpl) cdr-tmpl) bindings))
+              ((and (pair? car-tmpl) (eq? (car car-tmpl) '**splice-unsyntax-splicing**))
+               (cons (append (list (cadr car-tmpl) '...) cdr-tmpl) bindings))
+              (else
+               (cons (cons car-tmpl cdr-tmpl) bindings))))))))
+    ((vector? x)
+     (let ((res (extract-quasisyntax (vector->list x) depth literals)))
+       (cons (list->vector (car res)) (cdr res))))
+    (else (cons x '()))))
+
+;;=============================================================================
 ;; SECTION 4: syntax-case Core
 ;;=============================================================================
 ;; with-syntax (R6RS)
@@ -202,7 +245,6 @@
                         env)))
 
 ;; generate-temporaries (R6RS)
-(define *syntax-temp-counter* 0)
 (define (generate-temporaries l)
   (let ((lst (syntax->list l)))
     (map (lambda (x)
@@ -267,6 +309,13 @@
        (cond
          ((eq? (car x) 'syntax)
           `(expand-syntax ',(cadr x) *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals))
+         ((eq? (car x) 'quasisyntax)
+          (let ((res (extract-quasisyntax (cadr x) 0 literals)))
+            (let ((new-tmpl (car res))
+                  (bindings (cdr res)))
+              (if (null? bindings)
+                  `(expand-syntax ',new-tmpl *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals)
+                  (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
          ((eq? (car x) 'syntax-case)
           (let ((input (loop (cadr x)))
                 (lits (caddr x))
