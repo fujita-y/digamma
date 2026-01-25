@@ -107,9 +107,34 @@
 (define (rename-symbol sym suffix)
   (string->symbol (string-append (symbol->string sym) "." suffix)))
 
-;;=========================================================================
-;; MACRO LOOKUP & CORE FORM DETECTION
-;;=========================================================================
+;; Construct a sequence, flattening nested begins and removing single-element wrappers.
+;; Flatten a list of expressions by splicing in nested 'begin' forms.
+(define (flatten-begins exprs)
+  (let loop ((exprs exprs))
+    (cond ((null? exprs) '())
+          ((pair? exprs)
+           (let ((first (car exprs)))
+             (if (and (pair? first) (eq? (car first) 'begin))
+                 (append (loop (cdr first)) (loop (cdr exprs)))
+                 (cons first (loop (cdr exprs))))))
+          (else (list exprs)))))
+
+;; Construct a sequence, flattening nested begins and removing single-element wrappers.
+(define (make-seq exprs)
+  (let ((flat (flatten-begins exprs)))
+    (cond ((null? flat) '(begin)) ;; Empty sequence
+          ((null? (cdr flat)) (car flat)) ;; Single element
+          (else `(begin ,@flat)))))
+
+;; ... binding vars ...
+
+;; ... define-syntax / compile-transformer ...
+
+;; ... expand ...
+;; Replace `(begin ...)` construction with (make-seq ...) in expand-let-syntax etc.
+
+;; Note: since the file is monolithic, I will splice `make-seq` in UTILITY functions section
+;; and update the `expand` function to use it.
 
 ;; Unwrap a promise-wrapped environment (used for letrec-syntax).
 (define (unwrap-env env)
@@ -288,7 +313,7 @@
                                                 bindings))
                               (new-env (append (map cons names transformers) macro-env))
                               (new-shadowed (remove-from-list shadowed-env names)))
-                        `(begin ,@(map-improper
+                        (make-seq (map-improper
                                     (lambda (x) (expand x new-env new-shadowed rename-env))
                                     body))))
 
@@ -306,7 +331,7 @@
                               (new-shadowed (remove-from-list shadowed-env names)))
                         ;; Fulfill the promise with the completed environment
                         (set-car! (cdr env-promise) new-env)
-                        `(begin ,@(map-improper
+                        (make-seq (map-improper
                                     (lambda (x) (expand x new-env new-shadowed rename-env))
                                     body))))
 
@@ -315,7 +340,7 @@
                       (let ((bindings (cadr expr))
                             (body (cddr expr)))
                         (if (null? bindings)
-                            `(begin ,@(map-improper
+                            (make-seq (map-improper
                                         (lambda (x) (expand x macro-env shadowed-env rename-env))
                                         body))
                             (expand `(let-syntax (,(car bindings))
@@ -342,9 +367,10 @@
                                   param-names new-param-names)
                         (if (null? internal-defs)
                             `(lambda ,new-params
-                                ,@(map-improper
-                                  (lambda (x) (expand x macro-env new-shadowed new-renames))
-                                  body))
+                                ,@(flatten-begins
+                                    (map-improper
+                                      (lambda (x) (expand x macro-env new-shadowed new-renames))
+                                      body)))
                             `(lambda ,new-params
                                 ,(expand `(letrec* ,internal-defs ,@rest-body)
                                         macro-env new-shadowed new-renames)))))
@@ -383,9 +409,10 @@
                                       vars new-vars)
                             (if (null? internal-defs)
                                 `(let ,new-bindings
-                                    ,@(map-improper
-                                      (lambda (x) (expand x macro-env new-shadowed new-renames))
-                                      body))
+                                    ,@(flatten-begins
+                                        (map-improper
+                                          (lambda (x) (expand x macro-env new-shadowed new-renames))
+                                          body)))
                                 `(let ,new-bindings
                                     ,(expand `(letrec* ,internal-defs ,@rest-body)
                                             macro-env new-shadowed new-renames))))))
@@ -427,9 +454,10 @@
                                     (register-renamed! nv v #f))
                                   vars new-vars)
                         `(letrec* ,new-bindings
-                            ,@(map-improper
-                              (lambda (x) (expand x macro-env new-shadowed new-renames))
-                              rest-body))))
+                            ,@(flatten-begins
+                                (map-improper
+                                  (lambda (x) (expand x macro-env new-shadowed new-renames))
+                                  rest-body)))))
 
                       ;; letrec: treat as letrec*
                       ((core-form? head 'letrec shadowed-env)
@@ -454,13 +482,14 @@
                       ;; define: expand body (not name)
                       ((core-form? head 'define shadowed-env)
                       `(define ,(cadr expr)
-                          ,@(map-improper
-                            (lambda (x) (expand x macro-env shadowed-env rename-env))
-                            (cddr expr))))
+                          ,@(flatten-begins
+                              (map-improper
+                                (lambda (x) (expand x macro-env shadowed-env rename-env))
+                                (cddr expr)))))
 
                       ;; begin: expand all subexpressions
                       ((core-form? head 'begin shadowed-env)
-                      `(begin ,@(map-improper
+                      (make-seq (map-improper
                                   (lambda (x) (expand x macro-env shadowed-env rename-env))
                                   (cdr expr))))
 

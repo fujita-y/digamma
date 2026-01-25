@@ -138,41 +138,41 @@
 (display "\n>>> local macros\n")
 
 ;; 1. let-syntax binding
-(test '(begin (+ 1 1))
+(test '(+ 1 1)
       '(let-syntax ((m (syntax-rules () ((m x) (+ x x)))))
          (m 1))
       "let-syntax simple")
 
 ;; 2. let-syntax shadowing
-(test '(begin (begin (+ 2 2)))
+(test '(+ 2 2)
       '(let-syntax ((m (syntax-rules () ((m x) (+ x x)))))
          (let-syntax ((m (syntax-rules () ((m x) (+ 2 2)))))
            (m 1)))
       "let-syntax shadowing")
 
 ;; 3. letrect-syntax mutual recursion (safe)
-(test '(begin 'ok)
+(test ''ok
       '(letrec-syntax ((f (syntax-rules () ((_) (g))))
                        (g (syntax-rules () ((_) 'ok))))
          (f))
       "letrec-syntax mutual recursion safe")
 
 ;; letrec-syntax mutual recursion 2
-(test '(begin (begin 1 2))
+(test '(begin 1 2)
       '(letrec-syntax ((a (syntax-rules () ((_) (b))))
                        (b (syntax-rules () ((_) (begin 1 2)))))
          (a))
       "letrec-syntax mutual recursion 2")
 
 ;; let*-syntax scoping
-(test '(begin (begin (begin (begin 1 2))))
+(test '(begin 1 2)
       '(let*-syntax ((a (syntax-rules () ((_) (begin 1 2))))
                       (b (syntax-rules () ((_) (a)))))
          (b))
       "let*-syntax sequential visibility")
 
 ;; let*-syntax shadowing
-(test '(begin (begin (begin (quote inner))))
+(test ''inner
       '(let-syntax ((a (syntax-rules () ((_) 'outer))))
          (let*-syntax ((a (syntax-rules () ((_) 'inner))))
            (a)))
@@ -181,7 +181,8 @@
 ;; --- Chibi Tests (R5RS 4.3) ---
 
 ;; "let-syntax" scoping
-(test '(let ((x 'outer)) (begin (let ((x 'inner)) x)))
+(test '(let ((x 'outer))
+         (let ((x 'inner)) x))
       '(let ((x 'outer))
          (let-syntax ((m (syntax-rules () ((m) x))))
            (let ((x 'inner))
@@ -189,14 +190,14 @@
       "Chibi let-syntax scoping")
 
 ;; "letrec-syntax" R5RS 4.3.1 - my-or
-(test '(begin (let ((x #f) (y 7) (temp 8) (let odd?) (if even?))
-         (let ((temp x))
-           (if temp temp
-               (let ((temp (let temp)))
-                 (if temp temp
-                     (let ((temp (if y)))
-                       (if temp temp
-                           y))))))))
+(test '(let ((x #f) (y 7) (temp 8) (let odd?) (if even?))
+             (let ((temp x))
+               (if temp temp
+                   (let ((temp (let temp)))
+                     (if temp temp
+                         (let ((temp (if y)))
+                           (if temp temp
+                               y)))))))
       '(letrec-syntax
            ((my-or (syntax-rules ()
                      ((my-or) #f)
@@ -220,7 +221,7 @@
 ;; --- Gauche Tests ---
 
 ;; let-syntax (multi)
-(test '(let ((+ *)) (begin (let ((* -) (+ /)) (+ (* 3 3) (* 3 3)))))
+(test '(let ((+ *)) (let ((* -) (+ /)) (+ (* 3 3) (* 3 3))))
       '(let ((+ *))
           (let-syntax ((a (syntax-rules () ((_ ?x) (+ ?x ?x))))
                        (b (syntax-rules () ((_ ?x) (* ?x ?x)))))
@@ -230,7 +231,7 @@
       "Gauche let-syntax multi")
 
 ;; let-syntax (nest)
-(test '(begin (begin (+ 9 10)))
+(test '(+ 9 10)
       '(let-syntax ((a (syntax-rules () ((_ ?x ...) (+ ?x ...)))))
           (let-syntax ((a (syntax-rules ()
                              ((_ ?x ?y ...) (a ?y ...))
@@ -241,7 +242,7 @@
 ;; --- R5RS Pitfall Tests ---
 
 ;; Pitfall 3.1
-(test '(begin (let ((+ *)) (+ 3 1)))
+(test '(let ((+ *)) (+ 3 1))
       '(let-syntax ((foo
                      (syntax-rules ()
                        ((_ expr) (+ expr 1)))))
@@ -250,7 +251,7 @@
       "Pitfall 3.1: Hygiene with shadowed global operator")
 
 ;; Pitfall 3.2
-(test '(begin (let ((x 2)) (letrec* ((foo +)) (cond (else (foo x))) x)))
+(test '(let ((x 2)) (letrec* ((foo +)) (cond (else (foo x))) x))
       '(let-syntax ((foo (syntax-rules ()
                              ((_ var) (define var 1)))))
           (let ((x 2))
@@ -260,7 +261,7 @@
       "Pitfall 3.2: let-syntax inside let with begin and cond")
 
 ;; Pitfall 3.3
-(test '(let ((x 1)) (begin (begin (bar))))
+(test '(let ((x 1)) (bar))
       '(let ((x 1))
          (let-syntax
              ((foo (syntax-rules ()
@@ -272,7 +273,7 @@
       "Pitfall 3.3: Nested let-syntax hygiene")
 
 ;; Pitfall 3.4
-(test '(begin 1)
+(test '1
       '(let-syntax ((x (syntax-rules ()))) 1)
       "Pitfall 3.4: let-syntax with no clauses")
 
@@ -282,7 +283,7 @@
       "Pitfall 8.1: named let with name -")
 
 ;; Pitfall 8.3
-(test '(let ((x 1)) (begin (define x 2) 3) x)
+(test '(let ((x 1)) (define x 2) 3 x)
       '(let ((x 1))
          (let-syntax ((foo (syntax-rules () ((_) 2))))
            (define x (foo))
@@ -556,8 +557,7 @@
 
 ;; User Case 1: letrec-syntax scoping
 (test '(let ((f (lambda (x) (+ x 1))))
-         (begin
-           (list 1 1)))
+         (list 1 1))
       '(let ((f (lambda (x) (+ x 1)))) ; an outer variable binding for 'f'
          (letrec-syntax ((f (syntax-rules () ((_ x) x))) ; local macro 'f'
                          (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
@@ -566,8 +566,7 @@
 
 ;; User Case 2: let-syntax scoping
 (test '(let ((f (lambda (x) (+ x 1))))
-         (begin
-           (list 1 (f 1))))
+         (list 1 (f 1)))
       '(let ((f (lambda (x) (+ x 1)))) ; an outer variable binding for 'f'
          (let-syntax ((f (syntax-rules () ((_ x) x))) ; local macro 'f'
                          (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
@@ -623,7 +622,7 @@
 
 ;; Internal defines in nested begin
 (test '(let ((x 1)) (letrec* ((y 2) (z 3)) (+ x y z)))
-      '(let ((x 1)) (begin (define y 2) (begin (define z 3) (+ x y z))))
+      '(let ((x 1)) (define y 2) (define z 3) (+ x y z))
       "let internal define")
 
 ;; No internal defines should not add letrec*
