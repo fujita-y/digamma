@@ -552,6 +552,8 @@
 ;; Pass 'no-strip as optional argument to preserve rename suffixes.
 (define macroexpand
   (lambda (expr . opt)
+    (set! *rename-counter* 0)
+    (set! *rename-env* '())
     (if (and (pair? opt) (eq? (car opt) 'strip))
         (strip-renames (expand expr '() '() '()))
         (expand expr '() '() '()))))
