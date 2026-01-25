@@ -85,4 +85,24 @@
 ;; Note: testing duplicate failure might be hard as it's an error.
 ;; We'll just verify it passes for valid input.
 
+;; R6RS 'rec' macro
+(macroexpand
+ '(define-syntax rec
+    (lambda (x)
+      (syntax-case x ()
+        [(_ x e)
+         (identifier? (syntax x))
+         (syntax (letrec ([x e]) x))]))))
+
+(test "r6rs-rec-fact"
+      (macroexpand 
+       '(map (rec fact
+                  (lambda (n)
+                    (if (= n 0)                 
+                        1
+                        (* n (fact (- n 1))))))
+             '(1 2 3 4 5))
+       'strip)
+      '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) fact) (quote (1 2 3 4 5))))
+
 (display "Done.\n")
