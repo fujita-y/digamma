@@ -104,7 +104,6 @@
             id))
       id))
 
-;; Create a renamed symbol with a suffix (e.g., x -> x.1).
 (define (rename-symbol sym suffix)
   (string->symbol (string-append (symbol->string sym) "." suffix)))
 
@@ -205,7 +204,9 @@
      ;; Procedural macro
      (lambda (expr)
        (let ((input (make-syntax-object expr context)))
-         (syntax->datum (eval `((lambda ,(cadr spec) ,@(cddr spec)) ',input) (interaction-environment))))))
+         ;; Transform the procedural macro body to eliminate host-level macros
+         (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '())))
+           (syntax->datum (eval body (interaction-environment)))))))
     (else (error "Only syntax-rules and lambda are supported for macros" spec))))
 
 ;;=========================================================================

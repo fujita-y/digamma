@@ -7,19 +7,22 @@
 ;; SECTION 1: Syntax Objects
 ;;=============================================================================
 
-;; A syntax object is a pair: (datum . context)
-;; context is a structure containing rename-env and macro-env.
+;; A syntax object is a vector: #(**syntax-object** datum context)
 (define (make-syntax-object datum context)
-  (cons 'syntax-object (cons datum context)))
+  (if (or (symbol? datum) (pair? datum) (vector? datum))
+      (vector '**syntax-object** datum context)
+      datum))
 
 (define (syntax-object? obj)
-  (and (pair? obj) (eq? (car obj) 'syntax-object)))
+  (and (vector? obj) 
+       (= (vector-length obj) 3) 
+       (eq? (vector-ref obj 0) '**syntax-object**)))
 
 (define (syntax-object-datum obj)
-  (if (syntax-object? obj) (cadr obj) obj))
+  (if (syntax-object? obj) (vector-ref obj 1) obj))
 
 (define (syntax-object-context obj)
-  (if (syntax-object? obj) (cddr obj) '()))
+  (if (syntax-object? obj) (vector-ref obj 2) '()))
 
 (define (syntax->datum obj)
   (cond
@@ -159,7 +162,7 @@
      (let ((b (assq template bindings)))
        (if (and b (= (or (cdr (assq template meta-env)) 0) depth))
            (cdr b)
-           (make-syntax-object template context))))
+           template)))
     ((pair? template)
      (if (and (pair? (cdr template)) (eq? (cadr template) ellipsis))
          ;; Handle ellipsis in template
@@ -207,6 +210,9 @@
            (make-syntax-object (string->symbol (string-append "temp." (number->string *syntax-temp-counter*))) '()))
          lst)))
 
+(define *current-syntax-bindings* '())
+(define *current-syntax-meta-env* '())
+
 (define (expand-syntax-case input literals clauses env)
   (let ((ellipsis '...))
     (let loop ((clauses clauses))
@@ -218,55 +224,62 @@
                              (if (null? (cddr clause)) #t (cadr clause))))
                  (output (if (null? (cdr clause)) (error "invalid syntax-case clause")
                              (if (null? (cddr clause)) (cadr clause) (caddr clause))))
-                 (bindings (syntax-case-match literals pattern input ellipsis)))
-            (if (and bindings
-                     (eval-fender fender literals pattern bindings env))
-                (eval-output output literals pattern bindings env)
+                 (m (syntax-case-match literals pattern input ellipsis)))
+            (if m
+                (let ((old-bindings *current-syntax-bindings*)
+                      (old-meta *current-syntax-meta-env*)
+                      (new-meta (syntax-depth-map pattern literals ellipsis 0)))
+                  (set! *current-syntax-bindings* (append m old-bindings))
+                  (set! *current-syntax-meta-env* (append new-meta old-meta))
+                  (let ((matched? (eval-fender fender literals pattern *current-syntax-bindings* env)))
+                    (if matched?
+                        (let ((res (eval-output output literals pattern *current-syntax-bindings* env)))
+                          (set! *current-syntax-bindings* old-bindings)
+                          (set! *current-syntax-meta-env* old-meta)
+                          res)
+                        (begin
+                          (set! *current-syntax-bindings* old-bindings)
+                          (set! *current-syntax-meta-env* old-meta)
+                          (loop (cdr clauses))))))
                 (loop (cdr clauses))))))))
 
 (define (eval-fender expr literals pattern bindings env)
   (if (eq? expr #t) #t
-      (eval (prepare-eval-expr expr literals pattern bindings) 
+      (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings) 
             (if (null? env) (interaction-environment) env))))
 
 (define (eval-output expr literals pattern bindings env)
-  (eval (prepare-eval-expr expr literals pattern bindings) 
+  (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings) 
         (if (null? env) (interaction-environment) env)))
 
-(define (prepare-eval-expr expr literals pattern bindings)
-  (let ((meta-env (syntax-depth-map pattern literals '... 0)))
-    (let loop ((x expr))
-      (cond
-        ((pair? x)
-         (if (eq? (car x) 'syntax)
-             (let ((template (cadr x)))
-               (list 'quote (expand-syntax template bindings '() meta-env 0 '... literals)))
-             (cons (loop (car x)) (loop (cdr x)))))
-        ((symbol? x)
-         (let ((b (assq x bindings)))
-           (if b
-               (list 'quote (cdr b))
-               x)))
-        (else x)))))
+(define (prepare-eval-expr expr literals meta-env bindings)
+  (let loop ((x expr))
+    (cond
+      ((symbol? x)
+       (let ((b (assq x bindings)))
+         (if (and b (= (or (cdr (assq x meta-env)) 0) 0))
+             (let ((val (cdr b)))
+               (if (and (pair? val) (eq? (car val) 'quote))
+                   val
+                   (list 'quote val)))
+             x)))
+      ((pair? x)
+       (cond
+         ((eq? (car x) 'syntax)
+          `(expand-syntax ',(cadr x) *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals))
+         ((eq? (car x) 'syntax-case)
+          (let ((input (loop (cadr x)))
+                (lits (caddr x))
+                (clauses (cdddr x)))
+            `(expand-syntax-case ,input ',lits ',clauses (interaction-environment))))
+         ((eq? (car x) 'with-syntax)
+          (let ((b-specs (cadr x))
+                (body (cddr x)))
+            `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) ,@(map (lambda (b) `',b) body)) (interaction-environment))))
+         ((eq? (car x) 'quote) x)
+         (else (cons (loop (car x)) (loop (cdr x))))))
+      (else x))))
 
-;; host-level macros to use our expansion logic
-(define-syntax syntax-case
-  (syntax-rules ()
-    ((_ e (lit ...) clause ...)
-     (expand-syntax-case e '(lit ...) '(clause ...) (interaction-environment)))))
-
-(define-syntax syntax
-  (syntax-rules ()
-    ((_ template)
-     ;; This is tricky because syntax-case needs to communicate bindings.
-     ;; For now, let's assume it's used inside syntax-case RHS which is eval'd.
-     '(syntax template))))
-
-(define-syntax with-syntax
-  (syntax-rules ()
-    ((_ ((p e) ...) body ...)
-     (syntax-case (list e ...) ()
-       ((p ...) (begin body ...))))))
 
 ;; Helper utilities (if not provided by host)
 (define (filter pred lst)

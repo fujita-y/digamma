@@ -82,9 +82,6 @@
       (macroexpand '(r6rs-let ((x 1) (y 2)) (+ x y)) 'strip)
       '((lambda (x y) (+ x y)) 1 2))
 
-;; Note: testing duplicate failure might be hard as it's an error.
-;; We'll just verify it passes for valid input.
-
 ;; R6RS 'rec' macro
 (macroexpand
  '(define-syntax rec
@@ -104,5 +101,95 @@
              '(1 2 3 4 5))
        'strip)
       '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) fact) (quote (1 2 3 4 5))))
+
+;; Anaphoric IF (aif)
+(macroexpand
+ '(define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test true false)
+         (with-syntax ((it (datum->syntax (syntax test) (string->symbol "it"))))
+           (syntax (let ((it test))
+                     (if it true false)))))))))
+
+(test "aif-test"
+      (macroexpand '(aif (assoc 'a '((a . 1))) (cdr it) #f) 'strip)
+      '(let ((it (assoc (quote a) (quote ((a . 1)))))) (if it (cdr it) #f)))
+
+;; Simple define-struct
+(macroexpand
+ '(define-syntax define-struct
+    (lambda (x)
+      (syntax-case x ()
+        ((_ name (field ...))
+         (with-syntax ((make-name (datum->syntax (syntax name)
+                                                 (string->symbol
+                                                  (string-append "make-"
+                                                                 (symbol->string
+                                                                  (syntax->datum (syntax name)))))))
+                       (name? (datum->syntax (syntax name)
+                                             (string->symbol
+                                              (string-append (symbol->string
+                                                              (syntax->datum (syntax name))) "?")))))
+           (syntax (begin
+                     (define (make-name field ...) (list (quote name) field ...))
+                     (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name))))))))))))
+
+(test "define-struct-expansion"
+      (macroexpand '(define-struct point (x y)) 'strip)
+      '(begin
+         (define (make-point x y) (list (quote point) x y))
+         (define (point? obj) (and (pair? obj) (eq? (car obj) (quote point))))))
+
+;; Stringify macro for constant testing
+(macroexpand
+ '(define-syntax stringify
+    (lambda (x)
+      (syntax-case x ()
+        ((_ n)
+         (syntax (number->string n)))))))
+
+(test "stringify-constant"
+      (macroexpand '(stringify 100) 'strip)
+      '(number->string 100))
+
+;; Stringify macro for symbol testing
+(macroexpand
+ '(define-syntax stringify
+    (lambda (x)
+      (syntax-case x ()
+        ((_ n)
+         (syntax (symbol->string n)))))))
+
+(test "stringify-symbl"
+      (macroexpand '(stringify 'hoge) 'strip)
+      '(symbol->string 'hoge))
+
+;; with-syntax with ellipsis
+(macroexpand
+ '(define-syntax list-to-vars
+    (lambda (x)
+      (syntax-case x ()
+        ((_ (vals ...))
+         (with-syntax (((v ...) (syntax (vals ...))))
+           (syntax (list v ...))))))))
+
+(test "with-syntax-ellipsis"
+      (macroexpand '(list-to-vars (1 2 3)) 'strip)
+      '(list 1 2 3))
+
+;; Nested with-syntax dependencies
+(macroexpand
+ '(define-syntax nested-with
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (with-syntax ((a (syntax val)))
+           (with-syntax ((b (datum->syntax (syntax a) 'inner-sym)))
+             (syntax (list a b)))))))))
+
+(test "with-syntax-nested"
+      (macroexpand '(nested-with 99) 'strip)
+      '(list 99 inner-sym))
 
 (display "Done.\n")
