@@ -19,7 +19,8 @@
 ;;   - Captured context tracking for macro-introduced identifiers
 
 ;; Load syntax-rules implementation (pattern matching, binding, substitution)
-(load "syntax_rules.scm")
+(load "./syntax_rules.scm")
+(load "./syntax_case.scm")
 
 ;; Global state for macro environment and renaming
 (define *macro-env* '())
@@ -195,11 +196,17 @@
                               new-sym)))))
         (apply-syntax-rules literals rules expr renamer ellipsis)))))
 
-;; Parse a transformer specification (must be syntax-rules).
+;; Parse a transformer specification (must be syntax-rules or lambda).
 (define (parse-transformer spec context)
-  (if (and (pair? spec) (core-form? (car spec) 'syntax-rules (cadr context)))
-      (make-syntax-rules-transformer (cdr spec) context)
-      (error "Only syntax-rules is supported for local macros" spec)))
+  (cond
+    ((and (pair? spec) (core-form? (car spec) 'syntax-rules (cadr context)))
+     (make-syntax-rules-transformer (cdr spec) context))
+    ((and (pair? spec) (core-form? (car spec) 'lambda (cadr context)))
+     ;; Procedural macro
+     (lambda (expr)
+       (let ((input (make-syntax-object expr context)))
+         (syntax->datum (eval `((lambda ,(cadr spec) ,@(cddr spec)) ',input) (interaction-environment))))))
+    (else (error "Only syntax-rules and lambda are supported for macros" spec))))
 
 ;;=========================================================================
 ;; BINDING FORM HELPERS
@@ -293,14 +300,8 @@
                       (let ((name (cadr expr))
                             (rule (caddr expr))
                             (context (list macro-env shadowed-env rename-env)))
-                        (if (and (pair? rule)
-                                  (core-form? (car rule) 'syntax-rules shadowed-env))
-                            (begin
-                              (register-macro!
-                                name
-                                (make-syntax-rules-transformer (cdr rule) context))
-                              ''defined)
-                            (error "Only syntax-rules is supported for define-syntax"))))
+                        (register-macro! name (parse-transformer rule context))
+                        ''defined))
 
                       ;; let-syntax: local macros with parallel scope
                       ((core-form? head 'let-syntax shadowed-env)
@@ -506,10 +507,14 @@
               (lambda (x) (expand x macro-env shadowed-env rename-env))
               expr))))
 
-      ;; Symbol: resolve through rename environment
+      ;; Symbol: check for identifier macro, then resolve through rename environment
       ((symbol? expr)
-        (let ((pair (assq expr rename-env)))
-          (if pair (cdr pair) expr)))
+        (let ((transformer (and (not (memq expr shadowed-env))
+                                (lookup-macro expr macro-env))))
+          (if transformer
+              (expand (transformer expr) macro-env shadowed-env rename-env)
+              (let ((pair (assq expr rename-env)))
+                (if pair (cdr pair) expr)))))
 
       ;; Other atoms: return unchanged
       (else expr))))

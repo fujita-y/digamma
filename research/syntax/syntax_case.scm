@@ -1,0 +1,279 @@
+;; syntax_case.scm
+;; R6RS-compatible syntax-case implementation for research.
+;;
+;; Provides syntax-case, syntax, and related procedural macro utilities.
+
+;;=============================================================================
+;; SECTION 1: Syntax Objects
+;;=============================================================================
+
+;; A syntax object is a pair: (datum . context)
+;; context is a structure containing rename-env and macro-env.
+(define (make-syntax-object datum context)
+  (cons 'syntax-object (cons datum context)))
+
+(define (syntax-object? obj)
+  (and (pair? obj) (eq? (car obj) 'syntax-object)))
+
+(define (syntax-object-datum obj)
+  (if (syntax-object? obj) (cadr obj) obj))
+
+(define (syntax-object-context obj)
+  (if (syntax-object? obj) (cddr obj) '()))
+
+(define (syntax->datum obj)
+  (cond
+    ((syntax-object? obj) (syntax->datum (syntax-object-datum obj)))
+    ((pair? obj) (cons (syntax->datum (car obj)) (syntax->datum (cdr obj))))
+    ((vector? obj) (list->vector (map syntax->datum (vector->list obj))))
+    (else obj)))
+
+(define (datum->syntax template-id datum)
+  (make-syntax-object datum (syntax-object-context template-id)))
+
+;;=============================================================================
+;; SECTION 2: Identifiers
+;;=============================================================================
+
+(define (identifier? obj)
+  (or (symbol? obj)
+      (and (syntax-object? obj) (symbol? (syntax-object-datum obj)))))
+
+(define (bound-identifier=? id1 id2)
+  (let ((d1 (syntax-object-datum id1))
+        (d2 (syntax-object-datum id2)))
+    (and (symbol? d1)
+         (symbol? d2)
+         (eq? d1 d2)
+         (equal? (syntax-object-context id1) (syntax-object-context id2)))))
+
+;; For free-identifier=?, we need to resolve the identifier in its context.
+;; This requires integration with the macro expander's environment.
+(define (free-identifier=? id1 id2)
+  (let ((v1 (resolve-syntax-id id1))
+        (v2 (resolve-syntax-id id2)))
+    (eq? v1 v2)))
+
+;; Placeholder for resolution logic (will be refined during integration)
+(define (resolve-syntax-id id)
+  (syntax-object-datum id))
+
+;;=============================================================================
+;; SECTION 3: Pattern Matching (Internal)
+;;=============================================================================
+
+;; Decompose a syntax object into a list if possible.
+(define (syntax->list obj)
+  (let ((datum (syntax-object-datum obj))
+        (ctx (syntax-object-context obj)))
+    (cond
+      ((null? datum) '())
+      ((pair? datum)
+       (cons (make-syntax-object (car datum) ctx)
+             (syntax->list (make-syntax-object (cdr datum) ctx))))
+      (else obj))))
+
+(define (syntax-case-match literals pattern input ellipsis)
+  (cond
+    ;; Literal identifier: must match exactly (free-identifier=?)
+    ((and (identifier? pattern) (member (syntax-object-datum pattern) literals))
+     (and (identifier? input)
+          (free-identifier=? pattern input)
+          '()))
+
+    ;; Wildcard
+    ((eq? pattern '_) '())
+
+    ;; Pattern variable
+    ((symbol? pattern) (list (cons pattern input)))
+
+    ;; Ellipsis pattern (P ... rest)
+    ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
+     (let ((input-list (syntax->list input)))
+       (if (list? input-list)
+           (let loop ((xs input-list) (prefix '()))
+             (let ((m-rest (syntax-case-match literals (cddr pattern) (make-syntax-object xs (syntax-object-context input)) ellipsis)))
+               (if m-rest
+                   ;; Match found for rest, now need to bind variables in P for all elements in prefix
+                   (let ((p-vars (collect-bindings-for-ellipsis literals (car pattern) prefix ellipsis)))
+                     (append p-vars m-rest))
+                   (if (null? xs)
+                       #f
+                       (let ((m-p (syntax-case-match literals (car pattern) (car xs) ellipsis)))
+                         (if m-p
+                             (loop (cdr xs) (cons (car xs) prefix))
+                             #f))))))
+           #f)))
+
+    ;; Pair
+    ((pair? pattern)
+     (let ((input-datum (syntax-object-datum input))
+           (input-context (syntax-object-context input)))
+       (if (pair? input-datum)
+           (let ((m1 (syntax-case-match literals (car pattern) (make-syntax-object (car input-datum) input-context) ellipsis))
+                 (m2 (syntax-case-match literals (cdr pattern) (make-syntax-object (cdr input-datum) input-context) ellipsis)))
+             (and m1 m2 (append m1 m2)))
+           #f)))
+
+    ;; Constant
+    (else (if (equal? pattern (syntax-object-datum input)) '() #f))))
+
+;; Helper to collect bindings for ellipsis
+(define (collect-bindings-for-ellipsis literals pattern input-list ellipsis)
+  (let ((vars (collect-pattern-vars pattern literals ellipsis)))
+    (map (lambda (v)
+           (cons v (map (lambda (input)
+                          (let ((m (syntax-case-match literals pattern input ellipsis)))
+                            (cdr (assq v m))))
+                        (reverse input-list))))
+         vars)))
+
+(define (collect-pattern-vars pattern literals ellipsis)
+  (cond
+    ((and (symbol? pattern) (not (member pattern literals)) (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
+     (list pattern))
+    ((pair? pattern)
+     (append (collect-pattern-vars (car pattern) literals ellipsis)
+             (collect-pattern-vars (cdr pattern) literals ellipsis)))
+    (else '())))
+
+;;=============================================================================
+;; SECTION 4: Syntax Template Expansion
+;;=============================================================================
+
+(define (syntax-depth-map pattern literals ellipsis depth)
+  (cond
+    ((and (symbol? pattern) (not (member pattern literals)) (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
+     (list (cons pattern depth)))
+    ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
+     (append (syntax-depth-map (car pattern) literals ellipsis (+ depth 1))
+             (syntax-depth-map (cddr pattern) literals ellipsis depth)))
+    ((pair? pattern)
+     (append (syntax-depth-map (car pattern) literals ellipsis depth)
+             (syntax-depth-map (cdr pattern) literals ellipsis depth)))
+    (else '())))
+
+(define (expand-syntax template bindings context meta-env depth ellipsis literals)
+  (cond
+    ((symbol? template)
+     (let ((b (assq template bindings)))
+       (if (and b (= (or (cdr (assq template meta-env)) 0) depth))
+           (cdr b)
+           (make-syntax-object template context))))
+    ((pair? template)
+     (if (and (pair? (cdr template)) (eq? (cadr template) ellipsis))
+         ;; Handle ellipsis in template
+         (let* ((p (car template))
+                (p-vars (collect-pattern-vars p literals ellipsis))
+                (drivers (filter (lambda (v)
+                                   (let ((pair (assq v meta-env)))
+                                     (and pair (> (cdr pair) depth))))
+                                 p-vars))
+                (len (if (null? drivers)
+                         (error "ellipsis in template with no pattern variables" template)
+                         (length (cdr (assq (car drivers) bindings)))))
+                (new-template-list
+                 (map (lambda (i)
+                        (let ((iter-bindings
+                               (map (lambda (v)
+                                      (cons v (list-ref (cdr (assq v bindings)) i)))
+                                    drivers)))
+                          (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals)))
+                      (iota len))))
+           (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals)))
+         (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals)
+               (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals))))
+    (else template)))
+
+;;=============================================================================
+;; SECTION 4: syntax-case Core
+;;=============================================================================
+;; with-syntax (R6RS)
+;; (with-syntax ((p e) ...) body ...) is same as (syntax-case (list e ...) () ((p ...) (begin body ...)))
+(define (expand-with-syntax expr env)
+  (let ((bindings (cadr expr))
+        (body (cddr expr)))
+    (expand-syntax-case (make-syntax-object (map cadr bindings) '())
+                        '()
+                        (list (list (map car bindings) #t (cons 'begin body)))
+                        env)))
+
+;; generate-temporaries (R6RS)
+(define *syntax-temp-counter* 0)
+(define (generate-temporaries l)
+  (let ((lst (syntax->list l)))
+    (map (lambda (x)
+           (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))
+           (make-syntax-object (string->symbol (string-append "temp." (number->string *syntax-temp-counter*))) '()))
+         lst)))
+
+(define (expand-syntax-case input literals clauses env)
+  (let ((ellipsis '...))
+    (let loop ((clauses clauses))
+      (if (null? clauses)
+          (error "syntax-case: no matching pattern" input)
+          (let* ((clause (car clauses))
+                 (pattern (car clause))
+                 (fender (if (null? (cdr clause)) #t
+                             (if (null? (cddr clause)) #t (cadr clause))))
+                 (output (if (null? (cdr clause)) (error "invalid syntax-case clause")
+                             (if (null? (cddr clause)) (cadr clause) (caddr clause))))
+                 (bindings (syntax-case-match literals pattern input ellipsis)))
+            (if (and bindings
+                     (eval-fender fender literals pattern bindings env))
+                (eval-output output literals pattern bindings env)
+                (loop (cdr clauses))))))))
+
+(define (eval-fender expr literals pattern bindings env)
+  (if (eq? expr #t) #t
+      (eval (prepare-eval-expr expr literals pattern bindings) 
+            (if (null? env) (interaction-environment) env))))
+
+(define (eval-output expr literals pattern bindings env)
+  (eval (prepare-eval-expr expr literals pattern bindings) 
+        (if (null? env) (interaction-environment) env)))
+
+(define (prepare-eval-expr expr literals pattern bindings)
+  (let ((meta-env (syntax-depth-map pattern literals '... 0)))
+    (let loop ((x expr))
+      (cond
+        ((pair? x)
+         (if (eq? (car x) 'syntax)
+             (let ((template (cadr x)))
+               (list 'quote (expand-syntax template bindings '() meta-env 0 '... literals)))
+             (cons (loop (car x)) (loop (cdr x)))))
+        ((symbol? x)
+         (let ((b (assq x bindings)))
+           (if b
+               (list 'quote (cdr b))
+               x)))
+        (else x)))))
+
+;; host-level macros to use our expansion logic
+(define-syntax syntax-case
+  (syntax-rules ()
+    ((_ e (lit ...) clause ...)
+     (expand-syntax-case e '(lit ...) '(clause ...) (interaction-environment)))))
+
+(define-syntax syntax
+  (syntax-rules ()
+    ((_ template)
+     ;; This is tricky because syntax-case needs to communicate bindings.
+     ;; For now, let's assume it's used inside syntax-case RHS which is eval'd.
+     '(syntax template))))
+
+(define-syntax with-syntax
+  (syntax-rules ()
+    ((_ ((p e) ...) body ...)
+     (syntax-case (list e ...) ()
+       ((p ...) (begin body ...))))))
+
+;; Helper utilities (if not provided by host)
+(define (filter pred lst)
+  (cond ((null? lst) '())
+        ((pred (car lst)) (cons (car lst) (filter pred (cdr lst))))
+        (else (filter pred (cdr lst)))))
+
+(define (iota n)
+  (let loop ((i 0))
+    (if (= i n) '() (cons i (loop (+ i 1))))))
