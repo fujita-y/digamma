@@ -1,7 +1,17 @@
 ;; test_syntax.scm
+;; Test suite for the R6RS/R7RS macro expansion system.
+;;
+;; Test categories:
+;;   - Macro expansion: define-syntax, syntax-rules, recursive macros
+;;   - Hygiene: variable capture prevention, alpha-renaming
+;;   - Local macros: let-syntax, letrec-syntax, let*-syntax scoping
+;;   - R7RS features: ellipsis escape, literals, vectors
+;;   - Binding forms: let, let*, letrec, letrec*, named let
+;;   - Internal defines: R6RS-style conversion to letrec*
+
 (load "macroexpand.scm")
 
-;; --- Helper Functions ---
+;; --- Test Helper Functions ---
 
 (define (assert-equal expected actual msg)
   (if (equal? expected actual)
@@ -146,7 +156,7 @@
                        (g (syntax-rules () ((_) 'ok))))
          (f))
       "letrec-syntax mutual recursion safe")
-      
+
 ;; letrec-syntax mutual recursion 2
 (test '(begin (begin 1 2))
       '(letrec-syntax ((a (syntax-rules () ((_) (b))))
@@ -240,7 +250,7 @@
       "Pitfall 3.1: Hygiene with shadowed global operator")
 
 ;; Pitfall 3.2
-(test '(begin (let ((x 2)) (begin (define foo +)) (cond (else (define x 1))) x))
+(test '(begin (let ((x 2)) (letrec* ((foo +)) (cond (else (foo x))) x)))
       '(let-syntax ((foo (syntax-rules ()
                              ((_ var) (define var 1)))))
           (let ((x 2))
@@ -573,3 +583,50 @@
 (test '(letrec* ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))) (f 5))
       '(letrec ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))) (f 5))
       "letrec* sequential recursive binding")
+
+(display "\n>>> internal define (R6RS)\n")
+
+;; Internal define in lambda
+(test '(lambda (x) (letrec* ((y 1)) (+ x y)))
+      '(lambda (x) (define y 1) (+ x y))
+      "lambda internal define simple")
+
+;; Internal define with function syntax in lambda
+(test '(lambda (x) (letrec* ((f (lambda (n) (* n 2)))) (f x)))
+      '(lambda (x) (define (f n) (* n 2)) (f x))
+      "lambda internal define function syntax")
+
+;; Multiple internal defines in lambda
+(test '(lambda (x) (letrec* ((a 1) (b 2)) (+ x a b)))
+      '(lambda (x) (define a 1) (define b 2) (+ x a b))
+      "lambda multiple internal defines")
+
+;; Internal define in let
+(test '(let ((x 1)) (letrec* ((y 2)) (+ x y)))
+      '(let ((x 1)) (define y 2) (+ x y))
+      "let internal define")
+
+;; Internal define in let*
+(test '(let ((a 1)) (let ((b 2)) (letrec* ((c 3)) (+ a b c))))
+      '(let* ((a 1) (b 2)) (define c 3) (+ a b c))
+      "let* internal define")
+
+;; Internal define in letrec
+(test '(letrec* ((f (lambda (x) x)) (g (lambda (y) y))) (f (g 1)))
+      '(letrec ((f (lambda (x) x))) (define (g y) y) (f (g 1)))
+      "letrec internal define")
+
+;; Internal define in letrec*
+(test '(letrec* ((a 1) (b 2) (c 3)) (+ a b c))
+      '(letrec* ((a 1) (b 2)) (define c 3) (+ a b c))
+      "letrec* internal define merged")
+
+;; Internal defines in nested begin
+(test '(let ((x 1)) (letrec* ((y 2) (z 3)) (+ x y z)))
+      '(let ((x 1)) (begin (define y 2) (begin (define z 3) (+ x y z))))
+      "let internal define")
+
+;; No internal defines should not add letrec*
+(test '(lambda (x) (+ x 1))
+      '(lambda (x) (+ x 1))
+      "lambda without internal define unchanged")
