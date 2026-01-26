@@ -4,7 +4,28 @@
 ;; Provides syntax-case, syntax, and related procedural macro utilities.
 
 ;;=============================================================================
-;; SECTION 1: Syntax Objects
+;; SECTION 1: Globals & State
+;;=============================================================================
+
+(define *syntax-temp-counter* 0)
+(define *current-syntax-bindings* '())
+(define *current-syntax-meta-env* '())
+
+;;=============================================================================
+;; SECTION 2: Utilities
+;;=============================================================================
+
+(define (filter pred lst)
+  (cond ((null? lst) '())
+        ((pred (car lst)) (cons (car lst) (filter pred (cdr lst))))
+        (else (filter pred (cdr lst)))))
+
+(define (iota n)
+  (let loop ((i 0))
+    (if (= i n) '() (cons i (loop (+ i 1))))))
+
+;;=============================================================================
+;; SECTION 3: Syntax Objects
 ;;=============================================================================
 
 ;; A syntax object is a vector: #(**syntax-object** datum context)
@@ -34,8 +55,18 @@
 (define (datum->syntax template-id datum)
   (make-syntax-object datum (syntax-object-context template-id)))
 
+(define (syntax->list obj)
+  (let ((datum (syntax-object-datum obj))
+        (ctx (syntax-object-context obj)))
+    (cond
+      ((null? datum) '())
+      ((pair? datum)
+       (cons (make-syntax-object (car datum) ctx)
+             (syntax->list (make-syntax-object (cdr datum) ctx))))
+      (else obj))))
+
 ;;=============================================================================
-;; SECTION 2: Identifiers
+;; SECTION 4: Identifiers
 ;;=============================================================================
 
 (define (identifier? obj)
@@ -50,31 +81,27 @@
          (eq? d1 d2)
          (equal? (syntax-object-context id1) (syntax-object-context id2)))))
 
-;; For free-identifier=?, we need to resolve the identifier in its context.
-;; This requires integration with the macro expander's environment.
 (define (free-identifier=? id1 id2)
-  (let ((v1 (resolve-syntax-id id1))
-        (v2 (resolve-syntax-id id2)))
-    (eq? v1 v2)))
-
-;; Placeholder for resolution logic (will be refined during integration)
-(define (resolve-syntax-id id)
-  (syntax-object-datum id))
+  (eq? (syntax-object-datum id1) (syntax-object-datum id2)))
 
 ;;=============================================================================
-;; SECTION 3: Pattern Matching (Internal)
+;; SECTION 5: Pattern Matching
 ;;=============================================================================
 
-;; Decompose a syntax object into a list if possible.
-(define (syntax->list obj)
-  (let ((datum (syntax-object-datum obj))
-        (ctx (syntax-object-context obj)))
-    (cond
-      ((null? datum) '())
-      ((pair? datum)
-       (cons (make-syntax-object (car datum) ctx)
-             (syntax->list (make-syntax-object (cdr datum) ctx))))
-      (else obj))))
+(define (collect-pattern-vars pattern literals ellipsis)
+  (cond
+    ((and (symbol? pattern) (not (member pattern literals)) 
+          (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
+     (list pattern))
+    ((pair? pattern)
+     (append (collect-pattern-vars (car pattern) literals ellipsis)
+             (collect-pattern-vars (cdr pattern) literals ellipsis)))
+    (else '())))
+
+(define (transpose-matches vars matches)
+  (map (lambda (v)
+         (cons v (map (lambda (m) (cdr (assq v m))) matches)))
+       vars))
 
 (define (syntax-case-match literals pattern input ellipsis)
   (cond
@@ -94,17 +121,22 @@
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
      (let ((input-list (syntax->list input)))
        (if (list? input-list)
-           (let loop ((xs input-list) (prefix '()))
-             (let ((m-rest (syntax-case-match literals (cddr pattern) (make-syntax-object xs (syntax-object-context input)) ellipsis)))
+           (let loop ((xs input-list) (prefix-matches '()))
+             (let ((m-rest (syntax-case-match literals (cddr pattern) 
+                                              (make-syntax-object xs (syntax-object-context input)) 
+                                              ellipsis)))
                (if m-rest
-                   ;; Match found for rest, now need to bind variables in P for all elements in prefix
-                   (let ((p-vars (collect-bindings-for-ellipsis literals (car pattern) prefix ellipsis)))
+                   ;; Match found for rest, bind P variables for all elements in prefix
+                   (let* ((vars (if (null? prefix-matches)
+                                    (collect-pattern-vars (car pattern) literals ellipsis)
+                                    (map car (car prefix-matches))))
+                          (p-vars (transpose-matches vars (reverse prefix-matches))))
                      (append p-vars m-rest))
                    (if (null? xs)
                        #f
                        (let ((m-p (syntax-case-match literals (car pattern) (car xs) ellipsis)))
                          (if m-p
-                             (loop (cdr xs) (cons (car xs) prefix))
+                             (loop (cdr xs) (cons m-p prefix-matches))
                              #f))))))
            #f)))
 
@@ -121,34 +153,14 @@
     ;; Constant
     (else (if (equal? pattern (syntax-object-datum input)) '() #f))))
 
-;; Helper to collect bindings for ellipsis
-(define (collect-bindings-for-ellipsis literals pattern input-list ellipsis)
-  (let ((vars (collect-pattern-vars pattern literals ellipsis)))
-    (map (lambda (v)
-           (cons v (map (lambda (input)
-                          (let ((m (syntax-case-match literals pattern input ellipsis)))
-                            (cdr (assq v m))))
-                        (reverse input-list))))
-         vars)))
-
-(define (collect-pattern-vars pattern literals ellipsis)
-  (cond
-    ((and (symbol? pattern) (not (member pattern literals)) (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
-     (list pattern))
-    ((pair? pattern)
-     (append (collect-pattern-vars (car pattern) literals ellipsis)
-             (collect-pattern-vars (cdr pattern) literals ellipsis)))
-    (else '())))
-
 ;;=============================================================================
-;; SECTION 4: Syntax Template Expansion
+;; SECTION 6: Template Expansion
 ;;=============================================================================
-
-(define *syntax-temp-counter* 0)
 
 (define (syntax-depth-map pattern literals ellipsis depth)
   (cond
-    ((and (symbol? pattern) (not (member pattern literals)) (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
+    ((and (symbol? pattern) (not (member pattern literals))
+          (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
      (list (cons pattern depth)))
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
      (append (syntax-depth-map (car pattern) literals ellipsis (+ depth 1))
@@ -191,7 +203,7 @@
     (else template)))
 
 ;;=============================================================================
-;; SECTION 4.5: Quasisyntax Support
+;; SECTION 7: Quasisyntax & Transformation
 ;;=============================================================================
 
 (define (extract-quasisyntax x depth literals)
@@ -201,18 +213,21 @@
        ((and (eq? (car x) 'quasisyntax) (pair? (cdr x)) (null? (cddr x)))
         (let ((res (extract-quasisyntax (cadr x) (+ depth 1) literals)))
           (cons `(quasisyntax ,(car res)) (cdr res))))
+       
        ((and (eq? (car x) 'unsyntax) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
             (let ((tmp (string->symbol (string-append "unsyntax." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
               (cons (list '**splice-unsyntax** tmp) (list (list tmp (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax ,(car res)) (cdr res)))))
+       
        ((and (eq? (car x) 'unsyntax-splicing) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
             (let ((tmp (string->symbol (string-append "unsyntax-splicing." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
               (cons (list '**splice-unsyntax-splicing** tmp) (list (list (list tmp '...) (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax-splicing ,(car res)) (cdr res)))))
+       
        (else
         (let ((car-res (extract-quasisyntax (car x) depth literals))
               (cdr-res (extract-quasisyntax (cdr x) depth literals)))
@@ -226,25 +241,51 @@
                (cons (append (list (cadr car-tmpl) '...) cdr-tmpl) bindings))
               (else
                (cons (cons car-tmpl cdr-tmpl) bindings))))))))
+    
     ((vector? x)
      (let ((res (extract-quasisyntax (vector->list x) depth literals)))
        (cons (list->vector (car res)) (cdr res))))
     (else (cons x '()))))
 
-;;=============================================================================
-;; SECTION 4: syntax-case Core
-;;=============================================================================
-;; with-syntax (R6RS)
-;; (with-syntax ((p e) ...) body ...) is same as (syntax-case (list e ...) () ((p ...) (begin body ...)))
-(define (expand-with-syntax expr env)
-  (let ((bindings (cadr expr))
-        (body (cddr expr)))
-    (expand-syntax-case (make-syntax-object (map cadr bindings) '())
-                        '()
-                        (list (list (map car bindings) #t (cons 'begin body)))
-                        env)))
+(define (prepare-eval-expr expr literals meta-env bindings)
+  (let loop ((x expr))
+    (cond
+      ((symbol? x)
+       (let ((b (assq x bindings)))
+         (if (and b (= (or (cdr (assq x meta-env)) 0) 0))
+             (let ((val (cdr b)))
+               (if (and (pair? val) (eq? (car val) 'quote))
+                   val
+                   (list 'quote val)))
+             x)))
+      ((pair? x)
+       (cond
+         ((eq? (car x) 'syntax)
+          `(expand-syntax ',(cadr x) *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals))
+         ((eq? (car x) 'quasisyntax)
+          (let ((res (extract-quasisyntax (cadr x) 0 literals)))
+            (let ((new-tmpl (car res))
+                  (bindings (cdr res)))
+              (if (null? bindings)
+                  `(expand-syntax ',new-tmpl *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals)
+                  (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
+         ((eq? (car x) 'syntax-case)
+          (let ((input (loop (cadr x)))
+                (lits (caddr x))
+                (clauses (cdddr x)))
+            `(expand-syntax-case ,input ',lits ',clauses (interaction-environment))))
+         ((eq? (car x) 'with-syntax)
+          (let ((b-specs (cadr x))
+                (body (cddr x)))
+            `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) ,@(map (lambda (b) `',b) body)) (interaction-environment))))
+         ((eq? (car x) 'quote) x)
+         (else (cons (loop (car x)) (loop (cdr x))))))
+      (else x))))
 
-;; generate-temporaries (R6RS)
+;;=============================================================================
+;; SECTION 8: Macro Expansion Entry Points
+;;=============================================================================
+
 (define (generate-temporaries l)
   (let ((lst (syntax->list l)))
     (map (lambda (x)
@@ -252,8 +293,13 @@
            (make-syntax-object (string->symbol (string-append "temp." (number->string *syntax-temp-counter*))) '()))
          lst)))
 
-(define *current-syntax-bindings* '())
-(define *current-syntax-meta-env* '())
+(define (expand-with-syntax expr env)
+  (let ((bindings (cadr expr))
+        (body (cddr expr)))
+    (expand-syntax-case (make-syntax-object (map cadr bindings) '())
+                        '()
+                        (list (list (map car bindings) #t (cons 'begin body)))
+                        env)))
 
 (define (expand-syntax-case input literals clauses env)
   (let ((ellipsis '...))
@@ -293,49 +339,3 @@
 (define (eval-output expr literals pattern bindings env)
   (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings) 
         (if (null? env) (interaction-environment) env)))
-
-(define (prepare-eval-expr expr literals meta-env bindings)
-  (let loop ((x expr))
-    (cond
-      ((symbol? x)
-       (let ((b (assq x bindings)))
-         (if (and b (= (or (cdr (assq x meta-env)) 0) 0))
-             (let ((val (cdr b)))
-               (if (and (pair? val) (eq? (car val) 'quote))
-                   val
-                   (list 'quote val)))
-             x)))
-      ((pair? x)
-       (cond
-         ((eq? (car x) 'syntax)
-          `(expand-syntax ',(cadr x) *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals))
-         ((eq? (car x) 'quasisyntax)
-          (let ((res (extract-quasisyntax (cadr x) 0 literals)))
-            (let ((new-tmpl (car res))
-                  (bindings (cdr res)))
-              (if (null? bindings)
-                  `(expand-syntax ',new-tmpl *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals)
-                  (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
-         ((eq? (car x) 'syntax-case)
-          (let ((input (loop (cadr x)))
-                (lits (caddr x))
-                (clauses (cdddr x)))
-            `(expand-syntax-case ,input ',lits ',clauses (interaction-environment))))
-         ((eq? (car x) 'with-syntax)
-          (let ((b-specs (cadr x))
-                (body (cddr x)))
-            `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) ,@(map (lambda (b) `',b) body)) (interaction-environment))))
-         ((eq? (car x) 'quote) x)
-         (else (cons (loop (car x)) (loop (cdr x))))))
-      (else x))))
-
-
-;; Helper utilities (if not provided by host)
-(define (filter pred lst)
-  (cond ((null? lst) '())
-        ((pred (car lst)) (cons (car lst) (filter pred (cdr lst))))
-        (else (filter pred (cdr lst)))))
-
-(define (iota n)
-  (let loop ((i 0))
-    (if (= i n) '() (cons i (loop (+ i 1))))))
