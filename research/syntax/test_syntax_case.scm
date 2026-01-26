@@ -328,4 +328,21 @@
       (macroexpand '(tailmatch2 1 2 3 . 4) 'strip)
       '4)
 
+;; local-definition-test
+(macroexpand
+ '(define-syntax local-definition-test
+    (lambda (x)
+      (define list-to-string
+        (lambda (lst)
+          (if (pair? lst) "ok" (error 'list-to-string "list expected"))))
+      (syntax-case x ()
+        ((_ ret name (args ...))
+         (let ((signature (list-to-string (syntax->datum (syntax (ret args ...))))))
+            (with-syntax ((signature signature))
+              (syntax signature))))))))
+
+(test "local-definition-test"
+      (macroexpand '(local-definition-test int hoge (int int)) 'strip)
+      "ok")
+
 (display "\n")
