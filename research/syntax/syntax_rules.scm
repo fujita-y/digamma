@@ -66,12 +66,7 @@
 
     ;; Ellipsis pattern: (P ... . tail)
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
-     (if (list? input)
-         (let ((P (car pattern))
-               (tail (cddr pattern)))
-           ;; Optimize: Match tail against end of input if tail is fixed structure
-           (sr-match-ellipsis literals P tail input ellipsis))
-         #f))
+     (sr-match-ellipsis literals (car pattern) (cddr pattern) input ellipsis))
 
     ;; Pair: recursively match car and cdr
     ((pair? pattern)
@@ -91,33 +86,23 @@
 
 ;; Handles (P ... . tail) matching
 (define (sr-match-ellipsis literals P tail input ellipsis)
-  ;; We need to find a split (head . rest) of input such that:
-  ;; 1. tail matches rest
-  ;; 2. P matches every element of head
-  ;; We try to be greedy (maximize head), but must satisfy tail.
-  ;; Since this is simple R7RS spec, we can just linear scan?
-  ;; Actually, backtracking is needed if P matches but tail doesn't.
-  (let loop ((xs input) (head-bindings '()))
-    ;; Attempt to match tail with current xs
-    (let ((m-tail (sr-match-pattern literals tail xs ellipsis)))
-      (if m-tail
-          ;; Tail matched! Now check if collected head-bindings are valid
-          ;; We need to "transpose" the head bindings:
-          ;; List of alists -> Alist of lists
-          ;; e.g. ( ((x . 1)) ((x . 2)) ) -> ( (x . (1 2)) )
-          (let* ((p-vars (map car (sr-analyze-pattern P literals ellipsis 0)))
-                 (transposed (map (lambda (v)
-                                    (cons v (map (lambda (b) (cdr (assq v b))) (reverse head-bindings))))
-                                  p-vars)))
-            (append transposed m-tail))
-          
-          ;; Tail didn't match, so we must match P with (car xs) and continue
-          (if (null? xs)
-              #f ;; Consumed input but tail didn't match empty
-              (let ((m-p (sr-match-pattern literals P (car xs) ellipsis)))
-                (if m-p
-                    (loop (cdr xs) (cons m-p head-bindings))
-                    #f))))))) ;; P didn't match either, total failure
+  (letrec ((try-tail
+            (lambda (xs head-bindings)
+              (let ((m-tail (sr-match-pattern literals tail xs ellipsis)))
+                (if m-tail
+                    (let* ((p-vars (map car (sr-analyze-pattern P literals ellipsis 0)))
+                           (transposed (map (lambda (v)
+                                              (cons v (map (lambda (b) (cdr (assq v b))) (reverse head-bindings))))
+                                            p-vars)))
+                      (append transposed m-tail))
+                    #f))))
+           (loop (lambda (xs head-bindings)
+                   (let ((m-p (if (pair? xs) (sr-match-pattern literals P (car xs) ellipsis) #f)))
+                     (if m-p
+                         (let ((res (loop (cdr xs) (cons m-p head-bindings))))
+                           (if res res (try-tail xs head-bindings)))
+                         (try-tail xs head-bindings))))))
+    (loop input '())))
 
 ;;=============================================================================
 ;; SECTION 4: Template Expansion

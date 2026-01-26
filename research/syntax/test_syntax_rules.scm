@@ -479,6 +479,18 @@
                        ((_ (?a ...) ?b) (?a ... . ?b)))))
 (test '(1 2 . 3) '(dot3 (1 2) 3) "dot3")
 
+(macroexpand '(define-syntax tailmatch-rules1
+           (syntax-rules ()
+             ((_ first ... last . rest)
+              rest))))
+(test 4 '(tailmatch-rules1 1 2 3 . 4) "tailmatch-rules-test1")
+
+(macroexpand '(define-syntax tailmatch-rules2
+           (syntax-rules ()
+             ((_ first ... . rest)
+              rest))))
+(test 4 '(tailmatch-rules2 1 2 3 . 4) "tailmatch-rules-test2")
+
 (display "\n>>> chez scheme\n")
 
 ;; From https://www.scheme.com/csug7/syntax.html Section 10.3

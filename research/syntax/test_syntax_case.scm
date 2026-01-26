@@ -304,4 +304,27 @@
       (macroexpand '(test-datum-syntax foo 42) 'strip)
       '(define prefix-foo 42))
 
+;; tailmatch test (Backtracking ellipsis + Improper list)
+(macroexpand
+ '(define-syntax tailmatch1
+    (lambda (x)
+      (syntax-case x ()
+        ((_ first ... last . rest)
+         (syntax rest))))))
+
+(test "tailmatch-greedy-backtracking1"
+      (macroexpand '(tailmatch1 1 2 3 . 4) 'strip)
+      '4)
+
+(macroexpand
+ '(define-syntax tailmatch2
+    (lambda (x)
+      (syntax-case x ()
+        ((_ first ... . rest)
+         (syntax rest))))))
+
+(test "tailmatch2-greedy-backtracking2"
+      (macroexpand '(tailmatch2 1 2 3 . 4) 'strip)
+      '4)
+
 (display "Done.\n")

@@ -120,25 +120,25 @@
     ;; Ellipsis pattern (P ... rest)
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
      (let ((input-list (syntax->list input)))
-       (if (list? input-list)
-           (let loop ((xs input-list) (prefix-matches '()))
-             (let ((m-rest (syntax-case-match literals (cddr pattern) 
-                                              (make-syntax-object xs (syntax-object-context input)) 
-                                              ellipsis)))
-               (if m-rest
-                   ;; Match found for rest, bind P variables for all elements in prefix
-                   (let* ((vars (if (null? prefix-matches)
-                                    (collect-pattern-vars (car pattern) literals ellipsis)
-                                    (map car (car prefix-matches))))
-                          (p-vars (transpose-matches vars (reverse prefix-matches))))
-                     (append p-vars m-rest))
-                   (if (null? xs)
-                       #f
-                       (let ((m-p (syntax-case-match literals (car pattern) (car xs) ellipsis)))
-                         (if m-p
-                             (loop (cdr xs) (cons m-p prefix-matches))
-                             #f))))))
-           #f)))
+       (letrec ((match-rest
+                 (lambda (xs prefix-matches)
+                   (let ((m-rest (syntax-case-match literals (cddr pattern) 
+                                                    (if (syntax-object? xs) xs (make-syntax-object xs (syntax-object-context input)))
+                                                    ellipsis)))
+                     (if m-rest
+                         (let* ((vars (if (null? prefix-matches)
+                                          (collect-pattern-vars (car pattern) literals ellipsis)
+                                          (map car (car prefix-matches))))
+                                (p-vars (transpose-matches vars (reverse prefix-matches))))
+                           (append p-vars m-rest))
+                         #f))))
+                (loop (lambda (xs prefix-matches)
+                        (let ((m-p (if (pair? xs) (syntax-case-match literals (car pattern) (car xs) ellipsis) #f)))
+                          (if m-p
+                              (let ((res (loop (cdr xs) (cons m-p prefix-matches))))
+                                (if res res (match-rest xs prefix-matches)))
+                              (match-rest xs prefix-matches))))))
+         (loop input-list '()))))
 
     ;; Pair
     ((pair? pattern)
