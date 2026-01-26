@@ -1,10 +1,14 @@
-;; syntax_case.scm
-;; R6RS-compatible syntax-case implementation for research.
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
 ;;
-;; Provides syntax-case, syntax, and related procedural macro utilities.
+;; R6RS-compatible syntax-case implementation
+;;
+;; Description: Provides syntax-case, syntax, and related procedural macro utilities.
+;; This implementation focus on lexical scoping within transformers by using thunks
+;; for delayed evaluation of fenders and outputs.
 
 ;;=============================================================================
-;; SECTION 1: Globals & State
+;; 1. Globals & State
 ;;=============================================================================
 
 (define *syntax-temp-counter* 0)
@@ -12,7 +16,7 @@
 (define *current-syntax-meta-env* '())
 
 ;;=============================================================================
-;; SECTION 2: Utilities
+;; 2. Utilities
 ;;=============================================================================
 
 (define (filter pred lst)
@@ -24,8 +28,14 @@
   (let loop ((i 0))
     (if (= i n) '() (cons i (loop (+ i 1))))))
 
+(define (syntax-violation who message form . subform)
+  (let ((who-str (if who (format "~a: " who) "")))
+    (if (null? subform)
+        (error (format "~asyntax-violation: ~a in ~s" who-str message form))
+        (error (format "~asyntax-violation: ~a in ~s (subform: ~s)" who-str message form (car subform))))))
+
 ;;=============================================================================
-;; SECTION 3: Syntax Objects
+;; 3. Syntax Objects & Identifiers
 ;;=============================================================================
 
 ;; A syntax object is a vector: #(**syntax-object** datum context)
@@ -35,8 +45,8 @@
       datum))
 
 (define (syntax-object? obj)
-  (and (vector? obj) 
-       (= (vector-length obj) 3) 
+  (and (vector? obj)
+       (= (vector-length obj) 3)
        (eq? (vector-ref obj 0) '**syntax-object**)))
 
 (define (syntax-object-datum obj)
@@ -65,10 +75,6 @@
              (syntax->list (make-syntax-object (cdr datum) ctx))))
       (else obj))))
 
-;;=============================================================================
-;; SECTION 4: Identifiers
-;;=============================================================================
-
 (define (identifier? obj)
   (or (symbol? obj)
       (and (syntax-object? obj) (symbol? (syntax-object-datum obj)))))
@@ -85,13 +91,15 @@
   (eq? (syntax-object-datum id1) (syntax-object-datum id2)))
 
 ;;=============================================================================
-;; SECTION 5: Pattern Matching
+;; 4. Pattern Matching
 ;;=============================================================================
 
 (define (collect-pattern-vars pattern literals ellipsis)
   (cond
-    ((and (symbol? pattern) (not (member pattern literals)) 
-          (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
+    ((and (symbol? pattern)
+          (not (member pattern literals))
+          (not (eq? pattern '_))
+          (not (eq? pattern ellipsis)))
      (list pattern))
     ((pair? pattern)
      (append (collect-pattern-vars (car pattern) literals ellipsis)
@@ -119,18 +127,16 @@
 
     ;; Ellipsis pattern (P ... rest)
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
-     (let ((input-list (syntax->list input)))
+     (let* ((input-list (syntax->list input))
+            (p-vars (collect-pattern-vars (car pattern) literals ellipsis)))
        (letrec ((match-rest
                  (lambda (xs prefix-matches)
-                   (let ((m-rest (syntax-case-match literals (cddr pattern) 
-                                                    (if (syntax-object? xs) xs (make-syntax-object xs (syntax-object-context input)))
-                                                    ellipsis)))
+                   (let ((m-rest (syntax-case-match literals (cddr pattern)
+                                                     (if (syntax-object? xs) xs (make-syntax-object xs (syntax-object-context input)))
+                                                     ellipsis)))
                      (if m-rest
-                         (let* ((vars (if (null? prefix-matches)
-                                          (collect-pattern-vars (car pattern) literals ellipsis)
-                                          (map car (car prefix-matches))))
-                                (p-vars (transpose-matches vars (reverse prefix-matches))))
-                           (append p-vars m-rest))
+                         (let ((transposed (transpose-matches p-vars (reverse prefix-matches))))
+                           (append transposed m-rest))
                          #f))))
                 (loop (lambda (xs prefix-matches)
                         (let ((m-p (if (pair? xs) (syntax-case-match literals (car pattern) (car xs) ellipsis) #f)))
@@ -154,7 +160,7 @@
     (else (if (equal? pattern (syntax-object-datum input)) '() #f))))
 
 ;;=============================================================================
-;; SECTION 6: Template Expansion
+;; 5. Template Expansion
 ;;=============================================================================
 
 (define (syntax-depth-map pattern literals ellipsis depth)
@@ -187,14 +193,14 @@
                                      (and pair (> (cdr pair) depth))))
                                  p-vars))
                 (len (if (null? drivers)
-                         (error "ellipsis in template with no pattern variables" template)
+                         (syntax-violation 'syntax "ellipsis in template with no pattern variables" template)
                          (length (cdr (assq (car drivers) bindings)))))
                 (new-template-list
                  (map (lambda (i)
                         (let ((iter-bindings
                                (map (lambda (v)
                                       (cons v (list-ref (cdr (assq v bindings)) i)))
-                                    drivers)))
+                                     drivers)))
                           (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals)))
                       (iota len))))
            (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals)))
@@ -203,7 +209,7 @@
     (else template)))
 
 ;;=============================================================================
-;; SECTION 7: Quasisyntax & Transformation
+;; 6. Quasisyntax & Transformation
 ;;=============================================================================
 
 (define (extract-quasisyntax x depth literals)
@@ -213,21 +219,21 @@
        ((and (eq? (car x) 'quasisyntax) (pair? (cdr x)) (null? (cddr x)))
         (let ((res (extract-quasisyntax (cadr x) (+ depth 1) literals)))
           (cons `(quasisyntax ,(car res)) (cdr res))))
-       
+
        ((and (eq? (car x) 'unsyntax) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
             (let ((tmp (string->symbol (string-append "unsyntax." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
               (cons (list '**splice-unsyntax** tmp) (list (list tmp (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax ,(car res)) (cdr res)))))
-       
+
        ((and (eq? (car x) 'unsyntax-splicing) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
             (let ((tmp (string->symbol (string-append "unsyntax-splicing." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
               (cons (list '**splice-unsyntax-splicing** tmp) (list (list (list tmp '...) (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax-splicing ,(car res)) (cdr res)))))
-       
+
        (else
         (let ((car-res (extract-quasisyntax (car x) depth literals))
               (cdr-res (extract-quasisyntax (cdr x) depth literals)))
@@ -241,7 +247,7 @@
                (cons (append (list (cadr car-tmpl) '...) cdr-tmpl) bindings))
               (else
                (cons (cons car-tmpl cdr-tmpl) bindings))))))))
-    
+
     ((vector? x)
      (let ((res (extract-quasisyntax (vector->list x) depth literals)))
        (cons (list->vector (car res)) (cdr res))))
@@ -276,7 +282,7 @@
                                                  (let ((pat (car c))
                                                        (fender (if (null? (cddr c)) #t (cadr c)))
                                                        (output (if (null? (cddr c)) (cadr c) (caddr c))))
-                                                   `(list ',pat 
+                                                   `(list ',pat
                                                           (lambda () ,(loop fender))
                                                           (lambda () ,(loop output)))))
                                                (cdddr x)))))
@@ -290,7 +296,7 @@
       (else x))))
 
 ;;=============================================================================
-;; SECTION 8: Macro Expansion Entry Points
+;; 7. Macro Expansion Entry Points
 ;;=============================================================================
 
 (define (generate-temporaries l)
@@ -312,7 +318,7 @@
   (let ((ellipsis '...))
     (let loop ((clauses clauses))
       (if (null? clauses)
-          (error "syntax-case: no matching pattern" input)
+          (syntax-violation 'syntax-case "no matching pattern" input)
           (let* ((clause (car clauses))
                  (pattern (car clause))
                  (fender (cadr clause))
@@ -324,9 +330,9 @@
                       (new-meta (syntax-depth-map pattern literals ellipsis 0)))
                   (set! *current-syntax-bindings* (append m old-bindings))
                   (set! *current-syntax-meta-env* (append new-meta old-meta))
-                  (let ((matched? (eval-fender fender literals pattern *current-syntax-bindings* env)))
+                  (let ((matched? (eval-transformer-expr fender literals pattern *current-syntax-bindings* env)))
                     (if matched?
-                        (let ((res (eval-output output literals pattern *current-syntax-bindings* env)))
+                        (let ((res (eval-transformer-expr output literals pattern *current-syntax-bindings* env)))
                           (set! *current-syntax-bindings* old-bindings)
                           (set! *current-syntax-meta-env* old-meta)
                           res)
@@ -336,15 +342,9 @@
                           (loop (cdr clauses))))))
                 (loop (cdr clauses))))))))
 
-(define (eval-fender expr literals pattern bindings env)
+(define (eval-transformer-expr expr literals pattern bindings env)
   (if (procedure? expr)
       (expr)
       (if (eq? expr #t) #t
-          (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings) 
+          (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings)
                 (if (null? env) (interaction-environment) env)))))
-
-(define (eval-output expr literals pattern bindings env)
-  (if (procedure? expr)
-      (expr)
-      (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings) 
-            (if (null? env) (interaction-environment) env))))

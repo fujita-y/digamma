@@ -1,10 +1,16 @@
 ;; test_syntax_case.scm
 (load "./macroexpand.scm")
 
+(define *pass-count* 0)
+(define *fail-count* 0)
+
 (define (test name output expected)
   (if (equal? output expected)
-      (begin (display "PASS: ") (display name) (newline))
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
       (begin
+        (set! *fail-count* (+ *fail-count* 1))
         (display "FAIL: ") (display name) (newline)
         (display "  Expected: ") (write expected) (newline)
         (display "  Actual:   ") (write output) (newline))))
@@ -345,4 +351,25 @@
       (macroexpand '(local-definition-test int hoge (int int)) 'strip)
       "ok")
 
-(display "\n")
+;; bound-identifier=? test
+(macroexpand
+ '(define-syntax test-bound-id
+    (lambda (x)
+      (syntax-case x ()
+        ((_ id)
+         (let* ((introduced (datum->syntax (syntax here) 'x))
+                (res1 (bound-identifier=? (syntax id) introduced))
+                (res2 (bound-identifier=? introduced introduced)))
+           (with-syntax ((res1 res1) (res2 res2))
+             (syntax (list res1 res2)))))))))
+
+(test "bound-identifier=? test"
+      (macroexpand '(test-bound-id x) 'strip)
+      '(list #f #t))
+
+(newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

@@ -1,4 +1,6 @@
-;; macroexpand.scm
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
+;;
 ;; R6RS/R7RS-compatible macro expansion system for research purposes.
 ;;
 ;; This module provides the main macro expansion logic. 

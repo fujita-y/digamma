@@ -13,21 +13,30 @@
 
 ;; --- Test Helper Functions ---
 
+(define *pass-count* 0)
+(define *fail-count* 0)
+
 (define (assert-equal expected actual msg)
   (if (equal? expected actual)
-      (begin (display "PASS: ") (display msg) (newline))
-      (begin (display "FAIL: ") (display msg) (newline)
-             (display "  Expected: ") (display expected) (newline)
-             (display "  Actual:   ") (display actual) (newline))))
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display msg) (newline))
+      (begin 
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display msg) (newline)
+        (display "  Expected: ") (display expected) (newline)
+        (display "  Actual:   ") (display actual) (newline))))
 
 (define (test expected expr msg)
   (let ((expanded (macroexpand expr 'strip)))
     (if (equal? expected expanded)
         (begin
+          (set! *pass-count* (+ *pass-count* 1))
           (display "PASS: ")
           (display msg)
           (newline))
         (begin
+          (set! *fail-count* (+ *fail-count* 1))
           (display "FAIL: ")
           (display msg)
           (newline)
@@ -128,9 +137,11 @@
 
 (if (eq? inner-var 'temp)
     (begin
+      (set! *fail-count* (+ *fail-count* 1))
       (display "FAIL: Hygiene test - 'temp' was captured.\n")
       (assert-equal "not temp" inner-var "Inner variable should be renamed"))
     (begin
+      (set! *pass-count* (+ *pass-count* 1))
       (display "PASS: Hygiene test - 'temp' appeared to be renamed (or at least different).\n")))
 
 (display "\n>>> local macros\n")
@@ -639,3 +650,10 @@
 (test '(lambda (x) (+ x 1))
       '(lambda (x) (+ x 1))
       "lambda without internal define unchanged")
+
+(newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

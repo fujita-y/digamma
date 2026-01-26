@@ -1,5 +1,7 @@
-;; syntax_rules.scm
-;; R7RS-compatible syntax-rules implementation for research.
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
+;;
+;; R7RS-compatible syntax-rules implementation.
 ;;
 ;; Provides pattern matching and template expansion for syntax-rules macros.
 ;; Optimized for performance by unifying matching and binding.
