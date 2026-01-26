@@ -1,4 +1,4 @@
-;; test_syntax_case_integrated.scm
+;; test_syntax_case.scm
 (load "./macroexpand.scm")
 
 (define (test name output expected)
@@ -9,6 +9,36 @@
         (display " ... FAIL\n")
         (display "  Expected: ") (write expected) (newline)
         (display "  Got:      ") (write output) (newline))))
+
+;;=============================================================================
+;; SECTION 1: Standalone expansion tests
+;;=============================================================================
+
+;; Test basic matching
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '() 
+                '(((name val ...) #t (syntax (name val ...)))) 
+                (interaction-environment))))
+  (test "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
+
+;; Test ellipsis expansion
+(let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
+       (result (expand-syntax-case input '()
+                '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
+                (interaction-environment))))
+  (test "ellipsis-expansion" (syntax->datum result) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
+
+;; Test fenders
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '()
+                '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
+                  ((name val ...) #t 'not-empty))
+                (interaction-environment))))
+  (test "fender-false" result 'not-empty))
+
+;;=============================================================================
+;; SECTION 2: Integrated macro expansion tests
+;;=============================================================================
 
 ;; Define a macro using syntax-case
 (macroexpand 
@@ -66,7 +96,7 @@
       (and (let loop ((x (car ls)) (rest (cdr ls)))
              (or (null? rest)
                  (and (not (bound-identifier=? x (car rest)))
-                      (loop x (cdr rest)))))
+                       (loop x (cdr rest)))))
            (unique-ids? (cdr ls)))))
 
 (macroexpand
@@ -125,12 +155,12 @@
          (with-syntax ((make-name (datum->syntax (syntax name)
                                                  (string->symbol
                                                   (string-append "make-"
-                                                                 (symbol->string
-                                                                  (syntax->datum (syntax name)))))))
+                                                                  (symbol->string
+                                                                   (syntax->datum (syntax name)))))))
                        (name? (datum->syntax (syntax name)
                                              (string->symbol
                                               (string-append (symbol->string
-                                                              (syntax->datum (syntax name))) "?")))))
+                                                               (syntax->datum (syntax name))) "?")))))
            (syntax (begin
                      (define (make-name field ...) (list (quote name) field ...))
                      (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name))))))))))))
@@ -155,14 +185,14 @@
 
 ;; Stringify macro for symbol testing
 (macroexpand
- '(define-syntax stringify
+ '(define-syntax stringify-sym
     (lambda (x)
       (syntax-case x ()
         ((_ n)
          (syntax (symbol->string n)))))))
 
 (test "stringify-symbl"
-      (macroexpand '(stringify 'hoge) 'strip)
+      (macroexpand '(stringify-sym 'hoge) 'strip)
       '(symbol->string 'hoge))
 
 ;; with-syntax with ellipsis
@@ -227,5 +257,51 @@
 (test "quasisyntax-nested"
       (macroexpand '(nested-quasisyntax 42) 'strip)
       '(list (list 42)))
+
+;; generate-temporaries test
+(macroexpand
+ '(define-syntax test-gen-temp
+    (lambda (x)
+      (syntax-case x ()
+        ((_ x ...)
+         (let ((temps (generate-temporaries (syntax (x ...)))))
+           (with-syntax (((t ...) temps))
+             (syntax (list t ...)))))))))
+
+(test "generate-temporaries"
+      (let ((res (macroexpand '(test-gen-temp a b))))
+        (and (list? res) (= (length res) 3) (eq? (car res) 'list)
+             (symbol? (cadr res)) (symbol? (caddr res))
+             (not (eq? (cadr res) (caddr res)))))
+      #t)
+
+;; syntax->datum in macro body
+(macroexpand
+ '(define-syntax test-syntax-datum
+    (lambda (x)
+      (syntax-case x ()
+        ((_ a b c)
+         (let ((lst (syntax->datum (syntax (a b c)))))
+           (with-syntax ((res (list->vector lst)))
+             (syntax (quote res)))))))))
+
+(test "syntax->datum-in-macro"
+      (macroexpand '(test-syntax-datum 1 2 3) 'strip)
+      ''#(1 2 3))
+
+;; datum->syntax test
+(macroexpand
+ '(define-syntax test-datum-syntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ name val)
+         (with-syntax ((new-name (datum->syntax (syntax name) 
+                                               (string->symbol (string-append "prefix-" 
+                                                                             (symbol->string (syntax->datum (syntax name))))))))
+           (syntax (define new-name val))))))))
+
+(test "datum->syntax-test"
+      (macroexpand '(test-datum-syntax foo 42) 'strip)
+      '(define prefix-foo 42))
 
 (display "Done.\n")
