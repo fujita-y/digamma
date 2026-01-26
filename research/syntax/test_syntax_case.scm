@@ -2,46 +2,47 @@
 (load "./macroexpand.scm")
 
 (define (test name output expected)
-  (display name)
   (if (equal? output expected)
-      (display " ... PASS\n")
+      (begin (display "PASS: ") (display name) (newline))
       (begin
-        (display " ... FAIL\n")
+        (display "FAIL: ") (display name) (newline)
         (display "  Expected: ") (write expected) (newline)
-        (display "  Got:      ") (write output) (newline))))
+        (display "  Actual:   ") (write output) (newline))))
 
 ;;=============================================================================
 ;; SECTION 1: Standalone expansion tests
 ;;=============================================================================
+(display "\n>>> standalone\n")
 
 ;; Test basic matching
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
-       (result (expand-syntax-case input '() 
-                '(((name val ...) #t (syntax (name val ...)))) 
-                (interaction-environment))))
+       (result (expand-syntax-case input '()
+                                   '(((name val ...) #t (syntax (name val ...))))
+                                   (interaction-environment))))
   (test "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
 
 ;; Test ellipsis expansion
 (let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
        (result (expand-syntax-case input '()
-                '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
-                (interaction-environment))))
+                                   '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
+                                   (interaction-environment))))
   (test "ellipsis-expansion" (syntax->datum result) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
 
 ;; Test fenders
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
        (result (expand-syntax-case input '()
-                '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
-                  ((name val ...) #t 'not-empty))
-                (interaction-environment))))
+                                   '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
+                                     ((name val ...) #t 'not-empty))
+                                   (interaction-environment))))
   (test "fender-false" result 'not-empty))
 
 ;;=============================================================================
 ;; SECTION 2: Integrated macro expansion tests
 ;;=============================================================================
+(display "\n>>> integrated\n")
 
 ;; Define a macro using syntax-case
-(macroexpand 
+(macroexpand
  '(define-syntax reverse-params
     (lambda (x)
       (syntax-case x ()
@@ -96,7 +97,7 @@
       (and (let loop ((x (car ls)) (rest (cdr ls)))
              (or (null? rest)
                  (and (not (bound-identifier=? x (car rest)))
-                       (loop x (cdr rest)))))
+                      (loop x (cdr rest)))))
            (unique-ids? (cdr ls)))))
 
 (macroexpand
@@ -122,10 +123,10 @@
          (syntax (letrec ([x e]) x))]))))
 
 (test "r6rs-rec-fact"
-      (macroexpand 
+      (macroexpand
        '(map (rec fact
                   (lambda (n)
-                    (if (= n 0)                 
+                    (if (= n 0)
                         1
                         (* n (fact (- n 1))))))
              '(1 2 3 4 5))
@@ -155,12 +156,12 @@
          (with-syntax ((make-name (datum->syntax (syntax name)
                                                  (string->symbol
                                                   (string-append "make-"
-                                                                  (symbol->string
-                                                                   (syntax->datum (syntax name)))))))
+                                                                 (symbol->string
+                                                                  (syntax->datum (syntax name)))))))
                        (name? (datum->syntax (syntax name)
                                              (string->symbol
                                               (string-append (symbol->string
-                                                               (syntax->datum (syntax name))) "?")))))
+                                                              (syntax->datum (syntax name))) "?")))))
            (syntax (begin
                      (define (make-name field ...) (list (quote name) field ...))
                      (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name))))))))))))
@@ -295,9 +296,9 @@
     (lambda (x)
       (syntax-case x ()
         ((_ name val)
-         (with-syntax ((new-name (datum->syntax (syntax name) 
-                                               (string->symbol (string-append "prefix-" 
-                                                                             (symbol->string (syntax->datum (syntax name))))))))
+         (with-syntax ((new-name (datum->syntax (syntax name)
+                                                (string->symbol (string-append "prefix-"
+                                                                               (symbol->string (syntax->datum (syntax name))))))))
            (syntax (define new-name val))))))))
 
 (test "datum->syntax-test"
@@ -327,4 +328,4 @@
       (macroexpand '(tailmatch2 1 2 3 . 4) 'strip)
       '4)
 
-(display "Done.\n")
+(display "\n")

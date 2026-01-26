@@ -1,4 +1,4 @@
-;; test_syntax.scm
+;; test_syntax_rules.scm
 ;; Test suite for the R6RS/R7RS macro expansion system.
 ;;
 ;; Test categories:
@@ -19,7 +19,6 @@
       (begin (display "FAIL: ") (display msg) (newline)
              (display "  Expected: ") (display expected) (newline)
              (display "  Actual:   ") (display actual) (newline))))
-
 
 (define (test expected expr msg)
   (let ((expanded (macroexpand expr 'strip)))
@@ -50,16 +49,15 @@
 
 (assert-equal ''defined
               (macroexpand '(define-syntax my-or
-                         (syntax-rules ()
-                           ((_ a b)
-                             (let ((t a))
-                               (if t t b))))))
+                              (syntax-rules ()
+                                ((_ a b)
+                                 (let ((t a))
+                                   (if t t b))))))
               "Register my-or")
 
 (test '(let ((t #t)) (if t t #f))
       '(my-or #t #f)
       "Expand my-or")
-
 
 ;; Test 2: Recursive macro (my-and)
 ;; (and) -> #t
@@ -67,11 +65,11 @@
 ;; (and x y ...) -> (if x (and y ...) #f)
 
 (macroexpand '(define-syntax my-and
-           (syntax-rules ()
-             ((_) #t)
-             ((_ x) x)
-             ((_ x y ...)
-              (if x (my-and y ...) #f)))))
+                (syntax-rules ()
+                  ((_) #t)
+                  ((_ x) x)
+                  ((_ x y ...)
+                   (if x (my-and y ...) #f)))))
 
 (assert-equal '#t
               (macroexpand '(my-and))
@@ -87,9 +85,9 @@
 
 ;; Test 3: List literal in pattern
 (macroexpand '(define-syntax method
-           (syntax-rules (=>)
-             ((_ (name args ...) => body)
-              (define (name args ...) body)))))
+                (syntax-rules (=>)
+                  ((_ (name args ...) => body)
+                   (define (name args ...) body)))))
 
 (assert-equal '(define (add x y) (+ x y))
               (macroexpand '(method (add x y) => (+ x y)))
@@ -108,14 +106,14 @@
 ;; If unhygienic, the macro's 'temp' will shadow the user's 'temp'.
 
 (macroexpand '(define-syntax swap
-           (syntax-rules ()
-             ((_ a b)
-              (let ((temp a))
-                (set! a b)
-                (set! b temp))))))
+                (syntax-rules ()
+                  ((_ a b)
+                   (let ((temp a))
+                     (set! a b)
+                     (set! b temp))))))
 
 (define result (macroexpand '(let ((temp 1) (other 2))
-                          (swap temp other))))
+                               (swap temp other))))
 
 (display "Expansion result: ")
 (display result)
@@ -167,7 +165,7 @@
 ;; let*-syntax scoping
 (test '(begin 1 2)
       '(let*-syntax ((a (syntax-rules () ((_) (begin 1 2))))
-                      (b (syntax-rules () ((_) (a)))))
+                     (b (syntax-rules () ((_) (a)))))
          (b))
       "let*-syntax sequential visibility")
 
@@ -191,13 +189,13 @@
 
 ;; "letrec-syntax" R5RS 4.3.1 - my-or
 (test '(let ((x #f) (y 7) (temp 8) (let odd?) (if even?))
-             (let ((temp x))
-               (if temp temp
-                   (let ((temp (let temp)))
-                     (if temp temp
-                         (let ((temp (if y)))
-                           (if temp temp
-                               y)))))))
+         (let ((temp x))
+           (if temp temp
+               (let ((temp (let temp)))
+                 (if temp temp
+                     (let ((temp (if y)))
+                       (if temp temp
+                           y)))))))
       '(letrec-syntax
            ((my-or (syntax-rules ()
                      ((my-or) #f)
@@ -223,20 +221,20 @@
 ;; let-syntax (multi)
 (test '(let ((+ *)) (let ((* -) (+ /)) (+ (* 3 3) (* 3 3))))
       '(let ((+ *))
-          (let-syntax ((a (syntax-rules () ((_ ?x) (+ ?x ?x))))
-                       (b (syntax-rules () ((_ ?x) (* ?x ?x)))))
-            (let ((* -)
-                  (+ /))
-              (a (b 3)))))
+         (let-syntax ((a (syntax-rules () ((_ ?x) (+ ?x ?x))))
+                      (b (syntax-rules () ((_ ?x) (* ?x ?x)))))
+           (let ((* -)
+                 (+ /))
+             (a (b 3)))))
       "Gauche let-syntax multi")
 
 ;; let-syntax (nest)
 (test '(+ 9 10)
       '(let-syntax ((a (syntax-rules () ((_ ?x ...) (+ ?x ...)))))
-          (let-syntax ((a (syntax-rules ()
-                             ((_ ?x ?y ...) (a ?y ...))
-                             ((_) 2))))
-            (a 8 9 10)))
+         (let-syntax ((a (syntax-rules ()
+                           ((_ ?x ?y ...) (a ?y ...))
+                           ((_) 2))))
+           (a 8 9 10)))
       "Gauche let-syntax nest")
 
 ;; --- R5RS Pitfall Tests ---
@@ -253,11 +251,11 @@
 ;; Pitfall 3.2
 (test '(let ((x 2)) (letrec* ((foo +)) (cond (else (foo x))) x))
       '(let-syntax ((foo (syntax-rules ()
-                             ((_ var) (define var 1)))))
-          (let ((x 2))
-            (begin (define foo +))
-            (cond (else (foo x)))
-            x))
+                           ((_ var) (define var 1)))))
+         (let ((x 2))
+           (begin (define foo +))
+           (cond (else (foo x)))
+           x))
       "Pitfall 3.2: let-syntax inside let with begin and cond")
 
 ;; Pitfall 3.3
@@ -266,9 +264,9 @@
          (let-syntax
              ((foo (syntax-rules ()
                      ((_ y) (let-syntax
-                                  ((bar (syntax-rules ()
+                                ((bar (syntax-rules ()
                                         ((_) (let ((x 2)) y)))))
-                               (bar))))))
+                              (bar))))))
            (foo x)))
       "Pitfall 3.3: Nested let-syntax hygiene")
 
@@ -295,12 +293,12 @@
 
 ;; 1. be-like-begin1
 (macroexpand '(define-syntax be-like-begin1
-           (syntax-rules ()
-             ((be-like-begin1 name)
-              (define-syntax name
                 (syntax-rules ()
-                  ((name expr (... ...))
-                   (begin expr (... ...)))))))))
+                  ((be-like-begin1 name)
+                   (define-syntax name
+                     (syntax-rules ()
+                       ((name expr (... ...))
+                        (begin expr (... ...)))))))))
 ;; Register sequence1
 (macroexpand '(be-like-begin1 sequence1))
 (test '(begin 0 1 2 3)
@@ -309,12 +307,12 @@
 
 ;; 2. be-like-begin2 (ellipsis escape)
 (macroexpand '(define-syntax be-like-begin2
-           (syntax-rules ()
-             ((be-like-begin2 name)
-              (define-syntax name
-                (... (syntax-rules ()
-                       ((name expr ...)
-                        (begin expr ...)))))))))
+                (syntax-rules ()
+                  ((be-like-begin2 name)
+                   (define-syntax name
+                     (... (syntax-rules ()
+                            ((name expr ...)
+                             (begin expr ...)))))))))
 (macroexpand '(be-like-begin2 sequence2))
 (test '(begin 1 2 3 4)
       '(sequence2 1 2 3 4)
@@ -322,12 +320,12 @@
 
 ;; 3. Ellipsis escape via literals
 (macroexpand '(define-syntax be-like-begin3
-           (syntax-rules ()
-             ((be-like-begin3 name)
-              (define-syntax name
-                (syntax-rules dots ()
-                  ((name expr dots)
-                   (begin expr dots))))))))
+                (syntax-rules ()
+                  ((be-like-begin3 name)
+                   (define-syntax name
+                     (syntax-rules dots ()
+                       ((name expr dots)
+                        (begin expr dots))))))))
 (macroexpand '(be-like-begin3 sequence3))
 (test '(begin 2 3 4 5)
       '(sequence3 2 3 4 5)
@@ -335,13 +333,13 @@
 
 ;; 4. Ellipsis escape in output
 (macroexpand '(define-syntax elli-esc-1
-           (syntax-rules ()
-             ((_)
-              '(... ...))
-             ((_ x)
-              '(... (x ...)))
-             ((_ x y)
-              '(... (... x y))))))
+                (syntax-rules ()
+                  ((_)
+                   '(... ...))
+                  ((_ x)
+                   '(... (x ...)))
+                  ((_ x y)
+                   '(... (... x y))))))
 
 (test ''...
       '(elli-esc-1)
@@ -355,21 +353,21 @@
 
 ;; 5. Underscore
 (macroexpand '(define-syntax underscore
-           (syntax-rules ()
-             ((foo _) '_))))
+                (syntax-rules ()
+                  ((foo _) '_))))
 (test ''_
       '(underscore foo)
       "underscore match")
 
 ;; 6. Jabberwocky (nested definition)
 (macroexpand '(define-syntax jabberwocky
-           (syntax-rules ()
-             ((_ hatter)
-              (begin
-                (define march-hare 42)
-                (define-syntax hatter
-                  (syntax-rules ()
-                    ((_) march-hare))))))))
+                (syntax-rules ()
+                  ((_ hatter)
+                   (begin
+                     (define march-hare 42)
+                     (define-syntax hatter
+                       (syntax-rules ()
+                         ((_) march-hare))))))))
 
 (test '(begin (define march-hare 42) 'defined)
       '(jabberwocky mad-hatter)
@@ -377,9 +375,9 @@
 
 ;; 7. Literal priority over ellipsis
 (macroexpand '(define-syntax elli-lit-1
-           (syntax-rules ... (...)
-             ((_ x)
-              '(x ...)))))
+                (syntax-rules ... (...)
+                  ((_ x)
+                   '(x ...)))))
 (test ''(100 ...)
       '(elli-lit-1 100)
       "Literal ... priority")
@@ -387,11 +385,11 @@
 ;; --- Gauche Tests ---
 
 (macroexpand '(define-syntax simple (syntax-rules ()
-                        ((_ "a" ?a) (a ?a))
-                        ((_ "b" ?a) (b ?a))
-                        ((_ #f ?a)  (c ?a))
-                        ((_ #(1 2) ?a) (e ?a))
-                        ((_ ?b ?a)  (f ?a ?b)))))
+                                      ((_ "a" ?a) (a ?a))
+                                      ((_ "b" ?a) (b ?a))
+                                      ((_ #f ?a)  (c ?a))
+                                      ((_ #(1 2) ?a) (e ?a))
+                                      ((_ ?b ?a)  (f ?a ?b)))))
 
 (test '(a z) '(simple "a" z) "simple literal match 1")
 (test '(c z) '(simple #f z) "simple literal match 2")
@@ -400,20 +398,20 @@
 
 
 (macroexpand '(define-syntax underbar (syntax-rules ()
-                          [(_) 0]
-                          [(_ _) 1]
-                          [(_ _) 2]
-                          [(_ _ _) 3]
-                          [(_ _ _ _ . _) 'many])))
+                                        [(_) 0]
+                                        [(_ _) 1]
+                                        [(_ _) 2]
+                                        [(_ _ _) 3]
+                                        [(_ _ _ _ . _) 'many])))
 (test 0 '(underbar) "underbar 0")
 (test 1 '(underbar a) "underbar 1")
 (test ''many '(underbar a b c) "underbar 3")
 (test ''many '(underbar a b c d) "underbar many")
 
 (macroexpand '(define-syntax repeat (syntax-rules ()
-                        ((_ 0 (?a ?b) ...)     ((?a ...) (?b ...)))
-                        ((_ 1 (?a ?b) ...)     (?a ... ?b ...))
-                        ((_ 2 (?a ?b) ...)     (?a ... ?b ... ?a ...)))))
+                                      ((_ 0 (?a ?b) ...)     ((?a ...) (?b ...)))
+                                      ((_ 1 (?a ?b) ...)     (?a ... ?b ...))
+                                      ((_ 2 (?a ?b) ...)     (?a ... ?b ... ?a ...)))))
 
 (test '((a c e) (b d f))
       '(repeat 0 (a b) (c d) (e f))
@@ -423,10 +421,10 @@
       "repeat 1")
 
 (macroexpand '(define-syntax repeat2 (syntax-rules () ;r7rs
-                          ((_ 0 (?a ?b ... ?c))    (?a (?b ...) ?c))
-                          ((_ 1 (?a ?b ... ?c ?d)) (?a (?b ...) ?c ?d))
-                          ((_ 2 (?a ?b ... . ?c))  (?a (?b ...) ?c))
-                          ((_ ?x ?y) 'ho))))
+                                       ((_ 0 (?a ?b ... ?c))    (?a (?b ...) ?c))
+                                       ((_ 1 (?a ?b ... ?c ?d)) (?a (?b ...) ?c ?d))
+                                       ((_ 2 (?a ?b ... . ?c))  (?a (?b ...) ?c))
+                                       ((_ ?x ?y) 'ho))))
 
 (test '(a (b c d e f) g)
       '(repeat2 0 (a b c d e f g))
@@ -437,15 +435,15 @@
 (test ''ho '(repeat2 0 (a)) "repeat2 0 fail")
 
 (macroexpand '(define-syntax nest1 (syntax-rules ()
-                        ((_ (?a ...) ...)        ((?a ... z) ...)))))
+                                     ((_ (?a ...) ...)        ((?a ... z) ...)))))
 
 (test '((a z) (b c d z) (e f g h i z) (z) (j z))
       '(nest1 (a) (b c d) (e f g h i) () (j))
       "nest1")
 
 (macroexpand '(define-syntax nest4 (syntax-rules () ; r7rs parameter list
-                        ((_ ((?a ?b ... ?c) ... ?d))
-                         ((?a ...) ((?b ...) ...) (?c ...) ?d)))))
+                                    ((_ ((?a ?b ... ?c) ... ?d))
+                                     ((?a ...) ((?b ...) ...) (?c ...) ?d)))))
 
 (test '((a d f) ((b) () (g h i)) (c e j) (k l m))
       '(nest4 ((a b c) (d e) (f g h i j) (k l m)))
@@ -453,42 +451,42 @@
 
 ;; mixlevel
 (macroexpand '(define-syntax mixlevel1 (syntax-rules ()
-                            ((_ (?a ?b ...)) ((?a ?b) ...)))))
+                                         ((_ (?a ?b ...)) ((?a ?b) ...)))))
 (test '((1 2) (1 3) (1 4) (1 5) (1 6))
       '(mixlevel1 (1 2 3 4 5 6))
       "mixlevel1")
 
 (macroexpand '(define-syntax hygiene (syntax-rules ()
-                          ((_ ?a) (+ ?a 1)))))
+                                       ((_ ?a) (+ ?a 1)))))
 ;; We can't evaluate, but we test structure.
 (test '(let ((+ *)) (+ 2 1)) '(let ((+ *)) (hygiene 2)) "hygiene - + should be renamed")
 
 (macroexpand '(define-syntax vect1 (syntax-rules ()
-                        ((_ #(?a ...)) (?a ...))
-                        ((_ (?a ...))  #(?a ...)))))
+                                     ((_ #(?a ...)) (?a ...))
+                                     ((_ (?a ...))  #(?a ...)))))
 (test '(1 2 3 4 5) '(vect1 #(1 2 3 4 5)) "vect1 decode")
 (test '#(1 2 3 4 5) '(vect1 (1 2 3 4 5)) "vect1 encode")
 
 (macroexpand '(define-syntax dot1 (syntax-rules ()
-                       ((_ (?a . ?b)) (?a ?b))
-                       ((_ ?loser) #f))))
+                                   ((_ (?a . ?b)) (?a ?b))
+                                   ((_ ?loser) #f))))
 (test '(1 2) '(dot1 (1 . 2)) "dot1 pair")
 (test '(1 (2)) '(dot1 (1 2)) "dot1 list")
 
 (macroexpand '(define-syntax dot3 (syntax-rules ()
-                       ((_ (?a ...) ?b) (?a ... . ?b)))))
+                                   ((_ (?a ...) ?b) (?a ... . ?b)))))
 (test '(1 2 . 3) '(dot3 (1 2) 3) "dot3")
 
 (macroexpand '(define-syntax tailmatch-rules1
-           (syntax-rules ()
-             ((_ first ... last . rest)
-              rest))))
+                (syntax-rules ()
+                  ((_ first ... last . rest)
+                   rest))))
 (test 4 '(tailmatch-rules1 1 2 3 . 4) "tailmatch-rules-test1")
 
 (macroexpand '(define-syntax tailmatch-rules2
-           (syntax-rules ()
-             ((_ first ... . rest)
-              rest))))
+                (syntax-rules ()
+                  ((_ first ... . rest)
+                   rest))))
 (test 4 '(tailmatch-rules2 1 2 3 . 4) "tailmatch-rules-test2")
 
 (display "\n>>> chez scheme\n")
@@ -496,20 +494,20 @@
 ;; From https://www.scheme.com/csug7/syntax.html Section 10.3
 
 (macroexpand '(define-syntax chez-or
-           (syntax-rules ()
-             ((_) #f)
-             ((_ e) e)
-             ((_ e1 e2 e3 ...)
-              (let ((t e1))
-                (if t t (chez-or e2 e3 ...)))))))
+                (syntax-rules ()
+                  ((_) #f)
+                  ((_ e) e)
+                  ((_ e1 e2 e3 ...)
+                   (let ((t e1))
+                     (if t t (chez-or e2 e3 ...)))))))
 
 ;; The expansion algorithm maintains lexical scoping automatically...
 ;; (let ([if #f]) (let ([t 'okay]) (or if t))) => okay
 
 (test '(let ((if #f))
-        (let ((t 'okay))
-          (let ((t if))
-            (if t t t))))
+         (let ((t 'okay))
+           (let ((t if))
+             (if t t t))))
       '(let ((if #f))
          (let ((t 'okay))
            (chez-or if t)))
@@ -520,8 +518,8 @@
 ;; Corner Case 1: Dotted List Matching
 ;; Matches (1 . 2) and (1 2)
 (macroexpand '(define-syntax dotted
-           (syntax-rules ()
-             ((_ (a . b)) (cons a b)))))
+                (syntax-rules ()
+                  ((_ (a . b)) (cons a b)))))
 
 (test '(cons 1 2) '(dotted (1 . 2)) "dotted pair match")
 (test '(cons 1 (2)) '(dotted (1 2)) "dotted list match")
@@ -529,18 +527,18 @@
 ;; Corner Case 2: Vector Patterns w/ Ellipsis
 ;; Verify #(a ...) bindings and template expansion
 (macroexpand '(define-syntax vector-ellipses
-           (syntax-rules ()
-             ((_ #(a ...))
-              (list a ...)))))
+                (syntax-rules ()
+                  ((_ #(a ...))
+                   (list a ...)))))
 
 (test '(list 1 2 3) '(vector-ellipses #(1 2 3)) "vector ellipsis match")
 
 ;; Corner Case 3: Empty Vector
 ;; Verify #() literal matching
 (macroexpand '(define-syntax empty-vec
-           (syntax-rules ()
-             ((_ #()) 'empty)
-             ((_ x) 'not-empty))))
+                (syntax-rules ()
+                  ((_ #()) 'empty)
+                  ((_ x) 'not-empty))))
 
 (test ''empty '(empty-vec #()) "empty vector match")
 (test ''not-empty '(empty-vec #(1)) "non-empty vector fallback")
@@ -548,9 +546,9 @@
 ;; Corner Case 4: Ellipsis as Literal
 ;; Verify ... can be used as a literal to match identifier ...
 (macroexpand '(define-syntax ellipsis-literal
-           (syntax-rules (...)
-             ((_ ...) 'ellipsis-found)
-             ((_ x) 'not-ellipsis))))
+                (syntax-rules (...)
+                  ((_ ...) 'ellipsis-found)
+                  ((_ x) 'not-ellipsis))))
 
 (test ''ellipsis-found '(ellipsis-literal ...) "ellipsis literal match")
 (test ''not-ellipsis '(ellipsis-literal other) "ellipsis literal non-match")
@@ -558,9 +556,9 @@
 ;; Corner Case 5: Symbolic Literals
 ;; Verify identifier matching works for symbols like =>
 (macroexpand '(define-syntax symbol-literal
-           (syntax-rules (=>)
-             ((_ =>) 'arrow)
-             ((_ x) 'not-arrow))))
+                (syntax-rules (=>)
+                  ((_ =>) 'arrow)
+                  ((_ x) 'not-arrow))))
 
 (test ''arrow '(symbol-literal =>) "symbol literal match")
 (test ''not-arrow '(symbol-literal other) "symbol literal non-match")
@@ -581,7 +579,7 @@
          (list 1 (f 1)))
       '(let ((f (lambda (x) (+ x 1)))) ; an outer variable binding for 'f'
          (let-syntax ((f (syntax-rules () ((_ x) x))) ; local macro 'f'
-                         (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
+                      (g (syntax-rules () ((_ x) (f x))))) ; local macro 'g' calls 'f'
            (list (f 1) (g 1))))
       "User requested: let-syntax scoping case")
 
