@@ -1,49 +1,58 @@
+;; test_macroexpand_1.scm
+;; Basic macro expansion and identifier macro tests.
+
 (load "./macroexpand.scm")
 
-(define (assert-equal? name expected actual)
-  (if (equal? expected actual)
-      (begin (display "PASS: ") (display name) (newline))
-      (begin (display "FAIL: ") (display name) (newline)
-             (display "  Expected: ") (write expected) (newline)
-             (display "  Actual:   ") (write actual) (newline))))
+(define *pass-count* 0)
+(define *fail-count* 0)
 
-;; 1. Simple macro
-;; Register foo using the expander's define-syntax handling
+(define (test name output expected)
+  (if (equal? output expected)
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
+      (begin
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display name) (newline)
+        (display "  Expected: ") (write expected) (newline)
+        (display "  Actual:   ") (write output) (newline))))
+
+;; =============================================================================
+;; Section 1: Simple macro
+;; =============================================================================
+(display "\n>>> Section 1: Simple macro\n")
 (expand '(define-syntax foo (syntax-rules ()
-                              ((foo x) (list 'foo x)))))
+                               ((foo x) (list 'foo x)))))
 
 (define test1 (macroexpand-1 '(foo 1)))
 (display "Test 1 Expand: ") (write test1) (newline)
-;; Now we expect expansion. 
-;; (foo 1) -> (list 'foo 1). 
-;; But syntax-rules introduces hygiene. 
-;; The literal 'foo might be renamed or not? 
-;; In this implementation, (list 'foo x) -> (list (quote foo) x).
-;; 'foo is (quote foo). quote is core form.
-;; Let's inspect the output first.
 
-;; 2. Nested macro
+;; =============================================================================
+;; Section 2: Nested macro
+;; =============================================================================
+(display "\n>>> Section 2: Nested macro\n")
 (expand '(define-syntax bar (syntax-rules ()
-                              ((bar x) (foo x)))))
+                               ((bar x) (foo x)))))
 
 (define test2 (macroexpand-1 '(bar 2)))
 (display "Test 2 Expand: ") (write test2) (newline)
-;; Should be (foo 2) expansion, which is... (list 'foo 2)?
-;; NO. macroexpand-1 expands ONCE.
-;; So (bar 2) -> (foo 2).
-;; And (foo 2) is a macro call.
 
 (define test2b (macroexpand-1 test2))
 (display "Test 2b Expand: ") (write test2b) (newline)
-;; Should be (list 'foo 2) (approximately).
 
-;; 3. Non macro
-(define test3 (macroexpand-1 '(list 1 2)))
-(assert-equal? "Non-macro form" '(list 1 2) test3)
+;; =============================================================================
+;; Section 3: Non macro and Identifier macro
+;; =============================================================================
+(display "\n>>> Section 3: Non macro and Identifier macro\n")
+(test "Non-macro form" (macroexpand-1 '(list 1 2)) '(list 1 2))
 
-;; 4. Identifier macro
 (register-macro! 'baz (lambda (expr) 'expanded-baz))
-(define test4 (macroexpand-1 'baz))
-(assert-equal? "Identifier macro" 'expanded-baz test4)
+(test "Identifier macro" (macroexpand-1 'baz) 'expanded-baz)
 
-
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

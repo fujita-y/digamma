@@ -1,14 +1,22 @@
+;; test_destruct.scm
+;; Test suite for destructuring match macro.
+
 (load "./macroexpand.scm")
+
+(define *pass-count* 0)
+(define *fail-count* 0)
 
 (define (test name expr expected)
   (let ((result (eval (macroexpand expr 'strip) (interaction-environment))))
     (if (equal? result expected)
-        (display (format "PASS: ~a\n" name))
         (begin
-          (display (format "FAIL: ~a\n" name))
-          (display (format "  Expected: ~a\n" expected))
-          (display (format "  Got:      ~a\n" result))))))
-
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
 (define generate-temporary-symbol (lambda () (gensym "tmp")))
 
@@ -101,30 +109,30 @@
                       (compile-match ren mem (cddr pat) `(last-cdr ,ref) match (cons `(drop-last-cdr ,ref) bind) (cons (car pat) vars))))
                  ((pair? (cddr pat))
                   (let ((memoize (generate-temporary-symbol)))
-                    (cond ((null? (cdddr pat))
-                           (let ((memoize (memoize-ref `(last-pair ,ref) mem)))
-                             (if (eq? (car pat) '_)
-                                 (compile-match ren mem (cddr pat) memoize
-                                                (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
-                                                bind
-                                                vars)
-                                 (compile-match ren mem (cddr pat) memoize
-                                                (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
-                                                (cons `(drop-last-pair ,ref) bind)
-                                                (cons (car pat) vars)))))
-                          (else
-                           (let ((n (- (count-non-dotted-pattern pat) 2)))
-                             (let ((memoize (memoize-ref `(last-n-pair ,n ,ref) mem)))
-                               (if (eq? (car pat) '_)
-                                   (compile-match ren mem (cddr pat) memoize
-                                                  (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
-                                                  bind
-                                                  vars)
-                                   (compile-match ren mem (cddr pat) memoize
-                                                  (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
-                                                  (cons `(drop-last-n-pair ,n ,ref) bind)
-                                                  (cons (car pat) vars)))))))))
-                 (else (values #f #f #f))))
+                     (cond ((null? (cdddr pat))
+                            (let ((memoize (memoize-ref `(last-pair ,ref) mem)))
+                              (if (eq? (car pat) '_)
+                                  (compile-match ren mem (cddr pat) memoize
+                                                 (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
+                                                 bind
+                                                 vars)
+                                  (compile-match ren mem (cddr pat) memoize
+                                                 (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
+                                                 (cons `(drop-last-pair ,ref) bind)
+                                                 (cons (car pat) vars)))))
+                           (else
+                            (let ((n (- (count-non-dotted-pattern pat) 2)))
+                              (let ((memoize (memoize-ref `(last-n-pair ,n ,ref) mem)))
+                                (if (eq? (car pat) '_)
+                                    (compile-match ren mem (cddr pat) memoize
+                                                   (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
+                                                   bind
+                                                   vars)
+                                    (compile-match ren mem (cddr pat) memoize
+                                                   (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
+                                                   (cons `(drop-last-n-pair ,n ,ref) bind)
+                                                   (cons (car pat) vars)))))))))
+                  (else (values #f #f #f))))
           ((predicate-pair? pat)
            (let ((renamed (or (hash-table-get ren (cadr pat) #f) (generate-temporary-symbol))))
              (hash-table-put! ren (cadr pat) renamed)
@@ -250,7 +258,15 @@
                                (cond ?dispatch ... (else #f)))))))))))))))
 
 (test "simple match"
-  '(destructuring-match '(quote 1)
-     (('quote e) (list 1))
-     (_ (list 'nomatch)))
-  '(1))
+      '(destructuring-match '(quote 1)
+         (('quote e) (list 1))
+         (_ (list 'nomatch)))
+      '(1))
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

@@ -1,4 +1,5 @@
 ;; test_syntax_case.scm
+;; Test suite for syntax-case and related R6RS features.
 (load "./macroexpand.scm")
 
 (define *pass-count* 0)
@@ -15,10 +16,10 @@
         (display "  Expected: ") (write expected) (newline)
         (display "  Actual:   ") (write output) (newline))))
 
-;;=============================================================================
-;; SECTION 1: Standalone expansion tests
-;;=============================================================================
-(display "\n>>> standalone\n")
+;; =============================================================================
+;; Section 1: Standalone expansion tests
+;; =============================================================================
+(display "\n>>> Section 1: Standalone expansion tests\n")
 
 ;; Test basic matching
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
@@ -42,10 +43,10 @@
                                    (interaction-environment))))
   (test "fender-false" result 'not-empty))
 
-;;=============================================================================
-;; SECTION 2: Integrated macro expansion tests
-;;=============================================================================
-(display "\n>>> integrated\n")
+;; =============================================================================
+;; Section 2: Integrated macro expansion tests
+;; =============================================================================
+(display "\n>>> Section 2: Integrated macro expansion tests\n")
 
 ;; Define a macro using syntax-case
 (macroexpand
@@ -367,10 +368,10 @@
       (macroexpand '(test-bound-id x) 'strip)
       '(list #f #t))
 
-;;=============================================================================
-;; SECTION 3: Definition by syntax-case
-;;=============================================================================
-(display "\n>>> definition by syntax-case\n")
+;; =============================================================================
+;; Section 3: Definition by syntax-case
+;; =============================================================================
+(display "\n>>> Section 3: Definition by syntax-case\n")
 
 ;; Helper for eval tests (from test_syntax_rules.scm)
 (define (test-eval expected expr msg)
@@ -458,6 +459,7 @@
       "Pitfall 8.3: let-syntax and local define")
 
 (newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
     (display "ALL TESTS PASSED.\n")
     (begin
