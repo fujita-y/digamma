@@ -98,7 +98,7 @@
       (cond
         ((symbol? expr)
         (if (memq expr mutated-vars)
-            `(tuple-ref ,expr 0)
+            `(vector-ref ,expr 0)
             expr))
         ((not (pair? expr)) expr)
         ((eq? (car expr) 'quote) expr)
@@ -110,7 +110,7 @@
         (let ((var (cadr expr))
               (val (box-transform (caddr expr) mutated-vars)))
           (if (memq var mutated-vars)
-              `(tuple-set! ,var 0 ,val)
+              `(vector-set! ,var 0 ,val)
               `(set! ,var ,val))))
         ((eq? (car expr) 'begin)
         `(begin ,@(map (lambda (e) (box-transform e mutated-vars)) (cdr expr))))
@@ -128,7 +128,7 @@
                 ,(if (null? params-to-box)
                     (let ((new-body (map (lambda (e) (box-transform e mutated-vars)) body)))
                       (if (= (length new-body) 1) (car new-body) `(begin ,@new-body)))
-                    `(let ,(map (lambda (v) `(,v (tuple ,v))) params-to-box)
+                    `(let ,(map (lambda (v) `(,v (vector ,v))) params-to-box)
                         ,@(map (lambda (e) (box-transform e mutated-vars)) body)))))))
         ((eq? (car expr) 'let)
         (let ((bindings (cadr expr))
@@ -143,7 +143,7 @@
             `(let ,(map list vars vals)
                 ,@(if (null? vars-to-box)
                       (map (lambda (e) (box-transform e mutated-vars)) body)
-                      `((let ,(map (lambda (v) `(,v (tuple ,v))) vars-to-box)
+                      `((let ,(map (lambda (v) `(,v (vector ,v))) vars-to-box)
                           ,@(map (lambda (e) (box-transform e mutated-vars)) body))))))))
         (else
         (map (lambda (e) (box-transform e mutated-vars)) expr))))
@@ -176,8 +176,8 @@
                   (free (analyze-free-vars expr bound-vars))
                   (transformed-body (map (lambda (e) (lift-transform e inner-bound)) body))
                   (lifted-name (if (null? free)
-                                    (gensym "noname_subr_")
-                                    (gensym "noname_close_"))))
+                                    (gensym "_subr_noname_")
+                                    (gensym "_close_noname_"))))
               
               (if (null? free)
                   (let ((def `(define ,lifted-name

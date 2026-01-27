@@ -37,6 +37,7 @@
 (run-test "Case 2 (from memo.txt)"
   '(define foo
      (lambda (val lst)
+       (set! val (- val 2))
        (cons (map (lambda (x) (set! val (- val 1)) (+ x val)) lst)
              val))))
 
