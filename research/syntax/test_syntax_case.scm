@@ -32,7 +32,7 @@
        (result (expand-syntax-case input '()
                                    '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
                                    (interaction-environment))))
-  (test "ellipsis-expansion" (syntax->datum result) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
+  (test "ellipsis-expansion" (strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
 
 ;; Test fenders
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
@@ -366,6 +366,96 @@
 (test "bound-identifier=? test"
       (macroexpand '(test-bound-id x) 'strip)
       '(list #f #t))
+
+;;=============================================================================
+;; SECTION 3: Definition by syntax-case
+;;=============================================================================
+(display "\n>>> definition by syntax-case\n")
+
+;; Helper for eval tests (from test_syntax_rules.scm)
+(define (test-eval expected expr msg)
+  (let ((expanded (eval (macroexpand expr) (interaction-environment))))
+    (if (equal? expected expanded)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display msg) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display msg) (newline)
+          (display "  Expected: ") (display expected) (newline)
+          (display "  Actual:   ") (display expanded) (newline)))))
+
+(define (test-eval-strip expected expr msg)
+  (let ((expanded (eval (macroexpand expr 'strip) (interaction-environment))))
+    (if (equal? expected expanded)
+        (begin 
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display msg) (newline))
+        (begin 
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display msg) (newline)
+          (display "  Expected: ") (display expected) (newline)
+          (display "  Actual:   ") (display expanded) (newline)))))
+
+;; Define syntax-rules using syntax-case (shadowing core syntax-rules)
+(macroexpand
+ '(define-syntax syntax-rules
+    (lambda (x)
+      (syntax-case x (lambda syntax-case syntax)
+        ((_ (k ...) ((keyword . pattern) template) ...)
+         (syntax (lambda (x)
+             (syntax-case x (k ...)
+               ((dummy . pattern) (syntax template)) ...))))))))
+
+;; Pitfall 3.1
+(test-eval 4
+      '(let-syntax ((foo
+                     (syntax-rules ()
+                       ((_ expr) (+ expr 1)))))
+         (let ((+ *))
+           (foo 3)))
+      "Pitfall 3.1: Hygiene with shadowed global operator")
+
+;; Pitfall 3.2
+(test-eval 2
+      '(let-syntax ((foo (syntax-rules ()
+                           ((_ var) (define var 1)))))
+         (let ((x 2))
+           (begin (define foo +))
+           (cond (else (foo x)))
+           x))
+      "Pitfall 3.2: let-syntax inside let with begin and cond")
+
+;; Pitfall 3.3
+(test-eval 1
+      '(let ((x 1))
+         (let-syntax
+             ((foo (syntax-rules ()
+                     ((_ y) (let-syntax
+                                ((bar (syntax-rules ()
+                                        ((_) (let ((x 2)) y)))))
+                              (bar))))))
+           (foo x)))
+      "Pitfall 3.3: Nested let-syntax hygiene")
+
+;; Pitfall 3.4
+(test-eval 1
+      '(let-syntax ((x (syntax-rules ()))) 1)
+      "Pitfall 3.4: let-syntax with no clauses")
+
+;; Pitfall 8.1
+(test-eval -1
+      '(let - ((n (- 1))) n)
+      "Pitfall 8.1: named let with name -")
+
+;; Pitfall 8.3 (R6RS)
+(test-eval-strip 2
+      '(let ((x 1))
+         (let-syntax ((foo (syntax-rules () ((_) 2))))
+           (define x (foo))
+           3)
+         x)
+      "Pitfall 8.3: let-syntax and local define")
 
 (newline)
 (if (= *fail-count* 0)

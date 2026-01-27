@@ -76,11 +76,24 @@
             id))
       id))
 
+(define (resolve-variable id m-env s-env r-env)
+  (let ((local (assq id r-env)))
+    (if local
+        (cdr local)
+        (let ((entry (assq id *rename-env*)))
+          (if entry
+              (let ((original (cadr entry)) (context (caddr entry)))
+                (if context
+                    (let ((c-m (car context)) (c-s (cadr context)) (c-r (caddr context)))
+                      (resolve-variable original c-m c-s c-r))
+                    id))
+              id)))))
+
 (define (rename-symbol sym suffix)
   (string->symbol (string-append (symbol->string sym) "." suffix)))
 
 (define (unwrap-env env)
-  (if (and (pair? env) (eq? (car env) 'promise)) (cadr env) env))
+  (if (and (pair? env) (eq? (car env) 'promise)) (or (cadr env) '()) env))
 
 (define (lookup-macro name env)
   (let ((local-pair (assq name (unwrap-env env))))
@@ -126,15 +139,18 @@
         (apply-syntax-rules literals rules expr renamer ellipsis)))))
 
 (define (parse-transformer spec context)
-  (cond
-    ((and (pair? spec) (core-form? (car spec) 'syntax-rules (cadr context)))
-     (make-syntax-rules-transformer (cdr spec) context))
-    ((and (pair? spec) (core-form? (car spec) 'lambda (cadr context)))
-     (lambda (expr)
-       (let ((input (make-syntax-object expr context)))
-         (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '())))
-           (syntax->datum (eval body (interaction-environment)))))))
-    (else (error "Only syntax-rules and lambda are supported for macros" spec))))
+  (let ((head (if (pair? spec) (car spec) #f)))
+    (cond
+      ((and head (symbol? head) (lookup-macro head (car context)))
+       (parse-transformer ((lookup-macro head (car context)) spec) context))
+      ((and (pair? spec) (core-form? (car spec) 'syntax-rules (cadr context)))
+       (make-syntax-rules-transformer (cdr spec) context))
+      ((and (pair? spec) (core-form? (car spec) 'lambda (cadr context)))
+       (lambda (expr)
+         (let ((input (make-syntax-object expr context)))
+           (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '() context)))
+             (syntax->datum (eval body (interaction-environment)))))))
+      (else (error "Only syntax-rules and lambda are supported for macros" spec)))))
 
 ;;=============================================================================
 ;; SECTION 5: Binding Helpers
@@ -364,7 +380,7 @@
        (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
          (if transformer
              (expand (transformer expr) m-env s-env r-env)
-             (let ((pair (assq expr r-env))) (if pair (cdr pair) expr)))))
+             (resolve-variable expr m-env s-env r-env))))
       (else expr))))
 
 ;;=============================================================================

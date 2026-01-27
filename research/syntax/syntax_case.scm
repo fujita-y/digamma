@@ -176,13 +176,17 @@
              (syntax-depth-map (cdr pattern) literals ellipsis depth)))
     (else '())))
 
-(define (expand-syntax template bindings context meta-env depth ellipsis literals)
+(define (expand-syntax template bindings context meta-env depth ellipsis literals suffix)
   (cond
     ((symbol? template)
      (let ((b (assq template bindings)))
        (if (and b (= (or (cdr (assq template meta-env)) 0) depth))
            (cdr b)
-           template)))
+           (if (memq template literals)
+               template
+               (let ((new-sym (rename-symbol template suffix)))
+                 (register-renamed! new-sym template context)
+                 new-sym)))))
     ((pair? template)
      (if (and (pair? (cdr template)) (eq? (cadr template) ellipsis))
          ;; Handle ellipsis in template
@@ -200,12 +204,12 @@
                         (let ((iter-bindings
                                (map (lambda (v)
                                       (cons v (list-ref (cdr (assq v bindings)) i)))
-                                     drivers)))
-                          (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals)))
+                                    drivers)))
+                          (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals suffix)))
                       (iota len))))
-           (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals)))
-         (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals)
-               (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals))))
+           (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals suffix)))
+         (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals suffix)
+               (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals suffix))))
     (else template)))
 
 ;;=============================================================================
@@ -253,7 +257,7 @@
        (cons (list->vector (car res)) (cdr res))))
     (else (cons x '()))))
 
-(define (prepare-eval-expr expr literals meta-env bindings)
+(define (prepare-eval-expr expr literals meta-env bindings context)
   (let loop ((x expr))
     (cond
       ((symbol? x)
@@ -267,13 +271,15 @@
       ((pair? x)
        (cond
          ((eq? (car x) 'syntax)
-          `(expand-syntax ',(cadr x) *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals))
+          `(let ((suffix (fresh-suffix)))
+             (expand-syntax ',(cadr x) *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix)))
          ((eq? (car x) 'quasisyntax)
           (let ((res (extract-quasisyntax (cadr x) 0 literals)))
             (let ((new-tmpl (car res))
                   (bindings (cdr res)))
               (if (null? bindings)
-                  `(expand-syntax ',new-tmpl *current-syntax-bindings* '() *current-syntax-meta-env* 0 '... ',literals)
+                  `(let ((suffix (fresh-suffix)))
+                     (expand-syntax ',new-tmpl *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix))
                   (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
          ((eq? (car x) 'syntax-case)
           (let ((input (loop (cadr x)))
@@ -281,10 +287,11 @@
                 (clauses-expr (cons 'list (map (lambda (c)
                                                  (let ((pat (car c))
                                                        (fender (if (null? (cddr c)) #t (cadr c)))
-                                                       (output (if (null? (cddr c)) (cadr c) (caddr c))))
+                                                       (output (if (null? (cddr c)) (cadr c) (caddr c)))
+                                                       (new-lits (append (caddr x) literals)))
                                                    `(list ',pat
-                                                          (lambda () ,(loop fender))
-                                                          (lambda () ,(loop output)))))
+                                                          (lambda () ,(prepare-eval-expr fender new-lits meta-env bindings context))
+                                                          (lambda () ,(prepare-eval-expr output new-lits meta-env bindings context)))))
                                                (cdddr x)))))
             `(expand-syntax-case ,input ',lits ,clauses-expr (interaction-environment))))
           ((eq? (car x) 'with-syntax)
@@ -346,5 +353,5 @@
   (if (procedure? expr)
       (expr)
       (if (eq? expr #t) #t
-          (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings)
+          (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
                 (if (null? env) (interaction-environment) env)))))

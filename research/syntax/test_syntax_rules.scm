@@ -48,6 +48,26 @@
           (newline)))))
 
 (define (test-eval expected expr msg)
+  (let ((expanded (eval (macroexpand expr) (interaction-environment))))
+    (if (equal? expected expanded)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ")
+          (display msg)
+          (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ")
+          (display msg)
+          (newline)
+          (display "  Expected: ")
+          (display expected)
+          (newline)
+          (display "  Actual:   ")
+          (display expanded)
+          (newline)))))
+
+(define (test-eval-strip expected expr msg)
   (let ((expanded (eval (macroexpand expr 'strip) (interaction-environment))))
     (if (equal? expected expanded)
         (begin
@@ -313,7 +333,7 @@
       "Pitfall 8.1: named let with name -")
 
 ;; Pitfall 8.3 (R6RS)
-(test-eval 2
+(test-eval-strip 2
       '(let ((x 1))
          (let-syntax ((foo (syntax-rules () ((_) 2))))
            (define x (foo))
