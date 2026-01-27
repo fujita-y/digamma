@@ -1,4 +1,4 @@
-(load "macroexpand.scm")
+(load "./macroexpand.scm")
 
 (define (test name expr expected)
   (let ((result (eval (macroexpand expr 'strip) (interaction-environment))))

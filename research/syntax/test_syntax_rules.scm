@@ -9,7 +9,7 @@
 ;;   - Binding forms: let, let*, letrec, letrec*, named let
 ;;   - Internal defines: R6RS-style conversion to letrec*
 
-(load "macroexpand.scm")
+(load "./macroexpand.scm")
 
 ;; --- Test Helper Functions ---
 
