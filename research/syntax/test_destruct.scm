@@ -1,5 +1,15 @@
 (load "macroexpand.scm")
 
+(define (test name expr expected)
+  (let ((result (eval (macroexpand expr 'strip) (interaction-environment))))
+    (if (equal? result expected)
+        (display (format "PASS: ~a\n" name))
+        (begin
+          (display (format "FAIL: ~a\n" name))
+          (display (format "  Expected: ~a\n" expected))
+          (display (format "  Got:      ~a\n" result))))))
+
+
 (define generate-temporary-symbol (lambda () (gensym "tmp")))
 
 (define ca---r (make-hash-table))
@@ -239,9 +249,8 @@
                              (let* (?subexprs ...)
                                (cond ?dispatch ... (else #f)))))))))))))))
 
-(display
- (macroexpand
+(test "simple match"
   '(destructuring-match '(quote 1)
      (('quote e) (list 1))
-     (_ (list 'nomatch)))))
-(newline)
+     (_ (list 'nomatch)))
+  '(1))

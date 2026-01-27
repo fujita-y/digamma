@@ -97,11 +97,13 @@
                       (and global-pair (cdr global-pair))))))))))
 
 (define (core-form? sym name shadowed-env)
-  (let ((resolved (resolve-identifier sym)))
-    (if (pair? resolved)
-        (let ((context (car resolved)) (original (cdr resolved)))
-          (core-form? original name (unwrap-env (cadr context))))
-        (and (not (memq resolved (unwrap-env shadowed-env))) (eq? resolved name)))))
+  (if (not (symbol? sym))
+      #f
+      (let ((resolved (resolve-identifier sym)))
+        (if (pair? resolved)
+            (let ((context (car resolved)) (original (cdr resolved)))
+              (core-form? original name (unwrap-env (cadr context))))
+            (and (not (memq resolved (unwrap-env shadowed-env))) (eq? resolved name))))))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers
@@ -288,6 +290,63 @@
                      ((core-form? head 'if s-env)
                       `(if ,(expand (cadr expr) m-env s-env r-env) ,(expand (caddr expr) m-env s-env r-env)
                            ,@(map-improper (lambda (x) (expand x m-env s-env r-env)) (cdddr expr))))
+
+                     ((core-form? head 'cond s-env)
+                      (let ((clauses (cdr expr)))
+                        (if (null? clauses)
+                            '(begin)
+                            (let ((clause (car clauses)) (rest (cdr clauses)))
+                              (cond
+                                ((core-form? (car clause) 'else s-env)
+                                 (expand (make-seq (cdr clause)) m-env s-env r-env))
+                                ((and (pair? (cdr clause)) (core-form? (cadr clause) '=> s-env))
+                                 (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
+                                   (expand `(let ((,tmp ,(car clause)))
+                                              (if ,tmp
+                                                  (,(caddr clause) ,tmp)
+                                                  (cond ,@rest)))
+                                           m-env s-env r-env)))
+                                (else
+                                 (expand `(if ,(car clause)
+                                              ,(make-seq (cdr clause))
+                                              (cond ,@rest))
+                                         m-env s-env r-env)))))))
+
+                     ((core-form? head 'and s-env)
+                      (let ((args (cdr expr)))
+                        (cond
+                          ((null? args) #t)
+                          ((null? (cdr args)) (expand (car args) m-env s-env r-env))
+                          (else
+                           (expand `(if ,(car args) (and ,@(cdr args)) #f) m-env s-env r-env)))))
+
+                     ((core-form? head 'or s-env)
+                      (let ((args (cdr expr)))
+                        (cond
+                          ((null? args) #f)
+                          ((null? (cdr args)) (expand (car args) m-env s-env r-env))
+                          (else
+                           (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
+                             (expand `(let ((,tmp ,(car args)))
+                                        (if ,tmp ,tmp (or ,@(cdr args))))
+                                     m-env s-env r-env))))))
+
+                     ((core-form? head 'case s-env)
+                      (let ((val (cadr expr)) (clauses (cddr expr)))
+                        (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
+                          (expand `(let ((,tmp ,val))
+                                     ,(let recur ((clauses clauses))
+                                        (if (null? clauses)
+                                            '(begin)
+                                            (let ((clause (car clauses)) (rest (cdr clauses)))
+                                              (cond
+                                                ((core-form? (car clause) 'else s-env)
+                                                 (make-seq (cdr clause)))
+                                                (else
+                                                 `(if (memv ,tmp ',(car clause))
+                                                      ,(make-seq (cdr clause))
+                                                      ,(recur rest))))))))
+                                  m-env s-env r-env))))
 
                      ((core-form? head 'define s-env)
                       `(define ,(cadr expr) ,@(flatten-begins (map-improper (lambda (x) (expand x m-env s-env r-env)) (cddr expr)))))
