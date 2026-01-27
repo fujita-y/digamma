@@ -7,6 +7,8 @@
 ;; This implementation focus on lexical scoping within transformers by using thunks
 ;; for delayed evaluation of fenders and outputs.
 
+(load "./syntax_common.scm")
+
 ;;=============================================================================
 ;; 1. Globals & State
 ;;=============================================================================
@@ -19,14 +21,7 @@
 ;; 2. Utilities
 ;;=============================================================================
 
-(define (filter pred lst)
-  (cond ((null? lst) '())
-        ((pred (car lst)) (cons (car lst) (filter pred (cdr lst))))
-        (else (filter pred (cdr lst)))))
 
-(define (iota n)
-  (let loop ((i 0))
-    (if (= i n) '() (cons i (loop (+ i 1))))))
 
 (define (syntax-violation who message form . subform)
   (let ((who-str (if who (format "~a: " who) "")))

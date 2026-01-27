@@ -6,24 +6,7 @@
 ;; Provides pattern matching and template expansion for syntax-rules macros.
 ;; Optimized for performance by unifying matching and binding.
 
-;;=============================================================================
-;; SECTION 1: Utilities
-;;=============================================================================
-
-(define (sr-map-first-n lst n)
-  (if (= n 0) '() (cons (car lst) (sr-map-first-n (cdr lst) (- n 1)))))
-
-(define (sr-drop lst n)
-  (if (= n 0) lst (sr-drop (cdr lst) (- n 1))))
-
-(define (sr-filter pred lst)
-  (cond ((null? lst) '())
-        ((pred (car lst)) (cons (car lst) (sr-filter pred (cdr lst))))
-        (else (sr-filter pred (cdr lst)))))
-
-(define (sr-iota n)
-  (let loop ((i 0))
-    (if (= i n) '() (cons i (loop (+ i 1))))))
+(load "./syntax_common.scm")
 
 ;;=============================================================================
 ;; SECTION 2: Pattern Analysis
@@ -131,7 +114,7 @@
             (tail-tmpl (cddr template))
             ;; Find pattern vars in sub-tmpl that are drivers (depth >= current + 1)
             (p-vars (map car (sr-analyze-pattern sub-tmpl '() ellipsis 0)))
-            (drivers (sr-filter (lambda (v)
+            (drivers (filter (lambda (v)
                                   (let ((entry (assq v meta-env)))
                                     (and entry (>= (cdr entry) (+ depth 1)))))
                                 p-vars))
@@ -148,7 +131,7 @@
                                   (cons v (list-ref (cdr (assq v bindings)) i)))
                                 drivers)))
                       (sr-expand-template sub-tmpl (append iter-bindings bindings) rename ellipsis meta-env (+ depth 1))))
-                  (sr-iota len))))
+                  (iota len))))
        (append expanded-list 
                (sr-expand-template tail-tmpl bindings rename ellipsis meta-env depth))))
 
