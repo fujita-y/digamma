@@ -327,3 +327,17 @@
   (set! *rename-env* '())
   (let ((res (expand expr '() '() '())))
     (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
+(define (macroexpand-1 expr)
+  (cond
+    ((pair? expr)
+     (let* ((head (car expr))
+            (transformer (and (symbol? head) (lookup-macro head '()))))
+       (if transformer
+           (transformer expr)
+           expr)))
+    ((symbol? expr)
+     (let ((transformer (lookup-macro expr '())))
+       (if transformer
+           (transformer expr)
+           expr)))
+    (else expr)))
