@@ -17,11 +17,35 @@
 (define (expand-quasiquote expr)
   (expand-qq expr 0))
 
-;; Main expansion function with nesting level
+;; Helper: check if symbol is unquote (including renamed)
+(define (is-unquote? s)
+  (if (symbol? s)
+      (let ((name (symbol->string s)))
+        (or (eq? s 'unquote)
+            (and (> (string-length name) 8)
+                 (string=? (substring name 0 8) "unquote."))))
+      #f))
+
+(define (is-unquote-splicing? s)
+  (if (symbol? s)
+      (let ((name (symbol->string s)))
+        (or (eq? s 'unquote-splicing)
+            (and (> (string-length name) 17)
+                 (string=? (substring name 0 17) "unquote-splicing."))))
+      #f))
+
+(define (is-quasiquote? s)
+  (if (symbol? s)
+      (let ((name (symbol->string s)))
+        (or (eq? s 'quasiquote)
+            (and (> (string-length name) 11)
+                 (string=? (substring name 0 11) "quasiquote."))))
+      #f))
+
 (define (expand-qq expr level)
   (cond
    ;; Handle unquote
-   ((and (pair? expr) (eq? (car expr) 'unquote))
+   ((and (pair? expr) (is-unquote? (car expr)))
     (if (= level 0)
         ;; At level 0, unquote evaluates
         (cadr expr)
@@ -29,13 +53,15 @@
         (list 'list ''unquote (expand-qq (cadr expr) (- level 1)))))
    
    ;; Handle quasiquote (nested)
-   ((and (pair? expr) (eq? (car expr) 'quasiquote))
+   ((and (pair? expr) (is-quasiquote? (car expr)))
     ;; Increase nesting level
     (list 'list ''quasiquote (expand-qq (cadr expr) (+ level 1))))
    
-   ;; Not a pair - quote it
+   ;; Not a pair - quote it if not self-evaluating
    ((not (pair? expr))
-    (list 'quote expr))
+    (if (or (number? expr) (boolean? expr) (string? expr) (null? expr))
+        expr
+        (list 'quote expr)))
    
    ;; Handle list with potential unquote-splicing
    (else
@@ -81,18 +107,20 @@
 (define (expand-qq-opt expr level)
   (cond
    ;; Handle unquote
-   ((and (pair? expr) (eq? (car expr) 'unquote))
+   ((and (pair? expr) (is-unquote? (car expr)))
     (if (= level 0)
         (cadr expr)
         (list 'list ''unquote (expand-qq-opt (cadr expr) (- level 1)))))
    
    ;; Handle quasiquote (nested)
-   ((and (pair? expr) (eq? (car expr) 'quasiquote))
+   ((and (pair? expr) (is-quasiquote? (car expr)))
     (list 'list ''quasiquote (expand-qq-opt (cadr expr) (+ level 1))))
    
-   ;; Not a pair - quote it
+   ;; Not a pair - quote it if not self-evaluating
    ((not (pair? expr))
-    (list 'quote expr))
+    (if (or (number? expr) (boolean? expr) (string? expr) (null? expr))
+        expr
+        (list 'quote expr)))
    
    ;; List - try to build with list if no splicing
    (else
@@ -110,27 +138,44 @@
     (expand-qq-list-with-splicing expr level))
    
    ;; Check if we can use 'list' (no unquote-splicing in proper list)
-   ((no-splicing? expr level)
+   ((and (no-splicing? expr level) (no-unquote-tail? expr level))
     (let ((elements (map (lambda (e) (expand-qq-opt e level)) expr)))
       (cons 'list elements)))
    
-   ;; Has splicing, use cons/append
+   ;; Has splicing or unquote-tail, use cons/append
    (else
     (expand-qq-list-with-splicing expr level))))
+
+(define (no-unquote-tail? expr level)
+  (if (= level 0)
+      (let loop ((l expr))
+        (cond ((null? l) #t)
+              ((not (pair? l)) #t)
+              ((and (pair? (cdr l)) (is-unquote? (car (cdr l))) (null? (cddr l))) #f)
+              (else (loop (cdr l)))))
+      #t))
 
 (define (expand-qq-list-with-splicing expr level)
   (cond
    ((null? expr)
     ''())
    
+   ;; Handle atom in cdr of dotted pair
+   ((not (pair? expr))
+    (expand-qq-opt expr level))
+
    ;; First element is unquote-splicing at level 0
    ((and (pair? (car expr))
-         (eq? (caar expr) 'unquote-splicing)
+         (is-unquote-splicing? (caar expr))
          (= level 0))
     (if (null? (cdr expr))
         (cadar expr)
         (list 'append (cadar expr) (expand-qq-list-with-splicing (cdr expr) level))))
    
+   ;; Handle unquote in cdr of dotted pair (e.g. `(a . ,b))
+   ((and (is-unquote? (car expr)) (= level 0))
+    (cadr expr))
+
    ;; Improper list
    ((not (pair? (cdr expr)))
     (list 'cons (expand-qq-opt (car expr) level)
@@ -154,11 +199,11 @@
         #f
         (no-splicing? (car expr) level)))
    ((and (pair? (car expr))
-         (eq? (caar expr) 'unquote-splicing)
+         (is-unquote-splicing? (caar expr))
          (= level 0))
     #f)
    ((and (pair? (car expr))
-         (eq? (caar expr) 'quasiquote))
+         (is-quasiquote? (car (car expr))))
     (no-splicing? (cdr expr) level))
    (else
     (and (no-splicing? (car expr) level)

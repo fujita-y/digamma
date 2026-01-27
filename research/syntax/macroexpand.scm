@@ -8,6 +8,7 @@
 
 (load "./syntax_rules.scm")
 (load "./syntax_case.scm")
+(load "./quasiquote.scm")
 
 ;;=============================================================================
 ;; SECTION 1: Globals & State
@@ -82,15 +83,18 @@
   (if (and (pair? env) (eq? (car env) 'promise)) (cadr env) env))
 
 (define (lookup-macro name env)
-  (let ((resolved (resolve-identifier name)))
-    (if (pair? resolved)
-        (let ((context (car resolved)) (original (cdr resolved)))
-          (lookup-macro original (unwrap-env (car context))))
-        (let ((local-pair (assq resolved (unwrap-env env))))
-          (if local-pair
-              (cdr local-pair)
-              (let ((global-pair (assq resolved *macro-env*)))
-                (and global-pair (cdr global-pair))))))))
+  (let ((local-pair (assq name (unwrap-env env))))
+    (if local-pair
+        (cdr local-pair)
+        (let ((resolved (resolve-identifier name)))
+          (if (pair? resolved)
+              (let ((context (car resolved)) (original (cdr resolved)))
+                (lookup-macro original (unwrap-env (car context))))
+              (let ((local-pair-resolved (assq resolved (unwrap-env env))))
+                (if local-pair-resolved
+                    (cdr local-pair-resolved)
+                    (let ((global-pair (assq resolved *macro-env*)))
+                      (and global-pair (cdr global-pair))))))))))
 
 (define (core-form? sym name shadowed-env)
   (let ((resolved (resolve-identifier sym)))
@@ -292,6 +296,8 @@
                       (make-seq (map-improper (lambda (x) (expand x m-env s-env r-env)) (cdr expr))))
 
                      ((core-form? head 'quote s-env) expr)
+                     ((core-form? head 'quasiquote s-env)
+                      (expand (qq-expand (cadr expr)) m-env s-env r-env))
                      (else (map-improper (lambda (x) (expand x m-env s-env r-env)) expr)))))
              (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
 
@@ -322,11 +328,6 @@
         ((vector? expr) (list->vector (map strip-renames (vector->list expr))))
         (else expr)))
 
-(define (macroexpand expr . opt)
-  (set! *rename-counter* 0)
-  (set! *rename-env* '())
-  (let ((res (expand expr '() '() '())))
-    (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
 (define (macroexpand-1 expr)
   (cond
     ((pair? expr)
@@ -341,3 +342,9 @@
            (transformer expr)
            expr)))
     (else expr)))
+
+(define (macroexpand expr . opt)
+  (set! *rename-counter* 0)
+  (set! *rename-env* '())
+  (let ((res (expand expr '() '() '())))
+    (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
