@@ -36,11 +36,11 @@
 
 ;; Matches input against pattern.
 ;; Returns: alist of bindings ((var . val) ...) on success, or #f on failure.
-(define (sr-match-pattern literals pattern input ellipsis)
+(define (sr-match-pattern literals pattern input ellipsis literal=?)
   (cond
     ;; Literal identifier: must match exactly
     ((and (symbol? pattern) (memq pattern literals))
-     (and (symbol? input) (eq? pattern input) '()))
+     (and (symbol? input) (literal=? pattern input) '()))
 
     ;; Wildcard: matches anything, no binding
     ((eq? pattern '_) (and '()))
@@ -51,29 +51,29 @@
 
     ;; Ellipsis pattern: (P ... . tail)
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
-     (sr-match-ellipsis literals (car pattern) (cddr pattern) input ellipsis))
+     (sr-match-ellipsis literals (car pattern) (cddr pattern) input ellipsis literal=?))
 
     ;; Pair: recursively match car and cdr
     ((pair? pattern)
      (and (pair? input)
-          (let ((m-car (sr-match-pattern literals (car pattern) (car input) ellipsis)))
+          (let ((m-car (sr-match-pattern literals (car pattern) (car input) ellipsis literal=?)))
             (and m-car
-                 (let ((m-cdr (sr-match-pattern literals (cdr pattern) (cdr input) ellipsis)))
+                 (let ((m-cdr (sr-match-pattern literals (cdr pattern) (cdr input) ellipsis literal=?)))
                    (and m-cdr (append m-car m-cdr)))))))
 
     ;; Vector: match as list
     ((vector? pattern)
      (and (vector? input)
-          (sr-match-pattern literals (vector->list pattern) (vector->list input) ellipsis)))
+          (sr-match-pattern literals (vector->list pattern) (vector->list input) ellipsis literal=?)))
 
     ;; Constant datum
     (else (and (equal? pattern input) '()))))
 
 ;; Handles (P ... . tail) matching
-(define (sr-match-ellipsis literals P tail input ellipsis)
+(define (sr-match-ellipsis literals P tail input ellipsis literal=?)
   (letrec ((try-tail
             (lambda (xs head-bindings)
-              (let ((m-tail (sr-match-pattern literals tail xs ellipsis)))
+              (let ((m-tail (sr-match-pattern literals tail xs ellipsis literal=?)))
                 (if m-tail
                     (let* ((p-vars (map car (sr-analyze-pattern P literals ellipsis 0)))
                            (transposed (map (lambda (v)
@@ -82,7 +82,7 @@
                       (append transposed m-tail))
                     #f))))
            (loop (lambda (xs head-bindings)
-                   (let ((m-p (if (pair? xs) (sr-match-pattern literals P (car xs) ellipsis) #f)))
+                   (let ((m-p (if (pair? xs) (sr-match-pattern literals P (car xs) ellipsis literal=?) #f)))
                      (if m-p
                          (let ((res (loop (cdr xs) (cons m-p head-bindings))))
                            (if res res (try-tail xs head-bindings)))
@@ -151,15 +151,15 @@
 ;; SECTION 5: Entry Point
 ;;=============================================================================
 
-(define (apply-syntax-rules literals rules input rename ellipsis)
+(define (apply-syntax-rules literals rules input rename ellipsis literal=?)
   (let loop ((rules rules))
     (if (null? rules)
         (error "syntax-rules: no matching pattern" input)
         (let* ((rule (car rules))
                (pattern (car rule))
                (template (cadr rule))
-               (bindings (sr-match-pattern literals pattern input ellipsis)))
+               (bindings (sr-match-pattern literals pattern input ellipsis literal=?)))
           (if bindings
-              (let ((meta-env (sr-analyze-pattern pattern literals ellipsis 0)))
-                (sr-expand-template template bindings rename ellipsis meta-env 0))
-              (loop (cdr rules)))))))
+               (let ((meta-env (sr-analyze-pattern pattern literals ellipsis 0)))
+                 (sr-expand-template template bindings rename ellipsis meta-env 0))
+               (loop (cdr rules)))))))

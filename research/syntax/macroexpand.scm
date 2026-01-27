@@ -18,6 +18,7 @@
 (define *macro-env* '())
 (define *rename-counter* 0)
 (define *rename-env* '())
+(define *current-context* (make-parameter #f))
 
 (define (fresh-suffix)
   (set! *rename-counter* (+ *rename-counter* 1))
@@ -89,10 +90,11 @@
   (if (not (symbol? sym))
       #f
       (let ((resolved (resolve-identifier sym)))
-        (if (pair? resolved)
-            (let ((context (car resolved)) (original (cdr resolved)))
-              (core-form? original name (unwrap-env (cadr context))))
-            (and (not (memq resolved (unwrap-env shadowed-env))) (eq? resolved name))))))
+        (let ((res (if (pair? resolved)
+                       (let ((context (car resolved)) (original (cdr resolved)))
+                         (core-form? original name (unwrap-env (cadr context))))
+                       (and (not (memq resolved (unwrap-env shadowed-env))) (eq? resolved name)))))
+          res))))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers
@@ -111,8 +113,16 @@
                             '...
                             (let ((new-sym (rename-symbol sym suffix)))
                               (register-renamed! new-sym sym captured-context)
-                              new-sym)))))
-        (apply-syntax-rules literals rules expr renamer ellipsis)))))
+                              new-sym))))
+             (literal=? (lambda (p-lit input)
+                          (core-form? input p-lit (cadr (or (*current-context*) captured-context))))))
+        (apply-syntax-rules literals rules expr renamer ellipsis literal=?)))))
+
+(define (call-transformer transformer expr m-env s-env r-env)
+  (parameterize ((*current-context* (list m-env s-env r-env)))
+    (syntax->datum (if (variable-transformer? transformer)
+                       ((variable-transformer-procedure transformer) expr)
+                       (transformer expr)))))
 
 (define (parse-transformer spec context)
   (let ((head (if (pair? spec) (car spec) #f)))
@@ -126,7 +136,32 @@
          (let ((input (make-syntax-object expr context)))
            (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '() context)))
              (syntax->datum (eval body (interaction-environment)))))))
-      (else (error "Only syntax-rules and lambda are supported for macros" spec)))))
+      ((and (pair? spec) (core-form? (car spec) 'make-variable-transformer (cadr context)))
+       (let ((proc (parse-transformer (cadr spec) context)))
+         (make-variable-transformer proc)))
+      ((and (pair? spec) (core-form? (car spec) 'identifier-syntax (cadr context)))
+       (let ((args (cdr spec)))
+         (if (= (length args) 2)
+             ;; (identifier-syntax (id1 template1) ((set! id2 var) template2))
+             (let* ((c1 (car args)) (c2 (cadr args))
+                    (t1 (cadr c1))
+                    (t2 (cadr c2)))
+                (parse-transformer
+                 `(make-variable-transformer
+                   (lambda (x)
+                     (syntax-case x (set!)
+                       ((set! _ val) (syntax ,t2))
+                       ((_ . rest) (syntax (,t1 . rest)))
+                       (_ (syntax ,t1)))))
+                 context))
+             ;; (identifier-syntax template)
+             (parse-transformer
+              `(lambda (x)
+                 (syntax-case x ()
+                   ((_ . rest) (syntax (,(car args) . rest)))
+                   (_ (syntax ,(car args)))))
+              context))))
+      (else (error "Only syntax-rules, lambda, make-variable-transformer and identifier-syntax are supported for macros" spec)))))
 
 ;;=============================================================================
 ;; SECTION 5: Binding Helpers
@@ -184,7 +219,7 @@
          (new-params (reconstruct-params params new-p-names))
          (i-defs (extract-internal-defines body new-s-env))
          (r-body (skip-internal-defines body new-s-env)))
-    (for-each (lambda (p np) (register-renamed! np p #f)) p-names new-p-names)
+    (for-each (lambda (p np) (register-renamed! np p (list m-env new-s-env new-r-env))) p-names new-p-names)
     (if (null? i-defs)
         `(lambda ,new-params ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) body)))
         `(lambda ,new-params ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env)))))
@@ -203,7 +238,7 @@
              (new-bindings (map list new-vars expanded-vals))
              (i-defs (extract-internal-defines body new-s-env))
              (r-body (skip-internal-defines body new-s-env)))
-        (for-each (lambda (v nv) (register-renamed! nv v #f)) vars new-vars)
+        (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
         (if (null? i-defs)
             `(let ,new-bindings ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) body)))
             `(let ,new-bindings ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env))))))
@@ -219,7 +254,7 @@
          (new-s-env (append vars s-env))
          (expanded-vals (map (lambda (x) (expand x m-env new-s-env new-r-env)) vals))
          (new-bindings (map list new-vars expanded-vals)))
-    (for-each (lambda (v nv) (register-renamed! nv v #f)) vars new-vars)
+    (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
     `(letrec* ,new-bindings ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) r-body)))))
 
 ;;=============================================================================
@@ -277,8 +312,13 @@
   (expand `(letrec* ,@(cdr expr)) m-env s-env r-env))
 
 (define (expand-set! expr m-env s-env r-env)
-  (let* ((var (cadr expr)) (pair (assq var r-env)) (renamed (if pair (cdr pair) var)))
-    `(set! ,renamed ,(expand (caddr expr) m-env s-env r-env))))
+  (let* ((var (cadr expr))
+         (transformer (and (symbol? var) (not (memq var s-env)) (lookup-macro var m-env))))
+    (if (and transformer (variable-transformer? transformer))
+        (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+        (let* ((pair (assq var r-env))
+               (renamed (if pair (cdr pair) var)))
+          `(set! ,renamed ,(expand (caddr expr) m-env s-env r-env))))))
 
 (define (expand-if expr m-env s-env r-env)
   `(if ,(expand (cadr expr) m-env s-env r-env) ,(expand (caddr expr) m-env s-env r-env)
@@ -381,19 +421,19 @@
       ((pair? expr)
        (let ((head (car expr)))
          (if (symbol? head)
-             (let ((transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
-               (if transformer
-                   (expand (transformer expr) m-env s-env r-env)
-                   (let ((core-sym (resolve-core-form head s-env)))
-                     (let ((handler (and core-sym (assq core-sym *core-handlers*))))
-                       (if handler
-                           ((cdr handler) expr m-env s-env r-env)
-                           (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
-             (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
+              (let ((transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
+                (if transformer
+                    (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+                    (let ((core-sym (resolve-core-form head s-env)))
+                      (let ((handler (and core-sym (assq core-sym *core-handlers*))))
+                        (if handler
+                            ((cdr handler) expr m-env s-env r-env)
+                            (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
+              (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
       ((symbol? expr)
        (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
          (if transformer
-             (expand (transformer expr) m-env s-env r-env)
+             (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
              (resolve-variable expr m-env s-env r-env))))
       (else expr))))
 
@@ -412,10 +452,11 @@
             (loop (cdr chars) (cons (car chars) suffix))))))
 
 (define (strip-renames expr)
-  (cond ((symbol? expr) (string->symbol (strip-suffix (symbol->string expr))))
-        ((pair? expr) (cons (strip-renames (car expr)) (strip-renames (cdr expr))))
-        ((vector? expr) (list->vector (map strip-renames (vector->list expr))))
-        (else expr)))
+  (let ((expr (syntax->datum expr)))
+    (cond ((symbol? expr) (string->symbol (strip-suffix (symbol->string expr))))
+          ((pair? expr) (cons (strip-renames (car expr)) (strip-renames (cdr expr))))
+          ((vector? expr) (list->vector (map strip-renames (vector->list expr))))
+          (else expr))))
 
 (define (macroexpand-1 expr)
   (cond

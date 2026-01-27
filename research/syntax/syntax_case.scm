@@ -60,6 +60,17 @@
 (define (datum->syntax template-id datum)
   (make-syntax-object datum (syntax-object-context template-id)))
 
+(define (make-variable-transformer proc)
+  (vector '**variable-transformer** proc))
+
+(define (variable-transformer? obj)
+  (and (vector? obj)
+       (= (vector-length obj) 2)
+       (eq? (vector-ref obj 0) '**variable-transformer**)))
+
+(define (variable-transformer-procedure obj)
+  (vector-ref obj 1))
+
 (define (syntax->list obj)
   (let ((datum (syntax-object-datum obj))
         (ctx (syntax-object-context obj)))
@@ -83,7 +94,11 @@
          (equal? (syntax-object-context id1) (syntax-object-context id2)))))
 
 (define (free-identifier=? id1 id2)
-  (eq? (syntax-object-datum id1) (syntax-object-datum id2)))
+  (let ((d1 (syntax-object-datum id1))
+        (d2 (syntax-object-datum id2)))
+    (and (symbol? d1)
+         (symbol? d2)
+         (eq? d1 d2))))
 
 ;;=============================================================================
 ;; 4. Pattern Matching
