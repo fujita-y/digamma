@@ -148,6 +148,9 @@
                (let ((src (vector-ref inst 1)) (dst (vector-ref inst 2)))
                  (let ((cell (make-cell-box (reg-ref vm src))))
                    (reg-set! vm dst cell)) (loop)))
+              ((closure-self)
+               (let ((dst (vector-ref inst 1)))
+                 (reg-set! vm dst (vm-cl vm)) (loop)))
               (else (error "Unknown instruction" inst))))))))
 
 (define (vm-set-global! vm var val)
