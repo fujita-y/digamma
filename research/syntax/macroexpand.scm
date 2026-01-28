@@ -261,21 +261,6 @@
 ;; SECTION 7: Expansion Engine
 ;;=============================================================================
 
-(define (resolve-core-form sym shadowed-env)
-  (if (not (symbol? sym))
-      #f
-      (let ((resolved (resolve-identifier sym)))
-        (if (pair? resolved)
-            (let ((context (car resolved)) (original (cdr resolved)))
-              (resolve-core-form original (unwrap-env (cadr context))))
-            (if (memq resolved (unwrap-env shadowed-env))
-                #f
-                resolved)))))
-
-(define *core-handlers* '())
-(define (register-core-handler! name handler)
-  (set! *core-handlers* (cons (cons name handler) *core-handlers*)))
-
 (define (expand-define-syntax expr m-env s-env r-env)
   (register-macro! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env)))
   ''defined)
@@ -392,26 +377,39 @@
 (define (expand-quasiquote expr m-env s-env r-env)
   (expand (qq-expand (cadr expr)) m-env s-env r-env))
 
-(define (init-core-handlers!)
-  (register-core-handler! 'define-syntax expand-define-syntax)
-  (register-core-handler! 'let-syntax expand-let-syntax)
-  (register-core-handler! 'letrec-syntax expand-letrec-syntax)
-  (register-core-handler! 'let*-syntax expand-let*-syntax)
-  (register-core-handler! 'lambda expand-lambda)
-  (register-core-handler! 'let expand-let)
-  (register-core-handler! 'let* expand-let*)
-  (register-core-handler! 'letrec* expand-letrec-star)
-  (register-core-handler! 'letrec expand-letrec)
-  (register-core-handler! 'set! expand-set!)
-  (register-core-handler! 'if expand-if)
-  (register-core-handler! 'cond expand-cond)
-  (register-core-handler! 'and expand-and)
-  (register-core-handler! 'or expand-or)
-  (register-core-handler! 'case expand-case)
-  (register-core-handler! 'define expand-define)
-  (register-core-handler! 'begin expand-begin)
-  (register-core-handler! 'quote expand-quote)
-  (register-core-handler! 'quasiquote expand-quasiquote))
+(define (lookup-handler core-sym)
+  (case core-sym
+    ((define-syntax) expand-define-syntax)
+    ((let-syntax) expand-let-syntax)
+    ((letrec-syntax) expand-letrec-syntax)
+    ((let*-syntax) expand-let*-syntax)
+    ((lambda) expand-lambda)
+    ((let) expand-let)
+    ((let*) expand-let*)
+    ((letrec*) expand-letrec-star)
+    ((letrec) expand-letrec)
+    ((set!) expand-set!)
+    ((if) expand-if)
+    ((cond) expand-cond)
+    ((and) expand-and)
+    ((or) expand-or)
+    ((case) expand-case)
+    ((define) expand-define)
+    ((begin) expand-begin)
+    ((quote) expand-quote)
+    ((quasiquote) expand-quasiquote)
+    (else #f)))
+
+(define (resolve-core-form sym shadowed-env)
+  (if (not (symbol? sym))
+      #f
+      (let ((resolved (resolve-identifier sym)))
+        (if (pair? resolved)
+            (let ((context (car resolved)) (original (cdr resolved)))
+              (resolve-core-form original (unwrap-env (cadr context))))
+            (if (memq resolved (unwrap-env shadowed-env))
+                #f
+                resolved)))))
 
 (define (expand expr . args)
   (let* ((m-env (if (null? args) '() (car args)))
@@ -425,9 +423,9 @@
                 (if transformer
                     (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
                     (let ((core-sym (resolve-core-form head s-env)))
-                      (let ((handler (and core-sym (assq core-sym *core-handlers*))))
+                      (let ((handler (and core-sym (lookup-handler core-sym))))
                         (if handler
-                            ((cdr handler) expr m-env s-env r-env)
+                            (handler expr m-env s-env r-env)
                             (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
               (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
       ((symbol? expr)
@@ -479,5 +477,4 @@
   (let ((res (expand expr '() '() '())))
     (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
 
-;; Initialize handlers once
-(init-core-handlers!)
+
