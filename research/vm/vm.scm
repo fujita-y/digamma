@@ -135,7 +135,7 @@
                        (val (reg-ref vm src)))
                    (cell-value-set! cell val) (loop))))
               ((reg-cell-ref)
-               (let ((src-reg (vector-ref inst 1)) (dst-reg (vector-ref inst 2)))
+               (let ((dst-reg (vector-ref inst 1)) (src-reg (vector-ref inst 2)))
                  (let ((val (reg-ref vm src-reg)))
                    (let ((extracted (if (cell? val) (cell-value val) val)))
                      (reg-set! vm dst-reg extracted)) (loop))))

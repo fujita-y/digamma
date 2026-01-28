@@ -81,7 +81,7 @@
     (define (codegen-symbol expr env tail?)
       (let ((binding (lookup expr env)))
         (cond
-          ((eq? (car binding) 'reg) (if (memq expr mutated) (emit `(reg-cell-ref ,(cdr binding) r0)) (emit `(mov r0 ,(cdr binding)))))
+          ((eq? (car binding) 'reg) (if (memq expr mutated) (emit `(reg-cell-ref r0 ,(cdr binding))) (emit `(mov r0 ,(cdr binding)))))
           ((eq? (car binding) 'cl) (if (memq expr mutated) (emit `(closure-cell-ref r0 ,(cdr binding))) (emit `(closure-ref r0 ,(cdr binding)))))
           (else (emit `(global-ref r0 ,expr))))
         (if tail? (emit `(ret)))))
