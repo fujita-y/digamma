@@ -76,4 +76,23 @@
                    (e 10))
                 #t)
 
+
+;; 5. Multiple Input Session
+(display "Running Multiple Input Session test...\n")
+(let ((input-str "(define x 10)\n(+ x 5)\n(define y 20)\n(+ x y)\n")
+      (expected-outputs '("15" "30")))
+  (let ((output (with-output-to-string
+                  (lambda ()
+                    (with-input-from-string input-str run-repl)))))
+    ;; Simple check: ensure the output contains the expected results
+    (let loop ((out expected-outputs))
+      (if (null? out)
+          (display "  PASS: Multiple Input Session\n")
+          (if (string-scan output (car out)) ;; string-scan for gauche, or substring?
+              (loop (cdr out))
+              (begin
+                (format #t "  FAIL: Expected output to contain ~s\n" (car out))
+                (format #t "  Got:\n~a\n" output)
+                (exit 1)))))))
+
 (display "All REPL integration and pitfall tests PASSED!\n")
