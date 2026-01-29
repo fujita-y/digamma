@@ -74,27 +74,71 @@
 
 
 ;; --- Optimization: Peephole ---
-(define (cp:peephole-optimize code)
+;; --- Optimization: Peephole ---
+(define (cp:peephole-optimize-pass code)
   (cond
-    ((or (null? code) (null? (cdr code)) (null? (cddr code))) code)
+    ((null? code) '())
+    ((null? (cdr code)) code)
+    ;; Pattern: (mov A B) (mov B A) -> (mov A B)
+    ((and (pair? (car code)) (eq? (caar code) 'mov)
+          (pair? (cadr code)) (eq? (caadr code) 'mov)
+          (eq? (cadr (car code)) (caddr (cadr code)))
+          (eq? (caddr (car code)) (cadr (cadr code))))
+     (cp:peephole-optimize-pass (cons (car code) (cddr code))))
+
+    ((null? (cddr code)) code)
+
     (else
      (let ((i1 (car code))
            (i2 (cadr code))
            (i3 (caddr code)))
-       (if (and (pair? i1) (eq? (car i1) 'mov)
-                (pair? i2) (eq? (car i2) 'mov)
-                (pair? i3) (eq? (car i3) 'mov))
-           (let ((dst1 (cadr i1)) (src1 (caddr i1))
-                 (dst2 (cadr i2)) (src2 (caddr i2))
-                 (dst3 (cadr i3)) (src3 (caddr i3)))
-             (if (and (eq? dst1 src2)       ; A matches in mov A B; mov C A
-                      (eq? dst1 dst3)       ; A matches in ...; mov A D
-                      (not (eq? dst1 src3))); D != A
-                 ;; Optimization: (mov C B) (mov A D)
-                 (cp:peephole-optimize (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code))))
-                 ;; No match
-                 (cons i1 (cp:peephole-optimize (cdr code)))))
-           (cons i1 (cp:peephole-optimize (cdr code))))))))
+       (cond
+        ((and (pair? i1) (memq (car i1) '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref))
+              (pair? i2) (memq (car i2) '(mov global-ref closure-ref closure-cell-ref reg-cell-ref))
+              (pair? i3) (memq (car i3) '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref)))
+         (let ((dst1 (cadr i1)) (src1 (caddr i1))
+               (dst2 (cadr i2)) (src2 (caddr i2))
+               (dst3 (cadr i3)) (src3 (caddr i3)))
+           (cond
+             ;; Pattern: Load/Mov A->C, Mov D->A (overwriting A)
+             ((and (memq (car i1) '(const global-ref closure-ref closure-cell-ref reg-cell-ref))
+                   (eq? dst1 src2)
+                   (eq? dst1 dst3))
+              (cp:peephole-optimize-pass (cons `(,(car i1) ,dst2 ,src1) (cons i3 (cdddr code)))))
+             
+             ;; Pattern: Mov A->B, Mov C->A (overwriting A), Mov A->D ??
+             ;; Original logic:
+             ;; A matches in mov A B; mov C A
+             ;; A matches in ...; mov A D
+             ;; D != A
+             ((and (eq? (car i1) 'mov)
+                   (eq? dst1 src2)
+                   (eq? dst1 dst3)
+                   (not (eq? dst1 src3)))
+              (cp:peephole-optimize-pass (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code)))))
+
+             ;; Pattern: Redundant Restore
+             ;; (mov rA rB) (op rC <data>) (mov rB rA) -> (mov rA rB) (op rC <data>)
+             ;; Condition: rC != rA && rC != rB
+             ((and (eq? (car i1) 'mov)
+                   (memq (car i2) '(const global-ref closure-ref closure-cell-ref reg-cell-ref))
+                   (eq? (car i3) 'mov)
+                   (eq? dst1 src3)       ; rA == rA in (mov rB rA)
+                   (eq? src1 dst3)       ; rB == rB in (mov rB rA)
+                   (not (eq? dst2 dst1)) ; rC != rA
+                   (not (eq? dst2 src1))); rC != rB
+              (cp:peephole-optimize-pass (cons i1 (cons i2 (cdddr code)))))
+
+             (else (cons i1 (cp:peephole-optimize-pass (cdr code)))))))
+
+        (else (cons i1 (cp:peephole-optimize-pass (cdr code)))))))))
+
+(define (cp:peephole-optimize code)
+  (let loop ((current code))
+    (let ((next (cp:peephole-optimize-pass current)))
+      (if (equal? current next)
+          current
+          (loop next)))))
 
 ;; --- Optimization: Analyze Max Outgoing Args ---
 (define (cp:analyze-max-outgoing-args expr)
@@ -324,9 +368,9 @@
            (all-code (cp:peephole-optimize (append main-code closure-code)))
            (label-map (make-hash-table 'eq?))
            (final-code '()) (current-pc 0))
-      ;(newline)
-      ;(display all-code)
-      ;(newline)
+      (newline)
+      (display all-code)
+      (newline)
       (for-each (lambda (inst)
                   (if (eq? (car inst) 'label)
                       (hash-table-put! label-map (cadr inst) current-pc)
