@@ -179,10 +179,10 @@
       ((and (pair? proc) (eq? (car proc) 'lambda))
        (let ((params (cadr proc))
              (body (cddr proc)))
-         (if (= (length params) (length args))
+         (if (and (list? params) (= (length params) (length args)))
              (op:optimize-inner `(let ,(map list params args) ,@body) bound-vars)
-             ;; Handle argument mismatch
-             (if (< (length params) (length args))
+             ;; Handle argument mismatch or variadic/improper params
+             (if (and (list? params) (< (length params) (length args)))
                  (let ((extra-args (op:drop args (length params))))
                    (op:optimize-inner `(begin ,@extra-args (let ,(map list params (op:take args (length params))) ,@body)) bound-vars))
                  (cons proc args)))))

@@ -52,6 +52,12 @@
     (hash-table-put! globals 'set-cdr! set-cdr!)
     (hash-table-put! globals 'append append)
     (hash-table-put! globals 'abs abs)
+    (hash-table-put! globals 'sqrt sqrt)
+    (hash-table-put! globals 'memv memv)
+    (hash-table-put! globals 'memq memq)
+    (hash-table-put! globals 'reverse reverse)
+    (hash-table-put! globals 'eqv? eqv?)
+    (hash-table-put! globals 'number? number?)
     globals))
 
 (define (run-repl)
