@@ -140,7 +140,7 @@
 ;; =============================================================================
 (display "\n>>> Section 6: Identifier Macros\n")
 
-(register-macro! 'it (lambda (expr) 'expanded-it))
+(mc:register-macro! 'it (lambda (expr) 'expanded-it))
 
 (test "Identifier macro 'it' is shadowed by local binding"
       '(let ((it 1)) it)

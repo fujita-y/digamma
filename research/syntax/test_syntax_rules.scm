@@ -92,7 +92,7 @@
       '(define (add x y) (+ x y)))
 
 ;; Test 4: Nested expansion (let uses lambda)
-;; Note: our expand function handles let, lambda etc.
+;; Note: our mc:expand function handles let, lambda etc.
 (test "Lambda identity" '(lambda (x) x) '(lambda (x) x))
 
 ;; =============================================================================

@@ -65,9 +65,9 @@
 (test "nested-id-set" (macroexpand '(set! nested-id 7) 'strip) '(set-inner! 7))
 
 ;; =============================================================================
-;; Section 3: free-identifier=? tests
+;; Section 3: sc:free-identifier=? tests
 ;; =============================================================================
-(display "\n>>> Section 3: free-identifier=? tests\n")
+(display "\n>>> Section 3: sc:free-identifier=? tests\n")
 
 (macroexpand
  '(define-syntax check-else

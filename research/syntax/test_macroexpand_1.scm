@@ -21,7 +21,7 @@
 ;; Section 1: Simple macro
 ;; =============================================================================
 (display "\n>>> Section 1: Simple macro\n")
-(expand '(define-syntax foo (syntax-rules ()
+(mc:expand '(define-syntax foo (syntax-rules ()
                                ((foo x) (list 'foo x)))))
 
 (define test1 (macroexpand-1 '(foo 1)))
@@ -31,7 +31,7 @@
 ;; Section 2: Nested macro
 ;; =============================================================================
 (display "\n>>> Section 2: Nested macro\n")
-(expand '(define-syntax bar (syntax-rules ()
+(mc:expand '(define-syntax bar (syntax-rules ()
                                ((bar x) (foo x)))))
 
 (define test2 (macroexpand-1 '(bar 2)))
@@ -46,7 +46,7 @@
 (display "\n>>> Section 3: Non macro and Identifier macro\n")
 (test "Non-macro form" (macroexpand-1 '(list 1 2)) '(list 1 2))
 
-(register-macro! 'baz (lambda (expr) 'expanded-baz))
+(mc:register-macro! 'baz (lambda (expr) 'expanded-baz))
 (test "Identifier macro" (macroexpand-1 'baz) 'expanded-baz)
 
 (newline)
