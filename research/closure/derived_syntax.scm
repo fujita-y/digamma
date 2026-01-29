@@ -163,7 +163,7 @@
    
    ;; Expand quasiquote
    ((eq? (car expr) 'quasiquote)
-    (desugar (expand-quasiquote (cadr expr))))
+    (desugar (mc:expand-quasiquote (cadr expr))))
    
    ;; Recurse into basic forms
    ((eq? (car expr) 'lambda)

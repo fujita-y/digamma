@@ -6,7 +6,7 @@ set -e
 # Change to the directory of the script
 cd "$(dirname "$0")"
 
-echo "Running all tests in research/syntax..."
+echo "Running all tests in research/opt..."
 echo "--------------------------------------"
 
 # Count variables

@@ -380,8 +380,8 @@
 (define (mc:expand-quote expr m-env s-env r-env)
   `(quote ,(mc:strip-renames (cadr expr))))
 
-(define (mc:expand-quasiquote expr m-env s-env r-env)
-  (mc:expand (qq:expand (cadr expr)) m-env s-env r-env))
+(define (mc:expand-quasiquote-form expr m-env s-env r-env)
+  (mc:expand (mc:expand-quasiquote (cadr expr)) m-env s-env r-env))
 
 (define (mc:lookup-handler core-sym)
   (case core-sym
@@ -403,7 +403,7 @@
     ((define) mc:expand-define)
     ((begin) mc:expand-begin)
     ((quote) mc:expand-quote)
-    ((quasiquote) mc:expand-quasiquote)
+    ((quasiquote) mc:expand-quasiquote-form)
     (else #f)))
 
 (define (mc:resolve-core-form sym shadowed-env)

@@ -6,7 +6,7 @@ set -e
 # Change to the directory of the script
 cd "$(dirname "$0")"
 
-echo "Running all tests in research/syntax..."
+echo "Running all tests in research/closure..."
 echo "--------------------------------------"
 
 # Count variables
@@ -20,8 +20,8 @@ for test_file in test_*.scm; do
     # Run the test and capture output
     # We use a temporary file to capture output so we can check for "FAIL"
     # because Gauche might not return non-zero exit code on logical failures
-    # Added -I. to allow loading files from the current directory
-    OUTPUT=$(gosh -I. "$test_file" 2>&1)
+    # Added -I. and -I../syntax to allow loading files from current and syntax directories
+    OUTPUT=$(gosh -I. -I../syntax "$test_file" 2>&1)
     RETVAL=$?
     
     echo "$OUTPUT"

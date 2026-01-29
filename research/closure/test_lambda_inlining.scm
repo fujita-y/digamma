@@ -1,83 +1,105 @@
+;; test_lambda_inlining.scm
+;; Test suite for lambda inlining optimization.
+
 (load "lambda_inlining.scm")
 
-(define (pretty-print expr)
-  (write expr)
-  (newline))
+;; --- Test Helper Functions ---
 
-(define (test-optimize name expr)
-  (display "---------------------------------------------------")
-  (newline)
-  (display "Test: ") (display name) (newline)
-  (display "Original: ") (pretty-print expr)
-  (display "Optimized: ") (pretty-print (lambda-inlining expr))
-  (newline))
+(define *pass-count* 0)
+(define *fail-count* 0)
 
-;; Test 1: Simple lambda application
-(test-optimize "Simple Lambda Application"
-  '((lambda (x) (+ x 1)) 5))
+(define (test name expr expected)
+  (let ((result (lambda-inlining expr)))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
-;; Test 2: Multiple arguments
-(test-optimize "Multiple Arguments"
-  '((lambda (x y) (+ x y)) 3 4))
+;; =============================================================================
+;; Section 1: Basic Inlining
+;; =============================================================================
+(display "\n>>> Section 1: Basic Inlining\n")
 
-;; Test 3: Let expression (should convert to lambda and inline)
-(test-optimize "Let Expression"
-  '(let ((x 10)) (+ x 5)))
+(test "Simple Lambda Application"
+      '((lambda (x) (+ x 1)) 5)
+      '(+ 5 1))
 
-;; Test 4: Nested let
-(test-optimize "Nested Let"
-  '(let ((x 5))
-     (let ((y 10))
-       (+ x y))))
+(test "Multiple Arguments"
+      '((lambda (x y) (+ x y)) 3 4)
+      '(+ 3 4))
 
-;; Test 5: Lambda with variable reference (used once - should inline)
-(test-optimize "Lambda Used Once"
-  '((lambda (x) (+ x x)) (f y)))
-  ;; x is used twice, so won't inline if arg is complex
+(test "Let Expression"
+      '(let ((x 10)) (+ x 5))
+      '(+ 10 5))
 
-;; Test 6: Lambda with simple arg (should always inline)
-(test-optimize "Lambda Simple Arg"
-  '((lambda (x) (* x x)) 5))
+(test "Nested Let"
+      '(let ((x 5)) (let ((y 10)) (+ x y)))
+      '(+ 5 10))
 
-;; Test 7: Shadowing
-(test-optimize "Shadowing"
-  '((lambda (x) 
-      (let ((x 10)) 
-        x)) 
-    5))
+;; =============================================================================
+;; Section 2: Complexity and Thresholds
+;; =============================================================================
+(display "\n>>> Section 2: Complexity and Thresholds\n")
 
-;; Test 8: No inlining - arity mismatch
-(test-optimize "Arity Mismatch"
-  '((lambda (x y) (+ x y)) 5))
+(test "Lambda Used Once"
+      '((lambda (x) (+ x x)) (f y))
+      '((lambda (x) (+ x x)) (f y)))
 
-;; Test 9: Complex - let with body using variable multiple times
-(test-optimize "Let Multiple Uses"
-  '(let ((x (expensive-computation)))
-     (+ x x x)))
-  ;; Won't inline if used > 1 time
+(test "Lambda Simple Arg"
+      '((lambda (x) (* x x)) 5)
+      '(* 5 5))
 
-;; Test 10: Simple let with multiple uses
-(test-optimize "Simple Let Multiple Uses"
-  '(let ((x 42))
-     (+ x x)))
-  ;; Will inline because 42 is simple
+(test "Let Multiple Uses"
+      '(let ((x (expensive-computation))) (+ x x x))
+      '((lambda (x) (+ x x x)) (expensive-computation)))
 
-;; Test 11: Nested lambda applications
-(test-optimize "Nested Lambda Apps"
-  '((lambda (x) 
-      ((lambda (y) (+ x y)) 10)) 
-    5))
+(test "Simple Let Multiple Uses"
+      '(let ((x 42)) (+ x x))
+      '(+ 42 42))
 
-;; Test 12: Begin flattening
-(test-optimize "Begin Flattening"
-  '(begin (begin 1 2) 3))
+;; =============================================================================
+;; Section 3: Shadowing and Arity
+;; =============================================================================
+(display "\n>>> Section 3: Shadowing and Arity\n")
 
-;; Test 13: Define with lambda
-(test-optimize "Define with Lambda Body"
-  '(define (foo x)
-     (let ((y 10))
-       (+ x y))))
+(test "Shadowing"
+      '((lambda (x) (let ((x 10)) x)) 5)
+      10)
 
-;; Test 14: Lambda returning lambda (no immediate application)
-(test-optimize "Higher-order No Inline"
-  '(lambda (x) (lambda (y) (+ x y))))
+(test "Arity Mismatch"
+      '((lambda (x y) (+ x y)) 5)
+      '((lambda (x y) (+ x y)) 5))
+
+;; =============================================================================
+;; Section 4: Integration with Other Forms
+;; =============================================================================
+(display "\n>>> Section 4: Integration with Other Forms\n")
+
+(test "Nested Lambda Apps"
+      '((lambda (x) ((lambda (y) (+ x y)) 10)) 5)
+      '(+ 5 10))
+
+(test "Begin Flattening"
+      '(begin (begin 1 2) 3)
+      '(begin 1 2 3))
+
+(test "Define with Lambda Body"
+      '(define (foo x) (let ((y 10)) (+ x y)))
+      '(define (foo x) (+ x 10)))
+
+(test "Higher-order No Inline"
+      '(lambda (x) (lambda (y) (+ x y)))
+      '(lambda (x) (lambda (y) (+ x y))))
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

@@ -1,108 +1,134 @@
+;; test_derived_syntax.scm
+;; Test suite for derived syntax transformations.
+
 (load "derived_syntax.scm")
 
-(define (pretty-print expr)
-  (write expr)
-  (newline))
+;; --- Test Helper Functions ---
 
-(define (test-desugar name expr)
-  (display "---------------------------------------------------")
-  (newline)
-  (display "Test: ") (display name) (newline)
-  (display "Original: ") (pretty-print expr)
-  (display "Desugared: ") (pretty-print (expand-derived-syntax expr))
-  (newline))
+(define *pass-count* 0)
+(define *fail-count* 0)
 
-;; Test let*
-(test-desugar "let* Simple"
-  '(let* ((x 1)) x))
+(define (test name expr expected)
+  (let ((result (expand-derived-syntax expr)))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
-(test-desugar "let* Two Bindings"
-  '(let* ((x 1) (y 2)) (+ x y)))
+;; =============================================================================
+;; Section 1: Let* Transformation
+;; =============================================================================
+(display "\n>>> Section 1: Let* Transformation\n")
 
-(test-desugar "let* Sequential Dependency"
-  '(let* ((x 10) (y (+ x 5))) y))
+(test "let* Simple"
+      '(let* ((x 1)) x)
+      '(let ((x 1)) x))
 
-(test-desugar "let* Empty Bindings"
-  '(let* () 42))
+(test "let* Two Bindings"
+      '(let* ((x 1) (y 2)) (+ x y))
+      '(let ((x 1)) (let ((y 2)) (+ x y))))
 
-;; Test letrec
-(test-desugar "letrec Simple"
-  '(letrec ((fact (lambda (n)
-                    (if (= n 0)
-                        1
-                        (* n (fact (- n 1)))))))
-     (fact 5)))
+(test "let* Sequential Dependency"
+      '(let* ((x 10) (y (+ x 5))) y)
+      '(let ((x 10)) (let ((y (+ x 5))) y)))
 
-(test-desugar "letrec Mutual Recursion"
-  '(letrec ((even? (lambda (n)
-                     (if (= n 0) #t (odd? (- n 1)))))
-            (odd? (lambda (n)
-                    (if (= n 0) #f (even? (- n 1))))))
-     (even? 10)))
+(test "let* Empty Bindings"
+      '(let* () 42)
+      '(let () 42))
 
-;; Test letrec*
-(test-desugar "letrec* Simple"
-  '(letrec* ((x 1) (y 2)) (+ x y)))
+;; =============================================================================
+;; Section 2: Letrec and Letrec* Transformation
+;; =============================================================================
+(display "\n>>> Section 2: Letrec and Letrec* Transformation\n")
 
-;; Test cond
-(test-desugar "cond Simple"
-  '(cond ((< x 0) 'negative)
-         ((= x 0) 'zero)
-         (else 'positive)))
+(test "letrec Simple"
+      '(letrec ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) (fact 5))
+      '(let ((fact #f)) (set! fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1)))))) (fact 5)))
 
-(test-desugar "cond Without Else"
-  '(cond ((< x 0) 'negative)
-         ((= x 0) 'zero)))
+(test "letrec Mutual Recursion"
+      '(letrec ((even? (lambda (n) (if (= n 0) #t (odd? (- n 1)))))
+                (odd? (lambda (n) (if (= n 0) #f (even? (- n 1))))))
+         (even? 10))
+      '(let ((even? #f) (odd? #f))
+         (set! even? (lambda (n) (if (= n 0) #t (odd? (- n 1)))))
+         (set! odd? (lambda (n) (if (= n 0) #f (even? (- n 1)))))
+         (even? 10)))
 
-(test-desugar "cond Single Test"
-  '(cond (x 'truthy)))
+(test "letrec* Simple"
+      '(letrec* ((x 1) (y 2)) (+ x y))
+      '(let ((x #f) (y #f)) (set! x 1) (set! y 2) (+ x y)))
 
-(test-desugar "cond Test Only (returns test value)"
-  '(cond (x)
-         (else 'false)))
+;; =============================================================================
+;; Section 3: Cond Transformation
+;; =============================================================================
+(display "\n>>> Section 3: Cond Transformation\n")
 
-;; Test and
-(test-desugar "and Empty"
-  '(and))
+(test "cond Simple"
+      '(cond ((< x 0) 'negative) ((= x 0) 'zero) (else 'positive))
+      '(if (< x 0) 'negative (if (= x 0) 'zero 'positive)))
 
-(test-desugar "and Single"
-  '(and x))
+(test "cond Without Else"
+      '(cond ((< x 0) 'negative) ((= x 0) 'zero))
+      '(if (< x 0) 'negative (if (= x 0) 'zero #f)))
 
-(test-desugar "and Multiple"
-  '(and a b c))
+(test "cond Single Test"
+      '(cond (x 'truthy))
+      '(if x 'truthy #f))
 
-;; Test or
-(test-desugar "or Empty"
-  '(or))
+(test "cond Test Only (returns test value)"
+      '(cond (x) (else 'false))
+      '(if x x 'false))
 
-(test-desugar "or Single"
-  '(or x))
+;; =============================================================================
+;; Section 4: And and Or Transformation
+;; =============================================================================
+(display "\n>>> Section 4: And and Or Transformation\n")
 
-(test-desugar "or Multiple"
-  '(or a b c))
+(test "and Empty" '(and) #t)
+(test "and Single" '(and x) 'x)
+(test "and Multiple" '(and a b c) '(if a (if b c #f) #f))
 
-;; Test case
-(test-desugar "case Simple"
-  '(case x
-     ((1) 'one)
-     ((2) 'two)
-     (else 'other)))
+(test "or Empty" '(or) #f)
+(test "or Single" '(or x) 'x)
+(test "or Multiple"
+      '(or a b c)
+      '(let ((or-temp.1 a)) (if or-temp.1 or-temp.1 (let ((or-temp.2 b)) (if or-temp.2 or-temp.2 c)))))
 
-(test-desugar "case Multiple Values"
-  '(case x
-     ((1 2 3) 'small)
-     ((4 5 6) 'medium)
-     (else 'large)))
+;; =============================================================================
+;; Section 5: Case Transformation
+;; =============================================================================
+(display "\n>>> Section 5: Case Transformation\n")
 
-;; Test nested transformations
-(test-desugar "Nested let* and cond"
-  '(let* ((x 10)
-          (y 20))
-     (cond ((< x y) (+ x y))
-           (else (- x y)))))
+(test "case Simple"
+      '(case x ((1) 'one) ((2) 'two) (else 'other))
+      '(let ((case-key.3 x)) (if (memv case-key.3 '(1)) 'one (if (memv case-key.3 '(2)) 'two 'other))))
 
-(test-desugar "Lambda with let*"
-  '(lambda (n)
-     (let* ((x (* n 2))
-            (y (+ x 1)))
-       y)))
+(test "case Multiple Values"
+      '(case x ((1 2 3) 'small) ((4 5 6) 'medium) (else 'large))
+      '(let ((case-key.4 x)) (if (memv case-key.4 '(1 2 3)) 'small (if (memv case-key.4 '(4 5 6)) 'medium 'large))))
+
+;; =============================================================================
+;; Section 6: Nested Transformations
+;; =============================================================================
+(display "\n>>> Section 6: Nested Transformations\n")
+
+(test "Nested let* and cond"
+      '(let* ((x 10) (y 20)) (cond ((< x y) (+ x y)) (else (- x y))))
+      '(let ((x 10)) (let ((y 20)) (if (< x y) (+ x y) (- x y)))))
+
+(test "Lambda with let*"
+      '(lambda (n) (let* ((x (* n 2)) (y (+ x 1))) y))
+      '(lambda (n) (let ((x (* n 2))) (let ((y (+ x 1))) y))))
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

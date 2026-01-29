@@ -3,18 +3,19 @@
 # Exit on any error
 set -e
 
-# Change to the directory of the script
-cd "$(dirname "$0")"
+# Change to the project root relative to the script
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
 
-echo "Running all tests in research/syntax..."
+echo "Running all tests in research/repl..."
 echo "--------------------------------------"
 
 # Count variables
 TOTAL=0
 PASSED=0
 
-# Iterate over all test files
-for test_file in test_*.scm; do
+# Iterate over all test files in research/repl
+for test_file in research/repl/test_*.scm; do
     echo "Running $test_file..."
     
     # Run the test and capture output

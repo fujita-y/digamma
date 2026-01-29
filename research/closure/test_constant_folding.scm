@@ -1,109 +1,85 @@
-(load "constant-folding.scm")
+;; test_constant_folding.scm
+;; Test suite for constant folding optimization.
 
-(define (pretty-print expr)
-  (write expr)
-  (newline))
+(load "constant_folding.scm")
 
-(define (test-fold name expr)
-  (display "---------------------------------------------------")
-  (newline)
-  (display "Test: ") (display name) (newline)
-  (display "Original: ") (pretty-print expr)
-  (display "Folded: ") (pretty-print (constant-folding expr))
-  (newline))
+;; --- Test Helper Functions ---
 
-;; Arithmetic operations
-(test-fold "Addition"
-  '(+ 2 3))
+(define *pass-count* 0)
+(define *fail-count* 0)
 
-(test-fold "Subtraction"
-  '(- 10 4))
+(define (test name expr expected)
+  (let ((result (constant-folding expr)))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
-(test-fold "Multiplication"
-  '(* 5 6))
+;; =============================================================================
+;; Section 1: Arithmetic Operations
+;; =============================================================================
+(display "\n>>> Section 1: Arithmetic Operations\n")
 
-(test-fold "Division"
-  '(/ 20 4))
+(test "Addition" '(+ 2 3) 5)
+(test "Subtraction" '(- 10 4) 6)
+(test "Multiplication" '(* 5 6) 30)
+(test "Division" '(/ 20 4) 5)
+(test "Nested Arithmetic" '(+ (* 2 3) (- 10 5)) 11)
+(test "Mixed with Variables" '(+ 2 x 3) '(+ 2 x 3))
 
-(test-fold "Nested Arithmetic"
-  '(+ (* 2 3) (- 10 5)))
+;; =============================================================================
+;; Section 2: Comparison Operations
+;; =============================================================================
+(display "\n>>> Section 2: Comparison Operations\n")
 
-(test-fold "Mixed with Variables"
-  '(+ 2 x 3))
+(test "Less Than True" '(< 3 5) #t)
+(test "Less Than False" '(< 5 3) #f)
+(test "Equal True" '(= 5 5) #t)
+(test "Equal False" '(= 5 6) #f)
 
-;; Comparison operations
-(test-fold "Less Than True"
-  '(< 3 5))
+;; =============================================================================
+;; Section 3: Boolean Operations
+;; =============================================================================
+(display "\n>>> Section 3: Boolean Operations\n")
 
-(test-fold "Less Than False"
-  '(< 5 3))
+(test "Not True" '(not #f) #t)
+(test "Not False" '(not #t) #f)
+(test "And All True" '(and #t #t #t) #t)
+(test "And Some False" '(and #t #f #t) #f)
+(test "Or All False" '(or #f #f #f) #f)
+(test "Or Some True" '(or #f #t #f) #t)
 
-(test-fold "Equal True"
-  '(= 5 5))
+;; =============================================================================
+;; Section 4: Control Flow
+;; =============================================================================
+(display "\n>>> Section 4: Control Flow\n")
 
-(test-fold "Equal False"
-  '(= 5 6))
+(test "If True" '(if #t 1 2) 1)
+(test "If False" '(if #f 1 2) 2)
+(test "If with Folded Condition" '(if (< 3 5) (+ 1 2) (+ 3 4)) 3)
+(test "Complex Nested" '(if (and #t (< 2 5)) (+ (* 3 4) 5) (- 10 2)) 17)
 
-;; Boolean operations
-(test-fold "Not True"
-  '(not #f))
+;; =============================================================================
+;; Section 5: Other Forms
+;; =============================================================================
+(display "\n>>> Section 5: Other Forms\n")
 
-(test-fold "Not False"
-  '(not #t))
+(test "Let with Constants" '(let ((x 5) (y 10)) (+ x y)) '(let ((x 5) (y 10)) (+ x y)))
+(test "Partial Folding" '(lambda (x) (+ (* 2 3) x)) '(lambda (x) (+ 6 x)))
+(test "Begin with Constants" '(begin (+ 1 2) (+ 3 4)) '(begin 3 7))
+(test "Define with Constant" '(define pi (* 3 1.0)) '(define pi 3.0))
+(test "Variables Only" '(+ x y z) '(+ x y z))
+(test "Division by Zero" '(/ 10 0) '(/ 10 0))
 
-(test-fold "And All True"
-  '(and #t #t #t))
-
-(test-fold "And Some False"
-  '(and #t #f #t))
-
-(test-fold "Or All False"
-  '(or #f #f #f))
-
-(test-fold "Or Some True"
-  '(or #f #t #f))
-
-;; If with constant condition
-(test-fold "If True"
-  '(if #t 1 2))
-
-(test-fold "If False"
-  '(if #f 1 2))
-
-(test-fold "If with Folded Condition"
-  '(if (< 3 5) (+ 1 2) (+ 3 4)))
-
-;; Complex nested example
-(test-fold "Complex Nested"
-  '(if (and #t (< 2 5))
-       (+ (* 3 4) 5)
-       (- 10 2)))
-
-;; Let with constant values
-(test-fold "Let with Constants"
-  '(let ((x 5)
-         (y 10))
-     (+ x y)))
-
-;; Mixed - some foldable, some not
-(test-fold "Partial Folding"
-  '(lambda (x)
-     (+ (* 2 3) x)))
-
-;; Begin flattening and folding
-(test-fold "Begin with Constants"
-  '(begin 
-     (+ 1 2)
-     (+ 3 4)))
-
-;; Define with constant
-(test-fold "Define with Constant"
-  '(define pi (* 3 1.0)))
-
-;; No folding - variables only
-(test-fold "Variables Only"
-  '(+ x y z))
-
-;; Division by zero - should not fold
-(test-fold "Division by Zero"
-  '(/ 10 0))
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

@@ -89,7 +89,7 @@
 
 (test "Expand method with literal =>"
       '(method (add x y) => (+ x y))
-      '(define (add x y) (+ x y)))
+      '(define add (lambda (x y) (+ x y))))
 
 ;; Test 4: Nested expansion (let uses lambda)
 ;; Note: our mc:expand function handles let, lambda etc.

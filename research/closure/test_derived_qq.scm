@@ -1,30 +1,54 @@
+;; test_derived_qq.scm
+;; Test suite for quasiquote expansion through derived_syntax transformation.
+
 (load "derived_syntax.scm")
 
-(define (pretty-print expr)
-  (write expr)
-  (newline))
+;; --- Test Helper Functions ---
 
-(define (test-desugar-qq name expr)
-  (display "---------------------------------------------------")
-  (newline)
-  (display "Test: ") (display name) (newline)
-  (display "Original: ") (pretty-print expr)
-  (display "Desugared: ") (pretty-print (expand-derived-syntax expr))
-  (newline))
+(define *pass-count* 0)
+(define *fail-count* 0)
 
-;; Test quasiquote expansion through derived_syntax
-(test-desugar-qq "Quasiquote Simple"
-  '(quasiquote (a b c)))
+(define (test name expr expected)
+  (let ((result (expand-derived-syntax expr)))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
-(test-desugar-qq "Quasiquote with Unquote"
-  '(quasiquote (a (unquote x) b)))
+;; =============================================================================
+;; Section 1: Quasiquote Expansion
+;; =============================================================================
+(display "\n>>> Section 1: Quasiquote Expansion\n")
 
-(test-desugar-qq "Quasiquote with Unquote-Splicing"
-  '(quasiquote (a (unquote-splicing x) b)))
+(test "Quasiquote Simple"
+      '`(a b c)
+      '(list 'a 'b 'c))
 
-(test-desugar-qq "Quasiquote in Lambda"
-  '(lambda (x) (quasiquote (result (unquote x)))))
+(test "Quasiquote with Unquote"
+      '`(a ,x b)
+      '(list 'a x 'b))
 
-(test-desugar-qq "Combined: Let* and Quasiquote"
-  '(let* ((x 1) (y 2))
-     (quasiquote (values (unquote x) (unquote y)))))
+(test "Quasiquote with Unquote-Splicing"
+      '`(a ,@x b)
+      '(cons 'a (append x (cons 'b ()))))
+
+(test "Quasiquote in Lambda"
+      '(lambda (x) `(result ,x))
+      '(lambda (x) (list 'result x)))
+
+(test "Combined: Let* and Quasiquote"
+      '(let* ((x 1) (y 2)) `(values ,x ,y))
+      '(let ((x 1)) (let ((y 2)) (list 'values x y))))
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (display "ALL TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+(newline)

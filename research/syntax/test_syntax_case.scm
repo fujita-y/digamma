@@ -179,8 +179,8 @@
 (test "define-struct-expansion"
       (macroexpand '(define-struct point (x y)) 'strip)
       '(begin
-         (define (make-point x y) (list (quote point) x y))
-         (define (point? obj) (if (pair? obj) (eq? (car obj) 'point) #f))))
+         (define make-point (lambda (x y) (list 'point x y)))
+         (define point? (lambda (obj) (if (pair? obj) (eq? (car obj) 'point) #f)))))
 
 ;; Stringify macro for constant testing
 (macroexpand

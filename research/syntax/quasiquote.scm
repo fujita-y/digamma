@@ -1,7 +1,7 @@
 ;; quasiquote.scm
 ;; Expand quasiquote (backquote) syntax into core forms: quote, list, cons, and append.
 
-(define (qq:expand expr)
+(define (mc:expand-quasiquote expr)
   ;; --- Internal Helpers ---
 
   ;; Check if expr is a proper list.
