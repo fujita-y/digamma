@@ -49,31 +49,33 @@
        `(define ,var ,val)))
     (else (op:opt-app expr bound-vars))))
 
+
 ;; --- Specialized Optimizers ---
 
 (define (op:opt-if expr bound-vars)
   (let ((test (op:optimize-inner (cadr expr) bound-vars))
         (then (op:optimize-inner (caddr expr) bound-vars))
-        (else (if (null? (cdddr expr)) ''#f (op:optimize-inner (cadddr expr) bound-vars))))
+        (els (if (null? (cdddr expr)) ''#f (op:optimize-inner (cadddr expr) bound-vars))))
     (cond
       ;; If-lifting: (if (if a b c) d e) -> (if a (if b d e) (if c d e))
       ((and (pair? test) (eq? (car test) 'if))
        (let ((a (cadr test)) (b (caddr test)) (c (cadddr test)))
-         (op:optimize-inner `(if ,a (if ,b ,then ,else) (if ,c ,then ,else)) bound-vars)))
+         (op:optimize-inner `(if ,a (if ,b ,then ,els) (if ,c ,then ,els)) bound-vars)))
       ;; Boolean simplification: (if a #t #f) -> a (if a is boolean)
-      ((and (op:boolean-true? then) (op:boolean-false? else))
+      ((and (op:boolean-true? then) (op:boolean-false? els))
        test)
       ((and (pair? test) (eq? (car test) 'quote))
-       (if (cadr test) then else))
+       (if (cadr test) then els))
       ((boolean? test)
-       (if test then else))
-      (else `(if ,test ,then ,else)))))
+       (if test then els))
+      (else `(if ,test ,then ,els)))))
+
 
 (define (op:opt-begin expr bound-vars)
   (let* ((exprs (map (lambda (e) (op:optimize-inner e bound-vars)) (cdr expr)))
          (flattened (apply append (map (lambda (x) (if (and (pair? x) (eq? (car x) 'begin)) (cdr x) (list x))) exprs)))
          (filtered (filter (lambda (x) (op:has-effects? x)) (op:take flattened (- (length flattened) 1)))))
-    (let ((last-val (car (reverse flattened))))
+    (let ((last-val (if (null? flattened) ''#f (car (reverse flattened)))))
       (if (null? filtered)
           last-val
           `(begin ,@filtered ,last-val)))))

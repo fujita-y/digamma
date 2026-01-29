@@ -3,7 +3,7 @@
 
 (define (test-repl-expr expr expected)
   (format #t "Testing: ~s\n" expr)
-  (let* ((expanded (macroexpand expr 'strip))
+  (let* ((expanded (macroexpand expr))
          (optimized (op:optimize expanded))
          (code (cp:compile optimized))
          (vm (vm:init-vm))
@@ -25,6 +25,43 @@
 (test-repl-expr '(if (= 0 0) 'yes 'no) 'yes)
 (test-repl-expr '((lambda (x) (* x x)) 5) 25)
 
+;; --- Macro and Hygiene Tests ---
+(test-repl-expr '(begin
+                   (define-syntax my-or
+                     (syntax-rules ()
+                       ((_ a b)
+                        (let ((t a))
+                          (if t t b)))))
+                   (my-or #t #f))
+                #t)
+
+(test-repl-expr '(begin
+                   (define-syntax swap
+                     (syntax-rules ()
+                       ((_ a b)
+                        (let ((temp a))
+                          (set! a b)
+                          (set! b temp)))))
+                   (let ((temp 1) (other 2))
+                     (swap temp other)
+                     temp))
+                2)
+
+(test-repl-expr '(let-syntax ((m (syntax-rules () ((m x) (+ x x)))))
+                   (let-syntax ((m (syntax-rules () ((m x) (+ 2 2)))))
+                     (m 1)))
+                4)
+
+(test-repl-expr '(let-syntax ((foo
+                              (syntax-rules ()
+                                ((_ expr) (+ expr 1)))))
+                   (let ((+ *))
+                     (foo 3)))
+                4)
+
+;; --- Internal Define ---
+(test-repl-expr '((lambda (x) (define y 1) (+ x y)) 10) 11)
+
 ;;; Pitfall Tests
 (display "Running Pitfall tests...\n")
 
@@ -32,7 +69,7 @@
 (let* ((vm (vm:init-vm))
        (_ (repl:init-globals vm))
        (run (lambda (expr)
-              (let* ((expanded (macroexpand expr 'strip))
+              (let* ((expanded (macroexpand expr))
                      (optimized (op:optimize expanded))
                      (code (cp:compile optimized))
                      (ctx (vm:init-context vm code)))
