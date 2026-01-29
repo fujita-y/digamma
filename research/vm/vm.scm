@@ -33,10 +33,11 @@
   (vector-set! (ctx-regs ctx) (vm:decode-reg reg) val))
 
 (define-record-type <closure>
-  (make-closure-vec label free)
+  (make-closure-vec label free code)
   closure?
   (label closure-label)
-  (free  closure-free))
+  (free  closure-free)
+  (code  closure-code))
 
 (define-record-type <cell>
   (make-cell-box value)
@@ -103,8 +104,9 @@
     (let ((proc (vm:reg-ref ctx proc-reg)))
       (if (closure? proc)
           (begin
-            (ctx-stack-set! ctx (cons (list (ctx-pc ctx) (ctx-cl ctx) (vector-copy (ctx-regs ctx))) (ctx-stack ctx)))
+            (ctx-stack-set! ctx (cons (list (ctx-pc ctx) (ctx-cl ctx) (vector-copy (ctx-regs ctx)) (ctx-code ctx)) (ctx-stack ctx)))
             (ctx-cl-set! ctx proc)
+            (ctx-code-set! ctx (closure-code proc))
             (ctx-pc-set! ctx (closure-label proc))
             *vm:continue*)
           (let ((args (vm:fetch-args ctx n-args))
@@ -121,6 +123,7 @@
       (if (closure? proc)
           (begin
             (ctx-cl-set! ctx proc)
+            (ctx-code-set! ctx (closure-code proc))
             (ctx-pc-set! ctx (closure-label proc))
             *vm:continue*)
           (let ((args (vm:fetch-args ctx n-args)))
@@ -131,6 +134,7 @@
                     (ctx-pc-set! ctx (car ctx-data))
                     (ctx-cl-set! ctx (cadr ctx-data))
                     (ctx-regs-set! ctx (caddr ctx-data))
+                    (ctx-code-set! ctx (cadddr ctx-data))
                     (ctx-stack-set! ctx (cdr (ctx-stack ctx)))
                     (vm:reg-set! ctx 'r0 res)
                     *vm:continue*))))))))
@@ -143,6 +147,7 @@
         (ctx-pc-set! ctx (car ctx-data))
         (ctx-cl-set! ctx (cadr ctx-data))
         (ctx-regs-set! ctx (caddr ctx-data))
+        (ctx-code-set! ctx (cadddr ctx-data))
         (ctx-stack-set! ctx (cdr (ctx-stack ctx)))
         (vm:reg-set! ctx 'r0 res)
         *vm:continue*)))
@@ -152,7 +157,7 @@
         (label (vector-ref inst 2))
         (free-indices (vector-ref inst 3)))
     (let ((free-vals (map (lambda (idx) (vm:reg-ref ctx idx)) free-indices)))
-      (let ((cl (make-closure-vec label (list->vector free-vals))))
+      (let ((cl (make-closure-vec label (list->vector free-vals) (ctx-code ctx))))
         (vm:reg-set! ctx dst cl))
       *vm:continue*)))
 
