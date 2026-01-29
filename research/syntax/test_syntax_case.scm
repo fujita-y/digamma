@@ -138,7 +138,10 @@
                         (* n (fact (- n 1))))))
              '(1 2 3 4 5))
        'strip)
-      '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) fact) (quote (1 2 3 4 5))))
+      '(map (let ((fact '*undefined*))
+              (set! fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))
+              fact)
+            '(1 2 3 4 5)))
 
 ;; Anaphoric IF (aif)
 (macroexpand
