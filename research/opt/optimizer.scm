@@ -15,50 +15,51 @@
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10))
         current
-        (loop (op:optimize-once-inner current) current (+ iters 1)))))
+        (loop (op:optimize-inner current '()) current (+ iters 1)))))
 
 (define (op:optimize-once expr)
-  (op:optimize-once-inner expr))
+  (op:optimize-inner expr '()))
 
 (define (op:boolean-true? x) (or (eq? x #t) (equal? x ''#t)))
 (define (op:boolean-false? x) (or (eq? x #f) (equal? x ''#f) (null? x)))
 
 ;; --- Dispatcher ---
 
-(define (op:optimize-once-inner expr)
+(define (op:optimize-inner expr bound-vars)
   (cond
     ((symbol? expr) 
-     (if (hash-table-exists? op:global-env expr)
+     (if (and (hash-table-exists? op:global-env expr)
+              (not (memq expr bound-vars)))
          (hash-table-get op:global-env expr)
          expr))
     ((not (pair? expr)) expr)
     ((eq? (car expr) 'quote) expr)
-    ((eq? (car expr) 'if) (op:opt-if expr))
-    ((eq? (car expr) 'begin) (op:opt-begin expr))
-    ((eq? (car expr) 'lambda) (op:opt-lambda expr))
-    ((eq? (car expr) 'let) (op:opt-let expr))
+    ((eq? (car expr) 'if) (op:opt-if expr bound-vars))
+    ((eq? (car expr) 'begin) (op:opt-begin expr bound-vars))
+    ((eq? (car expr) 'lambda) (op:opt-lambda expr bound-vars))
+    ((eq? (car expr) 'let) (op:opt-let expr bound-vars))
     ((eq? (car expr) 'set!)
-     `(set! ,(cadr expr) ,(op:optimize-once-inner (caddr expr))))
+     `(set! ,(cadr expr) ,(op:optimize-inner (caddr expr) bound-vars)))
     ((eq? (car expr) 'define)
-     (let ((var (cadr expr)) (val (op:optimize-once-inner (caddr expr))))
+     (let ((var (cadr expr)) (val (op:optimize-inner (caddr expr) bound-vars)))
        (if (and (not (pair? val)) (not (symbol? val))) ;; Simple constant
            (hash-table-put! op:global-env var val))
        (if (and (pair? val) (eq? (car val) 'quote))
            (hash-table-put! op:global-env var val))
        `(define ,var ,val)))
-    (else (op:opt-app expr))))
+    (else (op:opt-app expr bound-vars))))
 
 ;; --- Specialized Optimizers ---
 
-(define (op:opt-if expr)
-  (let ((test (op:optimize-once-inner (cadr expr)))
-        (then (op:optimize-once-inner (caddr expr)))
-        (else (if (null? (cdddr expr)) ''#f (op:optimize-once-inner (cadddr expr)))))
+(define (op:opt-if expr bound-vars)
+  (let ((test (op:optimize-inner (cadr expr) bound-vars))
+        (then (op:optimize-inner (caddr expr) bound-vars))
+        (else (if (null? (cdddr expr)) ''#f (op:optimize-inner (cadddr expr) bound-vars))))
     (cond
       ;; If-lifting: (if (if a b c) d e) -> (if a (if b d e) (if c d e))
       ((and (pair? test) (eq? (car test) 'if))
        (let ((a (cadr test)) (b (caddr test)) (c (cadddr test)))
-         (op:optimize-once-inner `(if ,a (if ,b ,then ,else) (if ,c ,then ,else)))))
+         (op:optimize-inner `(if ,a (if ,b ,then ,else) (if ,c ,then ,else)) bound-vars)))
       ;; Boolean simplification: (if a #t #f) -> a (if a is boolean)
       ((and (op:boolean-true? then) (op:boolean-false? else))
        test)
@@ -68,8 +69,8 @@
        (if test then else))
       (else `(if ,test ,then ,else)))))
 
-(define (op:opt-begin expr)
-  (let* ((exprs (map op:optimize-once-inner (cdr expr)))
+(define (op:opt-begin expr bound-vars)
+  (let* ((exprs (map (lambda (e) (op:optimize-inner e bound-vars)) (cdr expr)))
          (flattened (apply append (map (lambda (x) (if (and (pair? x) (eq? (car x) 'begin)) (cdr x) (list x))) exprs)))
          (filtered (filter (lambda (x) (op:has-effects? x)) (op:take flattened (- (length flattened) 1)))))
     (let ((last-val (car (reverse flattened))))
@@ -77,9 +78,10 @@
           last-val
           `(begin ,@filtered ,last-val)))))
 
-(define (op:opt-lambda expr)
+(define (op:opt-lambda expr bound-vars)
   (let* ((params (cadr expr))
-         (body-exprs (map op:optimize-once-inner (cddr expr)))
+         (new-bound (if (list? params) (append params bound-vars) (cons params bound-vars)))
+         (body-exprs (map (lambda (e) (op:optimize-inner e new-bound)) (cddr expr)))
          (body `(begin ,@body-exprs))
          (used (op:analyze-used-vars body))
          (mutated (op:analyze-mutated-vars body)))
@@ -91,9 +93,11 @@
          (loop (cdr ps) (+ i 1) new-params)) ;; Remove it
         (else (loop (cdr ps) (+ i 1) (cons (car ps) new-params)))))))
 
-(define (op:opt-let expr)
-  (let* ((bindings (map (lambda (b) (list (car b) (op:optimize-once-inner (cadr b)))) (cadr expr)))
-         (body-exprs (map op:optimize-once-inner (cddr expr)))
+(define (op:opt-let expr bound-vars)
+  (let* ((bindings (map (lambda (b) (list (car b) (op:optimize-inner (cadr b) bound-vars))) (cadr expr)))
+         (vars (map car bindings))
+         (new-bound (append vars bound-vars))
+         (body-exprs (map (lambda (e) (op:optimize-inner e new-bound)) (cddr expr)))
          (body (if (and (null? (cdr body-exprs)) (pair? (car body-exprs)) (eq? (car (car body-exprs)) 'begin))
                    (cdr (car body-exprs))
                    body-exprs)))
@@ -109,7 +113,7 @@
                         (set! main-bindings (append main-bindings (list b))))))
                 bindings)
       (if (not (null? floated-bindings))
-          (op:optimize-once-inner `(let ,floated-bindings (let ,main-bindings ,@body)))
+          (op:optimize-inner `(let ,floated-bindings (let ,main-bindings ,@body)) bound-vars)
           
           ;; Binding Optimization Pipeline
           (let* ((used (op:analyze-used-vars `(begin ,@body)))
@@ -165,20 +169,20 @@
        (cons #t `(if ,test ,then (let ((,var ,val)) ,else))))
       (else (cons #f #f)))))
 
-(define (op:opt-app expr)
-  (let ((proc (op:optimize-once-inner (car expr)))
-        (args (map op:optimize-once-inner (cdr expr))))
+(define (op:opt-app expr bound-vars)
+  (let ((proc (op:optimize-inner (car expr) bound-vars))
+        (args (map (lambda (e) (op:optimize-inner e bound-vars)) (cdr expr))))
     (cond
       ;; Beta-reduction: ((lambda (x) ...) y) -> (let ((x y)) ...)
       ((and (pair? proc) (eq? (car proc) 'lambda))
        (let ((params (cadr proc))
              (body (cddr proc)))
          (if (= (length params) (length args))
-             (op:optimize-once `(let ,(map list params args) ,@body))
+             (op:optimize-inner `(let ,(map list params args) ,@body) bound-vars)
              ;; Handle argument mismatch
              (if (< (length params) (length args))
                  (let ((extra-args (op:drop args (length params))))
-                   (op:optimize-once `(begin ,@extra-args (let ,(map list params (op:take args (length params))) ,@body))))
+                   (op:optimize-inner `(begin ,@extra-args (let ,(map list params (op:take args (length params))) ,@body)) bound-vars))
                  (cons proc args)))))
       (else (cons proc args)))))
 

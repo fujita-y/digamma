@@ -153,7 +153,7 @@
              (prev-compiled-code compiled-code))
         (set! compiled-code '())
         (emit `(label ,entry-label))
-        (let* ((new-base (+ n-params 1))
+        (let* ((new-base (max (+ n-params 1) 32))
                (new-scope (let loop ((p params) (i 0))
                             (if (null? p) '() (cons (cons (car p) (make-reg (+ new-base i))) (loop (cdr p) (+ i 1))))))
                (cl-scope (let loop ((f free) (i 0))
@@ -265,7 +265,7 @@
         ((eq? (car expr) 'let) (codegen-let expr env next-reg tail?))
         (else (codegen-application expr env next-reg tail?))))
 
-    (codegen expr '() 1 #f)
+    (codegen expr '() 32 #f)
     (emit `(ret))
 
     (let* ((main-code (reverse compiled-code))
@@ -273,6 +273,9 @@
            (all-code (append main-code closure-code))
            (label-map (make-hash-table 'eq?))
            (final-code '()) (current-pc 0))
+      (newline)
+      (display all-code)
+      (newline)
       (for-each (lambda (inst)
                   (if (eq? (car inst) 'label)
                       (hash-table-put! label-map (cadr inst) current-pc)

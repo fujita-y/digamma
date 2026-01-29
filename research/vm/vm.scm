@@ -47,7 +47,7 @@
   (make-vm-internal (make-hash-table 'eq?)))
 
 (define (vm:init-context vm code)
-  (make-context code 0 '() #f (make-vector 32 #f) vm))
+  (make-context code 0 '() #f (make-vector 64 #f) vm))
 
 (define (vm:vm-run ctx)
   (let loop ()

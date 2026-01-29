@@ -84,4 +84,14 @@
                                         (even? 10))
       #t)
 
+(test "Many registers (r32+)"
+      '(let ((x1 1) (x2 2) (x3 3) (x4 4) (x5 5))
+         (+ x1 (+ x2 (+ x3 (+ x4 x5)))))
+      15)
+
+(test "Many registers (r32+)"
+      '(let ((p (lambda (x1 x2 x3 x4 x5 x6 x7 x8) (+ x1 x2 x3 x4 x5 x6 x7 x8))))
+         (p 1 2 3 4 5 6 7 8))
+      36)
+
 (print "All basic tests PASSED!")
