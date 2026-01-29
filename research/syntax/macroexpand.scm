@@ -369,7 +369,10 @@
               m-env s-env r-env))))
 
 (define (mc:expand-define expr m-env s-env r-env)
-  `(define ,(cadr expr) ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env s-env r-env)) (cddr expr)))))
+  (let ((head (cadr expr)))
+    (if (pair? head)
+        (mc:expand `(define ,(car head) (lambda ,(cdr head) ,@(cddr expr))) m-env s-env r-env)
+        `(define ,head ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env s-env r-env)) (cddr expr)))))))
 
 (define (mc:expand-begin expr m-env s-env r-env)
   (mc:make-seq (map-improper (lambda (x) (mc:expand x m-env s-env r-env)) (cdr expr))))
