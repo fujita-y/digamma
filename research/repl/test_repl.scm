@@ -6,9 +6,10 @@
   (let* ((expanded (macroexpand expr 'strip))
          (optimized (op:optimize expanded))
          (code (cp:compile optimized))
-         (vm (vm:init-vm code)))
+         (vm (vm:init-vm))
+         (ctx (vm:init-context vm code)))
     (repl:init-globals vm)
-    (let ((result (vm:vm-run vm)))
+    (let ((result (vm:vm-run ctx)))
       (if (equal? result expected)
           (format #t "  PASS: ~s\n" result)
           (begin

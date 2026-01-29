@@ -9,7 +9,8 @@
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)
   (let* ((code (cp:compile expr))
-         (vm (vm:init-vm code)))
+         (vm (vm:init-vm))
+         (ctx (vm:init-context vm code)))
     ;; Add some basic subrs to globals
     (vm:vm-set-global! vm '+ +)
     (vm:vm-set-global! vm '- -)
@@ -25,7 +26,7 @@
     (vm:vm-set-global! vm 'newline newline)
 
 
-    (let ((result (vm:vm-run vm)))
+    (let ((result (vm:vm-run ctx)))
       (if (equal? result expected)
           (format #t "  PASS: ~s\n" result)
           (begin
