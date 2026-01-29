@@ -97,6 +97,28 @@
          (test-quasisyntax 10))
       '(10 11))
 
+(test "define-struct"
+      '(begin
+         (define-syntax define-struct
+           (lambda (x)
+             (syntax-case x ()
+               ((_ name (field ...))
+                (with-syntax ((make-name (datum->syntax (syntax name)
+                                                        (string->symbol
+                                                         (string-append "make-"
+                                                                        (symbol->string
+                                                                         (syntax->datum (syntax name)))))))
+                              (name? (datum->syntax (syntax name)
+                                                    (string->symbol
+                                                     (string-append (symbol->string
+                                                                     (syntax->datum (syntax name))) "?")))))
+                  (syntax (begin
+                            (define (make-name field ...) (list (quote name) field ...))
+                            (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name)))))))))))
+         (define-struct point (x y))
+         (list (point? (make-point 1 2)) (make-point 1 2)))
+      '(#t (point 1 2)))
+
 (test "generate-temporaries"
       '(begin
          (define-syntax test-gen-temp
