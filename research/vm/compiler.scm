@@ -1,4 +1,8 @@
 
+;; --- Instruction Sets ---
+(define cp:ops-loads '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref))
+(define cp:ops-overwrites '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref)) ; ops that overwrite a register
+
 ;; --- Utility: Set Operations ---
 (define (cp:set-union s1 s2)
   (if (null? s1) s2
@@ -75,63 +79,70 @@
 
 ;; --- Optimization: Peephole ---
 ;; --- Optimization: Peephole ---
+(define (cp:optimize-swap code)
+  ;; Pattern: (mov A B) (mov B A) -> (mov A B)
+  (if (and (null? (cddr code)) ; exactly two if we are at the end, but usually we look ahead
+           (pair? (car code)) (eq? (caar code) 'mov)
+           (pair? (cadr code)) (eq? (caadr code) 'mov)
+           (eq? (cadr (car code)) (caddr (cadr code)))
+           (eq? (caddr (car code)) (cadr (cadr code))))
+      (list (car code))
+      #f))
+
+(define (cp:optimize-three-inst code)
+  (if (null? (cddr code)) #f
+      (let ((i1 (car code)) (i2 (cadr code)) (i3 (caddr code)))
+        (if (and (pair? i1) (memq (car i1) cp:ops-loads)
+                 (pair? i2) (memq (car i2) cp:ops-loads)
+                 (pair? i3) (memq (car i3) cp:ops-loads))
+            (let ((dst1 (cadr i1)) (src1 (caddr i1))
+                  (dst2 (cadr i2)) (src2 (caddr i2))
+                  (dst3 (cadr i3)) (src3 (caddr i3)))
+              (cond
+               ;; Pattern 1: Load/Mov A->C, Mov D->A (overwriting A)
+               ((and (memq (car i1) (delete 'mov cp:ops-loads))
+                     (eq? dst1 src2)
+                     (eq? dst1 dst3))
+                (cons `(,(car i1) ,dst2 ,src1) (cons i3 (cdddr code))))
+               
+               ;; Pattern 2: Mov A->B, Mov C->A (overwriting A), Mov A->D ??
+               ((and (eq? (car i1) 'mov)
+                     (eq? dst1 src2)
+                     (eq? dst1 dst3)
+                     (not (eq? dst1 src3)))
+                (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code))))
+
+               ;; Pattern 3: Redundant Restore
+               ;; (mov rA rB) (op rC <data>) (mov rB rA) -> (mov rA rB) (op rC <data>)
+               ;; Condition: rC != rA && rC != rB
+               ((and (eq? (car i1) 'mov)
+                     (memq (car i2) (delete 'mov cp:ops-loads))
+                     (eq? (car i3) 'mov)
+                     (eq? dst1 src3)       ; rA == rA in (mov rB rA)
+                     (eq? src1 dst3)       ; rB == rB in (mov rB rA)
+                     (not (eq? dst2 dst1)) ; rC != rA
+                     (not (eq? dst2 src1))); rC != rB
+                (cons i1 (cons i2 (cdddr code))))
+               
+               (else #f)))
+            #f))))
+
 (define (cp:peephole-optimize-pass code)
   (cond
     ((null? code) '())
     ((null? (cdr code)) code)
-    ;; Pattern: (mov A B) (mov B A) -> (mov A B)
+    ;; Try 2-inst optimizations
     ((and (pair? (car code)) (eq? (caar code) 'mov)
           (pair? (cadr code)) (eq? (caadr code) 'mov)
           (eq? (cadr (car code)) (caddr (cadr code)))
           (eq? (caddr (car code)) (cadr (cadr code))))
      (cp:peephole-optimize-pass (cons (car code) (cddr code))))
+    
+    ;; Try 3-inst optimizations
+    ((cp:optimize-three-inst code) => cp:peephole-optimize-pass)
 
-    ((null? (cddr code)) code)
+    (else (cons (car code) (cp:peephole-optimize-pass (cdr code))))))
 
-    (else
-     (let ((i1 (car code))
-           (i2 (cadr code))
-           (i3 (caddr code)))
-       (cond
-        ((and (pair? i1) (memq (car i1) '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref))
-              (pair? i2) (memq (car i2) '(mov global-ref closure-ref closure-cell-ref reg-cell-ref))
-              (pair? i3) (memq (car i3) '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref)))
-         (let ((dst1 (cadr i1)) (src1 (caddr i1))
-               (dst2 (cadr i2)) (src2 (caddr i2))
-               (dst3 (cadr i3)) (src3 (caddr i3)))
-           (cond
-             ;; Pattern: Load/Mov A->C, Mov D->A (overwriting A)
-             ((and (memq (car i1) '(const global-ref closure-ref closure-cell-ref reg-cell-ref))
-                   (eq? dst1 src2)
-                   (eq? dst1 dst3))
-              (cp:peephole-optimize-pass (cons `(,(car i1) ,dst2 ,src1) (cons i3 (cdddr code)))))
-             
-             ;; Pattern: Mov A->B, Mov C->A (overwriting A), Mov A->D ??
-             ;; Original logic:
-             ;; A matches in mov A B; mov C A
-             ;; A matches in ...; mov A D
-             ;; D != A
-             ((and (eq? (car i1) 'mov)
-                   (eq? dst1 src2)
-                   (eq? dst1 dst3)
-                   (not (eq? dst1 src3)))
-              (cp:peephole-optimize-pass (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code)))))
-
-             ;; Pattern: Redundant Restore
-             ;; (mov rA rB) (op rC <data>) (mov rB rA) -> (mov rA rB) (op rC <data>)
-             ;; Condition: rC != rA && rC != rB
-             ((and (eq? (car i1) 'mov)
-                   (memq (car i2) '(const global-ref closure-ref closure-cell-ref reg-cell-ref))
-                   (eq? (car i3) 'mov)
-                   (eq? dst1 src3)       ; rA == rA in (mov rB rA)
-                   (eq? src1 dst3)       ; rB == rB in (mov rB rA)
-                   (not (eq? dst2 dst1)) ; rC != rA
-                   (not (eq? dst2 src1))); rC != rB
-              (cp:peephole-optimize-pass (cons i1 (cons i2 (cdddr code)))))
-
-             (else (cons i1 (cp:peephole-optimize-pass (cdr code)))))))
-
-        (else (cons i1 (cp:peephole-optimize-pass (cdr code)))))))))
 
 (define (cp:peephole-optimize code)
   (let loop ((current code))
@@ -186,6 +197,19 @@
 
     (define (emit inst) (set! compiled-code (cons inst compiled-code)))
     (define (make-reg i) (string->symbol (string-append "r" (number->string i))))
+
+    (define (codegen-args args env arg-base)
+      (let loop ((as args) (i 0))
+        (if (not (null? as))
+            (let ((temp-reg (make-reg (+ arg-base i))))
+              (codegen (car as) env (+ arg-base i 1) #f)
+              (emit `(mov ,temp-reg r0))
+              (loop (cdr as) (+ i 1))))))
+
+    (define (move-args num-args base)
+      (let move-loop ((j 0))
+        (if (< j num-args)
+            (begin (emit `(mov ,(make-reg j) ,(make-reg (+ base j)))) (move-loop (+ j 1))))))
 
     (define (lookup var env)
       (let loop ((e env))
@@ -270,52 +294,27 @@
 
     (define (codegen-application expr env next-reg tail?)
       (if (and (pair? (car expr)) (cp:match-rec-pattern (car expr)))
-          (let* ((let-expr (car expr))
-                 (args (cdr expr))
-                 (num-args (length args))
-                 (bindings (cadr let-expr))
-                 (name (caar bindings))
-                 (sym (cadar bindings))
-                 (body (cddr let-expr))
-                 (set-expr (car body))
-                 (lambda-expr (caddr set-expr))
-                 (reg (make-reg next-reg))
-                 (arg-base (+ next-reg 1)))
-            (emit `(const r0 ,sym))
+          (let* ((let-expr (car expr)) (args (cdr expr)) (num-args (length args))
+                 (bindings (cadr let-expr)) (name (caar bindings)) (sym (cadar bindings))
+                 (body (cddr let-expr)) (set-expr (car body)) (lambda-expr (caddr set-expr))
+                 (reg (make-reg next-reg)) (arg-base (+ next-reg 1)))
+            (emit `(const r0 ,sym)) (emit `(mov ,reg r0))
+            (codegen-lambda lambda-expr (cons (list (cons name 'self)) env) next-reg #f)
             (emit `(mov ,reg r0))
-            (let* ((new-scope (list (cons name 'self)))
-                   (cl-env (cons new-scope env)))
-              (codegen-lambda lambda-expr cl-env next-reg #f))
-            (emit `(mov ,reg r0))
-            (let loop ((as args) (i 0))
-              (if (null? as)
-                  (let ((call-reg (make-reg (+ arg-base num-args))))
-                    (emit `(mov ,call-reg ,reg))
-                    (let move-loop ((j 0))
-                      (if (< j num-args)
-                          (begin (emit `(mov ,(make-reg j) ,(make-reg (+ arg-base j)))) (move-loop (+ j 1)))))
-                    (if tail? (emit `(tail-call ,call-reg ,num-args)) (emit `(call ,call-reg ,num-args))))
-                  (let ((temp-reg (make-reg (+ arg-base i))))
-                    (codegen (car as) (cons (list (cons name reg)) env) (+ arg-base i 1) #f)
-                    (emit `(mov ,temp-reg r0))
-                    (loop (cdr as) (+ i 1))))))
+            (codegen-args args (cons (list (cons name reg)) env) arg-base)
+            (let ((call-reg (make-reg (+ arg-base num-args))))
+              (emit `(mov ,call-reg ,reg))
+              (move-args num-args arg-base)
+              (if tail? (emit `(tail-call ,call-reg ,num-args)) (emit `(call ,call-reg ,num-args)))))
 
-          (let* ((proc (car expr)) (args (cdr expr))
-                 (num-args (length args))
+          (let* ((proc (car expr)) (args (cdr expr)) (num-args (length args))
                  (base-reg (max 1 next-reg)))
-            (let loop ((as args) (i 0))
-              (if (null? as)
-                  (let ((call-reg (make-reg (+ base-reg num-args))))
-                    (codegen proc env (+ base-reg num-args) #f)
-                    (emit `(mov ,call-reg r0))
-                    (let move-loop ((j 0))
-                      (if (< j num-args)
-                          (begin (emit `(mov ,(make-reg j) ,(make-reg (+ base-reg j)))) (move-loop (+ j 1)))))
-                    (if tail? (emit `(tail-call ,call-reg ,num-args)) (emit `(call ,call-reg ,num-args))))
-                  (let ((temp-reg (make-reg (+ base-reg i))))
-                    (codegen (car as) env (+ base-reg i 1) #f)
-                    (emit `(mov ,temp-reg r0))
-                    (loop (cdr as) (+ i 1))))))))
+            (codegen-args args env base-reg)
+            (let ((call-reg (make-reg (+ base-reg num-args))))
+              (codegen proc env (+ base-reg num-args) #f)
+              (emit `(mov ,call-reg r0))
+              (move-args num-args base-reg)
+              (if tail? (emit `(tail-call ,call-reg ,num-args)) (emit `(call ,call-reg ,num-args)))))))
 
     (define (codegen-let expr env next-reg tail?)
       (if (cp:match-rec-pattern expr)
