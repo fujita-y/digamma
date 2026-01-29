@@ -29,9 +29,14 @@ for d in "${DIRS[@]}"; do
     fi
 done
 
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
 if [ ${#FAILED_DIRS[@]} -ne 0 ]; then
     echo "======================================================================"
-    echo "ERROR: Some tests failed in the following directories:"
+    echo -e "${RED}ERROR: Some tests failed in the following directories:${NC}"
     for d in "${FAILED_DIRS[@]}"; do
         echo "  - $d"
     done
@@ -39,5 +44,5 @@ if [ ${#FAILED_DIRS[@]} -ne 0 ]; then
 fi
 
 echo "======================================================================"
-echo "All research tests passed successfully!"
+echo -e "${GREEN}All research tests passed successfully!${NC}"
 echo "======================================================================"

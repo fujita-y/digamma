@@ -14,6 +14,11 @@ echo "--------------------------------------"
 TOTAL=0
 PASSED=0
 
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
 # Iterate over all test files in research/repl
 for test_file in research/repl/test_*.scm; do
     echo "Running $test_file..."
@@ -29,13 +34,13 @@ for test_file in research/repl/test_*.scm; do
     
     if [ $RETVAL -ne 0 ]; then
         echo "--------------------------------------"
-        echo "ERROR: $test_file exited with non-zero status $RETVAL"
+        echo -e "${RED}ERROR: $test_file exited with non-zero status $RETVAL${NC}"
         exit 1
     fi
     
     if echo "$OUTPUT" | grep -q "FAIL"; then
         echo "--------------------------------------"
-        echo "ERROR: Failures detected in $test_file"
+        echo -e "${RED}ERROR: Failures detected in $test_file${NC}"
         exit 1
     fi
     
@@ -44,4 +49,4 @@ for test_file in research/repl/test_*.scm; do
     echo "--------------------------------------"
 done
 
-echo "All $TOTAL test files passed successfully!"
+echo -e "${GREEN}All $TOTAL test files passed successfully!${NC}"

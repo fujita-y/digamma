@@ -82,7 +82,6 @@
 
 
 ;; --- Optimization: Peephole ---
-;; --- Optimization: Peephole ---
 (define (cp:optimize-swap code)
   ;; Pattern: (mov A B) (mov B A) -> (mov A B)
   (if (and (null? (cddr code)) ; exactly two if we are at the end, but usually we look ahead
