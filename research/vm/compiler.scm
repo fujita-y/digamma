@@ -73,6 +73,29 @@
     (else '())))
 
 
+;; --- Optimization: Peephole ---
+(define (cp:peephole-optimize code)
+  (cond
+    ((or (null? code) (null? (cdr code)) (null? (cddr code))) code)
+    (else
+     (let ((i1 (car code))
+           (i2 (cadr code))
+           (i3 (caddr code)))
+       (if (and (pair? i1) (eq? (car i1) 'mov)
+                (pair? i2) (eq? (car i2) 'mov)
+                (pair? i3) (eq? (car i3) 'mov))
+           (let ((dst1 (cadr i1)) (src1 (caddr i1))
+                 (dst2 (cadr i2)) (src2 (caddr i2))
+                 (dst3 (cadr i3)) (src3 (caddr i3)))
+             (if (and (eq? dst1 src2)       ; A matches in mov A B; mov C A
+                      (eq? dst1 dst3)       ; A matches in ...; mov A D
+                      (not (eq? dst1 src3))); D != A
+                 ;; Optimization: (mov C B) (mov A D)
+                 (cp:peephole-optimize (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code))))
+                 ;; No match
+                 (cons i1 (cp:peephole-optimize (cdr code)))))
+           (cons i1 (cp:peephole-optimize (cdr code))))))))
+
 (define (cp:compile expr)
   (let* ((rec-vars '())
          (_ (let walk ((e expr))
@@ -270,12 +293,12 @@
 
     (let* ((main-code (reverse compiled-code))
            (closure-code (apply append (reverse all-closure-code)))
-           (all-code (append main-code closure-code))
+           (all-code (cp:peephole-optimize (append main-code closure-code)))
            (label-map (make-hash-table 'eq?))
            (final-code '()) (current-pc 0))
-      (newline)
-      (display all-code)
-      (newline)
+      ;;(newline)
+      ;;(display all-code)
+      ;;(newline)
       (for-each (lambda (inst)
                   (if (eq? (car inst) 'label)
                       (hash-table-put! label-map (cadr inst) current-pc)
