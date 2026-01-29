@@ -374,7 +374,8 @@
 (define (mc:expand-begin expr m-env s-env r-env)
   (mc:make-seq (map-improper (lambda (x) (mc:expand x m-env s-env r-env)) (cdr expr))))
 
-(define (mc:expand-quote expr m-env s-env r-env) expr)
+(define (mc:expand-quote expr m-env s-env r-env)
+  `(quote ,(mc:strip-renames (cadr expr))))
 
 (define (mc:expand-quasiquote expr m-env s-env r-env)
   (mc:expand (qq:expand (cadr expr)) m-env s-env r-env))
