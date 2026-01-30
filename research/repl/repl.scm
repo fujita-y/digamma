@@ -84,10 +84,34 @@
     (hash-table-put! globals 'delete delete)
     globals))
 
+(define repl:prelude
+  '((define (for-each func lst)
+      (cond ((null? lst) #f)
+            (else (func (car lst))
+                  (for-each func (cdr lst)))))
+
+    (define (map proc items)
+      (if (null? items)
+          '()
+          (cons (proc (car items))
+                (map proc (cdr items)))))))
+
+(define (repl:eval-prelude vm)
+  (let loop ((exprs repl:prelude))
+    (if (null? exprs)
+        #t
+        (let* ((expanded (macroexpand (car exprs)))
+               (optimized (op:optimize expanded))
+               (code (cp:compile optimized))
+               (ctx (vm:init-context vm code)))
+          (vm:vm-run ctx)
+          (loop (cdr exprs))))))
+
 (define (run-repl)
   (display "Starting Research REPL...\n")
   (let ((vm (vm:init-vm)))
     (repl:init-globals vm)
+    (repl:eval-prelude vm)
     
     (let loop ()
       (display "> ")

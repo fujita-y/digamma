@@ -12,6 +12,7 @@
          (vm (vm:init-vm))
          (ctx (vm:init-context vm code)))
     (repl:init-globals vm)
+    (repl:eval-prelude vm)
     (let ((result (vm:vm-run ctx)))
       (if (equal? result expected)
           (begin
@@ -26,6 +27,7 @@
 (display "\n>>> Section 1: Basic Integration & Core Forms\n")
 ;; =============================================================================
 
+(test "prelude: map" '(map (lambda (x) (+ x 1)) '(1 2 3)) '(2 3 4))
 (test "simple addition" '(+ 1 2) 3)
 (test "let-binding" '(let ((x 10)) (+ x 20)) 30)
 (test "if-expression" '(if (= 0 0) 'yes 'no) 'yes)
