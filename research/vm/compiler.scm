@@ -85,6 +85,56 @@
        (else (let loop ((exprs expr)) (if (null? exprs) '() (cp:set-union (cp:analyze-mutated-vars (car exprs) rec-vars) (loop (cdr exprs))))))))
     (else '())))
 
+;; --- Analysis 3: Escape Analysis ---
+(define (cp:var-escapes? var expr)
+  (cond
+   ((symbol? expr) (eq? expr var))
+   ((not (pair? expr)) #f)
+   ((eq? (car expr) 'quote) #f)
+   ((eq? (car expr) 'if)
+    (or (cp:var-escapes? var (cadr expr))
+        (cp:var-escapes? var (caddr expr))
+        (if (null? (cdddr expr)) #f (cp:var-escapes? var (cadddr expr)))))
+   ((eq? (car expr) 'begin)
+    (any (lambda (e) (cp:var-escapes? var e)) (cdr expr)))
+   ((eq? (car expr) 'set!)
+    (or (eq? (cadr expr) var) ;; If set! target is var, it's mutation, but checking if it escapes? Usually we care if it's used as value.
+                              ;; But here we check if 'var' (the closure) is put into something.
+                              ;; The var is the name of the closure. If we set! it, we are assigning TO it.
+                              ;; We care if we use the value OF var.
+        (cp:var-escapes? var (caddr expr))))
+   ((eq? (car expr) 'define)
+    (let ((head (cadr expr)))
+      (if (pair? head)
+          (cp:var-escapes? var `(lambda ,(cdr head) ,@(cddr expr)))
+          (cp:var-escapes? var (caddr expr)))))
+   ((eq? (car expr) 'lambda)
+    (let ((params (cadr expr)) (body (cddr expr)))
+       ;; If var is shadowed, it doesn't escape from inside here (referring to different var)
+      (if (or (and (list? params) (memq var params))
+              (and (symbol? params) (eq? var params)))
+          #f
+          (any (lambda (e) (cp:var-escapes? var e)) body))))
+   ((eq? (car expr) 'let)
+    (let ((bindings (cadr expr)) (body (cddr expr)))
+      (let ((vars (map car bindings)) (vals (map cadr bindings)))
+        (if (memq var vars)
+            (any (lambda (v) (cp:var-escapes? var v)) vals) ;; Shadowed in body, check init vals
+            (or (any (lambda (v) (cp:var-escapes? var v)) vals)
+                (any (lambda (e) (cp:var-escapes? var e)) body))))))
+   (else
+    ;; Function application (op args...)
+    (let ((op (car expr))
+          (args (cdr expr)))
+      (cond
+       ;; If it is in operator position (var ...), it is called, safe if only called.
+       ((eq? op var)
+        (any (lambda (arg) (cp:var-escapes? var arg)) args))
+       (else
+        ;; If it is in argument position, it escapes.
+        (or (cp:var-escapes? var op)
+            (any (lambda (arg) (cp:var-escapes? var arg)) args))))))))
+
 
 ;; --- Optimization: Peephole ---
 
@@ -372,7 +422,7 @@
         (else (cp:ctx-emit! ctx `(global-set! ,var r0))))
       (if tail? (cp:ctx-emit! ctx `(ret))))))
 
-(define (cp:codegen-lambda expr env next-reg tail? ctx)
+(define (cp:codegen-lambda expr env next-reg tail? ctx stack-alloc?)
   (let* ((params (cadr expr)) (body (cddr expr))
          (all-free (cp:analyze-free-vars expr '()))
          (params-list (if (list? params) params (list params)))
@@ -405,7 +455,7 @@
     (let loop ((fs free) (regs '()) (r next-reg))
       (if (null? fs)
           (begin
-            (cp:ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs)))
+            (cp:ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,stack-alloc?))
             (if tail? (cp:ctx-emit! ctx `(ret))))
           (let ((b (cp:lookup (car fs) env)))
             (if (eq? (car b) 'reg)
@@ -424,7 +474,11 @@
              (body (cddr let-expr)) (set-expr (car body)) (lambda-expr (caddr set-expr))
              (reg (cp:make-reg next-reg)) (arg-base (+ next-reg 1)))
         (cp:ctx-emit! ctx `(const r0 ,sym)) (cp:ctx-emit! ctx `(mov ,reg r0))
-        (cp:codegen-lambda lambda-expr (cons (list (cons name 'self)) env) next-reg #f ctx)
+        ;; For recursive let/match pattern, it's strictly a local binding structure by definition of match-rec-pattern (let ((name ...)) (set! name (lambda ...))) 
+        ;; We can enable stack allocation if 'name' does not escape in 'body'.
+        ;; The body starts with (set! name ...) so we check rest of body.
+        (let ((escapes? (cp:var-escapes? name `(begin ,@(cdr body)))))
+             (cp:codegen-lambda lambda-expr (cons (list (cons name 'self)) env) next-reg #f ctx (not escapes?)))
         (cp:ctx-emit! ctx `(mov ,reg r0))
         (cp:codegen-args args (cons (list (cons name reg)) env) arg-base ctx)
         (let ((call-reg (cp:make-reg (+ arg-base num-args))))
@@ -436,7 +490,10 @@
              (base-reg (max 1 next-reg)))
         (cp:codegen-args args env base-reg ctx)
         (let ((call-reg (cp:make-reg (+ base-reg num-args))))
-          (cp:codegen proc env (+ base-reg num-args) #f ctx)
+          ;; Anonymous lambda call: ((lambda ...) ...) -> Stack allocate!
+          (if (and (pair? proc) (eq? (car proc) 'lambda))
+              (cp:codegen-lambda proc env (+ base-reg num-args) #f ctx #t)
+              (cp:codegen proc env (+ base-reg num-args) #f ctx))
           (cp:ctx-emit! ctx `(mov ,call-reg r0))
           (cp:move-args num-args base-reg ctx)
           (if tail? (cp:ctx-emit! ctx `(tail-call ,call-reg ,num-args)) (cp:ctx-emit! ctx `(call ,call-reg ,num-args)))))))
@@ -453,14 +510,20 @@
         (let ((set-expr (car body))
               (rest (cdr body)))
           (let ((lambda-expr (caddr set-expr)))
-            (cp:codegen-lambda lambda-expr (cons (list (cons name 'self)) env) (+ next-reg 1) #f ctx))
+            ;; Recursive pattern again
+            (let ((escapes? (cp:var-escapes? name `(begin ,@(cdr body)))))
+                 (cp:codegen-lambda lambda-expr (cons (list (cons name 'self)) env) (+ next-reg 1) #f ctx (not escapes?))))
           (cp:ctx-emit! ctx `(mov ,reg r0))
           (cp:codegen `(begin ,@rest) (cons (list (cons name reg)) env) (+ next-reg 1) tail? ctx)))
       (let* ((bindings (cadr expr)) (body (cddr expr)) (vars (map car bindings)) (vals (map cadr bindings)))
         (let loop ((vs vals) (vars vars) (r next-reg) (new-scope '()))
           (if (null? vs) (cp:codegen `(begin ,@body) (cons new-scope env) r tail? ctx)
               (let ((reg (cp:make-reg r)))
-                (cp:codegen (car vs) env (+ r 1) #f ctx) (cp:ctx-emit! ctx `(mov ,reg r0))
+                (if (and (pair? (car vs)) (eq? (car (car vs)) 'lambda))
+                    (let ((escapes? (cp:var-escapes? (car vars) `(begin ,@body))))
+                      (cp:codegen-lambda (car vs) env (+ r 1) #f ctx (not escapes?)))
+                    (cp:codegen (car vs) env (+ r 1) #f ctx))
+                (cp:ctx-emit! ctx `(mov ,reg r0))
                 (if (memq (car vars) (cp:ctx-mutated ctx)) (cp:ctx-emit! ctx `(make-cell ,reg ,reg)))
                 (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope))))))))
 
@@ -478,6 +541,6 @@
        (cp:codegen val env next-reg #f ctx) (cp:ctx-emit! ctx `(global-set! ,var r0)) (cp:ctx-emit! ctx `(global-ref r0 ,var)) (if tail? (cp:ctx-emit! ctx `(ret)))))
     ((eq? (car expr) 'if) (cp:codegen-if expr env next-reg tail? ctx))
     ((eq? (car expr) 'set!) (cp:codegen-set! expr env next-reg tail? ctx))
-    ((eq? (car expr) 'lambda) (cp:codegen-lambda expr env next-reg tail? ctx))
+    ((eq? (car expr) 'lambda) (cp:codegen-lambda expr env next-reg tail? ctx #f)) ; Default to #f if raw lambda
     ((eq? (car expr) 'let) (cp:codegen-let expr env next-reg tail? ctx))
     (else (cp:codegen-application expr env next-reg tail? ctx))))
