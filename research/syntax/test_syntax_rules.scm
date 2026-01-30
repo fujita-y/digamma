@@ -49,11 +49,6 @@
 (display "\n>>> macroexpand\n")
 
 ;; Test 1: Simple macro
-(define-syntax my-or
-  (syntax-rules ()
-    ((_ a b)
-     (let ((t a))
-       (if t t b)))))
 
 (test "Register my-or"
       '(define-syntax my-or
@@ -636,6 +631,77 @@
 (test "lambda without internal define unchanged"
       '(lambda (x) (+ x 1))
       '(lambda (x) (+ x 1)))
+
+
+;; =============================================================================
+;; lambda*
+;; =============================================================================
+(display "\n>>> lambda*\n")
+
+;; Helper to decompose dotted/improper lists into a flat list of identifiers
+;; and then call the original lambda* logic.
+(macroexpand '(define-syntax lambda*-helper
+                (syntax-rules ()
+                  ;; Case 1: Reached the end of a dotted pair (the 'rest' variable)
+                  [(_ (h . t) (id ...) body)
+                   (lambda*-helper t (id ... h) body)]
+                  ;; Case 2: The tail is an identifier (improper list end) or empty
+                  [(_ rest (id ...) (b0 b1 ...))
+                   (lambda args
+                     (let-ids args (id ... rest) b0 b1 ...))])))
+
+;; Sequential binding helper with O(N) traversal optimization
+(macroexpand '(define-syntax let-ids
+                (syntax-rules ()
+                  ;; Base case: 1 identifier (the 'rest' or last one)
+                  ;; We bind the last identifier to the remaining list.
+                  [(_ ls (last) b0 b1 ...)
+                   (let ([last ls]) b0 b1 ...)]
+                  ;; Recursive step
+                  ;; We bind the current head to id0, and effectively peel off the cdr to a temp variable 'next'.
+                  ;; 'next' is then passed to the recursive call, avoiding nested (cdr (cdr ...)) chains.
+                  [(_ ls (id0 id1 ...) b0 b1 ...)
+                   (let ([id0 (car ls)]
+                         [next (cdr ls)])
+                     (let-ids next (id1 ...) b0 b1 ...))])))
+
+;; Main macro
+(macroexpand '(define-syntax lambda*
+                (syntax-rules ()
+                  ;; Handle standard proper lists: (lambda* (x y) ...)
+                  [(_ (id ...) b0 b1 ...)
+                   (lambda (id ...) b0 b1 ...)]
+                  ;; Handle improper/dotted lists: (lambda* (x . y) ...)
+                  [(_ (h . t) b0 b1 ...)
+                   (lambda*-helper (h . t) () (b0 b1 ...))]
+                  ;; Handle single rest argument: (lambda* args ...)
+                  [(_ rest b0 b1 ...)
+                   (lambda rest b0 b1 ...)])))
+
+;; Test 1: Proper list arguments
+(test-eval "lambda* proper list (2 args)"
+           '((lambda* (x y) (list x y)) 1 2)
+           '(1 2))
+
+;; Test 2: Standard rest argument
+(test-eval "lambda* standard rest arg"
+           '((lambda* args args) 1 2 3)
+           '(1 2 3))
+
+;; Test 3: Dotted list (1 fixed, rest)
+(test-eval "lambda* dotted list (1 fixed)"
+           '((lambda* (x . y) (list x y)) 1 2 3)
+           '(1 (2 3)))
+
+;; Test 4: Dotted list (2 fixed, rest)
+(test-eval "lambda* dotted list (2 fixed)"
+           '((lambda* (x y . z) (list x y z)) 1 2 3 4)
+           '(1 2 (3 4)))
+
+;; Test 5: Dotted list exact match (rest empty)
+(test-eval "lambda* dotted list (rest empty)"
+           '((lambda* (x . y) (list x y)) 1)
+           '(1 ()))
 
 (newline)
 (newline)
