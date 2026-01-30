@@ -94,4 +94,12 @@
          (p 1 2 3 4 5 6 7 8))
       36)
 
+(test "Recursive closure (closure-self)"
+      '(let ((loop #f))
+         (set! loop (lambda (n)
+                      (let ((inner (lambda () (loop (- n 1)))))
+                        (if (= n 0) 'done (inner)))))
+         (loop 5))
+      'done)
+
 (print "All basic tests PASSED!")

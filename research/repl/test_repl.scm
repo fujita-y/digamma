@@ -424,6 +424,33 @@
          (e 10))
       #t)
 
+
+(test "nested closure capture (label-map bug)"
+      '(begin
+         (define (for-each func lst)
+           (if (not (null? lst))
+               (begin (func (car lst))
+                      (for-each func (cdr lst)))))
+         (define (map proc items)
+           (if (null? items)
+               '()
+               (cons (proc (car items))
+                     (map proc (cdr items)))))
+         (let* ((all-code '((const r0 3) (ret))) (label-map (make-hash-table 'eq?)) (final-code '()))
+           (for-each
+             (lambda (inst)
+               (if (not (eq? (car inst) 'label))
+                   (let ((resolved
+                           (map (lambda (x)
+                                  (if (and (symbol? x) (hash-table-exists? label-map x))
+                                      (hash-table-get label-map x)
+                                      x))
+                                inst)))
+                     (set! final-code (cons (list->vector resolved) final-code)))))
+             all-code)
+           final-code))
+      '(#(ret) #(const r0 3)))
+
 ;; =============================================================================
 (display "\n>>> Section 9: REPL Session Tests\n")
 ;; =============================================================================

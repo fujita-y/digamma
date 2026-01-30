@@ -41,8 +41,6 @@
     (hash-table-put! globals 'eq? eq?)
     (hash-table-put! globals 'equal? equal?)
     (hash-table-put! globals 'length length)
-    (hash-table-put! globals 'map map)
-    (hash-table-put! globals 'for-each for-each)
     (hash-table-put! globals 'assoc assoc)
     (hash-table-put! globals 'number->string number->string)
     (hash-table-put! globals 'symbol->string symbol->string)
