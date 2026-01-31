@@ -176,3 +176,14 @@ add_test(
   COMMAND $<TARGET_FILE:test_hash>
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_executable(
+  test_symbol
+  tests/test_symbol.cpp
+  ${NANOS_CORE_SOURCES})
+target_link_libraries(test_symbol ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_symbol
+  COMMAND $<TARGET_FILE:test_symbol>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+

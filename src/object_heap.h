@@ -6,7 +6,9 @@
 
 #include "core.h"
 #include "object.h"
+#include <mutex>
 #include <set>
+#include <unordered_map>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -35,6 +37,7 @@ class object_heap_t {
   void finalize(void* obj);
   void snapshot_root();
   void update_weak_reference();
+  void sweep_symbol_table();
   void delete_private(void* obj);
 #if HPDEBUG
   void consistency_check();
@@ -53,6 +56,9 @@ class object_heap_t {
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_private(size_t size);
+
+  std::mutex m_symbol_table_mutex;
+  std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {

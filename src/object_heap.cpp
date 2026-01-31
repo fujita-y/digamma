@@ -6,6 +6,8 @@
 #include "object_heap.h"
 #include "bit.h"
 
+static constexpr int symbol_table_reserve_size = 4096;
+
 inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
 {
   assert(x >= 16);  // (1 << 4)
@@ -31,6 +33,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
 
   m_trip_bytes = 0;
   m_collect_trip_bytes = init_size / 8;
+  m_symbol_table.reserve(symbol_table_reserve_size);
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });
@@ -104,6 +107,22 @@ void object_heap_t::delete_private(void* obj) {
   traits->cache->delete_object(obj);
 }
 
+void object_heap_t::sweep_symbol_table() {
+  std::lock_guard<std::mutex> lock(m_symbol_table_mutex);
+  auto it = m_symbol_table.begin();
+  while (it != m_symbol_table.end()) {
+    scm_obj_t value = it->second;
+    assert(is_symbol(value));
+    void* p = to_address(value);
+    slab_traits_t* traits = SLAB_TRAITS_OF(p);
+    if (traits->cache->state(p)) {
+      ++it;
+    } else {
+      it = m_symbol_table.erase(it);
+    }
+  }
+}
+
 void object_heap_t::shade(scm_obj_t obj) {
   if (is_cons(obj)) {
     m_concurrent_heap.shade((void*)obj);
@@ -170,9 +189,11 @@ void object_heap_t::snapshot_root() {
   for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) shade(*it);
 }
 
-void object_heap_t::update_weak_reference() {}
+void object_heap_t::update_weak_reference() { sweep_symbol_table(); }
+
+void object_heap_t::renounce(void* obj, int size, void* refcon) {}
+
 #if HPDEBUG
 void object_heap_t::consistency_check() {}
 void object_heap_t::validate_concurrent_slab(void* slab) {}
 #endif
-void object_heap_t::renounce(void* obj, int size, void* refcon) {}
