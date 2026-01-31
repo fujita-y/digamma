@@ -13,5 +13,6 @@ void hash_table_delete(scm_obj_t ht, scm_obj_t key);
 
 unsigned int string_hash(scm_obj_t obj, unsigned int bound);
 bool string_equiv(scm_obj_t obj1, scm_obj_t obj2);
+int find_hash_table_size(int nsize);
 
 #endif

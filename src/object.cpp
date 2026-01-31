@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "object.h"
+#include "hash.h"
 #include "object_heap.h"
 
 inline scm_obj_t tc6_pointer(void* x, uintptr_t tc6_num) {
@@ -118,16 +119,17 @@ scm_obj_t make_u8vector(int nsize) {
 
 scm_obj_t make_hash_table(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   scm_hashtable_rec_t* obj = (scm_hashtable_rec_t*)object_heap_t::current()->alloc_hashtable();
+  int nsize = find_hash_table_size(capacity);
   obj->tag = tc6_tag(tc6_hashtable);
   obj->lock.init();
   obj->hash = hash;
   obj->equiv = equiv;
-  size_t aux_size = sizeof(hashtable_aux_t) + sizeof(scm_obj_t) * ((capacity + capacity) - 1);
+  size_t aux_size = sizeof(hashtable_aux_t) + sizeof(scm_obj_t) * ((nsize + nsize) - 1);
   obj->aux = (hashtable_aux_t*)object_heap_t::current()->alloc_private(aux_size);
-  obj->aux->capacity = capacity;
+  obj->aux->capacity = nsize;
   obj->aux->used = 0;
   obj->aux->live = 0;
-  for (int i = 0; i < (capacity * 2); i++) obj->aux->elts[i] = scm_hash_free;
+  for (int i = 0; i < (nsize * 2); i++) obj->aux->elts[i] = scm_hash_free;
   return tc6_pointer(obj, tc6_hashtable);
 }
 

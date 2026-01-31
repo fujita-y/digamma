@@ -48,18 +48,22 @@ else()
   add_compile_definitions(DEFAULT_HEAP_LIMIT=2048)
 endif()
 
-add_executable(
-  nanos
+set(NANOS_CORE_SOURCES
   src/bit.cpp
   src/object_heap.cpp
   src/object.cpp
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
+  src/utf8.cpp
+  src/hash.cpp)
+
+add_executable(
+  nanos
+  ${NANOS_CORE_SOURCES}
   src/reader.cpp
   src/printer.cpp
-  src/nanos.cpp
-  src/utf8.cpp)
+  src/nanos.cpp)
 
 execute_process(
   COMMAND llvm-config --libs all
@@ -71,13 +75,7 @@ target_link_libraries(nanos ${llvm_libs} -pthread -ldl)
 add_executable(
   test_object
   tests/test_object.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_object ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -88,14 +86,7 @@ add_test(
 add_executable(
   test_gc
   tests/test_gc.cpp
-  src/hash.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_gc ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -107,13 +98,7 @@ add_executable(
   test_printer
   tests/test_printer.cpp
   src/printer.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_printer ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -126,13 +111,7 @@ add_executable(
   tests/test_reader.cpp
   src/reader.cpp
   src/printer.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_reader ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -145,13 +124,7 @@ add_executable(
   tests/test_r7rs.cpp
   src/reader.cpp
   src/printer.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_r7rs ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -182,13 +155,7 @@ add_executable(
   tests/test_radix.cpp
   src/reader.cpp
   src/printer.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_radix ${llvm_libs} -pthread -ldl)
 
 add_test(
@@ -199,16 +166,9 @@ add_test(
 add_executable(
   test_hash
   tests/test_hash.cpp
-  src/hash.cpp
   src/reader.cpp
   src/printer.cpp
-  src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
-  src/concurrent_heap.cpp
-  src/concurrent_pool.cpp
-  src/concurrent_slab.cpp
-  src/utf8.cpp)
+  ${NANOS_CORE_SOURCES})
 target_link_libraries(test_hash ${llvm_libs} -pthread -ldl)
 
 add_test(
