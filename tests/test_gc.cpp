@@ -1,4 +1,5 @@
 #include "../src/core.h"
+#include "../src/hash.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 
@@ -35,10 +36,14 @@ static bool test_gc_allocation(int num_loops) {
 
   // Allocate enough objects to potentially trigger GC or just verify allocation works
   for (int i = 0; i < num_loops; i++) {
+    heap.safepoint();
+    usleep(1);
     scm_obj_t obj = make_cons(make_symbol("foo"), make_list(3, make_cons(make_fixnum(1), make_fixnum(2)),
                                                             make_cons(make_symbol("bar"), make_string("baz")), make_u8vector(122)));
-    usleep(1);
-    heap.safepoint();
+    scm_obj_t hash = make_hash_table(string_hash, string_equiv, 16);
+    hash_table_set(hash, make_string("foo"), make_symbol("value"));
+    hash_table_set(hash, make_string("bar"), obj);
+    hash_table_set(hash, make_string("baz"), make_fixnum(3));
     if (!is_cons(obj)) {
       printf("\033[31m###### allocation failed at %d\033[0m\n", i);
       some_test_failed = true;

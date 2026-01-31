@@ -48,6 +48,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_strings.init(&m_concurrent_heap, clp2(sizeof(scm_string_rec_t)), true, true);
   m_vectors.init(&m_concurrent_heap, clp2(sizeof(scm_vector_rec_t)), true, true);
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
+  m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
@@ -104,6 +105,10 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::shade(scm_obj_t obj) {
+  if (is_cons(obj)) {
+    m_concurrent_heap.shade((void*)obj);
+    return;
+  }
   if (!is_heap_object(obj)) return;
   // TODO: add additional early return if TBI enabled
   m_concurrent_heap.shade(to_address(obj));
@@ -126,6 +131,14 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (traits->cache == &m_hashtables) {
+    scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
+    hashtable_aux_t* aux = rec->aux;
+    for (int i = 0; i < aux->capacity * 2; i++) {
+      shade(aux->elts[i]);
+    }
+    return;
+  }
 }
 
 void object_heap_t::finalize(void* obj) {
@@ -144,6 +157,11 @@ void object_heap_t::finalize(void* obj) {
   if (traits->cache == &m_u8vectors) {
     scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
     delete_private(rec->elts);
+    return;
+  }
+  if (traits->cache == &m_hashtables) {
+    scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
+    delete_private(rec->aux);
     return;
   }
 }

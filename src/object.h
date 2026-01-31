@@ -5,6 +5,7 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
+#include "mutex.h"
 
 #if defined(NDEBUG)
   #define USE_TBI 1
@@ -45,6 +46,7 @@ constexpr uintptr_t tc6_string = 1;
 constexpr uintptr_t tc6_long_flonum = 2;
 constexpr uintptr_t tc6_vector = 3;
 constexpr uintptr_t tc6_u8vector = 4;
+constexpr uintptr_t tc6_hashtable = 5;
 /*
 constexpr uintptr_t tc6_bignum = 5;
 constexpr uintptr_t tc6_cont = 6;
@@ -52,17 +54,16 @@ constexpr uintptr_t tc6_closure = 7;
 constexpr uintptr_t tc6_subr = 8;
 constexpr uintptr_t tc6_port = 9;
 constexpr uintptr_t tc6_values = 10;
-constexpr uintptr_t tc6_hashtable = 11;
 constexpr uintptr_t tc6_gloc = 12;
 constexpr uintptr_t tc6_tuple = 13;
-constexpr uintptr_t tc6_weakhashtable = 14;
 constexpr uintptr_t tc6_complex = 15;
 constexpr uintptr_t tc6_rational = 16;
 constexpr uintptr_t tc6_heapenv = 17;
 constexpr uintptr_t tc6_heapcont = 18;
 constexpr uintptr_t tc6_weakmapping = 19;
-constexpr uintptr_t tc6_environment = 20;
-constexpr uintptr_t tc6_socket = 21;
+constexpr uintptr_t tc6_weakhashtable = 20;
+constexpr uintptr_t tc6_environment = 21;
+constexpr uintptr_t tc6_socket = 22;
 */
 
 inline scm_obj_t singleton(uintptr_t val) {
@@ -76,15 +77,18 @@ const scm_obj_t scm_nil = singleton(4);
 const scm_obj_t scm_undef = singleton(5);
 const scm_obj_t scm_unspecified = singleton(6);
 const scm_obj_t scm_eof = singleton(7);
+const scm_obj_t scm_hash_free = singleton(8);
+const scm_obj_t scm_hash_deleted = singleton(9);
 /*
 const scm_obj_t scm_timeout = singleton(8);
 const scm_obj_t scm_shutdown = singleton(9);
-const scm_obj_t scm_hash_free = singleton(10);
-const scm_obj_t scm_hash_deleted = singleton(11);
 const scm_obj_t scm_proc_apply = singleton(12);
 const scm_obj_t scm_proc_callcc = singleton(13);
 const scm_obj_t scm_proc_apply_values = singleton(14);
 */
+
+typedef unsigned int (*hash_proc_t)(scm_obj_t obj, unsigned int bound);
+typedef bool (*equiv_proc_t)(scm_obj_t obj1, scm_obj_t obj2);
 
 struct scm_cons_rec_t {
   scm_obj_t car;
@@ -118,6 +122,22 @@ struct scm_u8vector_rec_t {
   int nsize;
 };
 
+struct hashtable_aux_t {
+  int capacity;
+  int used;
+  int live;
+  scm_obj_t elts[1];  // [ key ... val ... ]
+};
+
+struct scm_hashtable_rec_t {
+  scm_tc6_t tag;
+  mutex_t lock;
+  hash_proc_t hash;
+  equiv_proc_t equiv;
+  hashtable_aux_t* aux;
+};
+
+inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
 inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
@@ -136,7 +156,6 @@ inline void* to_address(scm_obj_t x) {
   return (void*)(x - 2);
 }
 
-inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_fixnum(scm_obj_t x) { return (x & 0x01) == 0x01; }
 inline bool is_char(scm_obj_t x) { return (x & 0x17) == 0x16; }
 inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
@@ -155,6 +174,7 @@ scm_obj_t make_symbol(const char* name);
 scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
+scm_obj_t make_hash_table(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

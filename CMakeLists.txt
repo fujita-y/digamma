@@ -88,6 +88,7 @@ add_test(
 add_executable(
   test_gc
   tests/test_gc.cpp
+  src/hash.cpp
   src/bit.cpp
   src/object_heap.cpp
   src/object.cpp
@@ -194,3 +195,24 @@ add_test(
   NAME test_radix
   COMMAND $<TARGET_FILE:test_radix>
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(
+  test_hash
+  tests/test_hash.cpp
+  src/hash.cpp
+  src/reader.cpp
+  src/printer.cpp
+  src/bit.cpp
+  src/object_heap.cpp
+  src/object.cpp
+  src/concurrent_heap.cpp
+  src/concurrent_pool.cpp
+  src/concurrent_slab.cpp
+  src/utf8.cpp)
+target_link_libraries(test_hash ${llvm_libs} -pthread -ldl)
+
+add_test(
+  NAME test_hash
+  COMMAND $<TARGET_FILE:test_hash>
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
