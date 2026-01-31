@@ -6,9 +6,10 @@
 #include "hash.h"
 #include "object_heap.h"
 
-static inline int hash_busy_threshold(int nsize) { return nsize - (nsize >> 3); }  // 87.5%
-
-static inline int hash_dense_threshold(int nsize) { return nsize - (nsize >> 2); }  // 75%
+static inline int hash_busy_threshold(int nsize) { return nsize - (nsize >> 3); }         // 87.5%
+static inline int hash_dense_threshold(int nsize) { return nsize - (nsize >> 2); }        // 75%
+static inline int hash_sparse_threshold(int nsize) { return nsize >> 2; }                 // 25%
+static inline int hash_renew_size(int live) { return live + (live >> 1) + (live >> 2); }  // 175%
 
 static constexpr int primes[] = {7,         13,        29,        59,        113,        223,        431,       821,      1567,     2999,
                                  5701,      10837,     20593,     39133,     74353,      141277,     268439,    510047,   969097,   1841291,
@@ -82,7 +83,9 @@ found:
   aux->elts[index + nsize] = value;
   if (aux->used < hash_busy_threshold(nsize)) return 0;
   if (aux->live < hash_dense_threshold(nsize)) {
-    if (aux->live < (aux->used / 4)) return find_table_size(aux->live * 2);
+    if (aux->live < hash_sparse_threshold(aux->used)) {
+      return find_table_size(hash_renew_size(aux->live));
+    }
     return nsize;
   }
   return find_table_size(nsize);
@@ -122,6 +125,7 @@ static void rehash(scm_hashtable_rec_t* ht, int nsize) {
 }
 
 unsigned int string_hash(scm_obj_t obj, unsigned int bound) {
+  assert(is_string(obj));
   unsigned int hash = 5381;
   const uint8_t* s = string_name(obj);
   int c;
@@ -129,9 +133,14 @@ unsigned int string_hash(scm_obj_t obj, unsigned int bound) {
   return hash % bound;
 }
 
-bool string_equiv(scm_obj_t obj1, scm_obj_t obj2) { return strcmp((const char*)string_name(obj1), (const char*)string_name(obj2)) == 0; }
+bool string_equiv(scm_obj_t obj1, scm_obj_t obj2) {
+  assert(is_string(obj1));
+  assert(is_string(obj2));
+  return strcmp((const char*)string_name(obj1), (const char*)string_name(obj2)) == 0;
+}
 
 scm_obj_t hash_table_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) {
+  assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scm_obj_t value = get(ht, key);
   if (value != scm_undef) return value;
@@ -139,6 +148,7 @@ scm_obj_t hash_table_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) 
 }
 
 void hash_table_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
+  assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scoped_lock lock(ht->lock);
   object_heap_t::current()->write_barrier(key);
@@ -148,6 +158,7 @@ void hash_table_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
 }
 
 void hash_table_delete(scm_obj_t obj, scm_obj_t key) {
+  assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scoped_lock lock(ht->lock);
   remove(ht, key);

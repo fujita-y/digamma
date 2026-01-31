@@ -147,7 +147,7 @@ inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #else
   if (!is_heap_object(x)) return false;
   scm_tc6_t tag = *(scm_tc6_t*)(x - 2);
-  return ((tag >> 8) & 0x3f) == tc6;
+  return (tag & 0x3f00) == (tc6 << 8);
 #endif
 }
 
@@ -164,6 +164,7 @@ inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
 inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
 inline bool is_u8vector(scm_obj_t x) { return is_tc6(x, tc6_u8vector); }
+inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 

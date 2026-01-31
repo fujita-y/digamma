@@ -166,7 +166,10 @@ void object_heap_t::finalize(void* obj) {
   }
 }
 
-void object_heap_t::snapshot_root() {}
+void object_heap_t::snapshot_root() {
+  for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) shade(*it);
+}
+
 void object_heap_t::update_weak_reference() {}
 #if HPDEBUG
 void object_heap_t::consistency_check() {}

@@ -6,6 +6,7 @@
 
 #include "core.h"
 #include "object.h"
+#include <set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -23,7 +24,9 @@ class object_heap_t {
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
   concurrent_slab_t m_privates[8];  // 16-32-64-128-256-512-1024-2048
+
   uint64_t m_trip_bytes;
+  std::set<scm_obj_t> m_root_set;
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
@@ -58,6 +61,9 @@ class object_heap_t {
     }
     if (is_heap_object(obj)) m_concurrent_heap.write_barrier(to_address(obj));
   }
+
+  void add_root(scm_obj_t obj) { m_root_set.insert(obj); }
+  void remove_root(scm_obj_t obj) { m_root_set.erase(obj); }
 
   uint64_t m_collect_trip_bytes;
 
