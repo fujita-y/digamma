@@ -230,6 +230,49 @@ void test_reader() {
     std::cout << "String \"\\x1f600;\" (grinning face) passed" << std::endl;
     heap.destroy();
   }
+
+  // Test #i prefix (inexact)
+  {
+    object_heap_t heap;
+    heap.init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("#i42");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for #i42: %s", reader.get_error_message().c_str());
+    assert(is_short_flonum(obj) || is_long_flonum(obj));
+    assert(flonum(obj) == 42.0);
+    std::cout << "Inexact #i42 passed" << std::endl;
+    heap.destroy();
+  }
+
+  {
+    object_heap_t heap;
+    heap.init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("#i#x1A");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for #i#x1A: %s", reader.get_error_message().c_str());
+    assert(is_short_flonum(obj) || is_long_flonum(obj));
+    assert(flonum(obj) == 26.0);
+    std::cout << "Inexact #i#x1A passed" << std::endl;
+    heap.destroy();
+  }
+
+  {
+    object_heap_t heap;
+    heap.init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("#x#i10");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for #x#i10: %s", reader.get_error_message().c_str());
+    assert(is_short_flonum(obj) || is_long_flonum(obj));
+    assert(flonum(obj) == 16.0);
+    std::cout << "Inexact #x#i10 passed" << std::endl;
+    heap.destroy();
+  }
 }
 
 void test_reader_errors() {

@@ -421,6 +421,7 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
   int radix = 10;
   size_t idx = 0;
   bool has_radix = false;
+  bool inexact = false;
 
   // Check for prefixes
   while (idx < buf.length() && buf[idx] == '#') {
@@ -465,12 +466,10 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
       has_radix = true;
     } else if (p == 'e') {
       err = true;
-      error_message = "radix prefix #e not supported";
+      error_message = "exactness prefix #e not supported";
       return scm_undef;
     } else if (p == 'i') {
-      err = true;
-      error_message = "radix prefix #i not supported";
-      return scm_undef;
+      inexact = true;
     } else {
       err = true;
       error_message = "invalid lexical syntax";
@@ -505,7 +504,10 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
     } else {
       // parse as int
       long long l = std::stoll(num_str, &processed, radix);
-      if (processed == num_str.length()) return make_fixnum(l);
+      if (processed == num_str.length()) {
+        if (inexact) return make_flonum((double)l);
+        return make_fixnum(l);
+      }
     }
   } catch (...) {
     err = true;

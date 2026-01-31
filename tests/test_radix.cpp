@@ -86,8 +86,7 @@ void test_exactness_error() {
     heap.destroy();
   };
 
-  check_error("#e10", "radix prefix #e not supported");
-  check_error("#i10", "radix prefix #i not supported");
+  check_error("#e10", "exactness prefix #e not supported");
 }
 
 int main() {
