@@ -11,9 +11,10 @@
 ;;   (r7rs:import import-set ...)               - Import bindings
 ;;
 ;; Supported declarations in define-library:
-;;   (export id ...)        - Export identifiers
-;;   (import import-set...) - Import from other libraries
-;;   (begin form ...)       - Library body
+;;   (export id ...)                         - Export identifiers
+;;   (export (rename internal external) ...) - Export with renaming
+;;   (import import-set...)                  - Import from other libraries
+;;   (begin form ...)                        - Library body
 ;;
 ;; Supported import modifiers:
 ;;   (only import-set id ...)         - Keep only specified identifiers
@@ -26,21 +27,22 @@
 ;;=============================================================================
 
 ;; Registry mapping library names to records: ((name . record) ...)
-;; Each record is (exports . bindings) where:
-;;   exports:  list of exported identifier symbols
-;;   bindings: alist of (identifier . value) pairs
+;; Each record is ((exports . rename-map) . bindings) where:
+;;   exports:     list of exported identifier symbols (external names)
+;;   rename-map:  alist of (internal-name . external-name) for renamed exports
+;;   bindings:    alist of (identifier . value) pairs
 (define r7rs:*libraries* '())
 
 ;; Temporary variable for passing values through eval
 (define r7rs:*temp-value* #f)
 
 ;; Register a library in the global registry
-(define (r7rs:register-library! name exports bindings)
+(define (r7rs:register-library! name exports rename-map bindings)
   (set! r7rs:*libraries* 
-        (cons (cons name (cons exports bindings)) 
+        (cons (cons name (cons (cons exports rename-map) bindings)) 
               r7rs:*libraries*)))
 
-;; Lookup a library by name, returns (exports . bindings) or #f
+;; Lookup a library by name, returns ((exports . rename-map) . bindings) or #f
 (define (r7rs:lookup-library name)
   (let ((entry (assoc name r7rs:*libraries*)))
     (and entry (cdr entry))))
@@ -64,6 +66,24 @@
 (define (r7rs:scan-exports decls) (r7rs:scan-decls 'export decls))
 (define (r7rs:scan-imports decls) (r7rs:scan-decls 'import decls))
 (define (r7rs:scan-begins decls)  (r7rs:scan-decls 'begin decls))
+
+;; Process export specifications into (exports . rename-map)
+;; Export specs can be: identifier or (rename internal-name external-name)
+;; Returns (exported-names . rename-alist)
+(define (r7rs:process-export-specs specs)
+  (let loop ((specs specs) (exports '()) (renames '()))
+    (if (null? specs)
+        (cons (reverse exports) (reverse renames))
+        (let ((spec (car specs)))
+          (if (and (pair? spec) (eq? (car spec) 'rename))
+              ;; (rename internal external)
+              (let ((internal (cadr spec))
+                    (external (caddr spec)))
+                (loop (cdr specs) 
+                      (cons external exports)
+                      (cons (cons internal external) renames)))
+              ;; Plain identifier
+              (loop (cdr specs) (cons spec exports) renames))))))
 
 ;;=============================================================================
 ;; 3. Import Set Processing
@@ -124,9 +144,19 @@
          (record (r7rs:lookup-library lib-name)))
     (unless record
       (error "Library not found" lib-name))
-    (let* ((exports (car record))
+    (let* ((export-info (car record))
+           (exports (car export-info))
+           (rename-map (cdr export-info))
            (bindings (cdr record))
-           (exported (filter (lambda (b) (memq (car b) exports)) bindings)))
+           ;; Apply export renames: change binding keys from internal to external names
+           (renamed-bindings (map (lambda (b)
+                                    (let ((rename (assq (car b) rename-map)))
+                                      (if rename
+                                          (cons (cdr rename) (cdr b))
+                                          b)))
+                                  bindings))
+           ;; Filter by exported names (using external names)
+           (exported (filter (lambda (b) (memq (car b) exports)) renamed-bindings)))
       (r7rs:apply-import-spec import-set exported))))
 
 ;;=============================================================================
@@ -190,13 +220,16 @@
 
 ;; Runtime helper: process declarations and register the library
 (define (r7rs:define-library-helper lib-name decls)
-  (let* ((exports (r7rs:scan-exports decls))
+  (let* ((export-specs (r7rs:scan-exports decls))
+         (export-info (r7rs:process-export-specs export-specs))
+         (exports (car export-info))
+         (rename-map (cdr export-info))
          (imports (r7rs:scan-imports decls))
          (body-forms (r7rs:scan-begins decls))
          (imported-bindings (apply append (map r7rs:process-import-set imports)))
          (result-bindings (r7rs:eval-library-body imported-bindings body-forms)))
-    ;; Register the library with its exports and all defined bindings
-    (r7rs:register-library! lib-name exports result-bindings)
+    ;; Register the library with its exports, rename map, and all defined bindings
+    (r7rs:register-library! lib-name exports rename-map result-bindings)
     'defined))
 
 ;;=============================================================================
