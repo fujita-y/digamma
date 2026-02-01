@@ -399,9 +399,156 @@
 
 (macroexpand '(import-module (struct-user)))
 
-(test-eval "Use macro generated definition"
+(test-eval "Use imported generated macro 1" 
            '(point? 8)
            #f)
+
+(test-eval "Use imported generated macro 2" 
+           '(make-point 3 4)
+           '(point 3 4))
+
+;; =============================================================================
+;; Section 8: Additional R7RS Use Cases
+;; =============================================================================
+(display "\n>>> Section 8: Additional R7RS Use Cases\n")
+
+;; Use Case 8.1: Set Implementation
+;; Uses a list to store unique elements.
+(test "Define set library"
+      '(define-module (data set)
+         (export make-set set-add set-member? set-union)
+         (begin
+           (define (make-set) '())
+           (define (set-member? s x)
+             (if (memq x s) #t #f))
+           (define (set-add s x)
+             (if (set-member? s x) s (cons x s)))
+           (define (set-union s1 s2)
+             (if (null? s1)
+                 s2
+                 (set-union (cdr s1) (set-add s2 (car s1)))))))
+      ''defined)
+
+(macroexpand '(import-module (data set)))
+
+(test-eval "Set usage"
+           '(let* ((s1 (set-add (set-add (make-set) 1) 2))
+                  (s2 (set-add (make-set) 3))
+                  (s3 (set-union s1 s2)))
+              (list (set-member? s3 1)
+                    (set-member? s3 2)
+                    (set-member? s3 3)
+                    (set-member? s3 4)))
+           '(#t #t #t #f))
+
+;; Use Case 8.2: Grid System
+;; Uses a 1D vector to simulate a 2D grid.
+(test "Define grid library"
+      '(define-module (data grid)
+         (export make-grid grid-ref grid-set! grid-rows grid-cols)
+         (begin
+           (define (make-grid rows cols init)
+             (vector rows cols (make-vector (* rows cols) init)))
+           (define (grid-rows g) (vector-ref g 0))
+           (define (grid-cols g) (vector-ref g 1))
+           (define (grid-ref g r c)
+             (let ((data (vector-ref g 2))
+                   (cols (grid-cols g)))
+               (vector-ref data (+ (* r cols) c))))
+           (define (grid-set! g r c val)
+             (let ((data (vector-ref g 2))
+                   (cols (grid-cols g)))
+               (vector-set! data (+ (* r cols) c) val)))))
+      ''defined)
+
+(macroexpand '(import-module (data grid)))
+
+(test-eval "Grid usage"
+           '(let ((g (make-grid 3 3 0)))
+              (grid-set! g 1 1 5)
+              (list (grid-rows g) (grid-cols g) (grid-ref g 1 1) (grid-ref g 0 0)))
+           '(3 3 5 0))
+
+;; Use Case 8.3: Logger System
+;; Uses internal state (closure) to manage logs.
+(test "Define logger library"
+      '(define-module (system logger)
+         (export log-msg get-log clear-log)
+         (begin
+           (define logs '())
+           (define (log-msg msg)
+             (set! logs (cons msg logs)))
+           (define (get-log)
+             (reverse logs))
+           (define (clear-log)
+             (set! logs '()))))
+      ''defined)
+
+(macroexpand '(import-module (system logger)))
+
+(test-eval "Logger usage"
+           '(begin
+              (clear-log)
+              (log-msg "Error!")
+              (log-msg "Info")
+              (get-log))
+           '("Error!" "Info"))
+
+;; =============================================================================
+;; Section 9: Advanced Macro Tests
+;; =============================================================================
+(display "\n>>> Section 9: Advanced Macro Tests\n")
+
+;; Use Case 9.1: Macro Composition (Getter/Setter Generator)
+;; Defines a macro that generates other defines and uses an imported macro/function.
+(test "Define macro tools"
+      '(define-module (macro tools)
+         (export define-getter-setter)
+         (begin
+           (define-syntax define-getter-setter
+             (syntax-rules ()
+               ((_ container index getter setter)
+                (begin
+                  (define (getter) (vector-ref container index))
+                  (define (setter val) (vector-set! container index val))))))))
+      ''defined)
+
+(macroexpand '(import-module (macro tools)))
+
+(test-eval "Macro composition usage"
+           '(begin
+              (define my-vec (vector 10 20))
+              (define-getter-setter my-vec 0 get-first set-first!)
+              (set-first! 100)
+              (list (get-first) (vector-ref my-vec 0)))
+           '(100 100))
+
+;; Use Case 9.2: Hygiene Test
+;; Ensures macros don't capture local variables.
+(test "Define hygiene test macro"
+      '(define-module (macro hygiene)
+         (export check-hygiene)
+         (begin
+           (define internal-val 42)
+           (define-syntax check-hygiene
+             (syntax-rules ()
+               ((_ expr)
+                (let ((internal-val 99))
+                  (list internal-val expr))))))) ;; Should return (99 <expr>)
+      ''defined)
+
+(macroexpand '(import-module (macro hygiene)))
+
+(test-eval "Hygiene usage 1"
+           '(let ((internal-val 0))
+              (check-hygiene internal-val))
+           '(99 0))
+
+(test-eval "Hygiene usage 2"
+           '(begin 
+              (define internal-val -1)
+              (check-hygiene internal-val))
+           '(99 -1))
 
 ;; =============================================================================
 ;; Summary

@@ -143,6 +143,11 @@
 (define (mc:rename-symbol sym suffix)
   (string->symbol (string-append (symbol->string sym) "." suffix)))
 
+;; TODO: Optimization - Global environments (mc:*rename-env*, mc:*macro-env*, mc:*modules*)
+;; currently use association lists, which have O(N) lookup time.
+;; For large projects, these should be converted to hash tables if the host Scheme supports them.
+
+
 ;; Unwrap a lazy environment reference.
 ;; letrec-syntax uses ('promise #f) as a placeholder that gets filled in later.
 ;; This unwraps the promise to get the actual environment or returns '() if not yet set.
@@ -156,22 +161,23 @@
 ;; 3. Global macro environment
 ;; Returns the transformer procedure or #f if not found.
 (define (mc:lookup-macro name env)
-  (let ((local-pair (assq name (mc:unwrap-env env))))
-    (if local-pair
-        ;; Found in local macro environment
-        (cdr local-pair)
-        (let ((resolved (mc:resolve-identifier name)))
-          (if (pair? resolved)
-              ;; Name was renamed - look up in the context where it was introduced
-              (let ((context (car resolved)) (original (cdr resolved)))
-                (mc:lookup-macro original (mc:unwrap-env (car context))))
-              ;; Try resolved name in current env, then fall back to global
-              (let ((local-pair-resolved (assq resolved (mc:unwrap-env env))))
-                (if local-pair-resolved
-                    (cdr local-pair-resolved)
-                    ;; Look up in global macro environment
-                    (let ((global-pair (assq resolved mc:*macro-env*)))
-                      (and global-pair (cdr global-pair))))))))))
+  (let ((env (mc:unwrap-env env)))
+    (let ((local-pair (assq name env)))
+      (if local-pair
+          ;; Found in local macro environment
+          (cdr local-pair)
+          (let ((resolved (mc:resolve-identifier name)))
+            (if (pair? resolved)
+                ;; Name was renamed - look up in the context where it was introduced
+                (let ((context (car resolved)) (original (cdr resolved)))
+                  (mc:lookup-macro original (mc:unwrap-env (car context))))
+                ;; Try resolved name in current env, then fall back to global
+                (let ((local-pair-resolved (assq resolved env)))
+                  (if local-pair-resolved
+                      (cdr local-pair-resolved)
+                      ;; Look up in global macro environment
+                      (let ((global-pair (assq resolved mc:*macro-env*)))
+                        (and global-pair (cdr global-pair)))))))))))
 
 ;; Check if a symbol refers to a specific core form.
 ;; A core form is one that is not shadowed by a local binding.
@@ -181,17 +187,7 @@
 ;; shadowed-env: list of identifiers that shadow core forms in current scope
 ;; Returns #t if sym refers to the core form 'name'.
 (define (mc:core-form? sym name shadowed-env)
-  (if (not (symbol? sym))
-      #f
-      (let ((resolved (mc:resolve-identifier sym)))
-        (let ((res (if (pair? resolved)
-                       ;; Renamed - check in original context
-                       (let ((context (car resolved)) (original (cdr resolved)))
-                         (mc:core-form? original name (mc:unwrap-env (cadr context))))
-                       ;; Not renamed - check if it's the core form and not shadowed
-                       (and (not (memq resolved (mc:unwrap-env shadowed-env))) (eq? resolved name)))))
-          res))))
-
+  (eq? (mc:resolve-core-form sym shadowed-env) name))
 
 ;;=============================================================================
 ;; SECTION 2.5: Module System Helpers
@@ -220,22 +216,6 @@
 (define (mc:lookup-module name)
   (let ((entry (assoc name mc:*modules*)))
     (and entry (cdr entry))))
-
-;; Generic scanner: extract and flatten contents of declarations by keyword
-;; Returns concatenated (cdr ...) of all declarations matching the keyword
-(define (mc:scan-decls keyword decls)
-  (let loop ((decls decls) (result '()))
-    (cond
-      ((null? decls) (reverse result))
-      ((and (pair? (car decls)) (eq? (caar decls) keyword))
-       (loop (cdr decls) (append (reverse (cdar decls)) result)))
-      (else
-       (loop (cdr decls) result)))))
-
-;; Convenience wrappers for specific declaration types
-(define (mc:scan-exports decls) (mc:scan-decls 'export decls))
-(define (mc:scan-imports decls) (mc:scan-decls 'import decls))
-(define (mc:scan-begins decls)  (mc:scan-decls 'begin decls))
 
 ;; Process export specifications into (exports . rename-map)
 ;; Export specs can be: identifier or (rename internal-name external-name)
@@ -410,31 +390,30 @@
 
       (append runtime-bindings macro-bindings))))
 
-
-
 ;; Expand define-module: define a module and register it in the module registry.
 ;; (define-module (name ...) decl ...)
 ;; Declarations can be export, import, or begin forms.
 (define (mc:expand-define-module expr m-env s-env r-env)
   (let* ((mod-name (cadr expr))
-         (decls (cddr expr))
-         ;; Process declarations
-         (export-specs (mc:scan-exports decls))
-         (export-info (mc:process-export-specs export-specs))
-         (exports (car export-info))
-         (rename-map (cdr export-info))
-         (imports (mc:scan-imports decls))
-         (body-forms (mc:scan-begins decls))
-         ;; Process imports
-         (imported-bindings (apply append (map mc:process-import-set imports)))
-         ;; Evaluate library body. Pass environment for macro parsing.
-         (result-bindings (mc:eval-module-body imported-bindings body-forms m-env s-env r-env mod-name)))
-    ;; Register the module
-    (mc:register-module! mod-name exports rename-map (append result-bindings imported-bindings))
-    ''defined))
-
-
-
+         (decls (cddr expr)))
+    (let loop ((decls decls) (exports '()) (imports '()) (body-forms '()))
+      (if (null? decls)
+          (let* ((export-info (mc:process-export-specs (reverse exports)))
+                 (export-names (car export-info))
+                 (rename-map (cdr export-info))
+                 (imported-bindings (apply append (map mc:process-import-set (reverse imports))))
+                 (result-bindings (mc:eval-module-body imported-bindings (reverse body-forms) m-env s-env r-env mod-name)))
+            (mc:register-module! mod-name export-names rename-map (append result-bindings imported-bindings))
+            ''defined)
+          (let ((decl (car decls)))
+            (cond ((and (pair? decl) (eq? (car decl) 'export))
+                   (loop (cdr decls) (append (reverse (cdr decl)) exports) imports body-forms))
+                  ((and (pair? decl) (eq? (car decl) 'import))
+                   (loop (cdr decls) exports (append (reverse (cdr decl)) imports) body-forms))
+                  ((and (pair? decl) (eq? (car decl) 'begin))
+                   (loop (cdr decls) exports imports (append (reverse (cdr decl)) body-forms)))
+                  (else
+                   (loop (cdr decls) exports imports (cons decl body-forms)))))))))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers
@@ -573,6 +552,23 @@
         ((pair? old-params) (cons (car new-names) (mc:reconstruct-params (cdr old-params) (cdr new-names))))
         (else '())))
 
+;; Separate internal definitions from the body expressions.
+;; Returns a pair: (list-of-binding-pairs . remaining-body-expressions).
+;; Splices 'begin' forms that appear at the definition position.
+;; Stops at the first non-definition form.
+(define (mc:split-internal-defines body shadowed-env)
+  (let loop ((body body) (defs '()))
+    (if (null? body)
+        (cons (reverse defs) '())
+        (let ((first (car body)))
+          (cond
+            ((and (pair? first) (mc:core-form? (car first) 'define shadowed-env))
+             (loop (cdr body) (cons (mc:internal-define->binding first) defs)))
+            ((and (pair? first) (mc:core-form? (car first) 'begin shadowed-env))
+             (loop (append (cdr first) (cdr body)) defs))
+            (else
+             (cons (reverse defs) body)))))))
+
 ;; Convert an internal define form to a binding pair (name value).
 ;; Handles both forms:
 ;; - (define (f x) body) => (f (lambda (x) body))
@@ -585,39 +581,7 @@
         ;; Variable definition: (define x expr)
         (list pattern (caddr expr)))))
 
-;; Extract internal define forms from the beginning of a body.
-;; Returns a list of binding pairs ((name value) ...).
-;; Also handles spliced begins: (begin (define...) (define...))
-;; Stops when encountering a non-definition form.
-(define (mc:extract-internal-defines body shadowed-env)
-  (if (null? body)
-      '()
-      (let ((first (car body)))
-        (cond
-          ;; Internal define - convert to binding and continue
-          ((and (pair? first) (mc:core-form? (car first) 'define shadowed-env))
-           (cons (mc:internal-define->binding first) (mc:extract-internal-defines (cdr body) shadowed-env)))
-          ;; Begin may contain spliced definitions - recurse into it
-          ((and (pair? first) (mc:core-form? (car first) 'begin shadowed-env))
-           (append (mc:extract-internal-defines (cdr first) shadowed-env) (mc:extract-internal-defines (cdr body) shadowed-env)))
-          ;; Non-definition - stop extracting
-          (else '())))))
 
-;; Skip over internal define forms at the beginning of a body.
-;; Returns the remaining body expressions after all definitions.
-;; Also handles spliced begins.
-(define (mc:skip-internal-defines body shadowed-env)
-  (if (null? body)
-      '()
-      (let ((first (car body)))
-        (cond
-          ;; Skip internal define
-          ((and (pair? first) (mc:core-form? (car first) 'define shadowed-env)) (mc:skip-internal-defines (cdr body) shadowed-env))
-          ;; Skip defines inside begin
-          ((and (pair? first) (mc:core-form? (car first) 'begin shadowed-env))
-           (append (mc:skip-internal-defines (cdr first) shadowed-env) (mc:skip-internal-defines (cdr body) shadowed-env)))
-          ;; Return remaining body
-          (else body)))))
 
 ;;=============================================================================
 ;; SECTION 6: Expansion Handlers
@@ -651,13 +615,14 @@
          ;; Reconstruct formals with new names, preserving structure
          (new-params (mc:reconstruct-params params new-p-names))
          ;; Handle internal definitions (R6RS/R7RS)
-         (i-defs (mc:extract-internal-defines body new-s-env))
-         (r-body (mc:skip-internal-defines body new-s-env)))
+         (split (mc:split-internal-defines body new-s-env))
+         (i-defs (car split))
+         (r-body (cdr split)))
     ;; Register all renamed parameters for hygiene resolution
     (for-each (lambda (p np) (mc:register-renamed! np p (list m-env new-s-env new-r-env))) p-names new-p-names)
     (if (null? i-defs)
         ;; No internal defines - just expand body
-        `(lambda ,new-params ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env new-s-env new-r-env)) body)))
+        `(lambda ,new-params ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env new-s-env new-r-env)) r-body)))
         ;; Has internal defines - wrap remaining body in letrec*
         `(lambda ,new-params ,(mc:expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env)))))
 
@@ -684,13 +649,14 @@
              (new-s-env (append vars s-env))
              (new-bindings (map list new-vars expanded-vals))
              ;; Handle internal definitions in body
-             (i-defs (mc:extract-internal-defines body new-s-env))
-             (r-body (mc:skip-internal-defines body new-s-env)))
+             (split (mc:split-internal-defines body new-s-env))
+             (i-defs (car split))
+             (r-body (cdr split)))
         ;; Register renamed variables for hygiene
         (for-each (lambda (v nv) (mc:register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
         (if (null? i-defs)
             ;; No internal defines - expand body directly
-            `(let ,new-bindings ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env new-s-env new-r-env)) body)))
+            `(let ,new-bindings ,@(flatten-begins (map-improper (lambda (x) (mc:expand x m-env new-s-env new-r-env)) r-body)))
             ;; Has internal defines - wrap in letrec*
             `(let ,new-bindings ,(mc:expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env))))))
 
@@ -701,8 +667,9 @@
 (define (mc:expand-letrec-star expr m-env s-env r-env)
   (let* ((bindings (cadr expr)) (body (cddr expr))
          ;; Extract and merge internal defines with explicit bindings
-         (i-defs (mc:extract-internal-defines body s-env))
-         (r-body (mc:skip-internal-defines body s-env))
+         (split (mc:split-internal-defines body s-env))
+         (i-defs (car split))
+         (r-body (cdr split))
          (all-bindings (append bindings i-defs))
          (vars (map car all-bindings)) (vals (map cadr all-bindings))
          ;; Generate fresh names - all visible in all init exprs
@@ -1053,17 +1020,15 @@
 ;; Suffixes have the form ".N" where N is a number.
 ;; Recursively strips multiple suffixes (e.g., "x.1.2" -> "x").
 (define (mc:strip-suffix str)
-  (let loop ((chars (reverse (string->list str))) (suffix '()))
-    (if (null? chars)
-        str
-        (if (char=? (car chars) #\.)
-            ;; Found a dot - check if suffix is all numeric
-            (if (and (not (null? suffix)) (every? char-numeric? suffix))
-                ;; Valid hygiene suffix - strip it and recurse
-                (mc:strip-suffix (list->string (reverse (cdr chars))))
-                ;; Not a hygiene suffix - return original
-                str)
-            (loop (cdr chars) (cons (car chars) suffix))))))
+  (let ((len (string-length str)))
+    (let loop ((i (- len 1)))
+      (if (>= i 0)
+          (if (char=? (string-ref str i) #\.)
+              (if (and (< i (- len 1)) (every? char-numeric? (string->list (substring str (+ i 1) len))))
+                  (mc:strip-suffix (substring str 0 i))
+                  str)
+              (loop (- i 1)))
+          str))))
 
 ;; Strip all hygiene rename suffixes from an expression.
 ;; Recursively processes symbols, pairs, and vectors.
