@@ -36,14 +36,18 @@
     (else (func lst))))
 
 (define (flatten-begins exprs)
-  (let loop ((exprs exprs))
-    (cond ((null? exprs) '())
-          ((pair? exprs)
-           (let ((first (car exprs)))
-             (if (and (pair? first) (eq? (car first) 'begin))
-                 (append (loop (cdr first)) (loop (cdr exprs)))
-                 (cons first (loop (cdr exprs))))))
-          (else (list exprs)))))
+  (reverse
+   (let loop ((input exprs) (acc '()))
+     (cond ((null? input) acc)
+           ((pair? input)
+            (let ((head (car input)))
+              (if (and (pair? head) (eq? (car head) 'begin))
+                  ;; Found (begin ...), push its content onto input stream
+                  (loop (append (cdr head) (cdr input)) acc)
+                  ;; Found normal item, push to acc
+                  (loop (cdr input) (cons head acc)))))
+           ;; Improper list end or single non-list item
+           (else (cons input acc))))))
 
 (define (remove-from-list lst remove-items)
   (let loop ((lst lst) (acc '()))

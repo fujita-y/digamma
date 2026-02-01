@@ -1018,15 +1018,20 @@
 
 ;; Strip the hygiene suffix from a symbol name.
 ;; Suffixes have the form ".N" where N is a number.
-;; Recursively strips multiple suffixes (e.g., "x.1.2" -> "x").
+;; Iteratively strips multiple nested suffixes (e.g., "x.1.2" -> "x") without unnecessary allocation.
 (define (mc:strip-suffix str)
   (let ((len (string-length str)))
     (let loop ((i (- len 1)))
       (if (>= i 0)
           (if (char=? (string-ref str i) #\.)
-              (if (and (< i (- len 1)) (every? char-numeric? (string->list (substring str (+ i 1) len))))
-                  (mc:strip-suffix (substring str 0 i))
-                  str)
+              (if (< i (- len 1)) ;; optimize: must have at least one numeric char after dot
+                  (let check-numeric ((j (+ i 1)))
+                    (if (< j len)
+                        (if (char-numeric? (string-ref str j))
+                            (check-numeric (+ j 1))
+                            str) ;; Found non-numeric, not a suffix
+                        (mc:strip-suffix (substring str 0 i)))) ;; All numeric, strip and recurse
+                  str) ;; Dot at the end (like in "..."), not a suffix
               (loop (- i 1)))
           str))))
 
