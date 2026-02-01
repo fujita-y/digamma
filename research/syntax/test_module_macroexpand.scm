@@ -292,6 +292,80 @@
            '(12 8))
 
 ;; =============================================================================
+;; Section 7: Macro Export and Import
+;; =============================================================================
+(display "\n>>> Section 7: Macro Export and Import\n")
+
+(test "Define module exporting a macro"
+      '(define-module (test macro-export)
+         (export when-test)
+         (begin
+           (define-syntax when-test
+             (syntax-rules ()
+               ((_ test expr ...)
+                (if test
+                    (begin expr ...)
+                    #f))))))
+      ''defined)
+
+(macroexpand '(import-module (test macro-export)))
+
+(test-eval "Use imported macro (true case)"
+           '(let ((x 0))
+              (when-test #t (set! x 1))
+              x)
+           1)
+
+(test-eval "Use imported macro (false case)"
+           '(let ((x 0))
+              (when-test #f (set! x 1))
+              x)
+           0)
+
+;; =============================================================================
+
+(test "Define module exporting syntax-case macro"
+      '(define-module (test syntax-case-export)
+         (export my-or)
+         (begin
+           (define-syntax my-or
+             (lambda (x)
+               (syntax-case x ()
+                 ((_) (syntax #f))
+                 ((_ e) (syntax e))
+                 ((_ e1 e2 e3 ...)
+                  (syntax (let ((t e1))
+                            (if t t (my-or e2 e3 ...))))))))))
+      ''defined)
+
+(macroexpand '(import-module (test syntax-case-export)))
+
+(test-eval "Use imported syntax-case macro"
+           '(my-or #f 1 2)
+           1)
+
+;; =============================================================================
+
+(test "Define module with macro using helper"
+      '(define-module (test helper-export)
+         (export param-macro)
+         (begin
+           (define (helper x)
+             (list 'helper x))
+           (define-syntax param-macro
+             (lambda (x)
+               (syntax-case x ()
+                 ((_ val)
+                  (syntax (helper val))))))))
+      ''defined)
+
+(macroexpand '(import-module (test helper-export)))
+
+(test-eval "Use macro using helper"
+           '(param-macro 10)
+           '(helper 10))
+
+;; =============================================================================
 ;; Summary
 ;; =============================================================================
 (newline)

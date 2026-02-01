@@ -207,6 +207,15 @@
         (cons (cons name (cons (cons exports rename-map) bindings)) 
               mc:*modules*)))
 
+;; Helper: Convert module name list to string
+(define (mc:module-name->string name)
+  (string-join (map symbol->string name) "."))
+
+;; Helper: Mangle internal name with module prefix
+(define (mc:mangle-name mod-name sym)
+  (string->symbol 
+   (string-append (mc:module-name->string mod-name) "%" (symbol->string sym))))
+
 ;; Lookup a module by name, returns ((exports . rename-map) . bindings) or #f
 (define (mc:lookup-module name)
   (let ((entry (assoc name mc:*modules*)))
@@ -329,29 +338,101 @@
                       (cons (if (pair? pattern) (car pattern) pattern) ids))
                     ids))))))
 
+;; Filter out define-syntax forms from body
+(define (mc:filter-runtime-forms forms)
+  (filter (lambda (f) (not (and (pair? f) (eq? (car f) 'define-syntax)))) forms))
+
+;; Extract macro definitions from body and parse them
+(define (mc:extract-macro-defs forms m-env s-env r-env)
+  (let loop ((forms forms) (defs '()))
+    (if (null? forms)
+        (reverse defs)
+        (let ((form (car forms)))
+          (loop (cdr forms)
+                (if (and (pair? form) (eq? (car form) 'define-syntax))
+                    (let ((name (cadr form))
+                          (transformer-spec (caddr form)))
+                      (cons (cons name 
+                                  (mc:make-macro-binding 
+                                   (mc:parse-transformer transformer-spec (list m-env s-env r-env))))
+                            defs))
+                    defs))))))
+
 ;; Inject a binding into the interaction environment
 (define (mc:inject-binding! name value)
   (set! mc:*temp-value* value)
   (eval `(define ,name mc:*temp-value*) (interaction-environment)))
 
 ;; Evaluate module body in an isolated lexical scope using a lambda wrapper.
-;; Imports are quoted into defines; body forms are spliced in; defined values
-;; are collected and returned as an alist. This prevents internal bindings
-;; from leaking to the global environment.
-(define (mc:eval-module-body imported-bindings body-forms)
-  (let* ((defined-ids (mc:extract-module-defined-ids body-forms))
+;; Imports are quoted into defines; body forms are spliced in.
+;; Internal definitions are name-mangled and injected globally to be visible to exported macros.
+;; Defined values are collected and returned as an alist.
+
+(define (mc:eval-module-body imported-bindings body-forms m-env s-env r-env mod-name)
+  (let* (;; Separate runtime forms from syntax definitions
+         (runtime-forms (mc:filter-runtime-forms body-forms))
+         ;; Extract and parse macro definitions
+         ;; We need to augment m-env with imported macros so local macros can key off them
+         (macro-imports (filter (lambda (b) (mc:macro-binding? (cdr b))) imported-bindings))
+         (runtime-imports (filter (lambda (b) (not (mc:macro-binding? (cdr b)))) imported-bindings))
+         
+         ;; Add imported macros to m-env for usage in local macro definitions
+         (inner-m-env (append (map (lambda (b) (cons (car b) (mc:unwrap-macro-binding (cdr b)))) macro-imports) m-env))
+         
+         ;; For runtime evaluation, we only care about runtime imports and runtime forms
+         (defined-ids (mc:extract-module-defined-ids runtime-forms))
+
+         ;; Mapping for internal definitions to global unique names
+         (internal-mapping (map (lambda (id) (cons id (mc:mangle-name mod-name id))) defined-ids))
+
+         ;; Augment r-env for macro parsing so internal names resolve to mangled global names
+         (inner-r-env (append internal-mapping r-env))
+
+         (macro-bindings (mc:extract-macro-defs body-forms inner-m-env s-env inner-r-env))
+         
          ;; Quote imported values into define forms
          (import-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) 
-                          imported-bindings))
+                          runtime-imports))
          ;; Lambda wrapper: defines + body + return list of defined values
          (wrapper `(lambda ()
                      ,@import-defs
-                     ,@body-forms
+                     ,@runtime-forms
                      (list ,@defined-ids))))
     ;; Compile wrapper, invoke it, and pair ids with values
     (let* ((proc (eval wrapper (interaction-environment)))
-           (vals (proc)))
-      (map cons defined-ids vals))))
+           (vals (proc))
+           (runtime-bindings (map cons defined-ids vals)))
+      
+      ;; Define internal values globally with mangled names for macro visibility
+      (for-each (lambda (p val)
+                  (mc:inject-binding! (cdr p) val))
+                internal-mapping vals)
+
+      ;; Combine runtime bindings and macro bindings
+      (append runtime-bindings macro-bindings))))
+
+
+
+;; Expand define-module: define a module and register it in the module registry.
+;; (define-module (name ...) decl ...)
+;; Declarations can be export, import, or begin forms.
+(define (mc:expand-define-module expr m-env s-env r-env)
+  (let* ((mod-name (cadr expr))
+         (decls (cddr expr))
+         ;; Process declarations
+         (export-specs (mc:scan-exports decls))
+         (export-info (mc:process-export-specs export-specs))
+         (exports (car export-info))
+         (rename-map (cdr export-info))
+         (imports (mc:scan-imports decls))
+         (body-forms (mc:scan-begins decls))
+         ;; Process imports
+         (imported-bindings (apply append (map mc:process-import-set imports)))
+         ;; Evaluate library body. Pass environment for macro parsing.
+         (result-bindings (mc:eval-module-body imported-bindings body-forms m-env s-env r-env mod-name)))
+    ;; Register the module
+    (mc:register-module! mod-name exports rename-map (append result-bindings imported-bindings))
+    ''defined))
 
 
 
@@ -831,26 +912,19 @@
 (define (mc:expand-quasiquote-form expr m-env s-env r-env)
   (mc:expand (mc:expand-quasiquote (cadr expr)) m-env s-env r-env))
 
-;; Expand define-module: define a module and register it in the module registry.
-;; (define-module (name ...) decl ...)
-;; Declarations can be export, import, or begin forms.
-(define (mc:expand-define-module expr m-env s-env r-env)
-  (let* ((mod-name (cadr expr))
-         (decls (cddr expr))
-         ;; Process declarations
-         (export-specs (mc:scan-exports decls))
-         (export-info (mc:process-export-specs export-specs))
-         (exports (car export-info))
-         (rename-map (cdr export-info))
-         (imports (mc:scan-imports decls))
-         (body-forms (mc:scan-begins decls))
-         ;; Process imports
-         (imported-bindings (apply append (map mc:process-import-set imports)))
-         ;; Evaluate library body
-         (result-bindings (mc:eval-module-body imported-bindings body-forms)))
-    ;; Register the module
-    (mc:register-module! mod-name exports rename-map (append result-bindings imported-bindings))
-    ''defined))
+
+
+;; Helper: Check if a value is a macro binding wrapper
+(define (mc:macro-binding? val)
+  (and (pair? val) (eq? (car val) '**macro**)))
+
+;; Helper: Create a macro binding wrapper
+(define (mc:make-macro-binding trans)
+  (cons '**macro** trans))
+
+;; Helper: Unwrap a macro binding wrapper
+(define (mc:unwrap-macro-binding val)
+  (cdr val))
 
 ;; Expand import-module: import bindings from modules into the current environment.
 ;; (import-module import-set ...)
@@ -859,7 +933,11 @@
   (let* ((import-sets (cdr expr))
          (all-bindings (apply append (map mc:process-import-set import-sets))))
     ;; Inject all bindings into the interaction environment
-    (for-each (lambda (b) (mc:inject-binding! (car b) (cdr b)))
+    (for-each (lambda (b) 
+                (let ((name (car b)) (val (cdr b)))
+                  (if (mc:macro-binding? val)
+                      (mc:register-macro! name (mc:unwrap-macro-binding val))
+                      (mc:inject-binding! name val))))
               all-bindings)
     ''imported))
 
