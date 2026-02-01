@@ -147,7 +147,7 @@
                     ids))))))
 
 ;;=============================================================================
-;; 5. Binding Injection
+;; 5. Library Body Evaluation
 ;;=============================================================================
 
 ;; Inject a binding into the interaction environment
@@ -155,26 +155,24 @@
   (set! r7rs:*temp-value* value)
   (eval `(define ,name r7rs:*temp-value*) (interaction-environment)))
 
-;; Evaluate body forms with imported bindings, return resulting bindings
-;; Wraps evaluation to prevent non-exported identifiers from leaking
-(define (r7rs:eval-with-bindings imported-bindings body-forms exports)
-  ;; Generate wrapper code that evaluates body and returns only exported bindings
+;; Evaluate library body in an isolated lexical scope using a lambda wrapper.
+;; Imports are quoted into defines; body forms are spliced in; defined values
+;; are collected and returned as an alist. This prevents internal bindings
+;; from leaking to the global environment.
+(define (r7rs:eval-library-body imported-bindings body-forms)
   (let* ((defined-ids (r7rs:extract-defined-ids body-forms))
-         (import-names (map car imported-bindings))
-         (import-values (map cdr imported-bindings))
-         ;; Create a wrapper that defines imports locally and evaluates body
-         (wrapper-code 
-          `(let ,(map (lambda (name val)
-                       `(,name (quote ,val)))
-                     import-names
-                     import-values)
-             ,@body-forms
-             ;; Return alist of all defined ids and their values
-             (list ,@(map (lambda (id) `(cons (quote ,id) ,id))
-                         defined-ids)))))
-    ;; Evaluate the wrapper to get bindings without polluting global environment
-    (let ((result (eval wrapper-code (interaction-environment))))
-      result)))
+         ;; Quote imported values into define forms
+         (import-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) 
+                          imported-bindings))
+         ;; Lambda wrapper: defines + body + return list of defined values
+         (wrapper `(lambda ()
+                     ,@import-defs
+                     ,@body-forms
+                     (list ,@defined-ids))))
+    ;; Compile wrapper, invoke it, and pair ids with values
+    (let* ((proc (eval wrapper (interaction-environment)))
+           (vals (proc)))
+      (map cons defined-ids vals))))
 
 ;;=============================================================================
 ;; 6. r7rs:define-library Macro
@@ -196,8 +194,8 @@
          (imports (r7rs:scan-imports decls))
          (body-forms (r7rs:scan-begins decls))
          (imported-bindings (apply append (map r7rs:process-import-set imports)))
-         (result-bindings (r7rs:eval-with-bindings imported-bindings body-forms exports)))
-    ;; Register the library with exports
+         (result-bindings (r7rs:eval-library-body imported-bindings body-forms)))
+    ;; Register the library with its exports and all defined bindings
     (r7rs:register-library! lib-name exports result-bindings)
     'defined))
 

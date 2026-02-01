@@ -18,14 +18,14 @@
     (define (b x) (cons 'B (a x)))
     (define val-b (+ val-a 50))))
 
-;; --- Library C (Renaming) ---
+;; --- Library C (renaming) ---
 (r7rs:define-library (lib C)
   (import (rename (lib A) (a a-renamed)))
   (export c)
   (begin
     (define (c x) (list 'C (a-renamed x)))))
 
-;; --- Library D ---
+;; --- Library D (shadowing) ---
 (r7rs:define-library (lib D)
   (export d)
   (begin
