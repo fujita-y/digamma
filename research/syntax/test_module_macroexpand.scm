@@ -278,9 +278,9 @@
 (test "Define calculator API (renaming)"
       '(define-module (api math)
          (export (rename calc-sum plus)
-                 (rename calc-diff minus)
-                 (rename calc-prod mul)
-                 (rename calc-quot div))
+         (rename calc-diff minus)
+         (rename calc-prod mul)
+         (rename calc-quot div))
          (import (internal calc))
          (begin)) ;; Pure wrapper/renamer
       ''defined)
@@ -364,6 +364,44 @@
 (test-eval "Use macro using helper"
            '(param-macro 10)
            '(helper 10))
+
+;; =============================================================================
+
+(test "define-module with struct export (base)"
+      '(define-module (struct-def)
+         (export define-struct)
+         (begin
+           (define-syntax define-struct
+             (lambda (x)
+               (syntax-case x ()
+                 ((_ name (field ...))
+                  (with-syntax ((make-name (datum->syntax (syntax name)
+                                                          (string->symbol
+                                                           (string-append "make-"
+                                                                          (symbol->string
+                                                                           (syntax->datum (syntax name)))))))
+                                (name? (datum->syntax (syntax name)
+                                                      (string->symbol
+                                                       (string-append (symbol->string
+                                                                       (syntax->datum (syntax name))) "?")))))
+                    (syntax (begin
+                              (define (make-name field ...) (list (quote name) field ...))
+                              (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name)))))))))))))
+      ''defined)
+
+(test "define-module with struct import (user)"
+      '(define-module (struct-user)
+         (export make-point point?)
+         (import (struct-def))
+         (begin
+           (define-struct point (x y))))
+      ''defined)
+
+(macroexpand '(import-module (struct-user)))
+
+(test-eval "Use macro generated definition"
+           '(point? 8)
+           #f)
 
 ;; =============================================================================
 ;; Summary

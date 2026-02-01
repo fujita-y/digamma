@@ -369,46 +369,45 @@
 ;; Defined values are collected and returned as an alist.
 
 (define (mc:eval-module-body imported-bindings body-forms m-env s-env r-env mod-name)
-  (let* (;; Separate runtime forms from syntax definitions
-         (runtime-forms (mc:filter-runtime-forms body-forms))
-         ;; Extract and parse macro definitions
-         ;; We need to augment m-env with imported macros so local macros can key off them
-         (macro-imports (filter (lambda (b) (mc:macro-binding? (cdr b))) imported-bindings))
+  (let* ((macro-imports (filter (lambda (b) (mc:macro-binding? (cdr b))) imported-bindings))
          (runtime-imports (filter (lambda (b) (not (mc:macro-binding? (cdr b)))) imported-bindings))
          
-         ;; Add imported macros to m-env for usage in local macro definitions
          (inner-m-env (append (map (lambda (b) (cons (car b) (mc:unwrap-macro-binding (cdr b)))) macro-imports) m-env))
+
+         ;; Pre-expand body forms to expose hidden definitions
+         ;; We must NOT expand define-syntax forms here, as we need to extract them later
+         (expanded-forms 
+          (flatten-begins
+           (map (lambda (form) 
+                  (if (and (pair? form) (eq? (car form) 'define-syntax))
+                      form
+                      (mc:expand form inner-m-env s-env r-env)))
+                body-forms)))
+
+         (runtime-forms (mc:filter-runtime-forms expanded-forms))
          
-         ;; For runtime evaluation, we only care about runtime imports and runtime forms
          (defined-ids (mc:extract-module-defined-ids runtime-forms))
 
-         ;; Mapping for internal definitions to global unique names
          (internal-mapping (map (lambda (id) (cons id (mc:mangle-name mod-name id))) defined-ids))
 
-         ;; Augment r-env for macro parsing so internal names resolve to mangled global names
          (inner-r-env (append internal-mapping r-env))
 
-         (macro-bindings (mc:extract-macro-defs body-forms inner-m-env s-env inner-r-env))
+         (macro-bindings (mc:extract-macro-defs expanded-forms inner-m-env s-env inner-r-env))
          
-         ;; Quote imported values into define forms
          (import-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) 
                           runtime-imports))
-         ;; Lambda wrapper: defines + body + return list of defined values
          (wrapper `(lambda ()
                      ,@import-defs
                      ,@runtime-forms
                      (list ,@defined-ids))))
-    ;; Compile wrapper, invoke it, and pair ids with values
     (let* ((proc (eval wrapper (interaction-environment)))
            (vals (proc))
            (runtime-bindings (map cons defined-ids vals)))
       
-      ;; Define internal values globally with mangled names for macro visibility
       (for-each (lambda (p val)
                   (mc:inject-binding! (cdr p) val))
                 internal-mapping vals)
 
-      ;; Combine runtime bindings and macro bindings
       (append runtime-bindings macro-bindings))))
 
 
