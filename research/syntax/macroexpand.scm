@@ -62,6 +62,17 @@
 (define (mc:register-macro! name transformer)
   (set! mc:*macro-env* (cons (cons name transformer) mc:*macro-env*)))
 
+;; Module registry for define-module and import-module
+;; Registry mapping module names to records: ((name . record) ...)
+;; Each record is ((exports . rename-map) . bindings) where:
+;;   exports:     list of exported identifier symbols (external names)
+;;   rename-map:  alist of (internal-name . external-name) for renamed exports
+;;   bindings:    alist of (identifier . value) pairs
+(define mc:*modules* '())
+
+;; Temporary variable for passing values through eval
+(define mc:*temp-value* #f)
+
 ;;=============================================================================
 ;; SECTION 2: Utilities
 ;;=============================================================================
@@ -180,6 +191,169 @@
                        ;; Not renamed - check if it's the core form and not shadowed
                        (and (not (memq resolved (mc:unwrap-env shadowed-env))) (eq? resolved name)))))
           res))))
+
+
+;;=============================================================================
+;; SECTION 2.5: Module System Helpers
+;;=============================================================================
+;;
+;; Helper functions for the module system (define-module and import-module).
+;; These implement the core logic for registering modules, processing exports
+;; and imports, and managing the module registry.
+
+;; Register a module in the global registry
+(define (mc:register-module! name exports rename-map bindings)
+  (set! mc:*modules* 
+        (cons (cons name (cons (cons exports rename-map) bindings)) 
+              mc:*modules*)))
+
+;; Lookup a module by name, returns ((exports . rename-map) . bindings) or #f
+(define (mc:lookup-module name)
+  (let ((entry (assoc name mc:*modules*)))
+    (and entry (cdr entry))))
+
+;; Generic scanner: extract and flatten contents of declarations by keyword
+;; Returns concatenated (cdr ...) of all declarations matching the keyword
+(define (mc:scan-decls keyword decls)
+  (let loop ((decls decls) (result '()))
+    (cond
+      ((null? decls) (reverse result))
+      ((and (pair? (car decls)) (eq? (caar decls) keyword))
+       (loop (cdr decls) (append (reverse (cdar decls)) result)))
+      (else
+       (loop (cdr decls) result)))))
+
+;; Convenience wrappers for specific declaration types
+(define (mc:scan-exports decls) (mc:scan-decls 'export decls))
+(define (mc:scan-imports decls) (mc:scan-decls 'import decls))
+(define (mc:scan-begins decls)  (mc:scan-decls 'begin decls))
+
+;; Process export specifications into (exports . rename-map)
+;; Export specs can be: identifier or (rename internal-name external-name)
+;; Returns (exported-names . rename-alist)
+(define (mc:process-export-specs specs)
+  (let loop ((specs specs) (exports '()) (renames '()))
+    (if (null? specs)
+        (cons (reverse exports) (reverse renames))
+        (let ((spec (car specs)))
+          (if (and (pair? spec) (eq? (car spec) 'rename))
+              ;; (rename internal external)
+              (let ((internal (cadr spec))
+                    (external (caddr spec)))
+                (loop (cdr specs) 
+                      (cons external exports)
+                      (cons (cons internal external) renames)))
+              ;; Plain identifier
+              (loop (cdr specs) (cons spec exports) renames))))))
+
+;; Extract the base library name from an import set by unwrapping modifiers
+(define (mc:extract-library-name import-set)
+  (if (and (pair? import-set)
+           (memq (car import-set) '(only except rename prefix)))
+      (mc:extract-library-name (cadr import-set))
+      import-set))
+
+;; Apply import modifiers to transform bindings
+;; spec: import specification (library name or modifier form)
+;; bindings: alist of (id . value) to transform
+;; Returns transformed bindings alist
+(define (mc:apply-import-spec spec bindings)
+  (if (not (pair? spec))
+      bindings
+      (case (car spec)
+        ((only)
+         (let ((ids (cddr spec))
+               (inner (mc:apply-import-spec (cadr spec) bindings)))
+           (filter (lambda (b) (memq (car b) ids)) inner)))
+        
+        ((except)
+         (let ((ids (cddr spec))
+               (inner (mc:apply-import-spec (cadr spec) bindings)))
+           (filter (lambda (b) (not (memq (car b) ids))) inner)))
+        
+        ((rename)
+         (let ((renames (cddr spec))
+               (inner (mc:apply-import-spec (cadr spec) bindings)))
+           (map (lambda (b)
+                  (let ((rename (assq (car b) renames)))
+                    (if rename
+                        (cons (cadr rename) (cdr b))
+                        b)))
+                inner)))
+        
+        ((prefix)
+         (let ((pfx (caddr spec))
+               (inner (mc:apply-import-spec (cadr spec) bindings)))
+           (map (lambda (b)
+                  (cons (string->symbol
+                         (string-append (symbol->string pfx)
+                                        (symbol->string (car b))))
+                        (cdr b)))
+                inner)))
+        
+        ;; Unrecognized form - treat as plain library name
+        (else bindings))))
+
+;; Process an import set: lookup library and apply modifiers
+;; Returns filtered and transformed bindings alist
+(define (mc:process-import-set import-set)
+  (let* ((lib-name (mc:extract-library-name import-set))
+         (record (mc:lookup-module lib-name)))
+    (unless record
+      (error "Module not found" lib-name))
+    (let* ((export-info (car record))
+           (exports (car export-info))
+           (rename-map (cdr export-info))
+           (bindings (cdr record))
+           ;; Apply export renames: change binding keys from internal to external names
+           (renamed-bindings (map (lambda (b)
+                                    (let ((rename (assq (car b) rename-map)))
+                                      (if rename
+                                          (cons (cdr rename) (cdr b))
+                                          b)))
+                                  bindings))
+           ;; Filter by exported names (using external names)
+           (exported (filter (lambda (b) (memq (car b) exports)) renamed-bindings)))
+      (mc:apply-import-spec import-set exported))))
+
+;; Extract defined identifiers from body forms
+;; Handles: (define var ...) and (define (func args...) ...)
+(define (mc:extract-module-defined-ids forms)
+  (let loop ((forms forms) (ids '()))
+    (if (null? forms)
+        (reverse ids)
+        (let ((form (car forms)))
+          (loop (cdr forms)
+                (if (and (pair? form) (eq? (car form) 'define))
+                    (let ((pattern (cadr form)))
+                      (cons (if (pair? pattern) (car pattern) pattern) ids))
+                    ids))))))
+
+;; Inject a binding into the interaction environment
+(define (mc:inject-binding! name value)
+  (set! mc:*temp-value* value)
+  (eval `(define ,name mc:*temp-value*) (interaction-environment)))
+
+;; Evaluate module body in an isolated lexical scope using a lambda wrapper.
+;; Imports are quoted into defines; body forms are spliced in; defined values
+;; are collected and returned as an alist. This prevents internal bindings
+;; from leaking to the global environment.
+(define (mc:eval-module-body imported-bindings body-forms)
+  (let* ((defined-ids (mc:extract-module-defined-ids body-forms))
+         ;; Quote imported values into define forms
+         (import-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) 
+                          imported-bindings))
+         ;; Lambda wrapper: defines + body + return list of defined values
+         (wrapper `(lambda ()
+                     ,@import-defs
+                     ,@body-forms
+                     (list ,@defined-ids))))
+    ;; Compile wrapper, invoke it, and pair ids with values
+    (let* ((proc (eval wrapper (interaction-environment)))
+           (vals (proc)))
+      (map cons defined-ids vals))))
+
+
 
 
 ;;=============================================================================
@@ -657,6 +831,40 @@
 (define (mc:expand-quasiquote-form expr m-env s-env r-env)
   (mc:expand (mc:expand-quasiquote (cadr expr)) m-env s-env r-env))
 
+;; Expand define-module: define a module and register it in the module registry.
+;; (define-module (name ...) decl ...)
+;; Declarations can be export, import, or begin forms.
+(define (mc:expand-define-module expr m-env s-env r-env)
+  (let* ((mod-name (cadr expr))
+         (decls (cddr expr))
+         ;; Process declarations
+         (export-specs (mc:scan-exports decls))
+         (export-info (mc:process-export-specs export-specs))
+         (exports (car export-info))
+         (rename-map (cdr export-info))
+         (imports (mc:scan-imports decls))
+         (body-forms (mc:scan-begins decls))
+         ;; Process imports
+         (imported-bindings (apply append (map mc:process-import-set imports)))
+         ;; Evaluate library body
+         (result-bindings (mc:eval-module-body imported-bindings body-forms)))
+    ;; Register the module
+    (mc:register-module! mod-name exports rename-map (append result-bindings imported-bindings))
+    ''defined))
+
+;; Expand import-module: import bindings from modules into the current environment.
+;; (import-module import-set ...)
+;; Import sets are processed and bindings are injected into the environment.
+(define (mc:expand-import-module expr m-env s-env r-env)
+  (let* ((import-sets (cdr expr))
+         (all-bindings (apply append (map mc:process-import-set import-sets))))
+    ;; Inject all bindings into the interaction environment
+    (for-each (lambda (b) (mc:inject-binding! (car b) (cdr b)))
+              all-bindings)
+    ''imported))
+
+
+
 ;; Look up the handler function for a core form symbol.
 ;; Returns the handler procedure or #f if not a handled core form.
 (define (mc:lookup-handler core-sym)
@@ -680,6 +888,8 @@
     ((begin) mc:expand-begin)
     ((quote) mc:expand-quote)
     ((quasiquote) mc:expand-quasiquote-form)
+    ((define-module) mc:expand-define-module)
+    ((import-module) mc:expand-import-module)
     (else #f)))
 
 ;; Resolve a symbol to its core form name, if it refers to one.
