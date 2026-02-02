@@ -53,8 +53,8 @@
       '42)
 
 (test "Let-floating"
-      '(let ((x (let ((y 1)) y))) x)
-      '1)
+      '(let ((x (let ((y (unknown))) (cons y y)))) x)
+      '(let ((y (unknown))) (cons y y)))
 
 (test "Complex DCE and Beta"
       '(let ((f (lambda (x) (+ x 1)))) (f 5))
@@ -102,16 +102,42 @@
       '(let ((f (lambda (x) (+ x 1)))) (if c (f 10) (f 20)))
       '(if c (+ 10 1) (+ 20 1)))
 
-(test "Lambda Lifting (pure lambda out of let)"
+(test "Inlining (pure lambda)"
       '(let ((x 1)) (let ((f (lambda (y) (+ y 1)))) (f x)))
       '(+ 1 1))
 
-(test "Lambda Lifting (no lift if free vars)"
+(test "Inlining (lambda with free vars)"
       '(let ((x 1)) (let ((f (lambda (y) (+ y x)))) (f 10)))
       '(+ 10 1))
 
-(newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(test "Pure primitive substitution (car)"
+      '(let ((x '(1 2 3))) (let ((y (car x))) y))
+      '(car '(1 2 3)))
+
+(test "Pure primitive substitution (cdr)"
+      '(let ((x '(1 2 3))) (let ((y (cdr x))) y))
+      '(cdr '(1 2 3)))
+
+(test "Pure primitive substitution (cons)"
+      '(let ((x '(1 2 3))) (let ((y (cons 1 x))) y))
+      '(cons 1 '(1 2 3)))
+
+(test "Pure primitive substitution (null?)"
+      '(let ((x '(1 2 3))) (let ((y (null? x))) y))
+      '(null? '(1 2 3)))
+
+(test "Pure primitive substitution (eq?) - single use"
+      '(let ((x '(1 2 3))) (let ((y (eq? x x))) y))
+      '(eq? '(1 2 3) '(1 2 3)))
+
+(test "Pure primitive substitution (eq?) - multiple uses (no substitution)"
+      '(let ((x '(1 2 3))) (let ((y (eq? x x))) (list y y)))
+      '(let ((y (eq? '(1 2 3) '(1 2 3)))) (list y y)))
+
+(test "Pure primitive substitution (null?) - mutation (no substitution)"
+      '(let ((x '(1 2 3))) (let ((y (null? x))) (set! y #t)))
+      '(let ((y (null? '(1 2 3)))) (set! y #t)))
+
 (if (= *fail-count* 0)
     (display "ALL TESTS PASSED.\n")
     (begin

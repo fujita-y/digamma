@@ -42,15 +42,23 @@
     ((not (pair? expr)) '())
     ((eq? (car expr) 'quote) '())
     ((eq? (car expr) 'if)
-     (cp:set-union (cp:analyze-free-vars (cadr expr) bound-vars)
-                (cp:set-union (cp:analyze-free-vars (caddr expr) bound-vars)
-                           (if (null? (cdddr expr)) '() (cp:analyze-free-vars (cadddr expr) bound-vars)))))
+     (cp:set-union 
+      (cp:analyze-free-vars (cadr expr) bound-vars)
+      (cp:set-union 
+       (cp:analyze-free-vars (caddr expr) bound-vars)
+       (if (null? (cdddr expr)) 
+           '() 
+           (cp:analyze-free-vars (cadddr expr) bound-vars)))))
     ((eq? (car expr) 'begin)
      (let loop ((exprs (cdr expr)))
-       (if (null? exprs) '() (cp:set-union (cp:analyze-free-vars (car exprs) bound-vars) (loop (cdr exprs))))))
+       (if (null? exprs) 
+           '() 
+           (cp:set-union (cp:analyze-free-vars (car exprs) bound-vars) 
+                         (loop (cdr exprs))))))
     ((eq? (car expr) 'set!)
      (let ((var (cadr expr)) (val (caddr expr)))
-       (cp:set-union (if (memq var bound-vars) '() (list var)) (cp:analyze-free-vars val bound-vars))))
+       (cp:set-union (if (memq var bound-vars) '() (list var)) 
+                     (cp:analyze-free-vars val bound-vars))))
     ((eq? (car expr) 'define)
      (let ((head (cadr expr)))
        (if (pair? head)
@@ -60,16 +68,31 @@
      (let ((params (cadr expr)) (body (cddr expr)))
        (let ((new-bound (cp:flatten-params params)))
          (let ((body-free (let loop ((exprs body))
-                            (if (null? exprs) '() (cp:set-union (cp:analyze-free-vars (car exprs) (append new-bound bound-vars)) (loop (cdr exprs)))))))
+                            (if (null? exprs) 
+                                '() 
+                                (cp:set-union (cp:analyze-free-vars (car exprs) (append new-bound bound-vars)) 
+                                              (loop (cdr exprs)))))))
            (cp:set-minus body-free (append new-bound bound-vars))))))
     ((eq? (car expr) 'let)
      (let ((bindings (cadr expr)) (body (cddr expr)))
        (let ((vars (map car bindings)) (vals (map cadr bindings)))
-         (cp:set-union (let loop ((vs vals)) (if (null? vs) '() (cp:set-union (cp:analyze-free-vars (car vs) bound-vars) (loop (cdr vs)))))
-                    (let ((body-free (let loop ((exprs body))
-                                       (if (null? exprs) '() (cp:set-union (cp:analyze-free-vars (car exprs) (append vars bound-vars)) (loop (cdr exprs)))))))
-                      (cp:set-minus body-free (append vars bound-vars)))))))
-    (else (let loop ((exprs expr)) (if (null? exprs) '() (cp:set-union (cp:analyze-free-vars (car exprs) bound-vars) (loop (cdr exprs))))))))
+         (cp:set-union 
+          (let loop ((vs vals)) 
+            (if (null? vs) 
+                '() 
+                (cp:set-union (cp:analyze-free-vars (car vs) bound-vars) 
+                              (loop (cdr vs)))))
+          (let ((body-free (let loop ((exprs body))
+                             (if (null? exprs) 
+                                 '() 
+                                 (cp:set-union (cp:analyze-free-vars (car exprs) (append vars bound-vars)) 
+                                               (loop (cdr exprs)))))))
+            (cp:set-minus body-free (append vars bound-vars)))))))
+    (else (let loop ((exprs expr)) 
+            (if (null? exprs) 
+                '() 
+                (cp:set-union (cp:analyze-free-vars (car exprs) bound-vars) 
+                              (loop (cdr exprs))))))))
 
 ;; --- Check Recursive Pattern ---
 (define (cp:match-rec-pattern expr)
@@ -179,7 +202,8 @@
 
                         ;; (set-op IDX B) (ref-op C IDX) -> (set-op IDX B) (mov C B)
                        ((eq? (cp:inst-arg1 i1) (cp:inst-arg2 i2))
-                        (cons i1 (cons `(mov ,(cp:inst-arg1 i2) ,(cp:inst-arg2 i1)) (cddr code))))
+                        (cons i1 (cons `(mov ,(cp:inst-arg1 i2) ,(cp:inst-arg2 i1)) 
+                                       (cddr code))))
                        
                        (else (loop (cdr pairs))))
                       (loop (cdr pairs)))))))
@@ -189,9 +213,15 @@
 (define (cp:optimize-three-inst code)
   (if (null? (cddr code)) #f
       (let ((i1 (car code)) (i2 (cadr code)) (i3 (caddr code)))
-        (if (and (pair? i1) (or (memq (cp:inst-op i1) cp:ops-loads) (assq (cp:inst-op i1) cp:ops-memory-pairs))
-                 (pair? i2) (memq (cp:inst-op i2) cp:ops-loads)
-                 (pair? i3) (or (memq (cp:inst-op i3) cp:ops-loads) (let ((p (assq (cp:inst-op i1) cp:ops-memory-pairs))) (and p (eq? (cp:inst-op i3) (cdr p))))))
+    (if (and (pair? i1) 
+             (or (memq (cp:inst-op i1) cp:ops-loads) 
+                 (assq (cp:inst-op i1) cp:ops-memory-pairs))
+             (pair? i2) 
+             (memq (cp:inst-op i2) cp:ops-loads)
+             (pair? i3) 
+             (or (memq (cp:inst-op i3) cp:ops-loads) 
+                 (let ((p (assq (cp:inst-op i1) cp:ops-memory-pairs))) 
+                   (and p (eq? (cp:inst-op i3) (cdr p))))))
             (let ((dst1 (cp:inst-arg1 i1)) (src1 (cp:inst-arg2 i1))
                   (dst2 (cp:inst-arg1 i2)) (src2 (cp:inst-arg2 i2))
                   (dst3 (cp:inst-arg1 i3)) (src3 (cp:inst-arg2 i3)))
@@ -244,24 +274,26 @@
         (if (and (pair? i1) (eq? (cp:inst-op i1) 'mov))
             (let ((rA (cp:inst-arg1 i1)) (rB (cp:inst-arg2 i1)))
               (let loop ((rest (cdr code)) (acc '()) (count 0))
-                (if (null? rest) #f
-                    (let ((next (car rest)))
-                      (cond
-                        ;; Found restore (mov rB rA)
-                        ((and (eq? (cp:inst-op next) 'mov)
-                              (eq? (cp:inst-arg1 next) rB)
-                              (eq? (cp:inst-arg2 next) rA))
-                         ;; Optimize: i1 + reversed-acc + (cdr rest), excluding 'next'
-                         (cons i1 (append (reverse acc) (cdr rest))))
-                        
-                        ;; Check if 'next' is a safe load instruction that clobbers neither rA nor rB
-                        ((and (memq (cp:inst-op next) cp:ops-loads)
-                              (not (eq? (cp:inst-arg1 next) rA))
-                              (not (eq? (cp:inst-arg1 next) rB)))
-                         (loop (cdr rest) (cons next acc) (+ count 1)))
-                        
-                        ;; Otherwise, clobbered or unsafe op
-                        (else #f))))))
+                (cond
+                 ((or (null? rest) (> count 20)) #f) ;; Limit lookahead to 20
+                 (else
+                  (let ((next (car rest)))
+                    (cond
+                     ;; Found restore (mov rB rA)
+                     ((and (eq? (cp:inst-op next) 'mov)
+                           (eq? (cp:inst-arg1 next) rB)
+                           (eq? (cp:inst-arg2 next) rA))
+                      ;; Optimize: i1 + reversed-acc + (cdr rest), excluding 'next'
+                      (cons i1 (append (reverse acc) (cdr rest))))
+                     
+                     ;; Check if 'next' is a safe load instruction that clobbers neither rA nor rB
+                     ((and (memq (cp:inst-op next) cp:ops-loads)
+                           (not (eq? (cp:inst-arg1 next) rA))
+                           (not (eq? (cp:inst-arg1 next) rB)))
+                      (loop (cdr rest) (cons next acc) (+ count 1)))
+                     
+                     ;; Otherwise, clobbered or unsafe op
+                     (else #f)))))))
             #f))))
 
 (define (cp:peephole-optimize-pass code)
@@ -270,7 +302,9 @@
     ((null? (cdr code)) 
      ;; Check last instruction for self-move
      (let ((inst (car code)))
-       (if (and (pair? inst) (eq? (cp:inst-op inst) 'mov) (eq? (cp:inst-arg1 inst) (cp:inst-arg2 inst)))
+       (if (and (pair? inst) 
+                (eq? (cp:inst-op inst) 'mov) 
+                (eq? (cp:inst-arg1 inst) (cp:inst-arg2 inst)))
            '()
            code)))
 
@@ -465,28 +499,46 @@
          ;; We need to move them to new-base..(new-base+n-vars-1)
          
          (let* ((new-base (max 1 max-outgoing)) ; Ensure space for outgoing args
-                (all-params (if has-rest? (append fixed-params (list rest-param)) fixed-params))
+                (all-params (if has-rest? 
+                                (append fixed-params (list rest-param)) 
+                                fixed-params))
                 (n-total-params (length all-params))
                 
                 (new-scope (let loop ((p all-params) (i 0))
-                             (if (null? p) '() (cons (cons (car p) (cp:make-reg (+ new-base i))) (loop (cdr p) (+ i 1))))))
+                             (if (null? p) 
+                                 '() 
+                                 (cons (cons (car p) (cp:make-reg (+ new-base i))) 
+                                       (loop (cdr p) (+ i 1))))))
                 (cl-scope (let loop ((f free) (i 0))
-                            (if (null? f) '() (cons (cons (car f) i) (loop (cdr f) (+ i 1)))))))
+                            (if (null? f) 
+                                '() 
+                                (cons (cons (car f) i) (loop (cdr f) (+ i 1)))))))
            
            ;; Move params.
            ;; Incoming: r0 .. r(n-total-params - 1)
            ;; Dest: new-base ..
            ;; Move via reverse order
            (let move-params ((i (- n-total-params 1)))
-             (if (>= i 0) (begin (cp:ctx-emit! ctx `(mov ,(cp:make-reg (+ new-base i)) ,(cp:make-reg i))) (move-params (- i 1)))))
+             (if (>= i 0) 
+                 (begin (cp:ctx-emit! ctx `(mov ,(cp:make-reg (+ new-base i)) ,(cp:make-reg i))) 
+                        (move-params (- i 1)))))
 
-           (let* ((self-bindings (if (null? env) '()
-                                     (let ((scope (car env)))
-                                       (if (and (pair? scope) (not (eq? (car scope) 'cl)) (not (eq? (car scope) 'num-params)))
-                                           (filter (lambda (b) (eq? (cdr b) 'self)) scope)
-                                           '())))))
-             (for-each (lambda (p) (if (memq (car p) (cp:ctx-mutated ctx)) (cp:ctx-emit! ctx `(make-cell ,(cdr p) ,(cdr p))))) new-scope)
-             (cp:codegen `(begin ,@body) (cons (cons `num-params n-total-params) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-total-params) #t ctx)))
+           (let* ((self-bindings 
+                   (if (null? env) '()
+                       (let ((scope (car env)))
+                         (if (and (pair? scope) 
+                                  (not (eq? (car scope) 'cl)) 
+                                  (not (eq? (car scope) 'num-params)))
+                             (filter (lambda (b) (eq? (cdr b) 'self)) scope)
+                             '())))))
+             (for-each (lambda (p) 
+                         (if (memq (car p) (cp:ctx-mutated ctx)) 
+                             (cp:ctx-emit! ctx `(make-cell ,(cdr p) ,(cdr p))))) 
+                       new-scope)
+             (cp:codegen `(begin ,@body) 
+                         (cons (cons `num-params n-total-params) 
+                               (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) 
+                         (+ new-base n-total-params) #t ctx)))
 
          (cp:ctx-add-closure! ctx (reverse (cp:ctx-code ctx)))
          (cp:ctx-set-code! ctx prev-code)
@@ -513,7 +565,8 @@
              (body (cddr let-expr)) (set-expr (car body)) (lambda-expr (caddr set-expr))
              (reg (cp:make-reg next-reg)) (arg-base (+ next-reg 1)))
         (cp:ctx-emit! ctx `(const r0 ,sym)) (cp:ctx-emit! ctx `(mov ,reg r0))
-        ;; For recursive let/match pattern, it's strictly a local binding structure by definition of match-rec-pattern (let ((name ...)) (set! name (lambda ...))) 
+        ;; For recursive let/match pattern, it's strictly a local binding structure 
+        ;; by definition of match-rec-pattern (let ((name ...)) (set! name (lambda ...))) 
         ;; We can enable stack allocation if 'name' does not escape in 'body'.
         ;; The body starts with (set! name ...) so we check rest of body.
         (let ((escapes? (cp:var-escapes? name `(begin ,@(cdr body)))))
@@ -523,7 +576,9 @@
         (let ((call-reg (cp:make-reg (+ arg-base num-args))))
           (cp:ctx-emit! ctx `(mov ,call-reg ,reg))
           (cp:move-args num-args arg-base ctx)
-          (if tail? (cp:ctx-emit! ctx `(tail-call ,call-reg ,num-args)) (cp:ctx-emit! ctx `(call ,call-reg ,num-args)))))
+          (if tail? 
+              (cp:ctx-emit! ctx `(tail-call ,call-reg ,num-args)) 
+              (cp:ctx-emit! ctx `(call ,call-reg ,num-args)))))
 
       (let* ((proc (car expr)) (args (cdr expr)) (num-args (length args))
              (base-reg (max 1 next-reg)))
@@ -535,7 +590,9 @@
               (cp:codegen proc env (+ base-reg num-args) #f ctx))
           (cp:ctx-emit! ctx `(mov ,call-reg r0))
           (cp:move-args num-args base-reg ctx)
-          (if tail? (cp:ctx-emit! ctx `(tail-call ,call-reg ,num-args)) (cp:ctx-emit! ctx `(call ,call-reg ,num-args)))))))
+          (if tail? 
+              (cp:ctx-emit! ctx `(tail-call ,call-reg ,num-args)) 
+              (cp:ctx-emit! ctx `(call ,call-reg ,num-args)))))))
 
 (define (cp:codegen-let expr env next-reg tail? ctx)
   (if (cp:match-rec-pattern expr)
@@ -556,14 +613,16 @@
           (cp:codegen `(begin ,@rest) (cons (list (cons name reg)) env) (+ next-reg 1) tail? ctx)))
       (let* ((bindings (cadr expr)) (body (cddr expr)) (vars (map car bindings)) (vals (map cadr bindings)))
         (let loop ((vs vals) (vars vars) (r next-reg) (new-scope '()))
-          (if (null? vs) (cp:codegen `(begin ,@body) (cons new-scope env) r tail? ctx)
+          (if (null? vs) 
+              (cp:codegen `(begin ,@body) (cons new-scope env) r tail? ctx)
               (let ((reg (cp:make-reg r)))
                 (if (and (pair? (car vs)) (eq? (car (car vs)) 'lambda))
                     (let ((escapes? (cp:var-escapes? (car vars) `(begin ,@body))))
                       (cp:codegen-lambda (car vs) env (+ r 1) #f ctx (not escapes?)))
                     (cp:codegen (car vs) env (+ r 1) #f ctx))
                 (cp:ctx-emit! ctx `(mov ,reg r0))
-                (if (memq (car vars) (cp:ctx-mutated ctx)) (cp:ctx-emit! ctx `(make-cell ,reg ,reg)))
+                (if (memq (car vars) (cp:ctx-mutated ctx)) 
+                    (cp:ctx-emit! ctx `(make-cell ,reg ,reg)))
                 (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope))))))))
 
 (define (cp:codegen expr env next-reg tail? ctx)

@@ -23,6 +23,28 @@
 (define (op:boolean-true? x) (or (eq? x #t) (equal? x ''#t)))
 (define (op:boolean-false? x) (or (eq? x #f) (equal? x ''#f) (null? x)))
 
+(define op:pure-primitives
+  '(;; Booleans
+    not boolean? boolean=?
+    ;; Equivalence
+    eq? eqv? equal?
+    ;; Pairs and Lists
+    pair? cons car cdr caar cadr cdar cddr null? list? list length append reverse make-list list-tail list-ref memq memv member assq assv assoc
+    ;; Symbols
+    symbol? symbol=? symbol->string string->symbol
+    ;; Numbers
+    number? complex? real? rational? integer? exact? inexact? = < > <= >= zero? positive? negative? odd? even? max min + * - / abs floor ceiling truncate round gcd lcm numerator denominator expt sqrt number->string exact-integer-sqrt
+    ;; Characters
+    char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>? char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace? char-upper-case? char-lower-case? char->integer integer->char char-upcase char-downcase
+    ;; Strings
+    string? make-string string string-length string-ref string=? string<? string>? string<=? string>=? string-ci=? string-ci<? string-ci>? string-ci<=? string-ci>=? substring string-append string->list list->string string-copy string->number
+    ;; Vectors
+    vector? make-vector vector vector-length vector-ref vector->list list->vector
+    ;; Procedures
+    procedure?
+    ;; Bytevectors
+    bytevector? bytevector-length bytevector-u8-ref))
+
 ;; --- Dispatcher ---
 
 (define (op:optimize-inner expr bound-vars)
@@ -82,19 +104,66 @@
 
 (define (op:opt-lambda expr bound-vars)
   (let* ((params (cadr expr))
-         (new-bound (if (list? params) (append params bound-vars) (cons params bound-vars)))
+         (new-bound (if (list? params) 
+                        (append params bound-vars) 
+                        (cons params bound-vars)))
          (body-exprs (map (lambda (e) (op:optimize-inner e new-bound)) (cddr expr)))
          (body `(begin ,@body-exprs))
          (used (op:analyze-used-vars body))
          (mutated (op:analyze-mutated-vars body)))
     ;; Unused parameter removal
-    (let loop ((ps (if (list? params) params '())) (i 0) (new-params '()))
+    (let loop ((ps (if (list? params) params '())) 
+               (i 0) 
+               (new-params '()))
       (cond
-        ((null? ps) `(lambda ,(if (list? params) (reverse new-params) params) ,@body-exprs))
+        ((null? ps) 
+         `(lambda ,(if (list? params) (reverse new-params) params) ,@body-exprs))
         ((and (not (memq (car ps) used)) (not (memq (car ps) mutated)))
          (loop (cdr ps) (+ i 1) new-params)) ;; Remove it
         (else (loop (cdr ps) (+ i 1) (cons (car ps) new-params)))))))
 
+
+(define (op:analyze-free-var-counts expr)
+  (let ((counts (make-hash-table 'eq?)))
+    (let walk ((e expr) (shadowed '()))
+      (cond
+       ((symbol? e) 
+        (unless (memq e shadowed)
+          (hash-table-put! counts e (+ (hash-table-get counts e 0) 1))))
+       ((not (pair? e)) #f)
+       ((eq? (car e) 'quote) #f)
+       ((eq? (car e) 'lambda)
+        (let* ((params (cadr e))
+               (new-shadowed (if (list? params) 
+                                 (append params shadowed) 
+                                 (cons params shadowed))))
+          (for-each (lambda (body-expr) (walk body-expr new-shadowed)) (cddr e))))
+       ((eq? (car e) 'let)
+        (let* ((bindings (cadr e))
+               (vars (map car bindings))
+               ;; Evaluate init expressions in CURRENT scope (not shadowed by let vars yet)
+               (inits (map cadr bindings)))
+          (for-each (lambda (init) (walk init shadowed)) inits)
+          ;; Evaluate body in NEW scope
+          (let ((new-shadowed (append vars shadowed)))
+            (for-each (lambda (body-expr) (walk body-expr new-shadowed)) (cddr e)))))
+       ((eq? (car e) 'set!)
+        (walk (caddr e) shadowed)) ;; set! var is not a use in terms of substitution? 
+                                   ;; Wait, for "single use" we usually mean "read". 
+                                   ;; But if we substitute, we replace definitions.
+                                   ;; Actually, mutated vars are excluded from inlining/substitution entirely 
+                                   ;; by `op:analyze-mutated-vars`.
+                                   ;; So here we just count textual occurrences in non-binding positions?
+                                   ;; Correct.
+        
+       ((eq? (car e) 'if)
+        (walk (cadr e) shadowed)
+        (walk (caddr e) shadowed)
+        (if (not (null? (cdddr e))) (walk (cadddr e) shadowed)))
+       
+       (else (for-each (lambda (x) (walk x shadowed)) e))))
+    counts))
+    
 (define (op:opt-let expr bound-vars)
   (let* ((bindings (map (lambda (b) (list (car b) (op:optimize-inner (cadr b) bound-vars))) (cadr expr)))
          (vars (map car bindings))
@@ -111,39 +180,74 @@
                     (if (and (pair? val) (eq? (car val) 'let))
                         (begin
                           (set! floated-bindings (append floated-bindings (cadr val)))
-                          (set! main-bindings (append main-bindings (list (list var (if (null? (cddr val)) '() (car (reverse (cddr val)))))))))
+                          (set! main-bindings 
+                                (append main-bindings 
+                                        (list (list var (if (null? (cddr val)) '() (car (reverse (cddr val)))))))))
                         (set! main-bindings (append main-bindings (list b))))))
                 bindings)
       (if (not (null? floated-bindings))
           (op:optimize-inner `(let ,floated-bindings (let ,main-bindings ,@body)) bound-vars)
           
           ;; Binding Optimization Pipeline
-          (let* ((used (op:analyze-used-vars `(begin ,@body)))
-                 (mutated-vars (op:analyze-mutated-vars `(begin ,@body)))
-                 (new-bindings '()))
+          (let ((used (op:analyze-used-vars `(begin ,@body)))
+                (mutated-vars (op:analyze-mutated-vars `(begin ,@body)))
+                (new-bindings '())
+                (var-counts #f) ;; Cache for variable counts
+                (body-changed? #t)) ;; Flag to invalidate cache
+
+            (define (ensure-counts-up-to-date! current-body)
+              (when body-changed?
+                (set! var-counts (op:analyze-free-var-counts current-body))
+                (set! body-changed? #f)))
+
+            (define (get-use-count var current-body)
+              (ensure-counts-up-to-date! current-body)
+              (hash-table-get var-counts var 0))
+
+            (define (should-inline? var val current-body)
+              (let ((count (get-use-count var current-body)))
+                (or (<= count 1)
+                    (and (op:small-procedure? val)
+                         (let ((depth (hash-table-get op:*inlining-depth* var 0)))
+                           (< depth 2))))))
             
             (define (process-binding! b)
               (let ((var (car b)) (val (cadr b)))
                 (cond
-                  ;; 1. Copy Propagation
-                  ((and (not (memq var mutated-vars)) (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)))
+                  ((and (not (memq var mutated-vars)) 
+                        (or (not (pair? val)) 
+                            (and (pair? val) (eq? (car val) 'quote)) 
+                            (symbol? val)
+                            (and (not (op:has-effects? val)) ;; Pure expression substitution
+                                 (<= (get-use-count var `(begin ,@body)) 1))))
                    (set! body (map (lambda (e) (op:substitute e var val)) body))
+                   (set! body-changed? #t)
                    (if (op:has-effects? val) (set! new-bindings (cons b new-bindings))))
                   
                   ;; 2. Inlining
-                  ((and (not (memq var mutated-vars)) (pair? val) (eq? (car val) 'lambda) (op:should-inline? var val `(begin ,@body)))
+                  ((and (not (memq var mutated-vars)) 
+                        (pair? val) 
+                        (eq? (car val) 'lambda) 
+                        (should-inline? var val `(begin ,@body)))
                    (set! body (op:perform-inlining var val body))
+                   (set! body-changed? #t)
                    (if (op:has-effects? val) (set! new-bindings (cons b new-bindings))))
                   
                   ;; 3. Lambda Dropping
-                  ((and (not (memq var mutated-vars)) (pair? val) (eq? (car val) 'lambda) (and (pair? (car body)) (eq? (car (car body)) 'if)))
+                  ((and (not (memq var mutated-vars)) 
+                        (pair? val) 
+                        (eq? (car val) 'lambda) 
+                        (and (pair? (car body)) (eq? (car (car body)) 'if)))
                    (let ((res (op:try-drop-lambda var val (car body))))
                      (if (car res)
-                         (set! body (list (cdr res)))
+                         (begin (set! body (list (cdr res))) (set! body-changed? #t))
                          (set! new-bindings (cons b new-bindings)))))
                   
-                  ;; 4. Lambda Lifting (Handled by Let-floating in next pass)
-                  ((and (not (memq var mutated-vars)) (pair? val) (eq? (car val) 'lambda) (null? (op:analyze-free-vars val '())))
+                  ;; 4. Closed Lambda Preservation (Handled by Let-floating in next pass)
+                  ((and (not (memq var mutated-vars)) 
+                        (pair? val) 
+                        (eq? (car val) 'lambda) 
+                        (null? (op:analyze-free-vars val '())))
                    (set! new-bindings (cons b new-bindings)))
                   
                   ;; 5. Keep it if used or has effects
@@ -198,6 +302,9 @@
   (if (or (null? lst) (<= n 0)) lst
       (op:drop (cdr lst) (- n 1))))
 
+;; op:substitute: Simple value replacement.
+;; Replaces all occurrences of `var` with `val` in `expr`. 
+;; Used for constant propagation and copy propagation.
 (define (op:substitute expr var val)
   (cond
     ((eq? expr var) val)
@@ -206,14 +313,24 @@
     ((eq? (car expr) 'lambda)
      (if (memq var (if (list? (cadr expr)) (cadr expr) (list (cadr expr))))
          expr
-         `(lambda ,(cadr expr) ,@(map (lambda (e) (op:substitute e var val)) (cddr expr)))))
+         `(lambda ,(cadr expr) 
+            ,@(map (lambda (e) (op:substitute e var val)) (cddr expr)))))
     ((eq? (car expr) 'let)
      (let ((vars (map car (cadr expr))))
        (if (memq var vars)
-           `(let ,(map (lambda (b) (list (car b) (op:substitute (cadr b) var val))) (cadr expr)) ,@(cddr expr))
-           `(let ,(map (lambda (b) (list (car b) (op:substitute (cadr b) var val))) (cadr expr)) ,@(map (lambda (e) (op:substitute e var val)) (cddr expr))))))
+           `(let ,(map (lambda (b) 
+                         (list (car b) (op:substitute (cadr b) var val))) 
+                       (cadr expr)) 
+              ,@(cddr expr))
+           `(let ,(map (lambda (b) 
+                         (list (car b) (op:substitute (cadr b) var val))) 
+                       (cadr expr)) 
+              ,@(map (lambda (e) (op:substitute e var val)) (cddr expr))))))
     (else (map (lambda (e) (op:substitute e var val)) expr))))
 
+;; op:substitute-proc: Procedure inlining replacement.
+;; Like op:substitute, but specifically handles the case where `var` appears in the operator position of an application.
+;; If substitution results in ((lambda ...) ...), it immediately performs beta-reduction (op:optimize-once).
 (define (op:substitute-proc expr var val)
   (cond
     ((not (pair? expr)) expr)
@@ -225,8 +342,14 @@
     ((eq? (car expr) 'let)
      (let ((vars (map car (cadr expr))))
        (if (memq var vars)
-           `(let ,(map (lambda (b) (list (car b) (op:substitute-proc (cadr b) var val))) (cadr expr)) ,@(cddr expr))
-           `(let ,(map (lambda (b) (list (car b) (op:substitute-proc (cadr b) var val))) (cadr expr)) ,@(map (lambda (e) (op:substitute-proc e var val)) (cddr expr))))))
+           `(let ,(map (lambda (b) 
+                         (list (car b) (op:substitute-proc (cadr b) var val))) 
+                       (cadr expr)) 
+              ,@(cddr expr))
+           `(let ,(map (lambda (b) 
+                         (list (car b) (op:substitute-proc (cadr b) var val))) 
+                       (cadr expr)) 
+              ,@(map (lambda (e) (op:substitute-proc e var val)) (cddr expr))))))
     ((eq? (car expr) var) 
      (cons val (map (lambda (e) (op:substitute-proc e var val)) (cdr expr))))
     (else (let ((new-expr (map (lambda (e) (op:substitute-proc e var val)) expr)))
@@ -336,16 +459,7 @@
        (op:set-minus (apply op:set-union (map op:analyze-mutated-vars (cddr expr))) params)))
     (else (apply op:set-union (map op:analyze-mutated-vars expr)))))
 
-(define (op:mutated? var expr)
-  (cond
-    ((not (pair? expr)) #f)
-    ((eq? (car expr) 'quote) #f)
-    ((eq? (car expr) 'set!) (or (eq? (cadr expr) var) (op:mutated? var (caddr expr))))
-    ((eq? (car expr) 'lambda)
-     (if (memq var (if (list? (cadr expr)) (cadr expr) (list (cadr expr))))
-         #f
-         (op:any (lambda (e) (op:mutated? var e)) (cddr expr))))
-    (else (op:any (lambda (e) (op:mutated? var e)) expr))))
+
 
 (define (op:has-effects? expr)
   (cond
@@ -358,7 +472,12 @@
     ((eq? (car expr) 'set!) #t)
     ((eq? (car expr) 'define) #t)
     ((eq? (car expr) 'let) (or (op:any (lambda (b) (op:has-effects? (cadr b))) (cadr expr)) (op:any op:has-effects? (cddr expr))))
-    (else #t))) ;; Assume applications have effects for now
+    (else 
+     ;; Check if it's a known pure primitive
+     (if (and (memq (car expr) op:pure-primitives)
+              (not (op:any op:has-effects? (cdr expr))))
+         #f
+         #t)))) ;; Assume other applications have effects
 
 ;; --- General Utilities ---
 
