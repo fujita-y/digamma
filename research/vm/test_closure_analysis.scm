@@ -17,8 +17,8 @@
                                   instructions)))
     (if make-closure-inst
         (let* ((len (vector-length make-closure-inst))
-               ;; The last element should be the boolean flag
-               (status (vector-ref make-closure-inst (- len 1))))
+               ;; The stack-alloc? flag is at index 4 (0-based) or -3 from end
+               (status (vector-ref make-closure-inst (- len 3))))
           (if (eq? status expected-escapeStatus)
               (begin
                 (set! *pass-count* (+ *pass-count* 1))

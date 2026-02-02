@@ -33,11 +33,13 @@
   (vector-set! (ctx-regs ctx) (vm:decode-reg reg) val))
 
 (define-record-type <closure>
-  (make-closure-vec label free code)
+  (make-closure-vec label free code fixed-argc has-rest)
   closure?
   (label closure-label)
   (free  closure-free)
-  (code  closure-code))
+  (code  closure-code)
+  (fixed-argc closure-fixed-argc)
+  (has-rest   closure-has-rest))
 
 (define-record-type <cell>
   (make-cell-box value)
@@ -98,17 +100,31 @@
         (cons (vm:reg-ref ctx (string->symbol (string-append "r" (number->string i))))
               (arg-loop (+ i 1))))))
 
+(define (vm:fetch-args-range ctx start end)
+  (let arg-loop ((i start))
+    (if (= i end)
+        '()
+        (cons (vm:reg-ref ctx (string->symbol (string-append "r" (number->string i))))
+              (arg-loop (+ i 1))))))
+
 (define (vm:op-call ctx inst)
   (let ((proc-reg (vector-ref inst 1))
         (n-args (vector-ref inst 2)))
     (let ((proc (vm:reg-ref ctx proc-reg)))
       (if (closure? proc)
-          (begin
-            (ctx-stack-set! ctx (cons (list (ctx-pc ctx) (ctx-cl ctx) (vector-copy (ctx-regs ctx)) (ctx-code ctx)) (ctx-stack ctx)))
-            (ctx-cl-set! ctx proc)
-            (ctx-code-set! ctx (closure-code proc))
-            (ctx-pc-set! ctx (closure-label proc))
-            *vm:continue*)
+          (let ((fixed (closure-fixed-argc proc))
+                (rest? (closure-has-rest proc)))
+            (if (if rest? (< n-args fixed) (not (= n-args fixed)))
+                (error "Wrong number of arguments" n-args fixed rest?)
+                (begin
+                  (if rest?
+                      (let ((rest-args (vm:fetch-args-range ctx fixed n-args)))
+                        (vm:reg-set! ctx (string->symbol (string-append "r" (number->string fixed))) rest-args)))
+                  (ctx-stack-set! ctx (cons (list (ctx-pc ctx) (ctx-cl ctx) (vector-copy (ctx-regs ctx)) (ctx-code ctx)) (ctx-stack ctx)))
+                  (ctx-cl-set! ctx proc)
+                  (ctx-code-set! ctx (closure-code proc))
+                  (ctx-pc-set! ctx (closure-label proc))
+                  *vm:continue*)))
           (let ((args (vm:fetch-args ctx n-args))
                 (saved-regs (vector-copy (ctx-regs ctx))))
             (let ((res (apply proc args)))
@@ -121,11 +137,18 @@
         (n-args (vector-ref inst 2)))
     (let ((proc (vm:reg-ref ctx proc-reg)))
       (if (closure? proc)
-          (begin
-            (ctx-cl-set! ctx proc)
-            (ctx-code-set! ctx (closure-code proc))
-            (ctx-pc-set! ctx (closure-label proc))
-            *vm:continue*)
+          (let ((fixed (closure-fixed-argc proc))
+                (rest? (closure-has-rest proc)))
+            (if (if rest? (< n-args fixed) (not (= n-args fixed)))
+                (error "Wrong number of arguments" n-args fixed rest?)
+                (begin
+                  (if rest?
+                      (let ((rest-args (vm:fetch-args-range ctx fixed n-args)))
+                        (vm:reg-set! ctx (string->symbol (string-append "r" (number->string fixed))) rest-args)))
+                  (ctx-cl-set! ctx proc)
+                  (ctx-code-set! ctx (closure-code proc))
+                  (ctx-pc-set! ctx (closure-label proc))
+                  *vm:continue*)))
           (let ((args (vm:fetch-args ctx n-args)))
             (let ((res (apply proc args)))
               (if (null? (ctx-stack ctx))
@@ -155,9 +178,11 @@
 (define (vm:op-make-closure ctx inst)
   (let ((dst (vector-ref inst 1))
         (label (vector-ref inst 2))
-        (free-indices (vector-ref inst 3)))
+        (free-indices (vector-ref inst 3))
+        (fixed-argc (vector-ref inst 5))
+        (has-rest (vector-ref inst 6)))
     (let ((free-vals (map (lambda (idx) (vm:reg-ref ctx idx)) free-indices)))
-      (let ((cl (make-closure-vec label (list->vector free-vals) (ctx-code ctx))))
+      (let ((cl (make-closure-vec label (list->vector free-vals) (ctx-code ctx) fixed-argc has-rest)))
         (vm:reg-set! ctx dst cl))
       *vm:continue*)))
 

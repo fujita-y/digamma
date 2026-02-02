@@ -19,6 +19,22 @@
       (let ((rest (cp:set-minus (cdr s1) s2)))
         (if (memq (car s1) s2) rest (cons (car s1) rest)))))
 
+;; --- Utility: Parameter Analysis ---
+(define (cp:flatten-params params)
+  (cond
+   ((null? params) '())
+   ((symbol? params) (list params))
+   ((pair? params) (cons (car params) (cp:flatten-params (cdr params))))
+   (else '())))
+
+(define (cp:analyze-params params)
+  (let loop ((p params) (fixed '()))
+    (cond
+     ((null? p) (values (reverse fixed) #f #f))
+     ((symbol? p) (values (reverse fixed) p #t))
+     ((pair? p) (loop (cdr p) (cons (car p) fixed)))
+     (else (error "Invalid parameter list" params)))))
+
 ;; --- Analysis 1: Free Variables ---
 (define (cp:analyze-free-vars expr bound-vars)
   (cond
@@ -42,7 +58,7 @@
            (cp:analyze-free-vars (caddr expr) (cons head bound-vars)))))
     ((eq? (car expr) 'lambda)
      (let ((params (cadr expr)) (body (cddr expr)))
-       (let ((new-bound (if (list? params) params (list params))))
+       (let ((new-bound (cp:flatten-params params)))
          (let ((body-free (let loop ((exprs body))
                             (if (null? exprs) '() (cp:set-union (cp:analyze-free-vars (car exprs) (append new-bound bound-vars)) (loop (cdr exprs)))))))
            (cp:set-minus body-free (append new-bound bound-vars))))))
@@ -312,7 +328,12 @@
   (let* ((rec-vars '())
          (_ (let walk ((e expr))
               (if (cp:match-rec-pattern e) (set! rec-vars (cons (car (car (cadr e))) rec-vars)))
-              (if (pair? e) (if (eq? (car e) 'quote) '() (for-each walk e)))))
+              (cond
+               ((pair? e)
+                (if (eq? (car e) 'quote)
+                    '()
+                    (begin (walk (car e)) (walk (cdr e)))))
+               (else '()))))
 
          (mutated (cp:analyze-mutated-vars expr rec-vars))
          (ctx (cp:make-context mutated)))
@@ -425,47 +446,65 @@
 (define (cp:codegen-lambda expr env next-reg tail? ctx stack-alloc?)
   (let* ((params (cadr expr)) (body (cddr expr))
          (all-free (cp:analyze-free-vars expr '()))
-         (params-list (if (list? params) params (list params)))
+         (params-list (cp:flatten-params params))
          (potential-free (cp:set-minus all-free params-list))
          (free (filter (lambda (f) (let ((b (cp:lookup f env))) (not (eq? (car b) 'global)))) potential-free))
-         (n-params (length params-list))
          (entry-label (cp:gen-label ctx 'closure))
          (prev-code (cp:ctx-code ctx))
          (max-outgoing (apply max 0 (map cp:analyze-max-outgoing-args body))))
-    (cp:ctx-set-code! ctx '())
-    (cp:ctx-emit! ctx `(label ,entry-label))
-    (let* ((new-base (max 1 max-outgoing)) ; Ensure space for outgoing args
-           (new-scope (let loop ((p params) (i 0))
-                        (if (null? p) '() (cons (cons (car p) (cp:make-reg (+ new-base i))) (loop (cdr p) (+ i 1))))))
-           (cl-scope (let loop ((f free) (i 0))
-                       (if (null? f) '() (cons (cons (car f) i) (loop (cdr f) (+ i 1)))))))
-      ;; Move params in reverse order to tolerate overlap
-      (let move-params ((i (- n-params 1)))
-        (if (>= i 0) (begin (cp:ctx-emit! ctx `(mov ,(cp:make-reg (+ new-base i)) ,(cp:make-reg i))) (move-params (- i 1)))))
-      (let* ((self-bindings (if (null? env) '()
-                              (let ((scope (car env)))
-                                (if (and (pair? scope) (not (eq? (car scope) 'cl)) (not (eq? (car scope) 'num-params)))
-                                    (filter (lambda (b) (eq? (cdr b) 'self)) scope)
-                                    '())))))
-        (for-each (lambda (p) (if (memq (car p) (cp:ctx-mutated ctx)) (cp:ctx-emit! ctx `(make-cell ,(cdr p) ,(cdr p))))) new-scope)
-        (cp:codegen `(begin ,@body) (cons (cons `num-params n-params) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-params) #t ctx)))
-    (cp:ctx-add-closure! ctx (reverse (cp:ctx-code ctx)))
-    (cp:ctx-set-code! ctx prev-code)
     
-    (let loop ((fs free) (regs '()) (r next-reg))
-      (if (null? fs)
-          (begin
-            (cp:ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,stack-alloc?))
-            (if tail? (cp:ctx-emit! ctx `(ret))))
-          (let ((b (cp:lookup (car fs) env)))
-            (if (eq? (car b) 'reg)
-                (loop (cdr fs) (cons (cdr b) regs) r)
-                ;; It is 'cl (closure) or 'self
-                (let ((tmp (cp:make-reg r)))
-                  (if (eq? (car b) 'self)
-                      (cp:ctx-emit! ctx `(closure-self ,tmp))
-                      (cp:ctx-emit! ctx `(closure-ref ,tmp ,(cdr b))))
-                  (loop (cdr fs) (cons tmp regs) (+ r 1)))))))))
+    (let-values (((fixed-params rest-param has-rest?) (cp:analyze-params params)))
+       (let ((n-fixed (length fixed-params)))
+
+         (cp:ctx-set-code! ctx '())
+         (cp:ctx-emit! ctx `(label ,entry-label))
+
+         ;; Arg mapping:
+         ;; Fixed params 0..(n-fixed-1) are in r0..(rn-1)
+         ;; Rest param is in r(n-fixed) (if has-rest?)
+         ;; We need to move them to new-base..(new-base+n-vars-1)
+         
+         (let* ((new-base (max 1 max-outgoing)) ; Ensure space for outgoing args
+                (all-params (if has-rest? (append fixed-params (list rest-param)) fixed-params))
+                (n-total-params (length all-params))
+                
+                (new-scope (let loop ((p all-params) (i 0))
+                             (if (null? p) '() (cons (cons (car p) (cp:make-reg (+ new-base i))) (loop (cdr p) (+ i 1))))))
+                (cl-scope (let loop ((f free) (i 0))
+                            (if (null? f) '() (cons (cons (car f) i) (loop (cdr f) (+ i 1)))))))
+           
+           ;; Move params.
+           ;; Incoming: r0 .. r(n-total-params - 1)
+           ;; Dest: new-base ..
+           ;; Move via reverse order
+           (let move-params ((i (- n-total-params 1)))
+             (if (>= i 0) (begin (cp:ctx-emit! ctx `(mov ,(cp:make-reg (+ new-base i)) ,(cp:make-reg i))) (move-params (- i 1)))))
+
+           (let* ((self-bindings (if (null? env) '()
+                                     (let ((scope (car env)))
+                                       (if (and (pair? scope) (not (eq? (car scope) 'cl)) (not (eq? (car scope) 'num-params)))
+                                           (filter (lambda (b) (eq? (cdr b) 'self)) scope)
+                                           '())))))
+             (for-each (lambda (p) (if (memq (car p) (cp:ctx-mutated ctx)) (cp:ctx-emit! ctx `(make-cell ,(cdr p) ,(cdr p))))) new-scope)
+             (cp:codegen `(begin ,@body) (cons (cons `num-params n-total-params) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-total-params) #t ctx)))
+
+         (cp:ctx-add-closure! ctx (reverse (cp:ctx-code ctx)))
+         (cp:ctx-set-code! ctx prev-code)
+
+         (let loop ((fs free) (regs '()) (r next-reg))
+           (if (null? fs)
+               (begin
+                 (cp:ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,stack-alloc? ,n-fixed ,has-rest?))
+                 (if tail? (cp:ctx-emit! ctx `(ret))))
+               (let ((b (cp:lookup (car fs) env)))
+                 (if (eq? (car b) 'reg)
+                     (loop (cdr fs) (cons (cdr b) regs) r)
+                     ;; It is 'cl (closure) or 'self
+                     (let ((tmp (cp:make-reg r)))
+                       (if (eq? (car b) 'self)
+                           (cp:ctx-emit! ctx `(closure-self ,tmp))
+                           (cp:ctx-emit! ctx `(closure-ref ,tmp ,(cdr b))))
+                       (loop (cdr fs) (cons tmp regs) (+ r 1)))))))))))
 
 (define (cp:codegen-application expr env next-reg tail? ctx)
   (if (and (pair? (car expr)) (cp:match-rec-pattern (car expr)))
