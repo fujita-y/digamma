@@ -8,7 +8,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # List of directories with run_tests.sh
 # We exclude "closure" if it doesn't have a run_tests.sh, but we just created it.
-DIRS=("syntax" "opt" "vm" "repl" "closure")
+DIRS=("syntax" "opt" "vm" "repl" "closure", "types")
 
 FAILED_DIRS=()
 
