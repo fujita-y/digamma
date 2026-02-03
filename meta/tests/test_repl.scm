@@ -1,4 +1,5 @@
 ;;; Test for REPL logic
+(load "../../core/core.scm")
 (load "../repl.scm")
 
 (define *pass-count* 0)
@@ -7,8 +8,8 @@
 (define (test name expr expected)
   (format #t "Testing: ~a\n" name)
   (let* ((expanded (macroexpand expr))
-         (optimized (op:optimize expanded))
-         (code (cp:compile optimized))
+         (optimized (optimize expanded))
+         (code (compile optimized))
          (vm (vm:init-vm))
          (ctx (vm:init-context vm code)))
     (repl:init-globals vm)
@@ -382,8 +383,8 @@
        (_ (repl:init-globals vm))
        (run (lambda (expr)
               (let* ((expanded (macroexpand expr))
-                     (optimized (op:optimize expanded))
-                     (code (cp:compile optimized))
+                     (optimized (optimize expanded))
+                     (code (compile optimized))
                      (ctx (vm:init-context vm code)))
                 (vm:vm-run ctx)))))
   (display "Testing: shared state across contexts\n")

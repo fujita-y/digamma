@@ -1,6 +1,6 @@
 ;; test_syntax_case.scm
 ;; Test suite for syntax-case and related R6RS features.
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -22,22 +22,22 @@
 (display "\n>>> Section 1: Standalone expansion tests\n")
 
 ;; Test basic matching
-(let* ((input (sc:make-syntax-object '(foo 1 2 3) '()))
-       (result (sc:expand-syntax-case input '()
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '()
                                    '(((name val ...) #t (syntax (name val ...))))
                                    (interaction-environment))))
   (test "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
 
 ;; Test ellipsis expansion
-(let* ((input (sc:make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
-       (result (sc:expand-syntax-case input '()
+(let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
+       (result (expand-syntax-case input '()
                                    '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
                                    (interaction-environment))))
-  (test "ellipsis-expansion" (mc:strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
+  (test "ellipsis-expansion" (strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
 
 ;; Test fenders
-(let* ((input (sc:make-syntax-object '(foo 1 2 3) '()))
-       (result (sc:expand-syntax-case input '()
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '()
                                    '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
                                      ((name val ...) #t 'not-empty))
                                    (interaction-environment))))
@@ -103,7 +103,7 @@
   (or (null? ls)
       (and (let loop ((x (car ls)) (rest (cdr ls)))
              (or (null? rest)
-                 (and (not (sc:bound-identifier=? x (car rest)))
+                 (and (not (bound-identifier=? x (car rest)))
                       (loop x (cdr rest)))))
            (unique-ids? (cdr ls)))))
 
@@ -126,7 +126,7 @@
     (lambda (x)
       (syntax-case x ()
         [(_ x e)
-         (sc:identifier? (syntax x))
+         (identifier? (syntax x))
          (syntax (letrec ([x e]) x))]))))
 
 (test "r6rs-rec-fact"
@@ -355,19 +355,19 @@
       (macroexpand '(local-definition-test int hoge (int int)) 'strip)
       "ok")
 
-;; sc:bound-identifier=? test
+;; bound-identifier=? test
 (macroexpand
  '(define-syntax test-bound-id
     (lambda (x)
       (syntax-case x ()
         ((_ id)
          (let* ((introduced (datum->syntax (syntax here) 'x))
-                (res1 (sc:bound-identifier=? (syntax id) introduced))
-                (res2 (sc:bound-identifier=? introduced introduced)))
+                (res1 (bound-identifier=? (syntax id) introduced))
+                (res2 (bound-identifier=? introduced introduced)))
            (with-syntax ((res1 res1) (res2 res2))
              (syntax (list res1 res2)))))))))
 
-(test "sc:bound-identifier=? test"
+(test "bound-identifier=? test"
       (macroexpand '(test-bound-id x) 'strip)
       '(list #f #t))
 

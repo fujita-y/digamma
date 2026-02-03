@@ -1,7 +1,7 @@
 ;; test_r6rs_extra.scm
 ;; Test suite for extra R6RS features like variable transformers.
 
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -65,9 +65,9 @@
 (test "nested-id-set" (macroexpand '(set! nested-id 7) 'strip) '(set-inner! 7))
 
 ;; =============================================================================
-;; Section 3: sc:free-identifier=? tests
+;; Section 3: free-identifier=? tests
 ;; =============================================================================
-(display "\n>>> Section 3: sc:free-identifier=? tests\n")
+(display "\n>>> Section 3: free-identifier=? tests\n")
 
 (macroexpand
  '(define-syntax check-else

@@ -1,7 +1,7 @@
 ;; test_module_macroexpand.scm
 ;; Test suite for define-module and import-module in macroexpand.scm
 
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -45,7 +45,7 @@
       ''defined)
 
 ;; Test that module was registered
-(let ((module-info (mc:lookup-module '(math utils))))
+(let ((module-info (lookup-module '(math utils))))
   (if module-info
       (begin
         (set! *pass-count* (+ *pass-count* 1))

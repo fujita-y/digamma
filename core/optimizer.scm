@@ -1,499 +1,443 @@
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
+;;
+;; Optimizer for Scheme Core Forms
+;;
+;; This module performs high-level optimizations on core forms:
+;; - Constant propagation and folding
+;; - Dead code elimination (begin flattening, unused let-binding removal)
+;; - Procedure inlining and beta-reduction
+;; - If-lifting and boolean simplification
+;; - Unused parameter removal in lambdas
 
-;;; Optimizer for Scheme Core Forms
-;;; Core Forms: [lambda, let, define, if, set!, quote, begin] and applications.
+;;=============================================================================
+;; 1. Global State & Config
+;;=============================================================================
 
-;; --- Global State ---
+(define global-env (make-hash-table 'eq?))
+(define *inlining-depth* (make-hash-table 'eq?))
 
-(define op:global-env (make-hash-table 'eq?))
-(define op:*inlining-depth* (make-hash-table 'eq?))
+(define *cp0-effort-limit* 100)
+(define *cp0-score-limit* 20)
 
-;; --- Core API ---
+;; Pure side-effect-free primitives that can be removed if their result is unused.
+(define pure-primitives
+  '(not boolean? boolean=? eq? eqv? equal?
+    pair? cons car cdr caar cadr cdar cddr null? list? list length append reverse
+    make-list list-tail list-ref memq memv member assq assv assoc
+    symbol? symbol=? symbol->string string->symbol
+    number? complex? real? rational? integer? exact? inexact? = < > <= >= zero?
+    positive? negative? odd? even? max min + * - / abs floor ceiling truncate
+    round gcd lcm numerator denominator expt sqrt number->string exact-integer-sqrt
+    char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>?
+    char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace?
+    char-upper-case? char-lower-case? char->integer integer->char char-upcase char-downcase
+    string? make-string string string-length string-ref string=? string<? string>?
+    string<=? string>=? string-ci=? string-ci<? string-ci>? string-ci<=? string-ci>=?
+    substring string-append string->list list->string string-copy string->number
+    vector? make-vector vector vector-length vector-ref vector->list list->vector
+    procedure? bytevector? bytevector-length bytevector-u8-ref))
 
-(define (op:optimize expr)
-  (hash-table-clear! op:global-env)
-  (hash-table-clear! op:*inlining-depth*)
+;;=============================================================================
+;; 2. Entry Points
+;;=============================================================================
+
+;; Perform full optimization until fixed-point or iteration limit.
+(define (optimize expr)
+  (hash-table-clear! global-env)
+  (hash-table-clear! *inlining-depth*)
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10))
         current
-        (loop (op:optimize-inner current '()) current (+ iters 1)))))
+        (loop (optimize-inner current '()) current (+ iters 1)))))
 
-(define (op:optimize-once expr)
-  (op:optimize-inner expr '()))
+;; Perform a single optimization pass.
+(define (optimize-once expr)
+  (optimize-inner expr '()))
 
-(define (op:boolean-true? x) (or (eq? x #t) (equal? x ''#t)))
-(define (op:boolean-false? x) (or (eq? x #f) (equal? x ''#f) (null? x)))
+;;=============================================================================
+;; 3. Dispatcher & Core Handlers
+;;=============================================================================
 
-(define op:pure-primitives
-  '(;; Booleans
-    not boolean? boolean=?
-    ;; Equivalence
-    eq? eqv? equal?
-    ;; Pairs and Lists
-    pair? cons car cdr caar cadr cdar cddr null? list? list length append reverse make-list list-tail list-ref memq memv member assq assv assoc
-    ;; Symbols
-    symbol? symbol=? symbol->string string->symbol
-    ;; Numbers
-    number? complex? real? rational? integer? exact? inexact? = < > <= >= zero? positive? negative? odd? even? max min + * - / abs floor ceiling truncate round gcd lcm numerator denominator expt sqrt number->string exact-integer-sqrt
-    ;; Characters
-    char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>? char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace? char-upper-case? char-lower-case? char->integer integer->char char-upcase char-downcase
-    ;; Strings
-    string? make-string string string-length string-ref string=? string<? string>? string<=? string>=? string-ci=? string-ci<? string-ci>? string-ci<=? string-ci>=? substring string-append string->list list->string string-copy string->number
-    ;; Vectors
-    vector? make-vector vector vector-length vector-ref vector->list list->vector
-    ;; Procedures
-    procedure?
-    ;; Bytevectors
-    bytevector? bytevector-length bytevector-u8-ref))
-
-;; --- Dispatcher ---
-
-(define (op:optimize-inner expr bound-vars)
+(define (optimize-inner expr bound-vars)
   (cond
-    ((symbol? expr) 
-     (if (and (hash-table-exists? op:global-env expr)
+    ((symbol? expr)
+     (if (and (hash-table-exists? global-env expr)
               (not (memq expr bound-vars)))
-         (hash-table-get op:global-env expr)
+         (hash-table-get global-env expr)
          expr))
+
     ((not (pair? expr)) expr)
+
     ((eq? (car expr) 'quote) expr)
-    ((eq? (car expr) 'if) (op:opt-if expr bound-vars))
-    ((eq? (car expr) 'begin) (op:opt-begin expr bound-vars))
-    ((eq? (car expr) 'lambda) (op:opt-lambda expr bound-vars))
-    ((eq? (car expr) 'let) (op:opt-let expr bound-vars))
+
+    ((eq? (car expr) 'if) (opt-if expr bound-vars))
+
+    ((eq? (car expr) 'begin) (opt-begin expr bound-vars))
+
+    ((eq? (car expr) 'lambda) (opt-lambda expr bound-vars))
+
+    ((eq? (car expr) 'let) (opt-let expr bound-vars))
+
     ((eq? (car expr) 'set!)
-     `(set! ,(cadr expr) ,(op:optimize-inner (caddr expr) bound-vars)))
+     `(set! ,(cadr expr) ,(optimize-inner (caddr expr) bound-vars)))
+
     ((eq? (car expr) 'define)
-     (let ((var (cadr expr)) (val (op:optimize-inner (caddr expr) bound-vars)))
-       (if (and (not (pair? val)) (not (symbol? val))) ;; Simple constant
-           (hash-table-put! op:global-env var val))
-       (if (and (pair? val) (eq? (car val) 'quote))
-           (hash-table-put! op:global-env var val))
+     (let ((var (cadr expr))
+           (val (optimize-inner (caddr expr) bound-vars)))
+       (if (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)))
+           (hash-table-put! global-env var val))
        `(define ,var ,val)))
-    (else (op:opt-app expr bound-vars))))
 
+    (else (opt-app expr bound-vars))))
 
-;; --- Specialized Optimizers ---
+(define (boolean-true? x)
+  (or (eq? x #t) (equal? x ''#t)))
 
-(define (op:opt-if expr bound-vars)
-  (let ((test (op:optimize-inner (cadr expr) bound-vars))
-        (then (op:optimize-inner (caddr expr) bound-vars))
-        (els (if (null? (cdddr expr)) ''#f (op:optimize-inner (cadddr expr) bound-vars))))
+(define (boolean-false? x)
+  (or (eq? x #f) (equal? x ''#f) (null? x)))
+
+(define (opt-if expr bound-vars)
+  (let ((test (optimize-inner (cadr expr) bound-vars))
+        (then (optimize-inner (caddr expr) bound-vars))
+        (els (if (null? (cdddr expr)) ''#f (optimize-inner (cadddr expr) bound-vars))))
     (cond
       ;; If-lifting: (if (if a b c) d e) -> (if a (if b d e) (if c d e))
       ((and (pair? test) (eq? (car test) 'if))
        (let ((a (cadr test)) (b (caddr test)) (c (cadddr test)))
-         (op:optimize-inner `(if ,a (if ,b ,then ,els) (if ,c ,then ,els)) bound-vars)))
-      ;; Boolean simplification: (if a #t #f) -> a (if a is boolean)
-      ((and (op:boolean-true? then) (op:boolean-false? els))
-       test)
+         (optimize-inner `(if ,a (if ,b ,then ,els) (if ,c ,then ,els)) bound-vars)))
+
+      ;; Boolean simplification
+      ((and (boolean-true? then) (boolean-false? els)) test)
+
       ((and (pair? test) (eq? (car test) 'quote))
        (if (cadr test) then els))
+
       ((boolean? test)
        (if test then els))
-      (else `(if ,test ,then ,els)))))
 
+      (else
+       `(if ,test ,then ,els)))))
 
-(define (op:opt-begin expr bound-vars)
-  (let* ((exprs (map (lambda (e) (op:optimize-inner e bound-vars)) (cdr expr)))
+(define (opt-begin expr bound-vars)
+  (let* ((exprs (map (lambda (e) (optimize-inner e bound-vars)) (cdr expr)))
          (flattened (apply append (map (lambda (x) (if (and (pair? x) (eq? (car x) 'begin)) (cdr x) (list x))) exprs)))
-         (filtered (filter (lambda (x) (op:has-effects? x)) (op:take flattened (- (length flattened) 1)))))
+         (filtered (filter (lambda (x) (has-effects? x)) (take flattened (max 0 (- (length flattened) 1))))))
     (let ((last-val (if (null? flattened) ''#f (car (reverse flattened)))))
       (if (null? filtered)
           last-val
           `(begin ,@filtered ,last-val)))))
 
-(define (op:opt-lambda expr bound-vars)
+(define (opt-lambda expr bound-vars)
   (let* ((params (cadr expr))
-         (new-bound (if (list? params) 
-                        (append params bound-vars) 
-                        (cons params bound-vars)))
-         (body-exprs (map (lambda (e) (op:optimize-inner e new-bound)) (cddr expr)))
-         (body `(begin ,@body-exprs))
-         (used (op:analyze-used-vars body))
-         (mutated (op:analyze-mutated-vars body)))
-    ;; Unused parameter removal
-    (let loop ((ps (if (list? params) params '())) 
-               (i 0) 
+         (new-bound (if (list? params) (append params bound-vars) (cons params bound-vars)))
+         (body-exprs (map (lambda (e) (optimize-inner e new-bound)) (cddr expr)))
+         (body (make-seq body-exprs))
+         (used (analyze-used-vars body))
+         (mutated (analyze-mutated-vars-optimizer body)))
+    (let loop ((ps (if (list? params) params '()))
                (new-params '()))
       (cond
-        ((null? ps) 
+        ((null? ps)
          `(lambda ,(if (list? params) (reverse new-params) params) ,@body-exprs))
         ((and (not (memq (car ps) used)) (not (memq (car ps) mutated)))
-         (loop (cdr ps) (+ i 1) new-params)) ;; Remove it
-        (else (loop (cdr ps) (+ i 1) (cons (car ps) new-params)))))))
+         (loop (cdr ps) new-params)) ;; Remove unused param
+        (else
+         (loop (cdr ps) (cons (car ps) new-params)))))))
 
-
-(define (op:analyze-free-var-counts expr)
-  (let ((counts (make-hash-table 'eq?)))
-    (let walk ((e expr) (shadowed '()))
-      (cond
-       ((symbol? e) 
-        (unless (memq e shadowed)
-          (hash-table-put! counts e (+ (hash-table-get counts e 0) 1))))
-       ((not (pair? e)) #f)
-       ((eq? (car e) 'quote) #f)
-       ((eq? (car e) 'lambda)
-        (let* ((params (cadr e))
-               (new-shadowed (if (list? params) 
-                                 (append params shadowed) 
-                                 (cons params shadowed))))
-          (for-each (lambda (body-expr) (walk body-expr new-shadowed)) (cddr e))))
-       ((eq? (car e) 'let)
-        (let* ((bindings (cadr e))
-               (vars (map car bindings))
-               ;; Evaluate init expressions in CURRENT scope (not shadowed by let vars yet)
-               (inits (map cadr bindings)))
-          (for-each (lambda (init) (walk init shadowed)) inits)
-          ;; Evaluate body in NEW scope
-          (let ((new-shadowed (append vars shadowed)))
-            (for-each (lambda (body-expr) (walk body-expr new-shadowed)) (cddr e)))))
-       ((eq? (car e) 'set!)
-        (walk (caddr e) shadowed)) ;; set! var is not a use in terms of substitution? 
-                                   ;; Wait, for "single use" we usually mean "read". 
-                                   ;; But if we substitute, we replace definitions.
-                                   ;; Actually, mutated vars are excluded from inlining/substitution entirely 
-                                   ;; by `op:analyze-mutated-vars`.
-                                   ;; So here we just count textual occurrences in non-binding positions?
-                                   ;; Correct.
-        
-       ((eq? (car e) 'if)
-        (walk (cadr e) shadowed)
-        (walk (caddr e) shadowed)
-        (if (not (null? (cdddr e))) (walk (cadddr e) shadowed)))
-       
-       (else (for-each (lambda (x) (walk x shadowed)) e))))
-    counts))
-    
-(define (op:opt-let expr bound-vars)
-  (let* ((bindings (map (lambda (b) (list (car b) (op:optimize-inner (cadr b) bound-vars))) (cadr expr)))
+(define (opt-let expr bound-vars)
+  (let* ((bindings (map (lambda (b) (list (car b) (optimize-inner (cadr b) bound-vars))) (cadr expr)))
          (vars (map car bindings))
          (new-bound (append vars bound-vars))
-         (body-exprs (map (lambda (e) (op:optimize-inner e new-bound)) (cddr expr)))
-         (body (if (and (null? (cdr body-exprs)) (pair? (car body-exprs)) (eq? (car (car body-exprs)) 'begin))
+         (body-exprs (map (lambda (e) (optimize-inner e new-bound)) (cddr expr)))
+         (body (if (and (null? (cdr body-exprs))
+                        (pair? (car body-exprs))
+                        (eq? (car (car body-exprs)) 'begin))
                    (cdr (car body-exprs))
                    body-exprs)))
-    
+
     ;; Let-floating
-    (let ((floated-bindings '()) (main-bindings '()))
+    (let ((floated-bindings '())
+          (main-bindings '()))
       (for-each (lambda (b)
                   (let ((var (car b)) (val (cadr b)))
                     (if (and (pair? val) (eq? (car val) 'let))
                         (begin
                           (set! floated-bindings (append floated-bindings (cadr val)))
-                          (set! main-bindings 
-                                (append main-bindings 
-                                        (list (list var (if (null? (cddr val)) '() (car (reverse (cddr val)))))))))
+                          (set! main-bindings (append main-bindings
+                                                      (list (list var (if (null? (cddr val))
+                                                                          '()
+                                                                          (car (reverse (cddr val)))))))))
                         (set! main-bindings (append main-bindings (list b))))))
                 bindings)
-      (if (not (null? floated-bindings))
-          (op:optimize-inner `(let ,floated-bindings (let ,main-bindings ,@body)) bound-vars)
-          
-          ;; Binding Optimization Pipeline
-          (let ((used (op:analyze-used-vars `(begin ,@body)))
-                (mutated-vars (op:analyze-mutated-vars `(begin ,@body)))
-                (new-bindings '())
-                (var-counts #f) ;; Cache for variable counts
-                (body-changed? #t)) ;; Flag to invalidate cache
 
-            (define (ensure-counts-up-to-date! current-body)
-              (when body-changed?
-                (set! var-counts (op:analyze-free-var-counts current-body))
-                (set! body-changed? #f)))
+      (if (not (null? floated-bindings))
+          (optimize-inner `(let ,floated-bindings (let ,main-bindings ,@body)) bound-vars)
+
+          ;; Substitution / Inlining Pipeline
+          (let ((used (analyze-used-vars (make-seq body)))
+                (mutated-vars (analyze-mutated-vars-optimizer (make-seq body)))
+                (new-bindings '())
+                (var-counts #f)
+                (body-changed? #t))
 
             (define (get-use-count var current-body)
-              (ensure-counts-up-to-date! current-body)
+              (when body-changed?
+                (set! var-counts (analyze-free-var-counts current-body))
+                (set! body-changed? #f))
               (hash-table-get var-counts var 0))
 
-            (define (should-inline? var val current-body)
-              (let ((count (get-use-count var current-body)))
-                (or (<= count 1)
-                    (and (op:small-procedure? val)
-                         (let ((depth (hash-table-get op:*inlining-depth* var 0)))
-                           (< depth 2))))))
-            
             (define (process-binding! b)
               (let ((var (car b)) (val (cadr b)))
                 (cond
-                  ((and (not (memq var mutated-vars)) 
-                        (or (not (pair? val)) 
-                            (and (pair? val) (eq? (car val) 'quote)) 
-                            (symbol? val)
-                            (and (not (op:has-effects? val)) ;; Pure expression substitution
-                                 (<= (get-use-count var `(begin ,@body)) 1))))
-                   (set! body (map (lambda (e) (op:substitute e var val)) body))
+                  ((and (not (memq var mutated-vars))
+                        (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)
+                            (and (not (has-effects? val)) (<= (get-use-count var (make-seq body)) 1))))
+                   (set! body (map (lambda (e) (substitute e var val)) body))
                    (set! body-changed? #t)
-                   (if (op:has-effects? val) (set! new-bindings (cons b new-bindings))))
-                  
-                  ;; 2. Inlining
-                  ((and (not (memq var mutated-vars)) 
-                        (pair? val) 
-                        (eq? (car val) 'lambda) 
-                        (should-inline? var val `(begin ,@body)))
-                   (set! body (op:perform-inlining var val body))
+                   (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
+
+                  ((and (not (memq var mutated-vars))
+                        (pair? val)
+                        (eq? (car val) 'lambda)
+                        (should-inline? var val (make-seq body)))
+                   (set! body (perform-inlining var val body))
                    (set! body-changed? #t)
-                   (if (op:has-effects? val) (set! new-bindings (cons b new-bindings))))
-                  
-                  ;; 3. Lambda Dropping
-                  ((and (not (memq var mutated-vars)) 
-                        (pair? val) 
-                        (eq? (car val) 'lambda) 
+                   (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
+
+                  ((and (not (memq var mutated-vars))
+                        (pair? val)
+                        (eq? (car val) 'lambda)
                         (and (pair? (car body)) (eq? (car (car body)) 'if)))
-                   (let ((res (op:try-drop-lambda var val (car body))))
+                   (let ((res (try-drop-lambda var val (car body))))
                      (if (car res)
                          (begin (set! body (list (cdr res))) (set! body-changed? #t))
                          (set! new-bindings (cons b new-bindings)))))
-                  
-                  ;; 4. Closed Lambda Preservation (Handled by Let-floating in next pass)
-                  ((and (not (memq var mutated-vars)) 
-                        (pair? val) 
-                        (eq? (car val) 'lambda) 
-                        (null? (op:analyze-free-vars val '())))
-                   (set! new-bindings (cons b new-bindings)))
-                  
-                  ;; 5. Keep it if used or has effects
-                  ((or (memq var used) (memq var mutated-vars) (op:has-effects? val))
+
+                  ((or (memq var used) (memq var mutated-vars) (has-effects? val))
                    (set! new-bindings (cons b new-bindings))))))
 
             (for-each process-binding! main-bindings)
             (set! new-bindings (reverse new-bindings))
-            
+
             (if (null? new-bindings)
                 (if (null? (cdr body)) (car body) `(begin ,@body))
                 `(let ,new-bindings ,@body)))))))
 
-(define (op:try-drop-lambda var val if-expr)
-  (let* ((test (cadr if-expr))
-         (then (caddr if-expr))
-         (else (if (null? (cdddr if-expr)) ''#f (cadddr if-expr)))
-         (used-in-test (memq var (op:analyze-used-vars test)))
-         (used-in-then (memq var (op:analyze-used-vars then)))
-         (used-in-else (memq var (op:analyze-used-vars else))))
+(define (opt-app expr bound-vars)
+  (let ((proc (optimize-inner (car expr) bound-vars))
+        (args (map (lambda (e) (optimize-inner e bound-vars)) (cdr expr))))
     (cond
-      ((and (not used-in-test) used-in-then (not used-in-else))
-       (cons #t `(if ,test (let ((,var ,val)) ,then) ,else)))
-      ((and (not used-in-test) (not used-in-then) used-in-else)
-       (cons #t `(if ,test ,then (let ((,var ,val)) ,else))))
-      (else (cons #f #f)))))
-
-(define (op:opt-app expr bound-vars)
-  (let ((proc (op:optimize-inner (car expr) bound-vars))
-        (args (map (lambda (e) (op:optimize-inner e bound-vars)) (cdr expr))))
-    (cond
-      ;; Beta-reduction: ((lambda (x) ...) y) -> (let ((x y)) ...)
+      ;; Beta-reduction
       ((and (pair? proc) (eq? (car proc) 'lambda))
-       (let ((params (cadr proc))
-             (body (cddr proc)))
+       (let ((params (cadr proc)) (body (cddr proc)))
          (if (and (list? params) (= (length params) (length args)))
-             (op:optimize-inner `(let ,(map list params args) ,@body) bound-vars)
-             ;; Handle argument mismatch or variadic/improper params
+             (optimize-inner `(let ,(map list params args) ,@body) bound-vars)
              (if (and (list? params) (< (length params) (length args)))
-                 (let ((extra-args (op:drop args (length params))))
-                   (op:optimize-inner `(begin ,@extra-args (let ,(map list params (op:take args (length params))) ,@body)) bound-vars))
+                 (let ((extra-args (drop args (length params))))
+                   (optimize-inner `(begin ,@extra-args (let ,(map list params (take args (length params))) ,@body)) bound-vars))
                  (cons proc args)))))
       (else (cons proc args)))))
 
-;; --- Transformation Helpers ---
+;;=============================================================================
+;; 4. Analysis & Transformation Utilities
+;;=============================================================================
 
-(define (op:take lst n)
-  (if (or (null? lst) (<= n 0)) '()
-      (cons (car lst) (op:take (cdr lst) (- n 1)))))
+(define (analyze-free-var-counts expr)
+  (let ((counts (make-hash-table 'eq?)))
+    (let walk ((e expr) (shadowed '()))
+      (cond ((symbol? e)
+             (unless (memq e shadowed)
+               (hash-table-put! counts e (+ (hash-table-get counts e 0) 1))))
 
-(define (op:drop lst n)
-  (if (or (null? lst) (<= n 0)) lst
-      (op:drop (cdr lst) (- n 1))))
+            ((not (pair? e)) #f)
 
-;; op:substitute: Simple value replacement.
-;; Replaces all occurrences of `var` with `val` in `expr`. 
-;; Used for constant propagation and copy propagation.
-(define (op:substitute expr var val)
-  (cond
-    ((eq? expr var) val)
-    ((not (pair? expr)) expr)
-    ((eq? (car expr) 'quote) expr)
-    ((eq? (car expr) 'lambda)
-     (if (memq var (if (list? (cadr expr)) (cadr expr) (list (cadr expr))))
-         expr
-         `(lambda ,(cadr expr) 
-            ,@(map (lambda (e) (op:substitute e var val)) (cddr expr)))))
-    ((eq? (car expr) 'let)
-     (let ((vars (map car (cadr expr))))
-       (if (memq var vars)
-           `(let ,(map (lambda (b) 
-                         (list (car b) (op:substitute (cadr b) var val))) 
-                       (cadr expr)) 
-              ,@(cddr expr))
-           `(let ,(map (lambda (b) 
-                         (list (car b) (op:substitute (cadr b) var val))) 
-                       (cadr expr)) 
-              ,@(map (lambda (e) (op:substitute e var val)) (cddr expr))))))
-    (else (map (lambda (e) (op:substitute e var val)) expr))))
+            ((eq? (car e) 'quote) #f)
 
-;; op:substitute-proc: Procedure inlining replacement.
-;; Like op:substitute, but specifically handles the case where `var` appears in the operator position of an application.
-;; If substitution results in ((lambda ...) ...), it immediately performs beta-reduction (op:optimize-once).
-(define (op:substitute-proc expr var val)
-  (cond
-    ((not (pair? expr)) expr)
-    ((eq? (car expr) 'quote) expr)
-    ((eq? (car expr) 'lambda)
-     (if (memq var (if (list? (cadr expr)) (cadr expr) (list (cadr expr))))
-         expr
-         `(lambda ,(cadr expr) ,@(map (lambda (e) (op:substitute-proc e var val)) (cddr expr)))))
-    ((eq? (car expr) 'let)
-     (let ((vars (map car (cadr expr))))
-       (if (memq var vars)
-           `(let ,(map (lambda (b) 
-                         (list (car b) (op:substitute-proc (cadr b) var val))) 
-                       (cadr expr)) 
-              ,@(cddr expr))
-           `(let ,(map (lambda (b) 
-                         (list (car b) (op:substitute-proc (cadr b) var val))) 
-                       (cadr expr)) 
-              ,@(map (lambda (e) (op:substitute-proc e var val)) (cddr expr))))))
-    ((eq? (car expr) var) 
-     (cons val (map (lambda (e) (op:substitute-proc e var val)) (cdr expr))))
-    (else (let ((new-expr (map (lambda (e) (op:substitute-proc e var val)) expr)))
-            (if (and (pair? (car new-expr)) (eq? (car (car new-expr)) 'lambda))
-                (op:optimize-once new-expr) ;; Optimization opportunity (beta-reduction)
-                new-expr)))))
+            ((eq? (car e) 'lambda)
+             (let ((new-shadowed (let ((p (cadr e))) (if (list? p) (append p shadowed) (cons p shadowed)))))
+               (for-each (lambda (be) (walk be new-shadowed)) (cddr e))))
 
-(define (op:perform-inlining var val body)
-  (let ((depth (hash-table-get op:*inlining-depth* var 0)))
-    (hash-table-put! op:*inlining-depth* var (+ depth 1))
-    (let ((new-body (map (lambda (e) (op:substitute-proc e var val)) body)))
-      new-body)))
+            ((eq? (car e) 'let)
+             (let* ((bindings (cadr e))
+                    (vars (map car bindings))
+                    (inits (map cadr bindings)))
+               (for-each (lambda (init) (walk init shadowed)) inits)
+               (for-each (lambda (be) (walk be (append vars shadowed))) (cddr e))))
 
-;; --- Inlining Heuristics ---
+            ((eq? (car e) 'set!)
+             (walk (caddr e) shadowed))
 
-(define op:*cp0-effort-limit* 100)
-(define op:*cp0-score-limit* 20)
+            (else
+             (for-each (lambda (x) (walk x shadowed)) e))))
+    counts))
 
-(define (op:compute-score expr effort)
-  (if (<= effort 0) 1000 ;; Too much effort
-      (cond
-        ((not (pair? expr)) 1)
-        ((eq? (car expr) 'quote) 1)
-        ((eq? (car expr) 'if)
-         (+ 1 (op:compute-score (cadr expr) (- effort 1))
-            (max (op:compute-score (caddr expr) (- effort 1))
-                 (op:compute-score (cadddr expr) (- effort 1)))))
+(define (try-drop-lambda var val if-expr)
+  (let* ((test (cadr if-expr))
+         (then (caddr if-expr))
+         (else (if (null? (cdddr if-expr)) ''#f (cadddr if-expr)))
+         (used-in-test (memq var (analyze-used-vars test)))
+         (used-in-then (memq var (analyze-used-vars then)))
+         (used-in-else (memq var (analyze-used-vars else))))
+    (cond ((and (not used-in-test) used-in-then (not used-in-else))
+           (cons #t `(if ,test (let ((,var ,val)) ,then) ,else)))
+          ((and (not used-in-test) (not used-in-then) used-in-else)
+           (cons #t `(if ,test ,then (let ((,var ,val)) ,else))))
+          (else
+           (cons #f #f)))))
+
+(define (substitute expr var val)
+  (cond ((eq? expr var) val)
+        ((not (pair? expr)) expr)
+        ((eq? (car expr) 'quote) expr)
         ((eq? (car expr) 'lambda)
-         (+ 5 (op:compute-score (cddr expr) (- effort 1))))
-        (else (+ 1 (apply + (map (lambda (e) (op:compute-score e (- effort 1))) expr)))))))
+         (if (member var (let ((p (cadr expr))) (unique (if (list? p) p (list p)))))
+             expr
+             `(lambda ,(cadr expr) ,@(map (lambda (e) (substitute e var val)) (cddr expr)))))
+        ((eq? (car expr) 'let)
+         (let ((vars (map car (cadr expr))))
+           (if (memq var vars)
+               `(let ,(map (lambda (b) (list (car b) (substitute (cadr b) var val))) (cadr expr)) ,@(cddr expr))
+               `(let ,(map (lambda (b) (list (car b) (substitute (cadr b) var val))) (cadr expr)) ,@(map (lambda (e) (substitute e var val)) (cddr expr))))))
+        (else
+         (map (lambda (e) (substitute e var val)) expr))))
 
-(define (op:small-procedure? val)
-  (<= (op:compute-score val op:*cp0-effort-limit*) op:*cp0-score-limit*))
+(define (substitute-proc expr var val)
+  (cond ((not (pair? expr)) expr)
+        ((eq? (car expr) 'quote) expr)
+        ((eq? (car expr) 'lambda)
+         (if (memq var (let ((p (cadr expr))) (if (list? p) p (list p))))
+             expr
+             `(lambda ,(cadr expr) ,@(map (lambda (e) (substitute-proc e var val)) (cddr expr)))))
+        ((eq? (car expr) var)
+         (cons val (map (lambda (e) (substitute-proc e var val)) (cdr expr))))
+        (else
+         (let ((new-expr (map (lambda (e) (substitute-proc e var val)) expr)))
+           (if (and (pair? (car new-expr)) (eq? (car (car new-expr)) 'lambda))
+               (optimize-once new-expr)
+               new-expr)))))
 
-(define (op:should-inline? var val body)
-  (let ((count (op:count-occurrences var body)))
+(define (perform-inlining var val body)
+  (hash-table-put! *inlining-depth* var (+ (hash-table-get *inlining-depth* var 0) 1))
+  (map (lambda (e) (substitute-proc e var val)) body))
+
+(define (compute-score expr effort)
+  (if (<= effort 0)
+      1000
+      (cond ((not (pair? expr)) 1)
+            ((eq? (car expr) 'quote) 1)
+            ((eq? (car expr) 'if)
+             (+ 1 (compute-score (cadr expr) (- effort 1))
+                  (max (compute-score (caddr expr) (- effort 1))
+                       (compute-score (cadddr expr) (- effort 1)))))
+            ((eq? (car expr) 'lambda)
+             (+ 5 (compute-score (cddr expr) (- effort 1))))
+            (else
+             (+ 1 (apply + (map (lambda (e) (compute-score e (- effort 1))) expr)))))))
+
+(define (small-procedure? val)
+  (<= (compute-score val *cp0-effort-limit*) *cp0-score-limit*))
+
+(define (should-inline? var val body)
+  (let ((count (hash-table-get (analyze-free-var-counts body) var 0)))
     (or (<= count 1)
-        (and (op:small-procedure? val)
-             (let ((depth (hash-table-get op:*inlining-depth* var 0)))
-               (< depth 2)))))) ;; Unroll recursive calls once
+        (and (small-procedure? val)
+             (< (hash-table-get *inlining-depth* var 0) 2)))))
 
-(define (op:count-occurrences var expr)
-  (cond
-    ((eq? expr var) 1)
-    ((not (pair? expr)) 0)
-    ((eq? (car expr) 'quote) 0)
-    ((eq? (car expr) 'lambda)
-     (if (memq var (if (list? (cadr expr)) (cadr expr) (list (cadr expr))))
-         0
-         (apply + (map (lambda (e) (op:count-occurrences var e)) (cddr expr)))))
-    ((eq? (car expr) 'let)
-     (let ((vars (map car (cadr expr))))
-       (+ (apply + (map (lambda (b) (op:count-occurrences var (cadr b))) (cadr expr)))
-          (if (memq var vars) 0 (apply + (map (lambda (e) (op:count-occurrences var e)) (cddr expr)))))))
-    (else (apply + (map (lambda (e) (op:count-occurrences var e)) expr)))))
+(define (analyze-used-vars expr)
+  (cond ((symbol? expr) (list expr))
+        ((not (pair? expr)) '())
+        ((eq? (car expr) 'quote) '())
+        ((eq? (car expr) 'lambda)
+         (let ((p (cadr expr)))
+           (set-minus (analyze-used-vars (make-seq (cddr expr))) (if (list? p) p (list p)))))
+        ((eq? (car expr) 'let)
+         (let ((bindings (cadr expr))
+               (body (cddr expr)))
+           (set-union (apply set-union (map (lambda (b) (analyze-used-vars (cadr b))) bindings))
+                      (set-minus (analyze-used-vars (make-seq body)) (map car bindings)))))
+        (else
+         (apply set-union (map analyze-used-vars expr)))))
 
-;; --- Analysis Utilities ---
+(define (analyze-free-vars-optimizer expr bound-vars)
+  (cond ((symbol? expr)
+         (if (memq expr bound-vars) '() (list expr)))
 
-(define (op:analyze-used-vars expr)
-  (cond
-    ((symbol? expr) (list expr))
-    ((not (pair? expr)) '())
-    ((eq? (car expr) 'quote) '())
-    ((eq? (car expr) 'lambda)
-     (let ((params (cadr expr)) (body (cddr expr)))
-       (op:set-minus (op:analyze-used-vars `(begin ,@body)) (if (list? params) params (list params)))))
-    ((eq? (car expr) 'let)
-     (let ((bindings (cadr expr)) (body (cddr expr)))
-       (op:set-union (apply op:set-union (map (lambda (b) (op:analyze-used-vars (cadr b))) bindings))
-                  (op:set-minus (op:analyze-used-vars `(begin ,@body)) (map car bindings)))))
-    (else (apply op:set-union (map op:analyze-used-vars expr)))))
+        ((not (pair? expr)) '())
 
-(define (op:analyze-free-vars expr bound-vars)
-  (cond
-    ((symbol? expr) (if (memq expr bound-vars) '() (list expr)))
-    ((not (pair? expr)) '())
-    ((eq? (car expr) 'quote) '())
-    ((eq? (car expr) 'lambda)
-     (let ((params (cadr expr)) (body (cddr expr)))
-       (let ((params-list (if (list? params) params (list params))))
-         (op:analyze-free-vars `(begin ,@body) (op:set-union params-list bound-vars)))))
-    ((eq? (car expr) 'let)
-     (let ((bindings (cadr expr)) (body (cddr expr)))
-       (let ((vars (map car bindings)) (vals (map cadr bindings)))
-         (op:set-union (apply op:set-union (map (lambda (v) (op:analyze-free-vars v bound-vars)) vals))
-                    (op:analyze-free-vars `(begin ,@body) (op:set-union vars bound-vars))))))
-    ((eq? (car expr) 'if)
-     (op:set-union (op:analyze-free-vars (cadr expr) bound-vars)
-                (op:analyze-free-vars (caddr expr) bound-vars)
-                (if (null? (cdddr expr)) '() (op:analyze-free-vars (cadddr expr) bound-vars))))
-    ((eq? (car expr) 'begin)
-     (apply op:set-union (map (lambda (e) (op:analyze-free-vars e bound-vars)) (cdr expr))))
-    ((eq? (car expr) 'set!)
-     (op:set-union (if (memq (cadr expr) bound-vars) '() (list (cadr expr)))
-                (op:analyze-free-vars (caddr expr) bound-vars)))
-    ((eq? (car expr) 'define)
-     (op:analyze-free-vars (caddr expr) bound-vars))
-    (else (apply op:set-union (map (lambda (e) (op:analyze-free-vars e bound-vars)) expr)))))
+        ((eq? (car expr) 'quote) '())
 
-(define (op:analyze-mutated-vars expr)
-  (cond
-    ((not (pair? expr)) '())
-    ((eq? (car expr) 'quote) '())
-    ((eq? (car expr) 'set!) (cons (cadr expr) (op:analyze-mutated-vars (caddr expr))))
-    ((eq? (car expr) 'lambda)
-     (let ((params (if (list? (cadr expr)) (cadr expr) (list (cadr expr)))))
-       (op:set-minus (apply op:set-union (map op:analyze-mutated-vars (cddr expr))) params)))
-    (else (apply op:set-union (map op:analyze-mutated-vars expr)))))
+        ((eq? (car expr) 'lambda)
+         (let ((p (cadr expr)))
+           (analyze-free-vars-optimizer (make-seq (cddr expr))
+                                         (set-union (if (list? p) p (list p)) bound-vars))))
 
+        ((eq? (car expr) 'let)
+         (let ((bindings (cadr expr))
+               (body (cddr expr)))
+           (set-union (apply set-union (map (lambda (v) (analyze-free-vars-optimizer v bound-vars))
+                                               (map cadr bindings)))
+                      (analyze-free-vars-optimizer (make-seq body)
+                                                   (set-union (map car bindings) bound-vars)))))
 
+        ((eq? (car expr) 'if)
+         (set-union (analyze-free-vars-optimizer (cadr expr) bound-vars)
+                    (analyze-free-vars-optimizer (caddr expr) bound-vars)
+                    (if (null? (cdddr expr)) '() (analyze-free-vars-optimizer (cadddr expr) bound-vars))))
 
-(define (op:has-effects? expr)
-  (cond
-    ((symbol? expr) #f)
-    ((not (pair? expr)) #f)
-    ((eq? (car expr) 'quote) #f)
-    ((eq? (car expr) 'lambda) #f)
-    ((eq? (car expr) 'if) (or (op:has-effects? (cadr expr)) (op:has-effects? (caddr expr)) (and (not (null? (cdddr expr))) (op:has-effects? (cadddr expr)))))
-    ((eq? (car expr) 'begin) (op:any op:has-effects? (cdr expr)))
-    ((eq? (car expr) 'set!) #t)
-    ((eq? (car expr) 'define) #t)
-    ((eq? (car expr) 'let) (or (op:any (lambda (b) (op:has-effects? (cadr b))) (cadr expr)) (op:any op:has-effects? (cddr expr))))
-    (else 
-     ;; Check if it's a known pure primitive
-     (if (and (memq (car expr) op:pure-primitives)
-              (not (op:any op:has-effects? (cdr expr))))
-         #f
-         #t)))) ;; Assume other applications have effects
+        ((eq? (car expr) 'begin)
+         (apply set-union (map (lambda (e) (analyze-free-vars-optimizer e bound-vars)) (cdr expr))))
 
-;; --- General Utilities ---
+        ((eq? (car expr) 'set!)
+         (set-union (if (memq (cadr expr) bound-vars) '() (list (cadr expr)))
+                    (analyze-free-vars-optimizer (caddr expr) bound-vars)))
 
-(define (op:set-union . sets)
-  (op:fold (lambda (s acc)
-          (op:fold (lambda (x a) (if (memq x a) a (cons x a))) acc s))
-        '() sets))
+        ((eq? (car expr) 'define)
+         (analyze-free-vars-optimizer (caddr expr) bound-vars))
 
-(define (op:set-minus s1 s2)
-  (filter (lambda (x) (not (memq x s2))) s1))
+        (else
+         (apply set-union (map (lambda (e) (analyze-free-vars-optimizer e bound-vars)) expr)))))
 
-(define (op:any pred lst)
-  (cond ((null? lst) #f)
-        ((pred (car lst)) #t)
-        (else (op:any pred (cdr lst)))))
+(define (analyze-mutated-vars-optimizer expr)
+  (cond ((not (pair? expr)) '())
+        ((eq? (car expr) 'quote) '())
+        ((eq? (car expr) 'set!)
+         (cons (cadr expr) (analyze-mutated-vars-optimizer (caddr expr))))
+        ((eq? (car expr) 'lambda)
+         (let ((p (cadr expr)))
+           (set-minus (apply set-union (map analyze-mutated-vars-optimizer (cddr expr)))
+                      (if (list? p) p (list p)))))
+        (else
+         (apply set-union (map analyze-mutated-vars-optimizer expr)))))
 
-(define (op:fold proc seed lst)
-  (if (null? lst) seed
-      (op:fold proc (proc (car lst) seed) (cdr lst))))
+(define (has-effects? expr)
+  (cond ((symbol? expr) #f)
+        ((not (pair? expr)) #f)
+        ((eq? (car expr) 'quote) #f)
+        ((eq? (car expr) 'lambda) #f)
+        ((eq? (car expr) 'if)
+         (or (has-effects? (cadr expr))
+             (has-effects? (caddr expr))
+             (and (not (null? (cdddr expr))) (has-effects? (cadddr expr)))))
+        ((eq? (car expr) 'begin)
+         (any has-effects? (cdr expr)))
+        ((eq? (car expr) 'set!) #t)
+        ((eq? (car expr) 'define) #t)
+        ((eq? (car expr) 'let)
+         (or (any (lambda (b) (has-effects? (cadr b))) (cadr expr))
+             (any has-effects? (cddr expr))))
+        (else
+         (not (and (memq (car expr) pure-primitives)
+                   (not (any has-effects? (cdr expr))))))))
+
+;;=============================================================================
+;; 5. Misc Utilities
+;;=============================================================================
+
+(define (unique lst)
+  (if (null? lst)
+      '()
+      (let ((tail (unique (cdr lst))))
+        (if (memq (car lst) tail)
+            tail
+            (cons (car lst) tail)))))

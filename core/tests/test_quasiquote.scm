@@ -1,7 +1,7 @@
 ;; test_quasiquote.scm
 ;; Test suite for quasiquote expansion in macroexpand system.
 
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 ;; --- Test Helper Functions ---
 

@@ -3,12 +3,12 @@
 (use srfi-9)
 (use srfi-42) ; for list-ec etc if used, but let's stick to basics
 
+(load "../../core/core.scm")
 (load "../vm.scm")
-(load "../../core/compiler.scm")
 
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)
-  (let* ((code (cp:compile expr))
+  (let* ((code (compile expr))
          (vm (vm:init-vm))
          (ctx (vm:init-context vm code)))
     ;; Add some basic subrs to globals

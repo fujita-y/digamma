@@ -1,7 +1,7 @@
 ;; test_syntax_rules.scm
 ;; Test suite for the R6RS/R7RS macro expansion system.
 
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -87,7 +87,7 @@
       '(define add (lambda (x y) (+ x y))))
 
 ;; Test 4: Nested expansion (let uses lambda)
-;; Note: our mc:expand function handles let, lambda etc.
+;; Note: our expand function handles let, lambda etc.
 (test "Lambda identity" '(lambda (x) x) '(lambda (x) x))
 
 ;; =============================================================================

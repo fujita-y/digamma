@@ -6,10 +6,8 @@
 (add-load-path "../core" :relative)
 
 ;; Load dependencies
-(load "macroexpand.scm")
-(load "optimizer.scm")
-(load "vm.scm")
-(load "compiler.scm")
+(load "core.scm")  ; Load core system
+(load "vm.scm")            ; Load VM (meta-specific)
 
 (define (repl:init-globals vm)
   (let ((globals (vm-globals vm)))
@@ -95,8 +93,8 @@
     (if (null? exprs)
         #t
         (let* ((expanded (macroexpand (car exprs)))
-               (optimized (op:optimize expanded))
-               (code (cp:compile optimized))
+               (optimized (optimize expanded))
+               (code (compile optimized))
                (ctx (vm:init-context vm code)))
           (vm:vm-run ctx)
           (loop (cdr exprs))))))
@@ -121,8 +119,8 @@
                (loop))
              (lambda ()
                (let* ((expanded (macroexpand expr))
-                      (optimized (op:optimize expanded))
-                      (code (cp:compile optimized))
+                      (optimized (optimize expanded))
+                      (code (compile optimized))
                       (ctx (vm:init-context vm code)))
                  (let ((result (vm:vm-run ctx)))
                    (write result)

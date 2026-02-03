@@ -1,17 +1,15 @@
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
+
 ;; quasiquote.scm
 ;; Expand quasiquote (backquote) syntax into core forms: quote, list, cons, and append.
+;; This implementation handles nested quasiquotation and splicing correctly according to R7RS.
 
-(define (mc:expand-quasiquote expr)
-  ;; --- Internal Helpers ---
+(define (expand-quasiquote expr)
+  
+  ;; --- Identifier Predicates ---
+  ;; These handle potential renaming/tagging by the macro expander (e.g., "unquote.123").
 
-  ;; Check if expr is a proper list.
-  (define (proper-list? x)
-    (let loop ((x x))
-      (cond ((null? x) #t)
-            ((pair? x) (loop (cdr x)))
-            (else #f))))
-
-  ;; Symbol predicates that handle potential renaming/tagging by the macro expander (e.g., "unquote.123").
   (define (is-unquote? s)
     (and (symbol? s)
          (let ((name (symbol->string s)))
@@ -33,8 +31,10 @@
                (and (> (string-length name) 11)
                     (string=? (substring name 0 11) "quasiquote."))))))
 
+  ;; --- Analysis Helpers ---
+
   ;; Check if a list can be expanded using 'list' instead of 'cons'/'append'.
-  ;; It returns #t if there's no unquote-splicing at the current expansion level.
+  ;; Returns #t if there's no unquote-splicing at the current expansion level.
   (define (no-splicing? x level)
     (if (= level 0)
         (let loop ((l x))
@@ -57,43 +57,7 @@
                 (else (loop (cdr l)))))
         #f))
 
-  ;; --- Main Expansion Logic ---
-
-  (define (expand-qq x level)
-    (cond
-     ;; Handle ,expr (unquote)
-     ((and (pair? x) (is-unquote? (car x)))
-      (if (= level 0)
-          (cadr x)
-          (list 'list ''unquote (expand-qq (cadr x) (- level 1)))))
-
-     ;; Handle `expr (nested quasiquote)
-     ((and (pair? x) (is-quasiquote? (car x)))
-      (list 'list ''quasiquote (expand-qq (cadr x) (+ level 1))))
-
-     ;; Atoms and self-evaluating forms
-     ((not (pair? x))
-      (if (or (number? x) (boolean? x) (string? x) (null? x) (char? x))
-          x
-          (list 'quote x)))
-
-     ;; Lists and pairs
-     (else
-      (expand-qq-list x level))))
-
-  (define (expand-qq-list x level)
-    (cond
-     ((null? x) '())
-
-     ;; Optimization: use 'list' if it's a proper list with no splicing or unquote-tail at level 0.
-     ((and (proper-list? x)
-           (no-splicing? x level)
-           (not (unquote-tail? x level)))
-      (cons 'list (map (lambda (e) (expand-qq e level)) x)))
-
-     ;; Fallback to cons/append chain.
-     (else
-      (expand-qq-list-splicing x level))))
+  ;; --- Core Expansion Functions ---
 
   (define (expand-qq-list-splicing x level)
     (cond
@@ -120,6 +84,42 @@
      (else
       (list 'cons (expand-qq (car x) level)
             (expand-qq-list-splicing (cdr x) level)))))
+
+  (define (expand-qq-list x level)
+    (cond
+     ((null? x) '())
+
+     ;; Optimization: use 'list' if it's a proper list with no splicing or unquote-tail at level 0.
+     ((and (proper-list? x)
+           (no-splicing? x level)
+           (not (unquote-tail? x level)))
+      (cons 'list (map (lambda (e) (expand-qq e level)) x)))
+
+     ;; Fallback to cons/append chain.
+     (else
+      (expand-qq-list-splicing x level))))
+
+  (define (expand-qq x level)
+    (cond
+     ;; Handle ,expr (unquote)
+     ((and (pair? x) (is-unquote? (car x)))
+      (if (= level 0)
+          (cadr x)
+          (list 'list ''unquote (expand-qq (cadr x) (- level 1)))))
+
+     ;; Handle `expr (nested quasiquote)
+     ((and (pair? x) (is-quasiquote? (car x)))
+      (list 'list ''quasiquote (expand-qq (cadr x) (+ level 1))))
+
+     ;; Atoms and self-evaluating forms
+     ((not (pair? x))
+      (if (or (number? x) (boolean? x) (string? x) (null? x) (char? x))
+          x
+          (list 'quote x)))
+
+     ;; Lists and pairs
+     (else
+      (expand-qq-list x level))))
 
   ;; Initial expansion call starting at level 0.
   (expand-qq expr 0))

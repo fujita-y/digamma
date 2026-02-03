@@ -1,4 +1,4 @@
-(load "../optimizer.scm")
+(load "../core.scm")
 
 ;; --- Test Helper Functions ---
 
@@ -6,7 +6,7 @@
 (define *fail-count* 0)
 
 (define (test name expr expected)
-  (let ((result (op:optimize expr)))
+  (let ((result (optimize expr)))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -98,7 +98,7 @@
       '(let ((f (lambda (x) (+ x 1)))) (if c 10 (f 20)))
       '(if c 10 (+ 20 1)))
 
-(test "Lambda Dropping (no op:drop if used in both)"
+(test "Lambda Dropping (no drop if used in both)"
       '(let ((f (lambda (x) (+ x 1)))) (if c (f 10) (f 20)))
       '(if c (+ 10 1) (+ 20 1)))
 

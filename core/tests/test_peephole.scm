@@ -1,10 +1,10 @@
 
 (use srfi-1)
-(load "../compiler.scm")
+(load "../core.scm")
 
 (define (check-exact name input expected)
   (format #t "Testing ~a...\n" name)
-  (let ((result (cp:peephole-optimize input)))
+  (let ((result (peephole-optimize input)))
     (if (equal? result expected)
         (format #t "  PASS\n")
         (begin
@@ -51,8 +51,8 @@
 
 ;; --- 3-instruction Optimizations ---
 
-;; Pattern 4: (reg-cell-set! rA rB) ({cp:ops-loads} rC <any>) (reg-cell-ref rD rA)
-;; -> (reg-cell-set! rA rB) ({cp:ops-loads} rC <any>) (mov rD rB)
+;; Pattern 4: (reg-cell-set! rA rB) ({ops-loads} rC <any>) (reg-cell-ref rD rA)
+;; -> (reg-cell-set! rA rB) ({ops-loads} rC <any>) (mov rD rB)
 (check-exact "3-inst Reg Cell ref to mov"
              '((reg-cell-set! r1 r2) (const r3 10) (reg-cell-ref r4 r1))
              '((reg-cell-set! r1 r2) (const r3 10) (mov r4 r2)))
@@ -66,7 +66,7 @@
              '((reg-cell-set! r1 r2) (mov r1 r3) (reg-cell-ref r4 r1)))
 
 
-;; Pattern 5: (closure-cell-set! IDX rB) ({cp:ops-loads} rC <any>) (closure-cell-ref rD IDX)
+;; Pattern 5: (closure-cell-set! IDX rB) ({ops-loads} rC <any>) (closure-cell-ref rD IDX)
 (check-exact "3-inst Closure Cell ref to mov"
              '((closure-cell-set! 0 r1) (const r2 10) (closure-cell-ref r3 0))
              '((closure-cell-set! 0 r1) (const r2 10) (mov r3 r1)))

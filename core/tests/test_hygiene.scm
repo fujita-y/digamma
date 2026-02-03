@@ -1,7 +1,7 @@
 ;; test_hygiene.scm
 ;; Comprehensive hygiene tests for the macro expansion system.
 
-(load "../macroexpand.scm")
+(load "../core.scm")
 
 ;; --- Test Helper Functions ---
 
@@ -140,7 +140,7 @@
 ;; =============================================================================
 (display "\n>>> Section 6: Identifier Macros\n")
 
-(mc:register-macro! 'it (lambda (expr) 'expanded-it))
+(register-macro! 'it (lambda (expr) 'expanded-it))
 
 (test "Identifier macro 'it' is shadowed by local binding"
       '(let ((it 1)) it)
