@@ -4,6 +4,9 @@
 ;; Common utilities for the Digamma core system.
 ;; These functions provide a robust base for syntax expansion, optimization, and compilation.
 
+;; Counter for generating unique temporary symbol names
+(define *syntax-temp-counter* 0)
+
 ;;=============================================================================
 ;; Predicates
 ;;=============================================================================
@@ -123,3 +126,7 @@
                      (eq? (cadr (car body)) name)
                      (pair? (caddr (car body)))
                      (eq? (car (caddr (car body))) 'lambda)))))))
+
+(define (generate-temporary-symbol prefix)
+  (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))
+  (string->symbol (string-append prefix (number->string *syntax-temp-counter*))))

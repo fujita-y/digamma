@@ -250,10 +250,6 @@
                  (cons proc args)))))
       (else (cons proc args)))))
 
-(define (gen-licm-sym)
-  (set! *licm-count* (+ *licm-count* 1))
-  (string->symbol (string-append "licm." (number->string *licm-count*))))
-
 (define (is-licm-var? sym)
   (let ((s (symbol->string sym)))
     (and (> (string-length s) 5)
@@ -291,7 +287,7 @@
                   (not (any (lambda (v) (memq v forbidden)) fvars))))
             (if (hash-table-exists? hoisted-map e)
                 (hash-table-get hoisted-map e)
-                (let ((tmp (gen-licm-sym)))
+                (let ((tmp (generate-temporary-symbol "licm.")))
                   (hash-table-put! hoisted-map e tmp)
                   (set! hoisted-list (cons (list tmp e) hoisted-list))
                   tmp)))

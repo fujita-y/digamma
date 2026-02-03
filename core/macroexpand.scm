@@ -18,11 +18,11 @@
 ;; Association list of global macro definitions: ((name . transformer) ...)
 (define *macro-env* '())
 
-;; Counter for generating unique suffixes to ensure hygiene during renaming
-(define *rename-counter* 0)
-
 ;; Tracks all renamed identifiers: ((alias original context) ...)
 (define *rename-env* '())
+
+;; Counter for generating unique suffixes to ensure hygiene during renaming
+(define *suffix-counter* 0)
 
 ;; Registry mapping module names to records: ((name . record) ...)
 ;; Record structure: ((exports . rename-map) . bindings)
@@ -40,8 +40,8 @@
 
 ;; Generate a fresh unique suffix for identifier renaming.
 (define (fresh-suffix)
-  (set! *rename-counter* (+ *rename-counter* 1))
-  (number->string *rename-counter*))
+  (set! *suffix-counter* (+ *suffix-counter* 1))
+  (number->string *suffix-counter*))
 
 ;; Register a renamed identifier in the global rename environment.
 (define (register-renamed! alias original context)
@@ -530,5 +530,5 @@
         ((symbol? expr) (let ((t (lookup-macro expr '()))) (if t (t expr) expr))) (else expr)))
 
 (define (macroexpand expr . opt)
-  (set! *rename-counter* 0) (set! *rename-env* '())
+  (set! *suffix-counter* 0) (set! *rename-env* '())
   (let ((res (expand expr '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))

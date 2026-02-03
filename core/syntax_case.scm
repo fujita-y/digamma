@@ -21,9 +21,6 @@
 ;; 1. Globals & State
 ;;=============================================================================
 
-;; Counter for generating unique temporary symbol names
-(define *syntax-temp-counter* 0)
-
 ;; Current pattern variable bindings: ((var . value) ...)
 (define *current-syntax-bindings* '())
 
@@ -248,13 +245,13 @@
           (cons `(quasisyntax ,(car res)) (cdr res))))
        ((and (eq? (car x) 'unsyntax) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
-            (let ((tmp (string->symbol (string-append "unsyntax." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
+            (let ((tmp (generate-temporary-symbol "unsyntax.")))
               (cons (list '**splice-unsyntax** tmp) (list (list tmp (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax ,(car res)) (cdr res)))))
        ((and (eq? (car x) 'unsyntax-splicing) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
-            (let ((tmp (string->symbol (string-append "unsyntax-splicing." (number->string (begin (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1)) *syntax-temp-counter*))))))
+            (let ((tmp (generate-temporary-symbol "unsyntax-splicing.")))
               (cons (list '**splice-unsyntax-splicing** tmp) (list (list (list tmp '...) (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax-splicing ,(car res)) (cdr res)))))
@@ -371,7 +368,4 @@
 ;; Fresh identifier generator.
 (define (generate-temporaries l)
   (let ((lst (syntax->list l)))
-    (map (lambda (x)
-           (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))
-           (make-syntax-object (string->symbol (string-append "temp." (number->string *syntax-temp-counter*))) '()))
-         lst)))
+    (map (lambda (x) (make-syntax-object (generate-temporary-symbol "temp.") '())) lst)))
