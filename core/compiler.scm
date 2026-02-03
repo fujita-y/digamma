@@ -159,22 +159,7 @@
           (or (var-escapes? var op)
               (any (lambda (arg) (var-escapes? var arg)) args)))))))
 
-;; Recursive Pattern Matcher
-(define (match-rec-pattern expr)
-  (and (pair? expr)
-       (eq? (car expr) 'let)
-       (let ((bindings (cadr expr))
-             (body (cddr expr)))
-         (and (pair? bindings)
-              (null? (cdr bindings))
-              (let ((name (car (car bindings))))
-                (and (symbol? name)
-                     (pair? body)
-                     (pair? (car body))
-                     (eq? (car (car body)) 'set!)
-                     (eq? (cadr (car body)) name)
-                     (pair? (caddr (car body)))
-                     (eq? (car (caddr (car body))) 'lambda)))))))
+
 
 ;;=============================================================================
 ;; SECTION 4: Peephole Optimizer
