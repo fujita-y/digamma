@@ -1,7 +1,7 @@
 ;; test_module_macroexpand.scm
 ;; Test suite for define-module and import-module in macroexpand.scm
 
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)

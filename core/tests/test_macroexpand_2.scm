@@ -1,7 +1,7 @@
 ;; test_macroexpand_2.scm
 ;; Test suite for core macro forms like cond, and, or, case.
 
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)

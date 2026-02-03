@@ -1,8 +1,8 @@
 (use srfi-1)
 (use srfi-9)
 
-(load "vm.scm")
-(load "compiler.scm")
+(load "../vm.scm")
+(load "../../core/compiler.scm")
 
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)

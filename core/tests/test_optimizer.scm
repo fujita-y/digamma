@@ -1,4 +1,4 @@
-(load "optimizer.scm")
+(load "../optimizer.scm")
 
 ;; --- Test Helper Functions ---
 

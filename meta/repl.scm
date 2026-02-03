@@ -1,21 +1,15 @@
 ;;; REPL for Research Scheme
 ;;; Integrates macroexpand, optimizer, compiler, and VM.
 
+;; Add load paths relative to this script to find dependencies in core/ and meta/
+(add-load-path "." :relative)
+(add-load-path "../core" :relative)
+
 ;; Load dependencies
-;; Components are in different directories and use relative loads.
-;; We change directory temporarily to load them correctly.
-
-(define (repl:load-relative dir file)
-  (let ((old-env (sys-getcwd)))
-    (sys-chdir dir)
-    (load (string-append "./" file))
-    (sys-chdir old-env)))
-
-(let ((root (sys-getcwd)))
-  (repl:load-relative (string-append root "/research/syntax") "macroexpand.scm")
-  (repl:load-relative (string-append root "/research/opt") "optimizer.scm")
-  (repl:load-relative (string-append root "/research/vm") "vm.scm")
-  (repl:load-relative (string-append root "/research/vm") "compiler.scm"))
+(load "macroexpand.scm")
+(load "optimizer.scm")
+(load "vm.scm")
+(load "compiler.scm")
 
 (define (repl:init-globals vm)
   (let ((globals (vm-globals vm)))

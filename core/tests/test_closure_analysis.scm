@@ -1,7 +1,7 @@
 ;; test_closure_analysis.scm
 ;; Test suite for closure escape analysis in the compiler.
 
-(load "./compiler.scm")
+(load "../compiler.scm")
 (use srfi-1)
 
 (define *pass-count* 0)

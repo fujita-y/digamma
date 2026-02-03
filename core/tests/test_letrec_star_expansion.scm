@@ -1,5 +1,5 @@
 ;; test_letrec_star_expansion.scm
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 (define (test name output expected)
   (if (equal? output expected)

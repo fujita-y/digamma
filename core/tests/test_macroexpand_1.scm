@@ -1,7 +1,7 @@
 ;; test_macroexpand_1.scm
 ;; Basic macro expansion and identifier macro tests.
 
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)

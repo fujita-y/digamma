@@ -1,7 +1,7 @@
 ;; test_hygiene.scm
 ;; Comprehensive hygiene tests for the macro expansion system.
 
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 ;; --- Test Helper Functions ---
 

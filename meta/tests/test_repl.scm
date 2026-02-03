@@ -1,5 +1,5 @@
 ;;; Test for REPL logic
-(load "./research/repl/repl.scm")
+(load "../repl.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)

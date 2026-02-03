@@ -20,7 +20,7 @@
 ;; This implementation uses thunks (lambda wrappers) for delayed evaluation
 ;; of fenders and outputs to maintain proper lexical scoping within transformers.
 
-(load "./syntax_common.scm")
+(load "syntax_common.scm")
 
 ;;=============================================================================
 ;; 1. Globals & State

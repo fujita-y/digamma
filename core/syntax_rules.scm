@@ -6,7 +6,7 @@
 ;; Provides pattern matching and template expansion for syntax-rules macros.
 ;; Optimized for performance by unifying matching and binding.
 
-(load "./syntax_common.scm")
+(load "syntax_common.scm")
 
 ;;=============================================================================
 ;; SECTION 2: Pattern Analysis

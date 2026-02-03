@@ -1,6 +1,6 @@
 
 (use srfi-1)
-(load "compiler.scm")
+(load "../compiler.scm")
 
 (define (check-exact name input expected)
   (format #t "Testing ~a...\n" name)

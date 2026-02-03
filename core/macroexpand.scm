@@ -17,10 +17,10 @@
 ;;
 ;; Pattern matching and substitution are provided by syntax_rules.scm and syntax_case.scm.
 
-(load "./syntax_rules.scm")
-(load "./syntax_case.scm")
-(load "./quasiquote.scm")
-(load "./syntax_common.scm")
+(load "syntax_rules.scm")
+(load "syntax_case.scm")
+(load "quasiquote.scm")
+(load "syntax_common.scm")
 
 ;;=============================================================================
 ;; SECTION 1: Globals & State

@@ -3,8 +3,8 @@
 (use srfi-9)
 (use srfi-42) ; for list-ec etc if used, but let's stick to basics
 
-(load "vm.scm")
-(load "compiler.scm")
+(load "../vm.scm")
+(load "../../core/compiler.scm")
 
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)

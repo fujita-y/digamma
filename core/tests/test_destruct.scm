@@ -1,7 +1,7 @@
 ;; test_destruct.scm
 ;; Test suite for destructuring match macro.
 
-(load "./macroexpand.scm")
+(load "../macroexpand.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
