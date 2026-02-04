@@ -175,7 +175,7 @@ scm_obj_t make_symbol(const char* name);
 scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
-scm_obj_t make_hash_table(hash_proc_t hash, equiv_proc_t equiv, int capacity);
+scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

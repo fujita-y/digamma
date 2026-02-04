@@ -127,10 +127,10 @@ scm_obj_t make_u8vector(int nsize) {
   return tc6_pointer(rec, tc6_u8vector);
 }
 
-scm_obj_t make_hash_table(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
+scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   object_heap_t& heap = *object_heap_t::current();
   scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)heap.alloc_hashtable();
-  int nsize = find_hash_table_size(capacity);
+  int nsize = find_hashtable_size(capacity);
   rec->tag = tc6_tag(tc6_hashtable);
   rec->lock.init();
   rec->hash = hash;

@@ -46,10 +46,10 @@ static bool test_gc_allocation(int num_loops) {
     usleep(1);
     scm_obj_t obj = make_cons(make_symbol("afas"), make_list(3, make_cons(make_fixnum(1), make_fixnum(2)),
                                                              make_cons(make_symbol("affd"), make_string("adf")), make_u8vector(122)));
-    scm_obj_t hash = make_hash_table(string_hash, string_equiv, 16);
-    hash_table_set(hash, make_string("afd"), make_symbol("value"));
-    hash_table_set(hash, make_string("fdf"), obj);
-    hash_table_set(hash, make_string("sds"), make_fixnum(3));
+    scm_obj_t hash = make_hashtable(string_hash, string_equiv, 16);
+    hashtable_set(hash, make_string("afd"), make_symbol("value"));
+    hashtable_set(hash, make_string("fdf"), obj);
+    hashtable_set(hash, make_string("sds"), make_fixnum(3));
     if (!is_cons(obj)) {
       printf("\033[31m###### allocation failed at %d\033[0m\n", i);
       some_test_failed = true;

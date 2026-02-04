@@ -16,7 +16,7 @@ static constexpr int primes[] = {7,         13,        29,        59,        113
                                  3498457,   5247701,   7871573,   11807381,  17711087,   26566649,   39849977,  59774983, 89662483, 134493731,
                                  201740597, 302610937, 453916423, 680874641, 1021311983, 1531968019, 2147483647};
 
-int find_hash_table_size(int nsize) {
+int find_hashtable_size(int nsize) {
   for (int i = 0; i < array_sizeof(primes); i++) {
     if (primes[i] > nsize) return primes[i];
   }
@@ -84,11 +84,11 @@ found:
   if (aux->used < hash_busy_threshold(nsize)) return 0;
   if (aux->live < hash_dense_threshold(nsize)) {
     if (aux->live < hash_sparse_threshold(aux->used)) {
-      return find_hash_table_size(hash_renew_size(aux->live));
+      return find_hashtable_size(hash_renew_size(aux->live));
     }
     return nsize;
   }
-  return find_hash_table_size(nsize);
+  return find_hashtable_size(nsize);
 }
 
 static void remove(scm_hashtable_rec_t* ht, scm_obj_t key) {
@@ -115,7 +115,7 @@ static void remove(scm_hashtable_rec_t* ht, scm_obj_t key) {
 static void rehash(scm_hashtable_rec_t* ht, int nsize) {
   hashtable_aux_t* aux = ht->aux;
   int nelts = aux->capacity;
-  scm_hashtable_rec_t* ht2 = (scm_hashtable_rec_t*)to_address(make_hash_table(ht->hash, ht->equiv, nsize));
+  scm_hashtable_rec_t* ht2 = (scm_hashtable_rec_t*)to_address(make_hashtable(ht->hash, ht->equiv, nsize));
   for (int i = 0; i < nelts; i++) {
     if (aux->elts[i] == scm_hash_free) continue;
     if (aux->elts[i] == scm_hash_deleted) continue;
@@ -139,7 +139,7 @@ bool string_equiv(scm_obj_t obj1, scm_obj_t obj2) {
   return strcmp((const char*)string_name(obj1), (const char*)string_name(obj2)) == 0;
 }
 
-scm_obj_t hash_table_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) {
+scm_obj_t hashtable_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) {
   assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scm_obj_t value = get(ht, key);
@@ -147,7 +147,7 @@ scm_obj_t hash_table_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) 
   return default_value;
 }
 
-void hash_table_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
+void hashtable_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
   assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scoped_lock lock(ht->lock);
@@ -157,7 +157,7 @@ void hash_table_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
   if (n) rehash(ht, n);
 }
 
-void hash_table_delete(scm_obj_t obj, scm_obj_t key) {
+void hashtable_delete(scm_obj_t obj, scm_obj_t key) {
   assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
   scoped_lock lock(ht->lock);

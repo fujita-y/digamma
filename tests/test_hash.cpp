@@ -31,14 +31,14 @@ static bool some_test_failed = false;
 
 static bool test_hashtable() {
   int capacity = 7;
-  scm_obj_t ht = make_hash_table(string_hash, string_equiv, capacity);
+  scm_obj_t ht = make_hashtable(string_hash, string_equiv, capacity);
 
   // Test basic set/get
   scm_obj_t key1 = make_string("foo");
   scm_obj_t val1 = make_fixnum(100);
-  hash_table_set(ht, key1, val1);
+  hashtable_set(ht, key1, val1);
 
-  scm_obj_t got1 = hash_table_ref(ht, key1, scm_undef);
+  scm_obj_t got1 = hashtable_ref(ht, key1, scm_undef);
   if (got1 != val1) {
     printf("\033[31m###### hashtable failed: basic set/get\033[0m\n");
     some_test_failed = true;
@@ -46,8 +46,8 @@ static bool test_hashtable() {
   }
 
   // Test delete
-  hash_table_delete(ht, key1);
-  scm_obj_t got3 = hash_table_ref(ht, key1, scm_undef);
+  hashtable_delete(ht, key1);
+  scm_obj_t got3 = hashtable_ref(ht, key1, scm_undef);
   if (got3 != scm_undef) {
     printf("\033[31m###### hashtable failed: delete\033[0m\n");
     some_test_failed = true;
@@ -56,12 +56,12 @@ static bool test_hashtable() {
 
   // Test delete non-existent key
   scm_obj_t key_missing = make_string("non-existent");
-  hash_table_delete(ht, key_missing);  // should not crash or affect other items
+  hashtable_delete(ht, key_missing);  // should not crash or affect other items
 
   // Test default value
   scm_obj_t key2 = make_string("bar");
   scm_obj_t def = make_fixnum(999);
-  scm_obj_t got2 = hash_table_ref(ht, key2, def);
+  scm_obj_t got2 = hashtable_ref(ht, key2, def);
   if (got2 != def) {
     printf("\033[31m###### hashtable failed: default value\033[0m\n");
     some_test_failed = true;
@@ -72,20 +72,20 @@ static bool test_hashtable() {
   for (int i = 0; i < 20; i++) {
     char buf[32];
     sprintf(buf, "key-%d", i);
-    hash_table_set(ht, make_string(buf), make_fixnum(i));
+    hashtable_set(ht, make_string(buf), make_fixnum(i));
   }
 
   // Delete some items from the expanded table
   for (int i = 0; i < 20; i += 2) {
     char buf[32];
     sprintf(buf, "key-%d", i);
-    hash_table_delete(ht, make_string(buf));
+    hashtable_delete(ht, make_string(buf));
   }
 
   for (int i = 0; i < 20; i++) {
     char buf[32];
     sprintf(buf, "key-%d", i);
-    scm_obj_t val = hash_table_ref(ht, make_string(buf), scm_undef);
+    scm_obj_t val = hashtable_ref(ht, make_string(buf), scm_undef);
     if (i % 2 == 0) {
       if (val != scm_undef) {
         printf("\033[31m###### hashtable failed: delete verification at index %d\033[0m\n", i);
