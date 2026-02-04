@@ -1,5 +1,5 @@
-(use srfi-1)
-(use srfi-9)
+
+
 
 (load "../../core/core.scm")
 (load "../vm.scm")
@@ -7,13 +7,12 @@
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)
   (let* ((code (compile expr))
-         (vm (vm:init-vm))
-         (ctx (vm:init-context vm code)))
-    (vm:vm-set-global! vm '+ +)
-    (vm:vm-set-global! vm '- -)
-    (vm:vm-set-global! vm '* *)
-    (vm:vm-set-global! vm 'list list)
-    (vm:vm-set-global! vm 'equal? equal?)
+         (ctx (vm:init-context code)))
+    (global-variable-set! '+ +)
+    (global-variable-set! '- -)
+    (global-variable-set! '* *)
+    (global-variable-set! 'list list)
+    (global-variable-set! 'equal? equal?)
     
     (let ((result (let loop ((res (vm:vm-run ctx))) res)))
       (if (equal? result expected)

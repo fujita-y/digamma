@@ -1,22 +1,36 @@
 
 ;; Register-based VM for Scheme
-(use srfi-9)
-(use srfi-1)
-
-(define-record-type <vm>
-  (make-vm-internal globals)
-  vm?
-  (globals vm-globals vm-globals-set!))
+;;
+;; Bytecode Instruction Set:
+;;   (nop)                           - No operation
+;;   (const <reg> <val>)             - Load constant <val> into <reg>
+;;   (mov <dst> <src>)               - Move value from <src> register to <dst> register
+;;   (if <t-label> <f-label>)        - Jump to <t-label> if r0 is true, else <f-label>
+;;   (global-ref <reg> <var>)        - Load global variable <var> into <reg>
+;;   (global-set! <var> <src>)       - Store <src> register into global variable <var>
+;;   (jump <label>)                  - Unconditional jump to <label>
+;;   (call <proc-reg> <n-args>)      - Call procedure in <proc-reg> with <n-args>
+;;   (tail-call <proc-reg> <n-args>) - Tail call procedure in <proc-reg> with <n-args>
+;;   (ret)                           - Return from procedure (result in r0)
+;;   (make-closure <dst> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
+;;                                   - Create a closure from <label> and free variables
+;;   (closure-ref <reg> <idx>)       - Load free variable at <idx> from current closure into <reg>
+;;   (closure-cell-ref <reg> <idx>)  - Load value from cell at <idx> in current closure into <reg>
+;;   (closure-set! <idx> <src>)      - Store <src> into free variable at <idx> in current closure
+;;   (closure-cell-set! <idx> <src>) - Store <src> into cell at <idx> in current closure
+;;   (reg-cell-ref <dst> <src>)      - Extract value from cell in <src> register into <dst> register
+;;   (reg-cell-set! <dst> <src>)     - Store <src> register value into cell in <dst> register
+;;   (make-cell <src> <dst>)         - Create a cell from <src> register and store in <dst> register
+;;   (closure-self <dst>)            - Load current closure into <dst> register
 
 (define-record-type <context>
-  (make-context code pc stack cl regs vm)
+  (make-context code pc stack cl regs)
   context?
   (code    ctx-code    ctx-code-set!)
   (pc      ctx-pc      ctx-pc-set!)
   (stack   ctx-stack   ctx-stack-set!)
   (cl      ctx-cl      ctx-cl-set!)
-  (regs    ctx-regs    ctx-regs-set!)
-  (vm      ctx-vm      ctx-vm-set!))
+  (regs    ctx-regs    ctx-regs-set!))
 
 (define (vm:decode-reg reg)
   (if (symbol? reg)
@@ -46,28 +60,29 @@
   cell?
   (value cell-value cell-value-set!))
 
-(define (vm:init-vm)
-  (make-vm-internal (make-hash-table 'eq?)))
-
-(define (vm:init-context vm code)
-  (make-context code 0 '() #f (make-vector 64 #f) vm))
+(define (vm:init-context code)
+  (make-context code 0 '() #f (make-vector 64 #f)))
 
 (define *vm:continue* (list 'continue))
 
+;; (nop)
 (define (vm:op-nop ctx inst) *vm:continue*)
 
+;; (const <reg> <val>)
 (define (vm:op-const ctx inst)
   (let ((reg (vector-ref inst 1))
         (val (vector-ref inst 2)))
     (vm:reg-set! ctx reg val)
     *vm:continue*))
 
+;; (mov <dst> <src>)
 (define (vm:op-mov ctx inst)
   (let ((dst (vector-ref inst 1))
         (src (vector-ref inst 2)))
     (vm:reg-set! ctx dst (vm:reg-ref ctx src))
     *vm:continue*))
 
+;; (if <t-label> <f-label>)
 (define (vm:op-if ctx inst)
   (let ((t-label (vector-ref inst 1))
         (f-label (vector-ref inst 2)))
@@ -76,18 +91,21 @@
         (ctx-pc-set! ctx f-label))
     *vm:continue*))
 
+;; (global-ref <reg> <var>)
 (define (vm:op-global-ref ctx inst)
   (let ((reg (vector-ref inst 1))
         (var (vector-ref inst 2)))
-    (vm:reg-set! ctx reg (hash-table-get (vm-globals (ctx-vm ctx)) var))
+    (vm:reg-set! ctx reg (global-variable-ref var))
     *vm:continue*))
 
+;; (global-set! <var> <src>)
 (define (vm:op-global-set! ctx inst)
   (let ((var (vector-ref inst 1))
         (src (vector-ref inst 2)))
-    (hash-table-put! (vm-globals (ctx-vm ctx)) var (vm:reg-ref ctx src))
+    (global-variable-set! var (vm:reg-ref ctx src))
     *vm:continue*))
 
+;; (jump <label>)
 (define (vm:op-jump ctx inst)
   (let ((label (vector-ref inst 1)))
     (ctx-pc-set! ctx label)
@@ -107,6 +125,7 @@
         (cons (vm:reg-ref ctx (string->symbol (string-append "r" (number->string i))))
               (arg-loop (+ i 1))))))
 
+;; (call <proc-reg> <n-args>)
 (define (vm:op-call ctx inst)
   (let ((proc-reg (vector-ref inst 1))
         (n-args (vector-ref inst 2)))
@@ -132,6 +151,7 @@
               (vm:reg-set! ctx 'r0 res)
               *vm:continue*))))))
 
+;; (tail-call <proc-reg> <n-args>)
 (define (vm:op-tail-call ctx inst)
   (let ((proc-reg (vector-ref inst 1))
         (n-args (vector-ref inst 2)))
@@ -162,6 +182,7 @@
                     (vm:reg-set! ctx 'r0 res)
                     *vm:continue*))))))))
 
+;; (ret)
 (define (vm:op-ret ctx inst)
   (if (null? (ctx-stack ctx))
       (vm:reg-ref ctx 'r0)
@@ -175,6 +196,7 @@
         (vm:reg-set! ctx 'r0 res)
         *vm:continue*)))
 
+;; (make-closure <dst> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
 (define (vm:op-make-closure ctx inst)
   (let ((dst (vector-ref inst 1))
         (label (vector-ref inst 2))
@@ -186,12 +208,14 @@
         (vm:reg-set! ctx dst cl))
       *vm:continue*)))
 
+;; (closure-ref <reg> <idx>)
 (define (vm:op-closure-ref ctx inst)
   (let ((reg (vector-ref inst 1))
         (idx (vector-ref inst 2)))
     (vm:reg-set! ctx reg (vector-ref (closure-free (ctx-cl ctx)) idx))
     *vm:continue*))
 
+;; (closure-cell-ref <reg> <idx>)
 (define (vm:op-closure-cell-ref ctx inst)
   (let ((reg (vector-ref inst 1))
         (idx (vector-ref inst 2)))
@@ -200,12 +224,14 @@
         (vm:reg-set! ctx reg extracted))
       *vm:continue*)))
 
+;; (closure-set! <idx> <src>)
 (define (vm:op-closure-set! ctx inst)
   (let ((idx (vector-ref inst 1))
         (src (vector-ref inst 2)))
     (vector-set! (closure-free (ctx-cl ctx)) idx (vm:reg-ref ctx src))
     *vm:continue*))
 
+;; (closure-cell-set! <idx> <src>)
 (define (vm:op-closure-cell-set! ctx inst)
   (let ((idx (vector-ref inst 1))
         (src (vector-ref inst 2)))
@@ -214,6 +240,7 @@
       (cell-value-set! cell val)
       *vm:continue*)))
 
+;; (reg-cell-ref <dst> <src>)
 (define (vm:op-reg-cell-ref ctx inst)
   (let ((dst-reg (vector-ref inst 1))
         (src-reg (vector-ref inst 2)))
@@ -222,6 +249,7 @@
         (vm:reg-set! ctx dst-reg extracted))
       *vm:continue*)))
 
+;; (reg-cell-set! <dst> <src>)
 (define (vm:op-reg-cell-set! ctx inst)
   (let ((dst-reg (vector-ref inst 1))
         (src (vector-ref inst 2)))
@@ -230,6 +258,7 @@
       (cell-value-set! cell val)
       *vm:continue*)))
 
+;; (make-cell <src> <dst>)
 (define (vm:op-make-cell ctx inst)
   (let ((src (vector-ref inst 1))
         (dst (vector-ref inst 2)))
@@ -237,6 +266,7 @@
       (vm:reg-set! ctx dst cell))
     *vm:continue*))
 
+;; (closure-self <dst>)
 (define (vm:op-closure-self ctx inst)
   (let ((dst (vector-ref inst 1)))
     (vm:reg-set! ctx dst (ctx-cl ctx))
@@ -276,5 +306,3 @@
                   (loop)
                   res)))))))
 
-(define (vm:vm-set-global! vm var val)
-  (hash-table-put! (vm-globals vm) var val))

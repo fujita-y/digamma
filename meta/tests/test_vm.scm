@@ -1,7 +1,6 @@
 
-(use srfi-1)
-(use srfi-9)
-(use srfi-42) ; for list-ec etc if used, but let's stick to basics
+
+
 
 (load "../../core/core.scm")
 (load "../vm.scm")
@@ -9,21 +8,20 @@
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)
   (let* ((code (compile expr))
-         (vm (vm:init-vm))
-         (ctx (vm:init-context vm code)))
+         (ctx (vm:init-context code)))
     ;; Add some basic subrs to globals
-    (vm:vm-set-global! vm '+ +)
-    (vm:vm-set-global! vm '- -)
-    (vm:vm-set-global! vm '* *)
-    (vm:vm-set-global! vm '/ /)
-    (vm:vm-set-global! vm '= =)
-    (vm:vm-set-global! vm 'list list)
-    (vm:vm-set-global! vm 'cons cons)
-    (vm:vm-set-global! vm 'car car)
-    (vm:vm-set-global! vm 'cdr cdr)
-    (vm:vm-set-global! vm 'null? null?)
-    (vm:vm-set-global! vm 'display display)
-    (vm:vm-set-global! vm 'newline newline)
+    (global-variable-set! '+ +)
+    (global-variable-set! '- -)
+    (global-variable-set! '* *)
+    (global-variable-set! '/ /)
+    (global-variable-set! '= =)
+    (global-variable-set! 'list list)
+    (global-variable-set! 'cons cons)
+    (global-variable-set! 'car car)
+    (global-variable-set! 'cdr cdr)
+    (global-variable-set! 'null? null?)
+    (global-variable-set! 'display display)
+    (global-variable-set! 'newline newline)
 
 
     (let ((result (vm:vm-run ctx)))
