@@ -560,7 +560,7 @@
                   (if (not (eq? (car inst) 'label))
                       (let ((resolved (map (lambda (x)
                                              (if (and (symbol? x) (hashtable-contains? label-map x))
-                                                 (hashtable-ref label-map x)
+                                                 (hashtable-ref label-map x #f)
                                                  x))
                                            inst)))
                         (set! final-code (cons (list->vector resolved) final-code)))))
