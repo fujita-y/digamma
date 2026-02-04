@@ -4,6 +4,21 @@
 ;; Common utilities for the Digamma core system.
 ;; These functions provide a robust base for syntax expansion, optimization, and compilation.
 
+(cond-expand
+  (gauche
+   (define (make-eq-hashtable) (make-hash-table 'eq?))
+   (define (make-hashtable hash-fn equiv-fn)
+     (cond ((eq? equiv-fn equal?) (make-hash-table 'equal?))
+           ((eq? equiv-fn eqv?) (make-hash-table 'eqv?))
+           ((eq? equiv-fn eq?) (make-hash-table 'eq?))
+           (else (make-hash-table equiv-fn))))
+   (define hashtable-clear! hash-table-clear!)
+   (define hashtable-contains? hash-table-exists?)
+   (define hashtable-ref hash-table-get)
+   (define hashtable-set! hash-table-put!)
+   (define (equal-hash obj) (hash obj)))
+  (else))
+
 ;; Counter for generating unique temporary symbol names
 (define *syntax-temp-counter* 0)
 

@@ -14,8 +14,8 @@
 ;; 1. Global State & Config
 ;;=============================================================================
 
-(define global-env (make-hash-table 'eq?))
-(define *inlining-depth* (make-hash-table 'eq?))
+(define global-env (make-eq-hashtable))
+(define *inlining-depth* (make-eq-hashtable))
 
 (define *cp0-effort-limit* 100)
 (define *cp0-effort-limit* 100)
@@ -46,8 +46,8 @@
 
 ;; Perform full optimization until fixed-point or iteration limit.
 (define (optimize expr)
-  (hash-table-clear! global-env)
-  (hash-table-clear! *inlining-depth*)
+  (hashtable-clear! global-env)
+  (hashtable-clear! *inlining-depth*)
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10))
         current
@@ -64,9 +64,9 @@
 (define (optimize-inner expr bound-vars)
   (cond
     ((symbol? expr)
-     (if (and (hash-table-exists? global-env expr)
+     (if (and (hashtable-contains? global-env expr)
               (not (memq expr bound-vars)))
-         (hash-table-get global-env expr)
+         (hashtable-ref global-env expr #f)
          expr))
 
     ((not (pair? expr)) expr)
@@ -88,7 +88,7 @@
      (let ((var (cadr expr))
            (val (optimize-inner (caddr expr) bound-vars)))
        (if (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)))
-           (hash-table-put! global-env var val))
+           (hashtable-set! global-env var val))
        `(define ,var ,val)))
 
     (else (opt-app expr bound-vars))))
@@ -194,7 +194,7 @@
               (when body-changed?
                 (set! var-counts (analyze-free-var-counts current-body))
                 (set! body-changed? #f))
-              (hash-table-get var-counts var 0))
+              (hashtable-ref var-counts var 0))
 
               (define (process-binding! b)
                 (let ((var (car b)) (val (cadr b)))
@@ -274,7 +274,7 @@
     (let* ((params-list (flatten-params-opt params))
            (mutated (analyze-mutated-vars-optimizer (make-seq lambda-body)))
            (forbidden (append params-list mutated))
-           (hoisted-map (make-hash-table 'equal?))
+           (hoisted-map (make-hashtable equal-hash equal?))
            (hoisted-list '()))
 
       (define (transform e forbidden)
@@ -285,10 +285,10 @@
                 (not (has-effects? e))
                 (let ((fvars (analyze-free-vars-optimizer e '())))
                   (not (any (lambda (v) (memq v forbidden)) fvars))))
-            (if (hash-table-exists? hoisted-map e)
-                (hash-table-get hoisted-map e)
+            (if (hashtable-contains? hoisted-map e)
+                (hashtable-ref hoisted-map e #f)
                 (let ((tmp (generate-temporary-symbol "licm.")))
-                  (hash-table-put! hoisted-map e tmp)
+                  (hashtable-set! hoisted-map e tmp)
                   (set! hoisted-list (cons (list tmp e) hoisted-list))
                   tmp)))
           ((eq? (car e) 'lambda)
@@ -326,11 +326,11 @@
 ;;=============================================================================
 
 (define (analyze-free-var-counts expr)
-  (let ((counts (make-hash-table 'eq?)))
+  (let ((counts (make-eq-hashtable)))
     (let walk ((e expr) (shadowed '()))
       (cond ((symbol? e)
              (unless (memq e shadowed)
-               (hash-table-put! counts e (+ (hash-table-get counts e 0) 1))))
+               (hashtable-set! counts e (+ (hashtable-ref counts e 0) 1))))
 
             ((not (pair? e)) #f)
 
@@ -400,7 +400,7 @@
                new-expr)))))
 
 (define (perform-inlining var val body)
-  (hash-table-put! *inlining-depth* var (+ (hash-table-get *inlining-depth* var 0) 1))
+  (hashtable-set! *inlining-depth* var (+ (hashtable-ref *inlining-depth* var 0) 1))
   (map (lambda (e) (substitute-proc e var val)) body))
 
 (define (compute-score expr effort)
@@ -421,10 +421,10 @@
   (<= (compute-score val *cp0-effort-limit*) *cp0-score-limit*))
 
 (define (should-inline? var val body)
-  (let ((count (hash-table-get (analyze-free-var-counts body) var 0)))
+  (let ((count (hashtable-ref (analyze-free-var-counts body) var 0)))
     (or (<= count 1)
         (and (small-procedure? val)
-             (< (hash-table-get *inlining-depth* var 0) 2)))))
+             (< (hashtable-ref *inlining-depth* var 0) 2)))))
 
 (define (analyze-used-vars expr)
   (cond ((symbol? expr) (list expr))
