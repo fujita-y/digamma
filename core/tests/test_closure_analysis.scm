@@ -1,8 +1,9 @@
-;; test_closure_analysis.scm
-;; Test suite for closure escape analysis in the compiler.
-
 (load "../core.scm")
-(use srfi-1)
+
+(define (find pred lst)
+  (cond ((null? lst) #f)
+        ((pred (car lst)) (car lst))
+        (else (find pred (cdr lst)))))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

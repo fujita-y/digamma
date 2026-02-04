@@ -1,15 +1,19 @@
-
-(use srfi-1)
 (load "../core.scm")
 
+(define *pass-count* 0)
+(define *fail-count* 0)
+
 (define (check-exact name input expected)
-  (format #t "Testing ~a...\n" name)
   (let ((result (peephole-optimize input)))
     (if (equal? result expected)
-        (format #t "  PASS\n")
         (begin
-          (format #t "  FAIL\n  Expected: ~s\n  Got:      ~s\n" expected result)
-          (exit 1)))))
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Got:      ") (write result) (newline)))))
 
 ;; Compile-based tests are harder to exact-match due to label generation/register allocation details,
 ;; but we can verify the optimizer behavior directly using raw instruction lists.
@@ -127,4 +131,9 @@
              '((const r1 10) (mov r1 r1) (ret))
              '((const r1 10) (ret)))
 
-(print "Peephole optimization tests PASSED!")
+(if (= *fail-count* 0)
+    (display "ALL PEEPHOLE TESTS PASSED.\n")
+    (begin
+      (display "FAILED ") (display *fail-count*) (display " PEEPHOLE TESTS.\n")
+      (exit 1)))
+(newline)

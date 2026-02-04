@@ -16,8 +16,24 @@
    (define hashtable-contains? hash-table-exists?)
    (define hashtable-ref hash-table-get)
    (define hashtable-set! hash-table-put!)
+   (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj)))
+  (ypsilon
+   (define make-eq-hashtable (let ((val make-eq-hashtable)) val))
+   (define make-hashtable (let ((val make-hashtable)) val))
+   (define hashtable-clear! (let ((val hashtable-clear!)) val))
+   (define hashtable-contains? (let ((val hashtable-contains?)) val))
+   (define hashtable-ref (let ((val hashtable-ref)) (lambda (ht key . opt) (if (null? opt) (val ht key #f) (val ht key (car opt))))))
+   (define hashtable-set! (let ((val hashtable-set!)) val))
+   (define (hashtable->alist ht)
+     (let-values (((keys vals) (hashtable-entries ht)))
+       (map cons (vector->list keys) (vector->list vals))))
+   (define (equal-hash obj) (equal-hash obj)))
   (else))
+
+;;=============================================================================
+;; Globals & State
+;;=============================================================================
 
 ;; Counter for generating unique temporary symbol names
 (define *syntax-temp-counter* 0)
@@ -66,17 +82,37 @@
   (let loop ((i 0))
     (if (= i n) '() (cons i (loop (+ i 1))))))
 
+;; Standard partition implementation.
+(define (partition pred lst)
+  (let loop ((lst lst) (in '()) (out '()))
+    (cond ((null? lst) (values (reverse in) (reverse out)))
+          ((pred (car lst)) (loop (cdr lst) (cons (car lst) in) out))
+          (else (loop (cdr lst) in (cons (car lst) out))))))
+
 ;; Take first n elements of a list.
 (define (take lst n)
   (if (or (<= n 0) (null? lst))
       '()
       (cons (car lst) (take (cdr lst) (- n 1)))))
 
+(define list-head take)
+
 ;; Drop first n elements of a list.
 (define (drop lst n)
   (if (or (<= n 0) (null? lst))
       lst
       (drop (cdr lst) (- n 1))))
+
+(define list-tail drop)
+
+;; Join a list of strings with a delimiter.
+(define (string-join strings delimiter)
+  (if (null? strings)
+      ""
+      (let loop ((rest (cdr strings)) (acc (car strings)))
+        (if (null? rest)
+            acc
+            (loop (cdr rest) (string-append acc delimiter (car rest)))))))
 
 ;; Map a function over a potentially improper list.
 (define (map-improper func lst)

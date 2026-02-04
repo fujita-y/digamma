@@ -20,28 +20,28 @@
 
 (define generate-temporary-symbol (lambda () (gensym "tmp")))
 
-(define ca---r (make-hash-table))
-(define cd---r (make-hash-table))
+(define ca---r (make-eq-hashtable))
+(define cd---r (make-eq-hashtable))
 
-(for-each (lambda (e) (hash-table-put! ca---r (car e) (cdr e)))
+(for-each (lambda (e) (hashtable-set! ca---r (car e) (cdr e)))
           '((car . caar) (cdr . cadr) (caar . caaar) (cadr . caadr) (cdar . cadar) (cddr . caddr)
             (caaar . caaaar) (caadr . caaadr) (cadar . caadar) (caddr . caaddr) (cdaar . cadaar)
             (cdadr . cadadr) (cddar . caddar) (cdddr . cadddr)))
 
-(for-each (lambda (e) (hash-table-put! cd---r (car e) (cdr e)))
+(for-each (lambda (e) (hashtable-set! cd---r (car e) (cdr e)))
           '((car . cdar) (cdr . cddr) (caar . cdaar) (cadr . cdadr) (cdar . cddar) (cddr . cdddr)
             (caaar . cdaaar) (caadr . cdaadr) (cadar . cadadar) (caddr . cdaddr) (cdaar . cddaar)
             (cdadr . cddadr) (cddar . cdddar) (cdddr . cddddr)))
 
 (define car+
   (lambda (expr)
-    (cond ((and (pair? expr) (hash-table-get ca---r (car expr) #f))
+    (cond ((and (pair? expr) (hashtable-ref ca---r (car expr) #f))
            => (lambda (a) (cons a (cdr expr))))
           (else (list 'car expr)))))
 
 (define cdr+
   (lambda (expr)
-    (cond ((and (pair? expr) (hash-table-get cd---r (car expr) #f))
+    (cond ((and (pair? expr) (hashtable-ref cd---r (car expr) #f))
            => (lambda (a) (cons a (cdr expr))))
           (else (list 'cdr expr)))))
 
@@ -134,8 +134,8 @@
                                                    (cons (car pat) vars)))))))))
                   (else (values #f #f #f))))
           ((predicate-pair? pat)
-           (let ((renamed (or (hash-table-get ren (cadr pat) #f) (generate-temporary-symbol))))
-             (hash-table-put! ren (cadr pat) renamed)
+           (let ((renamed (or (hashtable-ref ren (cadr pat) #f) (generate-temporary-symbol))))
+             (hashtable-set! ren (cadr pat) renamed)
              (if (null? (cddr pat))
                  (values (cons `(,renamed ,ref) match) bind vars)
                  (compile-match ren mem (caddr pat) ref (cons `(,renamed ,ref) match) bind vars))))
@@ -201,7 +201,7 @@
       (syntax-case x ()
         ((?_ ?expr ?clauses ...)
          (let ((datum (generate-temporary-symbol))
-               (ren (make-hash-table))
+               (ren (make-eq-hashtable))
                (mem (vector '())))
            (let ((code (cse (reorder (map (lambda (clause)
                                            (syntax-case clause ()
@@ -233,7 +233,7 @@
                                 (map (lambda (a)
                                        (list (datum->syntax (syntax k) (cdr a))
                                              (datum->syntax (syntax ?_) (car a))))
-                                     (hash-table->alist ren)))
+                                      (hashtable->alist ren)))
                                ((?mem ...)
                                 (map (lambda (e) (datum->syntax (syntax k) (cdr e))) (vector-ref mem 0)))
                                ((?subexprs ...)
