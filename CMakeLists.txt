@@ -32,9 +32,28 @@ find_package(LLVM REQUIRED CONFIG PATHS ${llvm_cmakedir} NO_DEFAULT_PATH)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-include_directories(${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
-separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
-add_definitions(${LLVM_DEFINITIONS_LIST})
+execute_process(
+  COMMAND llvm-config --libs all
+  OUTPUT_VARIABLE llvm_libs
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# --- Boost (via vcpkg) ---
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  # Automatically detect vcpkg installation for the current architecture
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed")
+    # Detect triplet based on system processor
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+      set(VCPKG_TRIPLET "arm64-linux")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      set(VCPKG_TRIPLET "x64-linux")
+    else()
+      set(VCPKG_TRIPLET "${CMAKE_SYSTEM_PROCESSOR}-linux")
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/${VCPKG_TRIPLET}")
+  endif()
+endif()
+
+find_package(Boost CONFIG REQUIRED COMPONENTS context)
 
 # ==============================================================================
 # Compiler Configuration
@@ -46,14 +65,14 @@ set(CMAKE_CXX_COMPILER "${LLVM_DIR}/../../../bin/clang++")
 # Use LLD linker
 add_link_options("-fuse-ld=lld")
 
-# Common warning flags
+# Common compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wundef -Werror")
 
-# Release flags
+# Build-specific flags
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
 set(CMAKE_LINKER_FLAGS_RELEASE "${CMAKE_LINKER_FLAGS_RELEASE} -Wundef -Werror -flto")
 
-# Debug flags
+# Debug flags with hardware address sanitizer
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=hwaddress")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -Wundef -Werror -fsanitize=hwaddress")
 
@@ -62,20 +81,12 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -fno-omit-
 set(CMAKE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_LINKER_FLAGS_RELWITHDEBINFO} -Wundef -Werror")
 
 # ==============================================================================
-# Definitions
+# Installation Directories
 # ==============================================================================
 
 set(NANOS_SHARE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/share/nanos)
 set(NANOS_EXTENSION_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/nanos)
-
-add_compile_definitions(SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}")
-add_compile_definitions(SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}")
-
-if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-  add_compile_definitions(DEFAULT_HEAP_LIMIT=512)
-else()
-  add_compile_definitions(DEFAULT_HEAP_LIMIT=2048)
-endif()
+set(NANOS_SITELIB_DIRECTORY ${NANOS_SHARE_DIRECTORY}/sitelib)
 
 # ==============================================================================
 # Sources
@@ -93,33 +104,52 @@ set(NANOS_CORE_SOURCES
 )
 
 # ==============================================================================
-# Library Dependencies
+# Common Dependencies
 # ==============================================================================
 
-execute_process(
-  COMMAND llvm-config --libs all
-  OUTPUT_VARIABLE llvm_libs
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context -pthread -ldl)
 
 # ==============================================================================
 # Targets
 # ==============================================================================
 
-add_executable(
-  nanos
-  ${NANOS_CORE_SOURCES}
-  src/reader.cpp
-  src/printer.cpp
-  src/nanos.cpp
+# --- Core Library ---
+# Static library for core sources shared across all executables
+add_library(nanos_core STATIC ${NANOS_CORE_SOURCES})
+target_include_directories(nanos_core PRIVATE ${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(nanos_core PRIVATE
+  ${LLVM_DEFINITIONS}
+  SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}"
+  SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}"
+  $<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>,DEFAULT_HEAP_LIMIT=512,DEFAULT_HEAP_LIMIT=2048>
 )
 
-target_link_libraries(nanos ${llvm_libs} -pthread -ldl)
+# --- I/O Library ---
+# Static library for reader/printer sources used by multiple targets
+add_library(nanos_io STATIC src/reader.cpp src/printer.cpp)
+target_include_directories(nanos_io PRIVATE ${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(nanos_io PRIVATE
+  ${LLVM_DEFINITIONS}
+  SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}"
+  SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}"
+  $<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>,DEFAULT_HEAP_LIMIT=512,DEFAULT_HEAP_LIMIT=2048>
+)
+
+# --- Main Executable ---
+add_executable(nanos src/nanos.cpp)
+target_include_directories(nanos PRIVATE ${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(nanos PRIVATE
+  ${LLVM_DEFINITIONS}
+  SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}"
+  SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}"
+  $<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>,DEFAULT_HEAP_LIMIT=512,DEFAULT_HEAP_LIMIT=2048>
+)
+target_link_libraries(nanos nanos_core nanos_io ${NANOS_LINK_LIBRARIES})
 
 # ==============================================================================
 # Installation
 # ==============================================================================
 
-set(NANOS_SITELIB_DIRECTORY ${NANOS_SHARE_DIRECTORY}/sitelib)
 install(DIRECTORY sitelib/ DESTINATION ${NANOS_SITELIB_DIRECTORY})
 install(TARGETS nanos DESTINATION bin)
 
@@ -135,9 +165,15 @@ macro(add_nanos_test test_name test_source)
     ${test_name}
     ${test_source}
     ${ARGN}  # Additional sources
-    ${NANOS_CORE_SOURCES}
   )
-  target_link_libraries(${test_name} ${llvm_libs} -pthread -ldl)
+  target_include_directories(${test_name} PRIVATE ${LLVM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_definitions(${test_name} PRIVATE
+    ${LLVM_DEFINITIONS}
+    SYSTEM_SHARE_PATH="${NANOS_SHARE_DIRECTORY}"
+    SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}"
+    $<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>,DEFAULT_HEAP_LIMIT=512,DEFAULT_HEAP_LIMIT=2048>
+  )
+  target_link_libraries(${test_name} nanos_core ${NANOS_LINK_LIBRARIES})
   add_test(
     NAME ${test_name}
     COMMAND $<TARGET_FILE:${test_name}>
@@ -147,9 +183,21 @@ endmacro()
 
 add_nanos_test(test_object tests/test_object.cpp)
 add_nanos_test(test_gc tests/test_gc.cpp)
-add_nanos_test(test_printer tests/test_printer.cpp src/printer.cpp)
-add_nanos_test(test_reader tests/test_reader.cpp src/reader.cpp src/printer.cpp)
-add_nanos_test(test_r7rs tests/test_r7rs.cpp src/reader.cpp src/printer.cpp)
-add_nanos_test(test_radix tests/test_radix.cpp src/reader.cpp src/printer.cpp)
-add_nanos_test(test_hash tests/test_hash.cpp src/reader.cpp src/printer.cpp)
+
+# Tests that need I/O library
+add_nanos_test(test_printer tests/test_printer.cpp)
+target_link_libraries(test_printer nanos_io)
+
+add_nanos_test(test_reader tests/test_reader.cpp)
+target_link_libraries(test_reader nanos_io)
+
+add_nanos_test(test_r7rs tests/test_r7rs.cpp)
+target_link_libraries(test_r7rs nanos_io)
+
+add_nanos_test(test_radix tests/test_radix.cpp)
+target_link_libraries(test_radix nanos_io)
+
+add_nanos_test(test_hash tests/test_hash.cpp)
+target_link_libraries(test_hash nanos_io)
+
 add_nanos_test(test_symbol tests/test_symbol.cpp)
