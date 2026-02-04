@@ -4,8 +4,11 @@
 ;; Core system loader
 ;; Loads components in topological order to minimize forward references
 
-;; Base syntax utilities
+;; Common utilities
 (load "common.scm")
+
+;; Module
+(load "module.scm")
 
 ;; Expander components
 (load "quasiquote.scm")

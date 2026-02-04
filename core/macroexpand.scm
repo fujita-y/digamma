@@ -15,9 +15,6 @@
 ;; SECTION 1: Globals & State
 ;;=============================================================================
 
-;; Association list of global macro definitions: ((name . transformer) ...)
-(define *macro-env* '())
-
 ;; Tracks all renamed identifiers: ((alias original context) ...)
 (define *rename-env* '())
 
@@ -46,10 +43,6 @@
 ;; Register a renamed identifier in the global rename environment.
 (define (register-renamed! alias original context)
   (set! *rename-env* (cons (list alias original context) *rename-env*)))
-
-;; Register a global macro definition.
-(define (register-macro! name transformer)
-  (set! *macro-env* (cons (cons name transformer) *macro-env*)))
 
 ;; Unwrap a lazy environment reference used by letrec-syntax.
 (define (unwrap-env env)
@@ -96,8 +89,8 @@
                 (let ((local-pair-resolved (assq resolved env)))
                   (if local-pair-resolved
                       (cdr local-pair-resolved)
-                      (let ((global-pair (assq resolved *macro-env*)))
-                        (and global-pair (cdr global-pair)))))))))))
+                      (let ((global-trans (global-macro-ref resolved)))
+                        (and global-trans global-trans))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
 (define (resolve-core-form sym shadowed-env)
@@ -382,7 +375,7 @@
     (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env)) (cddr expr)))))
 
 (define (expand-define-syntax expr m-env s-env r-env)
-  (register-macro! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) ''defined)
+  (global-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) ''defined)
 
 (define (expand-define-module expr m-env s-env r-env)
   (let* ((mod-name (cadr expr)) (decls (cddr expr)))
@@ -400,7 +393,7 @@
                   (else (loop (cdr decls) exports imports (cons decl body-forms)))))))))
 
 (define (expand-import-module expr m-env s-env r-env)
-  (for-each (lambda (b) (if (macro-binding? (cdr b)) (register-macro! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
+  (for-each (lambda (b) (if (macro-binding? (cdr b)) (global-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
             (apply append (map process-import-set (cdr expr)))) ''imported)
 
 (define (expand-set! expr m-env s-env r-env)

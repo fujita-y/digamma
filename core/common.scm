@@ -6,6 +6,7 @@
 
 (cond-expand
   (gauche
+   (use srfi-9)
    (define (make-eq-hashtable) (make-hash-table 'eq?))
    (define (make-hashtable hash-fn equiv-fn)
      (cond ((eq? equiv-fn equal?) (make-hash-table 'equal?))
@@ -14,11 +15,13 @@
            (else (make-hash-table equiv-fn))))
    (define hashtable-clear! hash-table-clear!)
    (define hashtable-contains? hash-table-exists?)
+   (define hashtable-delete! hash-table-delete!)
    (define hashtable-ref hash-table-get)
    (define hashtable-set! hash-table-put!)
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj)))
   (ypsilon
+   (import (srfi 9))
    (define (hashtable->alist ht)
      (let-values (((keys vals) (hashtable-entries ht)))
        (map cons (vector->list keys) (vector->list vals)))))

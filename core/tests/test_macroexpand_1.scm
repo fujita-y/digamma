@@ -46,7 +46,7 @@
 (display "\n>>> Section 3: Non macro and Identifier macro\n")
 (test "Non-macro form" (macroexpand-1 '(list 1 2)) '(list 1 2))
 
-(register-macro! 'baz (lambda (expr) 'expanded-baz))
+(global-macro-set! 'baz (lambda (expr) 'expanded-baz))
 (test "Identifier macro" (macroexpand-1 'baz) 'expanded-baz)
 
 (newline)
