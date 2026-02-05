@@ -101,6 +101,7 @@ set(NANOS_CORE_SOURCES
   src/concurrent_slab.cpp
   src/utf8.cpp
   src/hash.cpp
+  src/vector.cpp
 )
 
 # ==============================================================================

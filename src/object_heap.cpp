@@ -52,6 +52,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_vectors.init(&m_concurrent_heap, clp2(sizeof(scm_vector_rec_t)), true, true);
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
+  for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
@@ -77,6 +78,23 @@ void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
     if (obj) return obj;
   } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
   fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
+  return NULL;
+}
+
+void* object_heap_t::alloc_collectible(size_t nsize) {
+  m_trip_bytes += nsize;
+  if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
+  int bucket = bytes_to_bucket(nsize);
+  if (bucket < array_sizeof(m_collectibles)) {
+    do {
+      void* obj = m_collectibles[bucket].new_collectible_object();
+      if (obj) return obj;
+    } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
+    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+  } else {
+    fatal("%s:%u collectible object over %d bytes not supported but %d bytes requested", __FILE__, __LINE__,
+          1 << (array_sizeof(m_collectibles) + 3), nsize);
+  }
   return NULL;
 }
 
@@ -155,6 +173,18 @@ void object_heap_t::trace(void* obj) {
     hashtable_aux_t* aux = rec->aux;
     for (int i = 0; i < aux->capacity * 2; i++) {
       shade(aux->elts[i]);
+    }
+    return;
+  }
+
+  uintptr_t tag = *(uintptr_t*)obj;
+  uintptr_t tc6 = (tag & 0x3f00) >> 8;
+
+  if (tc6 == tc6_closure) {
+    scm_closure_rec_t* rec = (scm_closure_rec_t*)obj;
+    shade(rec->code);
+    for (int i = 0; i < rec->n_env; i++) {
+      shade(rec->env[i]);
     }
     return;
   }

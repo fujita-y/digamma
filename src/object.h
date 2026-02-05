@@ -47,10 +47,10 @@ constexpr uintptr_t tc6_long_flonum = 2;
 constexpr uintptr_t tc6_vector = 3;
 constexpr uintptr_t tc6_u8vector = 4;
 constexpr uintptr_t tc6_hashtable = 5;
+constexpr uintptr_t tc6_closure = 6;
 /*
 constexpr uintptr_t tc6_bignum = 5;
 constexpr uintptr_t tc6_cont = 6;
-constexpr uintptr_t tc6_closure = 7;
 constexpr uintptr_t tc6_subr = 8;
 constexpr uintptr_t tc6_port = 9;
 constexpr uintptr_t tc6_values = 10;
@@ -137,6 +137,16 @@ struct scm_hashtable_rec_t {
   hashtable_aux_t* aux;
 };
 
+struct scm_closure_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t code;  // vm: code vector
+  int pc;          // vm: index of instruction in code
+  int fixed_argc;
+  int has_rest;
+  int n_env;
+  scm_obj_t env[1];  // free variables
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -165,6 +175,8 @@ inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
 inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
 inline bool is_u8vector(scm_obj_t x) { return is_tc6(x, tc6_u8vector); }
 inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
+inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
+
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 
@@ -176,6 +188,7 @@ scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
+scm_obj_t make_closure(int n_env);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

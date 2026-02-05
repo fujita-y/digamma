@@ -44,7 +44,7 @@ static bool test_gc_allocation(int num_loops) {
   for (int i = 0; i < num_loops; i++) {
     heap.safepoint();
     usleep(1);
-    scm_obj_t obj = make_cons(make_symbol("afas"), make_list(3, make_cons(make_fixnum(1), make_fixnum(2)),
+    scm_obj_t obj = make_cons(make_symbol("afas"), make_list(4, make_cons(make_fixnum(1), make_fixnum(2)), make_closure(6),
                                                              make_cons(make_symbol("affd"), make_string("adf")), make_u8vector(122)));
     scm_obj_t hash = make_hashtable(string_hash, string_equiv, 16);
     hashtable_set(hash, make_string("afd"), make_symbol("value"));
