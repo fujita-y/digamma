@@ -84,6 +84,12 @@
   (global-variable-set! 'hashtable-ref hashtable-ref)
   (global-variable-set! 'hashtable-contains? hashtable-contains?)
   (global-variable-set! 'hashtable-delete! hashtable-delete!)
+  (global-variable-set! 'closure-code closure-code)
+  (global-variable-set! 'closure-label closure-label)
+  (global-variable-set! 'closure-free closure-free)
+  (global-variable-set! 'closure-fixed-argc closure-fixed-argc)
+  (global-variable-set! 'closure-has-rest closure-has-rest)
+  (global-variable-set! 'closure? closure?)
   #t)
 
 (define repl:prelude
@@ -104,8 +110,9 @@
         #t
         (let* ((expanded (macroexpand (car exprs)))
                (optimized (optimize expanded))
-               (code (generate-bytecode (compile optimized)))
-               (ctx (vm:init-context code)))
+               (code (compile optimized))
+               (bytecode (generate-bytecode code))
+               (ctx (vm:init-context bytecode)))
           (vm:vm-run ctx)
           (loop (cdr exprs))))))
 
@@ -129,8 +136,9 @@
            (lambda ()
              (let* ((expanded (macroexpand expr))
                     (optimized (optimize expanded))
-                    (code (generate-bytecode (compile optimized)))
-                    (ctx (vm:init-context code)))
+                    (code (compile optimized))
+                    (bytecode (generate-bytecode code))
+                    (ctx (vm:init-context bytecode)))
                (let ((result (vm:vm-run ctx)))
                  (write result)
                  (newline)

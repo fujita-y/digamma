@@ -3,7 +3,7 @@
 ;;
 ;; Bytecode Instruction Set:
 ;;   (nop)                           - No operation
-;;   (const <reg> <val>)             - Load constant <val> into <reg>
+;;   (const <reg> <idx>)             - Load constant at <idx> into <reg>
 ;;   (mov <dst> <src>)               - Move value from <src> register to <dst> register
 ;;   (if <t-label> <f-label>)        - Jump to <t-label> if r0 is true, else <f-label>
 ;;   (global-ref <reg> <var>)        - Load global variable <var> into <reg>
@@ -33,12 +33,14 @@
   (regs    ctx-regs    ctx-regs-set!))
 
 (define (vm:decode-reg reg)
-  (if (symbol? reg)
-      (let ((s (symbol->string reg)))
-        (if (and (> (string-length s) 1) (char=? (string-ref s 0) #\r))
-            (string->number (substring s 1 (string-length s)))
-            (error "Invalid register name" reg)))
-      reg))
+  (if (fixnum? reg)
+      reg
+      (if (symbol? reg)
+          (let ((s (symbol->string reg)))
+            (if (and (> (string-length s) 1) (char=? (string-ref s 0) #\r))
+                (string->number (substring s 1 (string-length s)))
+                (error "Invalid register name" reg)))
+          (error "Invalid register" reg))))
 
 (define (vm:reg-ref ctx reg)
   (vector-ref (ctx-regs ctx) (vm:decode-reg reg)))
@@ -46,7 +48,7 @@
 (define (vm:reg-set! ctx reg val)
   (vector-set! (ctx-regs ctx) (vm:decode-reg reg) val))
 
-(define-record-type <closure>
+(define-record-type <nanos:closure>
   (make-closure-vec label free code fixed-argc has-rest)
   closure?
   (label closure-label)
@@ -55,7 +57,7 @@
   (fixed-argc closure-fixed-argc)
   (has-rest   closure-has-rest))
 
-(define-record-type <cell>
+(define-record-type cell>
   (make-cell-box value)
   cell?
   (value cell-value cell-value-set!))
@@ -68,11 +70,11 @@
 ;; (nop)
 (define (vm:op-nop ctx inst) *vm:continue*)
 
-;; (const <reg> <val>)
+;; (const <reg> <idx>)
 (define (vm:op-const ctx inst)
   (let ((reg (vector-ref inst 1))
-        (val (vector-ref inst 2)))
-    (vm:reg-set! ctx reg val)
+        (idx (vector-ref inst 2)))
+    (vm:reg-set! ctx reg (vector-ref (ctx-code ctx) idx))
     *vm:continue*))
 
 ;; (mov <dst> <src>)
@@ -86,7 +88,7 @@
 (define (vm:op-if ctx inst)
   (let ((t-label (vector-ref inst 1))
         (f-label (vector-ref inst 2)))
-    (if (vm:reg-ref ctx 'r0)
+    (if (vm:reg-ref ctx 0)
         (ctx-pc-set! ctx t-label)
         (ctx-pc-set! ctx f-label))
     *vm:continue*))
@@ -115,14 +117,14 @@
   (let arg-loop ((i 0))
     (if (= i n-args)
         '()
-        (cons (vm:reg-ref ctx (string->symbol (string-append "r" (number->string i))))
+        (cons (vm:reg-ref ctx i)
               (arg-loop (+ i 1))))))
 
 (define (vm:fetch-args-range ctx start end)
   (let arg-loop ((i start))
     (if (= i end)
         '()
-        (cons (vm:reg-ref ctx (string->symbol (string-append "r" (number->string i))))
+        (cons (vm:reg-ref ctx i)
               (arg-loop (+ i 1))))))
 
 ;; (call <proc-reg> <n-args>)
@@ -138,7 +140,7 @@
                 (begin
                   (if rest?
                       (let ((rest-args (vm:fetch-args-range ctx fixed n-args)))
-                        (vm:reg-set! ctx (string->symbol (string-append "r" (number->string fixed))) rest-args)))
+                        (vm:reg-set! ctx fixed rest-args)))
                   (ctx-stack-set! ctx (cons (list (ctx-pc ctx) (ctx-cl ctx) (vector-copy (ctx-regs ctx)) (ctx-code ctx)) (ctx-stack ctx)))
                   (ctx-cl-set! ctx proc)
                   (ctx-code-set! ctx (closure-code proc))
@@ -148,7 +150,7 @@
                 (saved-regs (vector-copy (ctx-regs ctx))))
             (let ((res (apply proc args)))
               (ctx-regs-set! ctx saved-regs)
-              (vm:reg-set! ctx 'r0 res)
+              (vm:reg-set! ctx 0 res)
               *vm:continue*))))))
 
 ;; (tail-call <proc-reg> <n-args>)
@@ -164,7 +166,7 @@
                 (begin
                   (if rest?
                       (let ((rest-args (vm:fetch-args-range ctx fixed n-args)))
-                        (vm:reg-set! ctx (string->symbol (string-append "r" (number->string fixed))) rest-args)))
+                        (vm:reg-set! ctx fixed rest-args)))
                   (ctx-cl-set! ctx proc)
                   (ctx-code-set! ctx (closure-code proc))
                   (ctx-pc-set! ctx (closure-label proc))
@@ -179,21 +181,21 @@
                     (ctx-regs-set! ctx (caddr ctx-data))
                     (ctx-code-set! ctx (cadddr ctx-data))
                     (ctx-stack-set! ctx (cdr (ctx-stack ctx)))
-                    (vm:reg-set! ctx 'r0 res)
+                    (vm:reg-set! ctx 0 res)
                     *vm:continue*))))))))
 
 ;; (ret)
 (define (vm:op-ret ctx inst)
   (if (null? (ctx-stack ctx))
-      (vm:reg-ref ctx 'r0)
+      (vm:reg-ref ctx 0)
       (let ((ctx-data (car (ctx-stack ctx)))
-            (res (vm:reg-ref ctx 'r0)))
+            (res (vm:reg-ref ctx 0)))
         (ctx-pc-set! ctx (car ctx-data))
         (ctx-cl-set! ctx (cadr ctx-data))
         (ctx-regs-set! ctx (caddr ctx-data))
         (ctx-code-set! ctx (cadddr ctx-data))
         (ctx-stack-set! ctx (cdr (ctx-stack ctx)))
-        (vm:reg-set! ctx 'r0 res)
+        (vm:reg-set! ctx 0 res)
         *vm:continue*)))
 
 ;; (make-closure <dst> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
@@ -277,7 +279,7 @@
     (let* ((code (ctx-code ctx))
            (pc (ctx-pc ctx)))
       (if (>= pc (vector-length code))
-          (vm:reg-ref ctx 'r0)
+          (vm:reg-ref ctx 0)
           (let* ((inst (vector-ref code pc))
                  (op (vector-ref inst 0)))
             (ctx-pc-set! ctx (+ pc 1))
