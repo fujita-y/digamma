@@ -104,7 +104,7 @@
         #t
         (let* ((expanded (macroexpand (car exprs)))
                (optimized (optimize expanded))
-               (code (compile optimized))
+               (code (generate-bytecode (compile optimized)))
                (ctx (vm:init-context code)))
           (vm:vm-run ctx)
           (loop (cdr exprs))))))
@@ -129,7 +129,7 @@
            (lambda ()
              (let* ((expanded (macroexpand expr))
                     (optimized (optimize expanded))
-                    (code (compile optimized))
+                    (code (generate-bytecode (compile optimized)))
                     (ctx (vm:init-context code)))
                (let ((result (vm:vm-run ctx)))
                  (write result)

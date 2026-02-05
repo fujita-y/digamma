@@ -10,16 +10,15 @@
 
 (define (test name expr expected-escapeStatus)
   (let* ((code (compile expr))
-         (instructions (vector->list code))
+         (instructions code)
          (make-closure-inst (find (lambda (inst) 
-                                    (and (vector? inst) 
-                                         (> (vector-length inst) 0)
-                                         (eq? (vector-ref inst 0) 'make-closure)))
+                                    (and (pair? inst) 
+                                         (eq? (car inst) 'make-closure)))
                                   instructions)))
     (if make-closure-inst
-        (let* ((len (vector-length make-closure-inst))
-               ;; The stack-alloc? flag is at index 4 (0-based) or -3 from end
-               (status (vector-ref make-closure-inst (- len 3))))
+        (let* ((len (length make-closure-inst))
+               ;; The stack-alloc? flag is at index 3 (0-based)
+               (status (list-ref make-closure-inst 4)))
           (if (eq? status expected-escapeStatus)
               (begin
                 (set! *pass-count* (+ *pass-count* 1))

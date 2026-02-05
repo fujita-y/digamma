@@ -20,4 +20,5 @@
 
 ;; Optmizer and Compiler
 (load "optimizer.scm")
+(load "bytecode.scm")
 (load "compiler.scm")

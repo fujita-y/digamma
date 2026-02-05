@@ -1,0 +1,22 @@
+;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;; See LICENSE file for terms and conditions of use.
+
+(define (generate-bytecode all-code)
+  (let ((label-map (make-eq-hashtable))
+        (final-code '())
+        (current-pc 0))
+    (for-each (lambda (inst)
+                (if (eq? (car inst) 'label)
+                    (hashtable-set! label-map (cadr inst) current-pc)
+                    (set! current-pc (+ current-pc 1))))
+              all-code)
+    (for-each (lambda (inst)
+                (if (not (eq? (car inst) 'label))
+                    (let ((resolved (map (lambda (x)
+                                           (if (and (symbol? x) (hashtable-contains? label-map x))
+                                               (hashtable-ref label-map x #f)
+                                               x))
+                                         inst)))
+                      (set! final-code (cons (list->vector resolved) final-code)))))
+              all-code)
+    (list->vector (reverse final-code))))
