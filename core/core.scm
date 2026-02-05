@@ -8,12 +8,12 @@
 (load "common.scm")
 
 ;; Module
-(load "module.scm")
+(load "env.scm")
 
 ;; Expander components
 (load "quasiquote.scm")
-(load "syntax_rules.scm")
-(load "syntax_case.scm")
+(load "syntax-rules.scm")
+(load "syntax-case.scm")
 
 ;; Main macro expander
 (load "macroexpand.scm")
