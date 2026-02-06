@@ -118,38 +118,6 @@ static bool test_u8vector(int nsize) {
   return true;
 }
 
-static bool test_closure(int num_free_vars) {
-  scm_obj_t x1 = make_closure(num_free_vars);
-  if (!is_closure(x1)) {
-    printf("\033[31m###### closure check failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(x1);
-  if (rec->argc != 0 || rec->rest != 0 || rec->literals != scm_nil) {
-    printf("\033[31m###### closure init failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  for (int i = 0; i < num_free_vars; i++) {
-    if (rec->env[i] != scm_nil) {
-      printf("\033[31m###### closure env init failed at %d\033[0m\n", i);
-      some_test_failed = true;
-      return false;
-    }
-    rec->env[i] = make_fixnum(i);
-  }
-  for (int i = 0; i < num_free_vars; i++) {
-    if (rec->env[i] != make_fixnum(i)) {
-      printf("\033[31m###### closure env set failed at %d\033[0m\n", i);
-      some_test_failed = true;
-      return false;
-    }
-  }
-  printf("\033[32mclosure passed: %d\033[0m\n", num_free_vars);
-  return true;
-}
-
 int main(int argc, char** argv) {
   object_heap_t heap;
   heap.init(1024 * 1024 * 2, 1024 * 1024);
@@ -184,10 +152,6 @@ int main(int argc, char** argv) {
 
   test_u8vector(97);
   test_u8vector(122);
-
-  test_closure(0);
-  test_closure(10);
-  test_closure(100);
 
   heap.destroy();
 

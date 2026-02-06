@@ -188,7 +188,7 @@ scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
-scm_obj_t make_closure(int nsize);
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
