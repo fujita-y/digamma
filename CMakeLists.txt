@@ -102,6 +102,7 @@ set(NANOS_CORE_SOURCES
   src/utf8.cpp
   src/hash.cpp
   src/vector.cpp
+  src/codegen.cpp
 )
 
 # ==============================================================================
@@ -202,3 +203,6 @@ add_nanos_test(test_hash tests/test_hash.cpp)
 target_link_libraries(test_hash nanos_io)
 
 add_nanos_test(test_symbol tests/test_symbol.cpp)
+
+add_nanos_test(test_codegen tests/test_codegen.cpp)
+target_link_libraries(test_codegen nanos_io)

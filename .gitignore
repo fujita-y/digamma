@@ -29,7 +29,10 @@
 
 # CMake
 build/
+cmake_install.cmake
 CMakeFiles/
+CMakeCache.txt
+CTestTestfile.cmake
 
 # VCPKG
 vcpkg_installed/
