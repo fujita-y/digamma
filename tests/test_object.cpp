@@ -126,7 +126,7 @@ static bool test_closure(int num_free_vars) {
     return false;
   }
   scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(x1);
-  if (rec->fixed_argc != 0 || rec->has_rest != 0 || rec->pc != 0 || rec->code != scm_nil) {
+  if (rec->argc != 0 || rec->rest != 0 || rec->literals != scm_nil) {
     printf("\033[31m###### closure init failed\033[0m\n");
     some_test_failed = true;
     return false;

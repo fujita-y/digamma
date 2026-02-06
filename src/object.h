@@ -139,11 +139,11 @@ struct scm_hashtable_rec_t {
 
 struct scm_closure_rec_t {
   scm_tc6_t tag;
-  scm_obj_t code;  // vm: code vector
-  int pc;          // vm: index of instruction in code
-  int fixed_argc;
-  int has_rest;
-  int n_env;
+  scm_obj_t literals;
+  void* code;
+  int argc;
+  int rest;
+  int nsize;
   scm_obj_t env[1];  // free variables
 };
 
@@ -188,7 +188,7 @@ scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
-scm_obj_t make_closure(int n_env);
+scm_obj_t make_closure(int nsize);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

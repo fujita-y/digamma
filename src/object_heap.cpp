@@ -182,8 +182,8 @@ void object_heap_t::trace(void* obj) {
 
   if (tc6 == tc6_closure) {
     scm_closure_rec_t* rec = (scm_closure_rec_t*)obj;
-    shade(rec->code);
-    for (int i = 0; i < rec->n_env; i++) {
+    shade(rec->literals);
+    for (int i = 0; i < rec->nsize; i++) {
       shade(rec->env[i]);
     }
     return;

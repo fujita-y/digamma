@@ -144,16 +144,16 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   return tc6_pointer(rec, tc6_hashtable);
 }
 
-scm_obj_t make_closure(int n_env) {
+scm_obj_t make_closure(int nsize) {
   object_heap_t& heap = *object_heap_t::current();
-  scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) + (n_env - 1) * sizeof(scm_obj_t));
+  scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) + (nsize - 1) * sizeof(scm_obj_t));
   rec->tag = tc6_tag(tc6_closure);
-  rec->code = scm_nil;
-  rec->pc = 0;
-  rec->fixed_argc = 0;
-  rec->has_rest = 0;
-  rec->n_env = n_env;
-  for (int i = 0; i < n_env; i++) {
+  rec->literals = scm_nil;
+  rec->code = nullptr;
+  rec->argc = 0;
+  rec->rest = 0;
+  rec->nsize = nsize;
+  for (int i = 0; i < nsize; i++) {
     rec->env[i] = scm_nil;
   }
   return tc6_pointer(rec, tc6_closure);
