@@ -104,6 +104,11 @@ scm_obj_t make_string(const char* name) {
   return tc6_pointer(rec, tc6_string);
 }
 
+uint8_t* string_name(scm_obj_t x) {
+  if (!is_string(x)) fatal("%s:%u internal error: string expected.", __FILE__, __LINE__);
+  return ((scm_string_rec_t*)to_address(x))->name;
+}
+
 scm_obj_t make_vector(int nsize, scm_obj_t init) {
   object_heap_t& heap = *object_heap_t::current();
   scm_vector_rec_t* rec = (scm_vector_rec_t*)heap.alloc_vector();
@@ -159,9 +164,27 @@ scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[
   return tc6_pointer(rec, tc6_closure);
 }
 
-uint8_t* string_name(scm_obj_t x) {
-  if (!is_string(x)) fatal("%s:%u internal error: string expected.", __FILE__, __LINE__);
-  return ((scm_string_rec_t*)to_address(x))->name;
+scm_obj_t make_environment(scm_obj_t name) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_environment_rec_t* rec = (scm_environment_rec_t*)heap.alloc_environment();
+  rec->tag = tc6_tag(tc6_environment);
+  rec->name = name;
+  rec->variables = make_hashtable(symbol_hash, symbol_equiv, 16);
+  rec->macros = make_hashtable(symbol_hash, symbol_equiv, 16);
+  return tc6_pointer(rec, tc6_environment);
+}
+
+scm_obj_t make_cell(scm_obj_t value) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();
+  rec->tag = tc6_tag(tc6_cell);
+  rec->value = value;
+  return tc6_pointer(rec, tc6_cell);
+}
+
+void cell_value_set(scm_obj_t x, scm_obj_t v) {
+  object_heap_t::current()->write_barrier(v);
+  ((scm_cell_rec_t*)to_address(x))->value = v;
 }
 
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr) {
@@ -185,4 +208,15 @@ scm_obj_t make_list(int len, ...) {
   }
   va_end(ap);
   return (scm_obj_t)rec;
+}
+
+scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_subr_rec_t* rec = (scm_subr_rec_t*)heap.alloc_subr();
+  rec->tag = tc6_tag(tc6_subr);
+  rec->name = name;
+  rec->argc = argc;
+  rec->rest = rest;
+  rec->code = code;
+  return tc6_pointer(rec, tc6_subr);
 }

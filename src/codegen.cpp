@@ -2,24 +2,123 @@
 // See LICENSE file for terms and conditions of use.
 
 #include "codegen.h"
+#include "codegen_aux.h"
+#include "object_heap.h"
 
-#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Analysis/CGSCCPassManager.h>
+#include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Passes/OptimizationLevel.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
-#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/ADCE.h>
+#include <llvm/Transforms/Scalar/EarlyCSE.h>
 #include <llvm/Transforms/Scalar/GVN.h>
-#include <llvm/Transforms/Utils.h>
+#include <llvm/Transforms/Scalar/SCCP.h>
+#include <llvm/Transforms/Scalar/SROA.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
-codegen_t::codegen_t(llvm::LLVMContext& ctx, llvm::Module* mod, llvm::ExecutionEngine* ee)
-    : context(ctx), module(mod), builder(ctx), engine(ee) {
+codegen_t::codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee) : context(ctx), builder(ctx), engine(ee) {
   sym_const = make_symbol("const");
   sym_mov = make_symbol("mov");
   sym_if = make_symbol("if");
   sym_jump = make_symbol("jump");
   sym_label = make_symbol("label");
   sym_ret = make_symbol("ret");
+  sym_make_closure = make_symbol("make-closure");
+  sym_global_set = make_symbol("global-set!");
+  sym_global_ref = make_symbol("global-ref");
+  sym_call = make_symbol("call");
+  sym_tail_call = make_symbol("tail-call");
+  sym_closure_ref = make_symbol("closure-ref");
+  sym_closure_set = make_symbol("closure-set!");
+  sym_closure_cell_set = make_symbol("closure-cell-set!");
+  sym_closure_self = make_symbol("closure-self");
+  sym_closure_cell_ref = make_symbol("closure-cell-ref");
+  sym_reg_cell_ref = make_symbol("reg-cell-ref");
+  sym_reg_cell_set = make_symbol("reg-cell-set!");
+  sym_make_cell = make_symbol("make-cell");
+
+  init_opcode_map();
+
+  llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+}
+
+extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+extern "C" void c_global_set(scm_obj_t key, scm_obj_t value);
+extern "C" scm_obj_t c_global_ref(scm_obj_t key);
+extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
+
+extern "C" scm_obj_t c_make_cell(scm_obj_t value);
+extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]);
+extern "C" void c_write_barrier(scm_obj_t obj);
+
+// Constants
+static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;      // Offset to untag heap objects
+static constexpr int CLOSURE_CODE_FIELD_OFFSET = 16;  // Offset to 'code' field in scm_closure_rec_t
+static constexpr int CLOSURE_ARGC_FIELD_OFFSET = 24;  // Offset to 'argc' field in scm_closure_rec_t
+static constexpr int CLOSURE_REST_FIELD_OFFSET = 28;  // Offset to 'rest' field in scm_closure_rec_t
+static constexpr int CLOSURE_ENV_FIELD_OFFSET = 40;   // Offset to 'env' field in scm_closure_rec_t
+static constexpr int CELL_VALUE_FIELD_OFFSET = 8;     // Offset to 'value' field in scm_cell_rec_t
+static constexpr int VALIST_BUFFER_SIZE = 256;        // Buffer size for va_list on all platforms
+
+// scm_closure_rec_t struct layout (for reference):
+//   offset 0:  scm_tc6_t tag       (8 bytes)
+//   offset 8:  scm_obj_t literals  (8 bytes)
+//   offset 16: void* code          (8 bytes)
+//   offset 24: int argc            (4 bytes)
+//   offset 28: int rest            (4 bytes)
+//   offset 32: int nsize           (4 bytes)
+//   offset 40: scm_obj_t env[...]
+
+static constexpr char CLOSURE_LABEL_PREFIX = 'C';
+
+// Helper macros for cons access
+#define CAR(x)     (((scm_cons_rec_t*)(x))->car)
+#define CDR(x)     (((scm_cons_rec_t*)(x))->cdr)
+#define CAAR(x)    CAR(CAR(x))
+#define CADR(x)    CAR(CDR(x))
+#define CDAR(x)    CDR(CAR(x))
+#define CDDR(x)    CDR(CDR(x))
+#define CADDR(x)   CAR(CDDR(x))
+#define CDDDR(x)   CDR(CDDDR(x))
+#define CADDDR(x)  CAR(CDDDR(x))
+#define CADDDDR(x) CAR(CDR(CDDDR(x)))
+
+// Helper function to get nth element of a list (1-indexed, like car/cdr convention)
+static inline scm_obj_t list_nth(scm_obj_t list, int n) {
+  if (n <= 0) return scm_nil;
+  scm_obj_t curr = list;
+  while (--n > 0 && is_cons(curr)) {
+    curr = CDR(curr);
+  }
+  return is_cons(curr) ? CAR(curr) : scm_nil;
+}
+
+// Helper function for instruction operand access (1-indexed: operand 1 is first after opcode)
+static inline scm_obj_t operand(scm_obj_t inst, int n) { return list_nth(CDR(inst), n); }
+
+// Helper function to check if a label is a closure label
+static bool is_closure_label(scm_obj_t label) {
+  if (!is_symbol(label)) return false;
+  const char* label_name = (const char*)symbol_name(label);
+  return label_name[0] == CLOSURE_LABEL_PREFIX;
+}
+
+// Helper function to count list length
+static int count_list_length(scm_obj_t list) {
+  int count = 0;
+  scm_obj_t curr = list;
+  while (is_cons(curr)) {
+    count++;
+    curr = CDR(curr);
+  }
+  return count;
 }
 
 static int parse_reg(scm_obj_t s) {
@@ -39,158 +138,658 @@ static int parse_reg(scm_obj_t s) {
   return -1;
 }
 
-// Helper macros for cons access
-#define CAR(x)   (((scm_cons_rec_t*)(x))->car)
-#define CDR(x)   (((scm_cons_rec_t*)(x))->cdr)
-#define CAAR(x)  CAR(CAR(x))
-#define CADR(x)  CAR(CDR(x))
-#define CADDR(x) CAR(CDR(CDR(x)))
+// Helper function to create 64-bit integer constant
+static inline llvm::Value* createInt64Constant(llvm::LLVMContext& ctx, uint64_t val) {
+  return llvm::ConstantInt::get(ctx, llvm::APInt(64, val));
+}
 
-static int scan_registers(scm_obj_t inst_list, scm_obj_t sym_const, scm_obj_t sym_mov) {
-  int max_reg = 0;
+// Helper function to create 32-bit  integer constant
+static inline llvm::Value* createInt32Constant(llvm::LLVMContext& ctx, int32_t val) { return llvm::ConstantInt::get(ctx, llvm::APInt(32, val)); }
+
+// Helper function to update max register index
+static inline void updateMaxRegister(int reg_idx, int& max_reg) {
+  if (reg_idx > max_reg) max_reg = reg_idx;
+}
+
+// ===== LLVM IR Helper Functions =====
+
+// Helper to untag a heap object pointer (converts tagged scm_obj_t to raw pointer)
+static inline llvm::Value* untagPointer(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx, llvm::Value* tagged_obj) {
+  llvm::Value* untagged_int = builder.CreateSub(tagged_obj, createInt64Constant(ctx, HEAP_OBJECT_TAG_OFFSET));
+  return builder.CreateIntToPtr(untagged_int, llvm::PointerType::get(ctx, 0));
+}
+
+// Helper to get pointer to closure's environment array
+static inline llvm::Value* getClosureEnvArrayPtr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx, llvm::Value* closure_tagged,
+                                                 llvm::Type* int64Type) {
+  llvm::Value* closure_ptr = untagPointer(builder, ctx, closure_tagged);
+  llvm::Value* env_start_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_ENV_FIELD_OFFSET);
+  return builder.CreateBitCast(env_start_ptr, llvm::PointerType::get(int64Type, 0));
+}
+
+// Helper to get pointer to cell's value field
+static inline llvm::Value* getCellValuePtr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx, llvm::Value* cell_tagged, llvm::Type* int64Type) {
+  llvm::Value* cell_ptr = untagPointer(builder, ctx, cell_tagged);
+  llvm::Value* value_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), cell_ptr, CELL_VALUE_FIELD_OFFSET);
+  return builder.CreateBitCast(value_ptr, llvm::PointerType::get(int64Type, 0));
+}
+
+// Helper to finish collecting closure literals
+void codegen_t::finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals) {
+  if (current_closure_label != scm_nil) {
+    if (!current_literals.empty()) {
+      scm_obj_t vec = make_vector(current_literals.size(), scm_false);
+      for (size_t i = 0; i < current_literals.size(); ++i) {
+        ((scm_vector_rec_t*)to_address(vec))->elts[i] = current_literals[i];
+      }
+      closure_literals[current_closure_label] = vec;
+    }
+    current_literals.clear();
+    current_closure_label = scm_nil;
+  }
+}
+
+// Initialize opcode map for faster lookup
+void codegen_t::init_opcode_map() {
+  opcode_map[sym_const] = Opcode::CONST;
+  opcode_map[sym_mov] = Opcode::MOV;
+  opcode_map[sym_if] = Opcode::IF;
+  opcode_map[sym_jump] = Opcode::JUMP;
+  opcode_map[sym_label] = Opcode::LABEL;
+  opcode_map[sym_ret] = Opcode::RET;
+  opcode_map[sym_make_closure] = Opcode::MAKE_CLOSURE;
+  opcode_map[sym_global_set] = Opcode::GLOBAL_SET;
+  opcode_map[sym_global_ref] = Opcode::GLOBAL_REF;
+  opcode_map[sym_call] = Opcode::CALL;
+  opcode_map[sym_tail_call] = Opcode::TAIL_CALL;
+  opcode_map[sym_closure_ref] = Opcode::CLOSURE_REF;
+  opcode_map[sym_closure_set] = Opcode::CLOSURE_SET;
+  opcode_map[sym_closure_cell_set] = Opcode::CLOSURE_CELL_SET;
+  opcode_map[sym_closure_self] = Opcode::CLOSURE_SELF;
+  opcode_map[sym_closure_cell_ref] = Opcode::CLOSURE_CELL_REF;
+  opcode_map[sym_reg_cell_ref] = Opcode::REG_CELL_REF;
+  opcode_map[sym_reg_cell_set] = Opcode::REG_CELL_SET;
+  opcode_map[sym_make_cell] = Opcode::MAKE_CELL;
+}
+
+// Helper to parse a single instruction
+void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label,
+                                         std::vector<scm_obj_t>& current_literals) {
+  if (!is_cons(inst_obj)) return;
+
+  Instruction inst;
+  inst.original = inst_obj;
+  inst.op = Opcode::UNKNOWN;
+
+  scm_obj_t op_sym = CAR(inst_obj);
+
+  // Look up opcode
+  auto it = opcode_map.find(op_sym);
+  if (it != opcode_map.end()) {
+    inst.op = it->second;
+  } else {
+    // Unknown opcode or not in map
+    return;
+  }
+
+  // Update max register usage
+  auto update_reg = [&](int r) {
+    if (r > func_info.max_reg) func_info.max_reg = r;
+  };
+
+  switch (inst.op) {
+    case Opcode::CONST: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));
+      inst.opr1 = operand(inst_obj, 2);  // val
+      update_reg(inst.rn1);
+
+      // Collect literals if in closure
+      if (current_closure_label != scm_nil) {
+        if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
+          current_literals.push_back(inst.opr1);
+        }
+      }
+      break;
+    }
+    case Opcode::MOV: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst
+      inst.rn2 = parse_reg(operand(inst_obj, 2));  // src
+      update_reg(inst.rn1);
+      update_reg(inst.rn2);
+      break;
+    }
+    case Opcode::IF: {
+      inst.opr1 = operand(inst_obj, 1);
+      inst.opr2 = operand(inst_obj, 2);
+      update_reg(0);  // Implicitly uses r0
+      break;
+    }
+    case Opcode::JUMP: {
+      inst.opr1 = operand(inst_obj, 1);
+      break;
+    }
+    case Opcode::LABEL: {
+      inst.opr1 = operand(inst_obj, 1);
+      // Check if this is a closure label
+      if (is_closure_label(inst.opr1)) {
+        finish_closure_literals(current_closure_label, current_literals);
+        current_closure_label = inst.opr1;
+      }
+      break;
+    }
+    case Opcode::RET: {
+      update_reg(0);  // Implicitly uses r0
+      break;
+    }
+    case Opcode::MAKE_CLOSURE: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst
+      inst.opr1 = operand(inst_obj, 2);            // label (C1)
+      inst.free_indices = operand(inst_obj, 3);    // free indices list
+
+      inst.argc = fixnum(operand(inst_obj, 5));
+      inst.has_rest = (operand(inst_obj, 6) == scm_true);
+
+      // Record closure parameters for function generation
+      closure_params[inst.opr1] = {inst.argc, inst.has_rest};
+
+      update_reg(inst.rn1);
+
+      // Update max reg for free indices
+      scm_obj_t fi = inst.free_indices;
+      while (is_cons(fi)) {
+        int r = parse_reg(CAR(fi));
+        update_reg(r);
+        fi = CDR(fi);
+      }
+      break;
+    }
+    case Opcode::GLOBAL_SET: {
+      inst.opr1 = operand(inst_obj, 1);  // symbol
+
+      scm_obj_t val = operand(inst_obj, 2);
+      int r = parse_reg(val);
+      if (r < 0) {
+        fatal("%s:%u codegen: global-set! requires a register operand", __FILE__, __LINE__);
+      }
+      inst.rn1 = r;
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::GLOBAL_REF: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg
+      inst.opr2 = operand(inst_obj, 2);            // symbol
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: global-ref requires a register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::CALL: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // closure reg
+      inst.argc = fixnum(operand(inst_obj, 2));
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: call requires a register operand for closure", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::TAIL_CALL: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // closure reg
+      inst.argc = fixnum(operand(inst_obj, 2));
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: tail-call requires a register operand for closure", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::CLOSURE_REF: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg
+      inst.opr2 = operand(inst_obj, 2);            // index
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: closure-ref missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::CLOSURE_SET: {
+      inst.opr1 = operand(inst_obj, 1);            // index
+      inst.rn2 = parse_reg(operand(inst_obj, 2));  // src reg
+
+      if (inst.rn2 < 0) {
+        fatal("%s:%u codegen: closure-set! missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn2);
+      break;
+    }
+    case Opcode::CLOSURE_SELF: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: closure-self missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::CLOSURE_CELL_REF: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg
+      inst.opr2 = operand(inst_obj, 2);            // index
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: closure-cell-ref missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    case Opcode::CLOSURE_CELL_SET: {
+      inst.opr1 = operand(inst_obj, 1);            // index
+      inst.rn2 = parse_reg(operand(inst_obj, 2));  // src reg
+
+      if (inst.rn2 < 0) {
+        fatal("%s:%u codegen: closure-cell-set! missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn2);
+      break;
+    }
+    case Opcode::REG_CELL_REF: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg
+      inst.rn2 = parse_reg(operand(inst_obj, 2));  // src reg
+
+      if (inst.rn1 < 0 || inst.rn2 < 0) {
+        fatal("%s:%u codegen: reg-cell-ref missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      update_reg(inst.rn2);
+      break;
+    }
+    case Opcode::REG_CELL_SET: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst reg (holds cell)
+      inst.rn2 = parse_reg(operand(inst_obj, 2));  // src reg (holds value)
+
+      if (inst.rn1 < 0 || inst.rn2 < 0) {
+        fatal("%s:%u codegen: reg-cell-set! missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      update_reg(inst.rn2);
+      break;
+    }
+    case Opcode::MAKE_CELL: {
+      inst.rn1 = parse_reg(operand(inst_obj, 1));  // dst/src reg
+
+      if (inst.rn1 < 0) {
+        fatal("%s:%u codegen: make-cell missing register operand", __FILE__, __LINE__);
+      }
+      update_reg(inst.rn1);
+      break;
+    }
+    default:
+      break;
+  }
+
+  func_info.instructions.push_back(inst);
+}
+
+void codegen_t::parse_instructions(scm_obj_t inst_list) {
+  functions.clear();
+  closure_literals.clear();
+  closure_params.clear();
+
+  // Create main function info
+  functions.emplace_back();
+  FunctionInfo* current_func = &functions.back();
+  current_func->label = scm_nil;
+
   scm_obj_t curr = inst_list;
+  scm_obj_t current_closure_label = scm_nil;
+  std::vector<scm_obj_t> current_literals;
+
+  // First pass: identify closure parameters to effectively switch contexts
+  // However, we process linearly. When we see a LABEL that corresponds to a closure
+  // (which we only know if we have seen MAKE-CLOSURE or if we pre-scan), it's tricky.
+  // BUT: The compiler emits code such that a closure body STARTS with a label.
+  // And that label is unique.
+  // We can collect closure params during parsing, but we need to know IF a label starts a new function.
+  // Standard scheme practice: top level code first, then closure bodies.
+  // Closures always start with a unique label. We can check `is_closure_label`.
+
   while (curr != scm_nil) {
     if (!is_cons(curr)) break;
-    scm_obj_t inst = CAR(curr);
-    if (is_cons(inst)) {
-      scm_obj_t op = CAR(inst);
-      if (op == sym_const) {
-        // (const reg val)
-        int r = parse_reg(CADR(inst));
-        if (r > max_reg) max_reg = r;
-      } else if (op == sym_mov) {
-        // (mov dst src)
-        int r1 = parse_reg(CADR(inst));
-        int r2 = parse_reg(CADDR(inst));  // Note: parse_reg returns -1 for non-reg, effectively ignored
-        if (r1 > max_reg) max_reg = r1;
-        if (r2 > max_reg) max_reg = r2;
+    scm_obj_t inst_obj = CAR(curr);
+    curr = CDR(curr);
+
+    // Check for LABEL opcode to detect function switch
+    if (is_cons(inst_obj) && CAR(inst_obj) == sym_label) {
+      scm_obj_t label = operand(inst_obj, 1);
+      if (is_closure_label(label)) {
+        // Finish previous closure literals
+        finish_closure_literals(current_closure_label, current_literals);
+
+        // Start new function
+        functions.emplace_back();
+        current_func = &functions.back();
+        current_func->label = label;
+        current_closure_label = label;
       }
     }
-    curr = CDR(curr);
+
+    parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
   }
-  return max_reg;
+
+  // Finish any remaining closure literals
+  finish_closure_literals(current_closure_label, current_literals);
+
+  // Post-process: Update max_reg for each function based on parameters
+  // Main function (index 0) doesn't have parameters in registers initially (or rather, it's just entry)
+  // Closures have parameters.
+  for (auto& func : functions) {
+    if (func.label != scm_nil && closure_params.count(func.label)) {
+      auto params = closure_params[func.label];
+      func.argc = params.first;
+      func.has_rest = params.second;
+      int argc = func.argc + (func.has_rest ? 1 : 0);
+      if (argc > 0) {
+        int needed_max = argc - 1;
+        if (needed_max > func.max_reg) {
+          func.max_reg = needed_max;
+        }
+      }
+    }
+  }
 }
 
 llvm::Value* codegen_t::get_reg(int idx) {
-  if (idx < 0 || idx >= num_registers) {
-    throw std::runtime_error("Register index out of bounds");
+  if (idx < 0 || (size_t)idx >= allocas.size()) {
+    fatal("%s:%u codegen: register index out of bounds: r%d (max: r%lu) in function %s", __FILE__, __LINE__, idx, allocas.size() - 1,
+          current_function ? current_function->getName().str().c_str() : "unknown");
   }
-  llvm::Value* val = registers[idx];
-  if (!val) {
-    return llvm::ConstantInt::get(context, llvm::APInt(64, 0));
-  }
-  return val;
+  return builder.CreateLoad(this->getInt64Type(), allocas[idx]);
 }
 
 void codegen_t::set_reg(int idx, llvm::Value* val) {
-  if (idx < 0 || idx >= num_registers) {
-    throw std::runtime_error("Register index out of bounds");
+  if (idx < 0 || (size_t)idx >= allocas.size()) {
+    fatal("%s:%u codegen: register index out of bounds: r%d (max: r%lu) in function %s", __FILE__, __LINE__, idx, allocas.size() - 1,
+          current_function ? current_function->getName().str().c_str() : "unknown");
   }
-  registers[idx] = val;
+  builder.CreateStore(val, allocas[idx]);
 }
 
-void codegen_t::ensure_phis(llvm::BasicBlock* target) {
-  if (block_phis.find(target) != block_phis.end()) return;
-
-  llvm::IRBuilder<>::InsertPointGuard guard(builder);
-  builder.SetInsertPoint(target);
-
-  std::vector<llvm::PHINode*> phis;
-  phis.resize(num_registers);
-
-  for (int i = 0; i < num_registers; ++i) {
-    phis[i] = builder.CreatePHI(llvm::Type::getInt64Ty(context), 0, "r" + std::to_string(i));
+// Helper to get or create an external function declaration
+llvm::Function* codegen_t::get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr) {
+  llvm::Function* func = module->getFunction(name);
+  if (!func) {
+    func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, module);
   }
-  block_phis[target] = phis;
+  // Map the function to its implementation
+  engine->addGlobalMapping(func, symbol_ptr);
+  return func;
 }
 
-void codegen_t::add_phi_incoming(llvm::BasicBlock* target) {
-  ensure_phis(target);
-  std::vector<llvm::PHINode*>& phis = block_phis[target];
-  llvm::BasicBlock* current_block = builder.GetInsertBlock();
+// Helper to get code pointer from closure object
+llvm::Value* codegen_t::getClosureCodePtr(llvm::Value* closure_tagged) {
+  llvm::Value* closure_ptr = untagPointer(builder, context, closure_tagged);
+  llvm::Value* code_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CODE_FIELD_OFFSET);
+  return builder.CreateLoad(this->getVoidPtrType(), code_field_ptr, "code_ptr");
+}
 
-  for (int i = 0; i < num_registers; ++i) {
-    phis[i]->addIncoming(get_reg(i), current_block);
+// Helper to emit write barrier call
+void codegen_t::emitWriteBarrier(llvm::Value* value) {
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::Type* voidTy = llvm::Type::getVoidTy(context);
+  std::vector<llvm::Type*> wbArgTypes = {intptrTy};
+  llvm::FunctionType* wbFT = llvm::FunctionType::get(voidTy, wbArgTypes, false);
+  llvm::Function* wb_func = get_or_create_external_function("c_write_barrier", wbFT, (void*)&c_write_barrier);
+  builder.CreateCall(wb_func, {value});
+}
+
+// Redefining helper to take count
+void codegen_t::create_allocas(llvm::Function* f, int num_regs) {
+  llvm::IRBuilder<> tmpBuilder(&f->getEntryBlock(), f->getEntryBlock().begin());
+  allocas.clear();
+  if (num_regs <= 0) return;
+
+  allocas.resize(num_regs);
+  for (int i = 0; i < num_regs; ++i) {
+    allocas[i] = tmpBuilder.CreateAlloca(this->getInt64Type(), nullptr, "r" + std::to_string(i));
+    if (!allocas[i]) {
+      fatal("%s:%u codegen: failed to create alloca for register r%d", __FILE__, __LINE__, i);
+    }
+    // Initialize with 0
+    tmpBuilder.CreateStore(createInt64Constant(context, 0), allocas[i]);
   }
+}
+
+// Setup rest arguments for a closure with extra arguments
+// This creates a Scheme list from extra arguments beyond the fixed parameters
+void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr) {
+  // Calculate number of rest arguments: actual_argc - fixed_argc
+  llvm::Value* fixed_argc_val = createInt64Constant(context, fixed_argc);
+  llvm::Value* rest_count = builder.CreateSub(actual_argc, fixed_argc_val, "rest_count");
+
+  // Get c_construct_rest_list helper function
+  // This C function builds a Scheme list from an array of arguments
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::Type* intptrPtrTy = llvm::PointerType::get(intptrTy, 0);
+  llvm::Type* int32Ty = this->getInt32Type();
+
+  // Ensure count uses int32 for C call
+  llvm::Value* count_i32 = builder.CreateTrunc(rest_count, int32Ty);
+
+  // Function type for helper: (i32, intptr_t*) -> intptr_t
+  std::vector<llvm::Type*> helperArgTypes = {int32Ty, intptrPtrTy};
+  llvm::FunctionType* helperFT = llvm::FunctionType::get(intptrTy, helperArgTypes, false);
+  llvm::Function* helper_func = get_or_create_external_function("c_construct_rest_list", helperFT, (void*)&c_construct_rest_list);
+
+  // Calculate pointer to argv[fixed_argc] (start of rest arguments)
+  llvm::Value* rest_argv_ptr = builder.CreateGEP(intptrTy, argv_ptr, fixed_argc_val, "rest_argv_ptr");
+
+  // Call helper to construct the rest list
+  llvm::Value* rest_list = builder.CreateCall(helper_func, {count_i32, rest_argv_ptr}, "rest_list");
+
+  // Store rest list to register[fixed_argc]
+  // In Scheme, if a function has signature (lambda (a b . rest) ...),
+  // then 'a' is in r0, 'b' is in r1, and 'rest' is in r2
+  set_reg(fixed_argc, rest_list);
 }
 
 intptr_t codegen_t::compile(scm_obj_t inst_list) {
-  // 0. Scan for max register usage
-  int max_reg = scan_registers(inst_list, sym_const, sym_mov);
-  num_registers = max_reg + 1;
-  registers.clear();
-  registers.resize(num_registers, nullptr);
-  block_phis.clear();
+  phase0_create_module();
+  phase1_parse_instructions(inst_list);
+  phase2_create_functions();
+  phase3_generate_code();
+  phase4_optimize_and_verify();
+  return phase5_finalize();
+}
+
+void codegen_t::phase0_create_module() {
+  // ===== Phase 0: Module Creation =====
+  // Create a new LLVM module for this compilation unit
+  std::string mod_name = "jit_module_" + std::to_string(std::rand());
+  this->current_module_uptr = std::make_unique<llvm::Module>(mod_name, context);
+  this->module = this->current_module_uptr.get();
+}
+
+void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
+  // ===== Phase 1: Instruction Parsing =====
+  // Parse the instruction list into our internal representation
+  parse_instructions(inst_list);
+
   labels.clear();
+  function_map.clear();
+}
 
-  // 1. Create a function type: intptr_t()
-  llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt64Ty(context), false);
-  llvm::Function* function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "scheme_func", module);
+void codegen_t::phase2_create_functions() {
+  // ===== Phase 2: Function and BasicBlock Creation =====
+  // Create the main function and all closure functions
+  // The first function in 'functions' is always the main entry point.
+  if (functions.empty()) return;
 
-  // 2. Create entry block
-  llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(context, "entry", function);
-  builder.SetInsertPoint(entryBlock);
+  // 1. Create Main Function
+  {
+    FunctionInfo& main_info = functions[0];
+    llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), false);
+    std::string func_name = "scheme_func_" + std::to_string(std::rand());
+    this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, module);
+    if (!this->main_function) {
+      fatal("%s:%u codegen: failed to create main function", __FILE__, __LINE__);
+    }
+    main_info.llvm_function = this->main_function;
 
-  // Initialize registers with 0/undef
-  llvm::Value* zero = llvm::ConstantInt::get(context, llvm::APInt(64, 0));
-  std::fill(registers.begin(), registers.end(), zero);
+    // Create generic entry block needed for allocas
+    llvm::BasicBlock::Create(context, "entry", this->main_function);
+  }
 
-  // 3. Pre-scan for labels to create BasicBlocks
-  scm_obj_t curr = inst_list;
-  while (curr != scm_nil) {
-    if (!is_cons(curr)) break;
-    scm_obj_t inst = CAR(curr);
-    if (is_cons(inst)) {
-      scm_obj_t op_sym = CAR(inst);
-      if (op_sym == sym_label) {
-        scm_obj_t label_sym = CADR(inst);
-        const char* label_name_str = (const char*)symbol_name(label_sym);
-        labels[label_sym] = llvm::BasicBlock::Create(context, label_name_str, function);
+  // 2. Create Closure Functions
+  for (size_t i = 1; i < functions.size(); ++i) {
+    FunctionInfo& info = functions[i];
+    if (info.label == scm_nil) continue;
+
+    const char* label_name_str = (const char*)symbol_name(info.label);
+
+    std::vector<llvm::Type*> paramTypes;
+    paramTypes.push_back(this->getInt64Type());  // self
+
+    if (info.has_rest) {
+      // (self, argc, argv[])
+      paramTypes.push_back(this->getInt64Type());                             // argc
+      paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+    } else {
+      // (self, arg0, arg1, ...)
+      for (int k = 0; k < info.argc; k++) {
+        paramTypes.push_back(this->getInt64Type());
       }
     }
-    curr = CDR(curr);
+
+    llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, label_name_str, module);
+    info.llvm_function = closure_func;
+    function_map[info.label] = closure_func;
+
+    llvm::BasicBlock::Create(context, "entry", closure_func);
   }
 
-  // 4. Trace instructions
-  curr = inst_list;
-  bool block_terminated = false;
-
-  while (curr != scm_nil) {
-    if (!is_cons(curr)) break;
-    scm_obj_t inst = CAR(curr);
-    curr = CDR(curr);
-
-    // If previous block terminated, we might have unreachable code or need a new block.
-    // We proceed assuming the instruction stream is well-formed (labels follow jumps).
-
-    emit_inst(inst);
-
-    if (is_cons(inst)) {
-      scm_obj_t op_sym = CAR(inst);
-      if (op_sym == sym_ret || op_sym == sym_jump || op_sym == sym_if) {
-        block_terminated = true;
-      } else if (op_sym == sym_label) {
-        block_terminated = false;
+  // 3. Create BasicBlocks for all labels within each function
+  for (auto& info : functions) {
+    llvm::Function* llvm_func = info.llvm_function;
+    for (const auto& inst : info.instructions) {
+      if (inst.op == Opcode::LABEL) {
+        // Only create blocks for internal jump targets, but technically all labels get blocks.
+        // Note: Closure entry labels are also labels in the instruction stream.
+        // We should check if we already have a block (entry block)?
+        // Actually, existing logic:
+        // if (function_map.count(inst.opr1)) current_scan_func = function_map[inst.opr1];
+        // The label op itself might be the start of the function.
+        // If it is the start, we might skip creating a NEW block if we use the entry block?
+        // But usually entry block is separate for allocas.
+        // Let's just create blocks.
+        const char* label_str = (const char*)symbol_name(inst.opr1);
+        labels[inst.opr1] = llvm::BasicBlock::Create(context, label_str, llvm_func);
       }
     }
   }
+}
 
-  if (llvm::verifyFunction(*function, &llvm::errs())) {
-    // Verification failed, error printed to stderr
+void codegen_t::phase3_generate_code() {
+  // ===== Phase 3: Code Generation =====
+  // Generate LLVM IR for all functions
+
+  for (auto& info : functions) {
+    current_function = info.llvm_function;
+    current_function_info = &info;
+
+    // Set insert point to entry block
+    llvm::BasicBlock& entry = current_function->getEntryBlock();
+    builder.SetInsertPoint(&entry);
+
+    // Create allocas for this function's register usage
+    // max_reg is 0-indexed, so count is max_reg + 1. If max_reg is -1, count is 0.
+    int reg_count = info.max_reg + 1;
+    create_allocas(current_function, reg_count);
+
+    // Function specific setup
+    if (info.label != scm_nil) {
+      // This is a closure
+      current_closure_self = current_function->getArg(0);
+
+      // Setup parameters
+      if (info.has_rest) {
+        // For rest closures: (self, argc, argv[])
+        auto arg_it = current_function->arg_begin();
+        arg_it++;                               // Skip self
+        llvm::Value* actual_argc = &*arg_it++;  // Get argc
+        llvm::Value* argv_ptr = &*arg_it++;     // Get argv pointer
+
+        // Load fixed arguments from argv[] into registers
+        for (int i = 0; i < info.argc; i++) {
+          llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_ptr, createInt64Constant(context, i));
+          llvm::Value* arg_val = builder.CreateLoad(this->getInt64Type(), arg_ptr);
+          set_reg(i, arg_val);
+        }
+
+        // Handle rest arguments
+        setup_closure_rest_arguments(info.argc, actual_argc, argv_ptr);
+      } else {
+        // For non-rest closures: (self, arg0, arg1, ...)
+        // Copy fixed arguments from function parameters to registers
+        auto arg_it = current_function->arg_begin();
+        arg_it++;  // Skip self
+
+        for (int i = 0; i < info.argc; i++) {
+          llvm::Value* arg_val = &*arg_it++;
+          set_reg(i, arg_val);
+        }
+      }
+    } else {
+      // Main function
+      current_closure_self = nullptr;
+    }
+
+    // Emit instructions
+    for (const auto& inst : info.instructions) {
+      // Skip the label instruction if it marks the start of this function to avoid
+      // redundant branching/blocks if handled effectively, or just let standard emit_label handle it.
+      // Standard emit_label will create a branch from Entry->FirstLabel. This is fine.
+      emit_inst(inst);
+    }
+  }
+}
+
+void codegen_t::phase4_optimize_and_verify() {
+  // ===== Phase 4: Verification and Optimization =====
+  // Verify correctness and optimize the generated LLVM IR
+  // Setup analysis managers
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  // Create pass builder and register analysis managers
+  llvm::PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  // Build O2 optimization pipeline
+  llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+
+  // Verify all functions first
+  for (auto const& [label, func] : function_map) {
+    if (llvm::verifyFunction(*func, &llvm::errs())) {
+      fatal("%s:%u codegen: LLVM function verification failed for: %s", __FILE__, __LINE__, func->getName().str().c_str());
+    }
+  }
+  if (llvm::verifyFunction(*main_function, &llvm::errs())) {
+    fatal("%s:%u codegen: LLVM function verification failed for: %s", __FILE__, __LINE__, main_function->getName().str().c_str());
   }
 
-  // 5. Optimize
-  llvm::legacy::FunctionPassManager fpm(module);
-  // Add some standard O2 passes
-  fpm.add(llvm::createInstructionCombiningPass());
-  fpm.add(llvm::createReassociatePass());
-  fpm.add(llvm::createGVNPass());
-  fpm.add(llvm::createCFGSimplificationPass());
-  fpm.add(llvm::createPromoteMemoryToRegisterPass());
+  // Run optimization passes on entire module
+  MPM.run(*module, MAM);
 
-  fpm.doInitialization();
-  fpm.run(*function);
-
+  // Dump IR to file for debugging and inspection
   std::error_code EC;
   llvm::raw_fd_ostream dest("/tmp/nanos.ll", EC, llvm::sys::fs::OF_None);
   if (EC) {
@@ -198,113 +797,559 @@ intptr_t codegen_t::compile(scm_obj_t inst_list) {
   } else {
     module->print(dest, nullptr);
   }
+}
 
+intptr_t codegen_t::phase5_finalize() {
+  // Transfer module ownership to execution engine and finalize
+  engine->addModule(std::move(current_module_uptr));
   engine->finalizeObject();
-  void* funcPtr = engine->getPointerToFunction(function);
+
+  // Get executable code for main function
+  void* funcPtr = engine->getPointerToFunction(main_function);
+  if (!funcPtr) {
+    fatal("%s:%u codegen: failed to get function pointer for compiled code", __FILE__, __LINE__);
+  }
+
+  // Clear local module pointers
+  this->module = nullptr;
+  this->main_function = nullptr;
+
   auto func = (intptr_t (*)())funcPtr;
   return func();
 }
 
-void codegen_t::emit_inst(scm_obj_t inst) {
-  if (!is_cons(inst)) return;
-
-  scm_obj_t op_sym = CAR(inst);
-  scm_obj_t args = CDR(inst);
-
-  if (op_sym == sym_const)
-    emit_const(args);
-  else if (op_sym == sym_mov)
-    emit_mov(args);
-  else if (op_sym == sym_if)
-    emit_if(args);
-  else if (op_sym == sym_jump)
-    emit_jump(args);
-  else if (op_sym == sym_label)
-    emit_label(args);
-  else if (op_sym == sym_ret)
-    emit_ret(args);
+void codegen_t::emit_inst(const Instruction& inst) {
+  switch (inst.op) {
+    case Opcode::CONST:
+      emit_const(inst);
+      break;
+    case Opcode::MOV:
+      emit_mov(inst);
+      break;
+    case Opcode::IF:
+      emit_if(inst);
+      break;
+    case Opcode::JUMP:
+      emit_jump(inst);
+      break;
+    case Opcode::LABEL:
+      emit_label(inst);
+      break;
+    case Opcode::RET:
+      emit_ret(inst);
+      break;
+    case Opcode::MAKE_CLOSURE:
+      emit_make_closure(inst);
+      break;
+    case Opcode::GLOBAL_SET:
+      emit_global_set(inst);
+      break;
+    case Opcode::GLOBAL_REF:
+      emit_global_ref(inst);
+      break;
+    case Opcode::CALL:
+      emit_call(inst);
+      break;
+    case Opcode::TAIL_CALL:
+      emit_tail_call(inst);
+      break;
+    case Opcode::CLOSURE_REF:
+      emit_closure_ref(inst);
+      break;
+    case Opcode::CLOSURE_SET:
+      emit_closure_set(inst);
+      break;
+    case Opcode::CLOSURE_SELF:
+      emit_closure_self(inst);
+      break;
+    case Opcode::CLOSURE_CELL_REF:
+      emit_closure_cell_ref(inst);
+      break;
+    case Opcode::CLOSURE_CELL_SET:
+      emit_closure_cell_set(inst);
+      break;
+    case Opcode::REG_CELL_REF:
+      emit_reg_cell_ref(inst);
+      break;
+    case Opcode::REG_CELL_SET:
+      emit_reg_cell_set(inst);
+      break;
+    case Opcode::MAKE_CELL:
+      emit_make_cell(inst);
+      break;
+    default:
+      fatal("%s:%u codegen: unknown opcode encountered during emission", __FILE__, __LINE__);
+      break;
+  }
 }
 
-void codegen_t::emit_const(scm_obj_t args) {
-  scm_obj_t reg_sym = CAR(args);
-  scm_obj_t val_obj = CADR(args);
+// Emit a constant value to a register
+void codegen_t::emit_const(const Instruction& inst) {
+  if (inst.rn1 < 0) return;
+  uint64_t val = (uint64_t)inst.opr1;
+  llvm::Value* v = createInt64Constant(context, val);
+  set_reg(inst.rn1, v);
+}
 
-  int reg_idx = parse_reg(reg_sym);
-  if (reg_idx < 0) return;
+// Move value from one register to another
+void codegen_t::emit_mov(const Instruction& inst) {
+  if (inst.rn1 < 0 || inst.rn2 < 0) return;
+  set_reg(inst.rn1, get_reg(inst.rn2));
+}
 
-  int64_t val = 0;
-  if (is_fixnum(val_obj)) {
-    val = fixnum(val_obj);
-  } else if (val_obj == scm_false) {
-    val = 0;
-  } else if (val_obj == scm_true) {
-    val = 1;
-  } else {
-    val = (int64_t)val_obj;
+// Conditional branch based on r0 value (#f vs everything else)
+void codegen_t::emit_if(const Instruction& inst) {
+  llvm::BasicBlock* b1 = labels[inst.opr1];
+  llvm::BasicBlock* b2 = labels[inst.opr2];
+
+  if (!b1) {
+    fatal("%s:%u codegen: if instruction label not found for true branch", __FILE__, __LINE__);
+  }
+  if (!b2) {
+    fatal("%s:%u codegen: if instruction label not found for false branch", __FILE__, __LINE__);
   }
 
-  llvm::Value* v = llvm::ConstantInt::get(context, llvm::APInt(64, val));
-  set_reg(reg_idx, v);
-}
-
-void codegen_t::emit_mov(scm_obj_t args) {
-  scm_obj_t dst_sym = CAR(args);
-  scm_obj_t src_sym = CADR(args);
-
-  int dst_idx = parse_reg(dst_sym);
-  int src_idx = parse_reg(src_sym);
-  if (dst_idx < 0 || src_idx < 0) return;
-
-  set_reg(dst_idx, get_reg(src_idx));
-}
-
-void codegen_t::emit_if(scm_obj_t args) {
-  scm_obj_t l1_sym = CAR(args);
-  scm_obj_t l2_sym = CADR(args);
-
-  llvm::BasicBlock* b1 = labels[l1_sym];
-  llvm::BasicBlock* b2 = labels[l2_sym];
-
-  if (!b1) printf("ERROR: Label %s not found!\n", (char*)symbol_name(l1_sym));
-  if (!b2) printf("ERROR: Label %s not found!\n", (char*)symbol_name(l2_sym));
-
-  add_phi_incoming(b1);
-  add_phi_incoming(b2);
-
   llvm::Value* cond = get_reg(0);
-  llvm::Value* zero = llvm::ConstantInt::get(context, llvm::APInt(64, 0));
-  llvm::Value* cmp = builder.CreateICmpNE(cond, zero, "cond");
-
+  llvm::Value* scm_false_v = this->getScmFalseValue();
+  llvm::Value* cmp = builder.CreateICmpNE(cond, scm_false_v, "cond");
   builder.CreateCondBr(cmp, b1, b2);
 }
 
-void codegen_t::emit_jump(scm_obj_t args) {
-  scm_obj_t l1_sym = CAR(args);
-  llvm::BasicBlock* target = labels[l1_sym];
-
-  if (!target) printf("ERROR: Label %s not found!\n", (char*)symbol_name(l1_sym));
-
-  add_phi_incoming(target);
+// Unconditional jump to label
+void codegen_t::emit_jump(const Instruction& inst) {
+  llvm::BasicBlock* target = labels[inst.opr1];
+  if (!target) {
+    fatal("%s:%u codegen: jump target label not found", __FILE__, __LINE__);
+  }
   builder.CreateBr(target);
 }
 
-void codegen_t::emit_label(scm_obj_t args) {
-  scm_obj_t l1_sym = CAR(args);
-  llvm::BasicBlock* block = labels[l1_sym];
-
+// Set insertion point to label's basic block
+void codegen_t::emit_label(const Instruction& inst) {
+  llvm::BasicBlock* block = labels[inst.opr1];
+  if (!block) {
+    fatal("%s:%u codegen: label basic block not found", __FILE__, __LINE__);
+  }
   llvm::BasicBlock* current = builder.GetInsertBlock();
+
   if (current->getTerminator() == nullptr) {
-    add_phi_incoming(block);
     builder.CreateBr(block);
   }
 
   builder.SetInsertPoint(block);
-  ensure_phis(block);
+}
 
-  std::vector<llvm::PHINode*>& phis = block_phis[block];
-  for (int i = 0; i < num_registers; ++i) {
-    registers[i] = phis[i];
+// Return r0 as function result
+void codegen_t::emit_ret(const Instruction& inst) { builder.CreateRet(get_reg(0)); }
+
+// Create a closure object with captured environment
+void codegen_t::emit_make_closure(const Instruction& inst) {
+  llvm::Function* closure_func = function_map[inst.opr1];
+  if (!closure_func) {
+    fatal("%s:%u codegen: closure function not found for label", __FILE__, __LINE__);
+  }
+
+  // Count free variables
+  int nsize = count_list_length(inst.free_indices);
+
+  // Get literals vector if available
+  scm_obj_t literals = scm_nil;
+  if (closure_literals.count(inst.opr1)) {
+    literals = closure_literals[inst.opr1];
+  }
+  llvm::Value* literals_val = createInt64Constant(context, (uint64_t)literals);
+
+  // Common types
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::Type* voidPtrTy = this->getVoidPtrType();
+  llvm::Type* int32Ty = this->getInt32Type();
+
+  // Prepare common arguments
+  llvm::Value* code_ptr = builder.CreateBitCast(closure_func, voidPtrTy);
+  llvm::Value* argc = createInt32Constant(context, inst.argc);
+
+  llvm::Value* closure;
+  if (!inst.has_rest && nsize == 0) {
+    if (literals == scm_nil) {
+      // Simple closure optimization (no literals)
+      std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
+      llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
+      llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s1", simpleFT, (void*)&c_make_closure_s1);
+      closure = builder.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
+    } else {
+      // Simple closure optimization (with literals)
+      std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty, intptrTy};
+      llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
+      llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s2", simpleFT, (void*)&c_make_closure_s2);
+      closure = builder.CreateCall(make_simple_closure_func, {code_ptr, argc, literals_val}, "closure");
+    }
+  } else {
+    // General case: Prepare environment array
+    llvm::Value* env_array = nullptr;
+    if (nsize > 0) {
+      env_array = builder.CreateAlloca(intptrTy, createInt32Constant(context, nsize), "env");
+      scm_obj_t curr = inst.free_indices;
+      for (int i = 0; i < nsize; i++) {
+        int reg_idx = parse_reg(CAR(curr));
+        llvm::Value* reg_val = get_reg(reg_idx);
+        llvm::Value* ptr = builder.CreateGEP(builder.getInt64Ty(), env_array, createInt32Constant(context, i));
+        builder.CreateStore(reg_val, ptr);
+        curr = CDR(curr);
+      }
+    } else {
+      env_array = llvm::ConstantPointerNull::get(llvm::PointerType::get(context, 0));
+    }
+
+    llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, {voidPtrTy, int32Ty, int32Ty, int32Ty, voidPtrTy, intptrTy}, false);
+    llvm::Function* make_closure_func = get_or_create_external_function("c_make_closure", ft, (void*)&c_make_closure);
+
+    llvm::Value* rest = createInt32Constant(context, inst.has_rest ? 1 : 0);
+    llvm::Value* nsize_val = createInt32Constant(context, nsize);
+    llvm::Value* env_ptr = builder.CreateBitCast(env_array, voidPtrTy);
+
+    std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nsize_val, env_ptr, literals_val};
+    closure = builder.CreateCall(make_closure_func, callArgs, "closure");
+  }
+
+  set_reg(inst.rn1, closure);
+}
+
+// Set global variable to value in register
+void codegen_t::emit_global_set(const Instruction& inst) {
+  // Get or create c_global_set external function
+  llvm::Type* voidTy = llvm::Type::getVoidTy(context);
+  llvm::Type* intptrTy = this->getInt64Type();
+  std::vector<llvm::Type*> argTypes = {intptrTy, intptrTy};
+  llvm::FunctionType* ft = llvm::FunctionType::get(voidTy, argTypes, false);
+  llvm::Function* global_set_func = get_or_create_external_function("c_global_set", ft, (void*)&c_global_set);
+
+  // Prepare arguments: symbol key and value from register
+  llvm::Value* key_v = createInt64Constant(context, (uint64_t)inst.opr1);
+
+  if (inst.rn1 < 0) {
+    fatal("%s:%u codegen: global-set! missing register operand", __FILE__, __LINE__);
+  }
+  llvm::Value* val_v = get_reg(inst.rn1);
+
+  std::vector<llvm::Value*> args = {key_v, val_v};
+  builder.CreateCall(global_set_func, args);
+}
+
+// Load global variable value into register
+void codegen_t::emit_global_ref(const Instruction& inst) {
+  // Resolve the address of the global variable's value slot at compile time
+  scm_obj_t cell = object_heap_t::current()->environment_variable_cell_ref(inst.opr2);
+  scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
+
+  // Create a constant for the value address
+  llvm::Value* value_address = createInt64Constant(context, (uint64_t)&(rec->value));
+
+  if (inst.rn1 < 0) {
+    fatal("%s:%u codegen: global-ref missing register operand", __FILE__, __LINE__);
+  }
+
+  // Get pointer to cell's value
+  llvm::Value* value_ptr = builder.CreateIntToPtr(value_address, llvm::PointerType::get(this->getInt64Type(), 0));
+
+  // Load the value directly
+  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr, "gref_val");
+
+  set_reg(inst.rn1, val);
+}
+
+void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
+  // Get closure object from register
+  llvm::Value* closure = get_reg(inst.rn1);
+
+  // Get code pointer from closure struct
+  llvm::Value* code_void_ptr = getClosureCodePtr(closure);
+
+  // Read closure's rest field to determine calling convention
+  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
+  llvm::Value* rest_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
+  llvm::Value* rest_field_ptr_i32 = builder.CreateBitCast(rest_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
+  llvm::Value* rest_flag = builder.CreateLoad(builder.getInt32Ty(), rest_field_ptr_i32, "rest");
+
+  // Branch based on rest flag
+  llvm::Value* is_rest = builder.CreateICmpNE(rest_flag, builder.getInt32(0), "is_rest");
+
+  llvm::BasicBlock* rest_block = llvm::BasicBlock::Create(context, is_tail ? "rest_tail_call" : "rest_call", current_function);
+  llvm::BasicBlock* normal_block = llvm::BasicBlock::Create(context, is_tail ? "normal_tail_call" : "normal_call", current_function);
+  llvm::BasicBlock* merge_block = nullptr;
+  if (!is_tail) {
+    merge_block = llvm::BasicBlock::Create(context, "call_merge", current_function);
+  }
+
+  llvm::MDBuilder MDB(context);
+  auto branch_weights = MDB.createBranchWeights(1, 2000);  // 1 = unlikely (rest), 2000 = likely (normal)
+  builder.CreateCondBr(is_rest, rest_block, normal_block, branch_weights);
+
+  llvm::Value* rest_result = nullptr;
+  llvm::Value* normal_result = nullptr;
+
+  // --- Rest Block: (self, argc, argv[]) ---
+  builder.SetInsertPoint(rest_block);
+  {
+    std::vector<llvm::Type*> paramTypes;
+    paramTypes.push_back(this->getInt64Type());                             // self
+    paramTypes.push_back(this->getInt64Type());                             // argc
+    paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+    llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+
+    // Allocate argv array and populate it
+    llvm::Value* argv_array = nullptr;
+    if (inst.argc > 0) {
+      argv_array = builder.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+      for (int i = 0; i < inst.argc; i++) {
+        llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
+        builder.CreateStore(get_reg(i), arg_ptr);
+      }
+    } else {
+      argv_array = llvm::ConstantPointerNull::get(llvm::PointerType::get(this->getInt64Type(), 0));
+    }
+
+    std::vector<llvm::Value*> args;
+    args.push_back(closure);
+    args.push_back(createInt64Constant(context, inst.argc));
+    args.push_back(argv_array);
+
+    llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
+    llvm::CallInst* call = builder.CreateCall(funcType, func_ptr, args, is_tail ? "rest_tail_call_result" : "rest_call_result");
+    rest_result = call;
+
+    if (is_tail) {
+      call->setTailCallKind(llvm::CallInst::TCK_Tail);
+      builder.CreateRet(call);
+    } else {
+      builder.CreateBr(merge_block);
+    }
+  }
+  llvm::BasicBlock* rest_exit_block = builder.GetInsertBlock();
+
+  // --- Normal Block: (self, arg0, arg1, ...) ---
+  builder.SetInsertPoint(normal_block);
+  {
+    std::vector<llvm::Type*> normalParamTypes;
+    normalParamTypes.push_back(this->getInt64Type());  // self
+    for (int i = 0; i < inst.argc; i++) {
+      normalParamTypes.push_back(this->getInt64Type());
+    }
+    llvm::FunctionType* normalFuncType = llvm::FunctionType::get(this->getInt64Type(), normalParamTypes, false);
+
+    std::vector<llvm::Value*> normalArgs;
+    normalArgs.push_back(closure);
+    for (int i = 0; i < inst.argc; i++) {
+      normalArgs.push_back(get_reg(i));
+    }
+
+    llvm::Value* normal_func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(normalFuncType, 0));
+    llvm::CallInst* call =
+        builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, is_tail ? "normal_tail_call_result" : "normal_call_result");
+    normal_result = call;
+
+    if (is_tail) {
+      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      builder.CreateRet(call);
+    } else {
+      builder.CreateBr(merge_block);
+    }
+  }
+  llvm::BasicBlock* normal_exit_block = builder.GetInsertBlock();
+
+  // --- Merge Block ---
+  if (!is_tail) {
+    builder.SetInsertPoint(merge_block);
+    llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "call_result");
+    phi->addIncoming(rest_result, rest_exit_block);
+    phi->addIncoming(normal_result, normal_exit_block);
+
+    // Store result in r0
+    set_reg(0, phi);
   }
 }
 
-void codegen_t::emit_ret(scm_obj_t args) { builder.CreateRet(get_reg(0)); }
+// Call a closure with arguments from registers
+void codegen_t::emit_call(const Instruction& inst) { emit_call_common(inst, false); }
+
+// Tail call a closure with arguments from registers
+void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst, true); }
+
+// Load free variable from closure environment
+void codegen_t::emit_closure_ref(const Instruction& inst) {
+  if (!current_closure_self) {
+    fatal("%s:%u codegen: closure-ref used outside of closure context", __FILE__, __LINE__);
+  }
+
+  int env_idx = (int)fixnum(inst.opr2);
+  if (env_idx < 0) {
+    fatal("%s:%u codegen: closure-ref invalid index: %d", __FILE__, __LINE__, env_idx);
+  }
+
+  // Get pointer to closure environment array
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+
+  // Get pointer to specific index
+  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+
+  // Load the value
+  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), val_ptr, "free_var");
+
+  set_reg(inst.rn1, val);
+}
+
+// Store value into closure environment
+void codegen_t::emit_closure_set(const Instruction& inst) {
+  if (!current_closure_self) {
+    fatal("%s:%u codegen: closure-set! used outside of closure context", __FILE__, __LINE__);
+  }
+
+  int env_idx = (int)fixnum(inst.opr1);
+  if (env_idx < 0) {
+    fatal("%s:%u codegen: closure-set! invalid index: %d", __FILE__, __LINE__, env_idx);
+  }
+
+  // Get pointer to closure environment array
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+
+  // Get pointer to specific index
+  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+
+  // Get value from source register
+  if (inst.rn2 < 0) {
+    fatal("%s:%u codegen: closure-set! missing source register", __FILE__, __LINE__);
+  }
+  llvm::Value* val = get_reg(inst.rn2);
+
+  // Store the value
+  builder.CreateStore(val, val_ptr);
+
+  // Write barrier
+  emitWriteBarrier(val);
+}
+
+// Load current closure object into register
+void codegen_t::emit_closure_self(const Instruction& inst) {
+  if (!current_closure_self) {
+    fatal("%s:%u codegen: closure-self used outside of closure context", __FILE__, __LINE__);
+  }
+  set_reg(inst.rn1, current_closure_self);
+}
+
+// Load free variable (cell) from closure environment and unbox it
+void codegen_t::emit_closure_cell_ref(const Instruction& inst) {
+  if (!current_closure_self) {
+    fatal("%s:%u codegen: closure-cell-ref used outside of closure context", __FILE__, __LINE__);
+  }
+
+  int env_idx = (int)fixnum(inst.opr2);
+  if (env_idx < 0) {
+    fatal("%s:%u codegen: closure-cell-ref invalid index: %d", __FILE__, __LINE__, env_idx);
+  }
+
+  // Get pointer to closure environment array
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+
+  // Load the cell object (which is a tagged pointer)
+  llvm::Value* cell_obj = builder.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
+
+  // Get pointer to cell's value and load it
+  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
+
+  set_reg(inst.rn1, val);
+}
+
+// Load free variable (cell) from closure environment and update its value
+void codegen_t::emit_closure_cell_set(const Instruction& inst) {
+  if (!current_closure_self) {
+    fatal("%s:%u codegen: closure-cell-set! used outside of closure context", __FILE__, __LINE__);
+  }
+
+  int env_idx = (int)fixnum(inst.opr1);
+  if (env_idx < 0) {
+    fatal("%s:%u codegen: closure-cell-set! invalid index: %d", __FILE__, __LINE__, env_idx);
+  }
+
+  // Get pointer to closure environment array
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+
+  // Load the cell object
+  llvm::Value* cell_obj = builder.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
+
+  // Get pointer to cell's value
+  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+
+  // Get value from source register
+  if (inst.rn2 < 0) {
+    fatal("%s:%u codegen: closure-cell-set! missing source register", __FILE__, __LINE__);
+  }
+  llvm::Value* val = get_reg(inst.rn2);
+
+  // Store the value
+  builder.CreateStore(val, value_ptr_typed);
+
+  // Write barrier on value being stored
+  emitWriteBarrier(val);
+}
+
+// Unbox cell in source register to destination register
+void codegen_t::emit_reg_cell_ref(const Instruction& inst) {
+  // Get cell object from source register
+  if (inst.rn2 < 0) {
+    fatal("%s:%u codegen: reg-cell-ref missing source register", __FILE__, __LINE__);
+  }
+  llvm::Value* cell_obj = get_reg(inst.rn2);
+
+  // Get pointer to cell's value and load it
+  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
+
+  set_reg(inst.rn1, val);
+}
+
+// Update value of cell in destination register with value from source register
+void codegen_t::emit_reg_cell_set(const Instruction& inst) {
+  // Get cell object from destination register
+  if (inst.rn1 < 0) {
+    fatal("%s:%u codegen: reg-cell-set! missing destination register", __FILE__, __LINE__);
+  }
+  llvm::Value* cell_obj = get_reg(inst.rn1);
+
+  // Get pointer to cell's value
+  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+
+  // Get value from source register
+  if (inst.rn2 < 0) {
+    fatal("%s:%u codegen: reg-cell-set! missing source register", __FILE__, __LINE__);
+  }
+  llvm::Value* val = get_reg(inst.rn2);
+
+  // Store value
+  builder.CreateStore(val, value_ptr_typed);
+
+  // Write barrier on value being stored
+  emitWriteBarrier(val);
+}
+
+// Create a cell from register value and store in the same register
+void codegen_t::emit_make_cell(const Instruction& inst) {
+  // Get or create c_make_cell external function
+  llvm::Type* intptrTy = this->getInt64Type();
+  std::vector<llvm::Type*> argTypes = {intptrTy};
+  llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, argTypes, false);
+  llvm::Function* make_cell_func = get_or_create_external_function("c_make_cell", ft, (void*)&c_make_cell);
+
+  // Get value from register
+  if (inst.rn1 < 0) {
+    fatal("%s:%u codegen: make-cell missing register operand", __FILE__, __LINE__);
+  }
+  llvm::Value* val = get_reg(inst.rn1);
+
+  // Call c_make_cell
+  llvm::Value* cell = builder.CreateCall(make_cell_func, {val}, "cell");
+
+  // Store result back to register
+  set_reg(inst.rn1, cell);
+}

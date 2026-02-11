@@ -5,6 +5,7 @@
 #include "object.h"
 #include "object_heap.h"
 #include "bit.h"
+#include "hash.h"
 
 static constexpr int symbol_table_reserve_size = 4096;
 
@@ -46,16 +47,21 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
 #endif
 
   m_cons.init(&m_concurrent_heap, clp2(sizeof(scm_cons_rec_t)), true, false);
+  m_cells.init(&m_concurrent_heap, clp2(sizeof(scm_cell_rec_t)), true, false);
   m_flonums.init(&m_concurrent_heap, clp2(sizeof(scm_long_flonum_rec_t)), true, false);
   m_symbols.init(&m_concurrent_heap, clp2(sizeof(scm_symbol_rec_t)), true, true);
   m_strings.init(&m_concurrent_heap, clp2(sizeof(scm_string_rec_t)), true, true);
   m_vectors.init(&m_concurrent_heap, clp2(sizeof(scm_vector_rec_t)), true, true);
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
+  m_environments.init(&m_concurrent_heap, clp2(sizeof(scm_environment_rec_t)), true, false);
+  m_subrs.init(&m_concurrent_heap, clp2(sizeof(scm_subr_rec_t)), true, false);
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
+
+  m_environment = make_environment(make_symbol("interaction-environment"));
 }
 
 void object_heap_t::destroy() {
@@ -141,6 +147,52 @@ void object_heap_t::sweep_symbol_table() {
   }
 }
 
+void object_heap_t::environment_variable_set(scm_obj_t key, scm_obj_t value) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  hashtable_delete(env_rec->macros, key);
+  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
+  if (cell == scm_undef) {
+    scm_obj_t new_cell = make_cell(value);
+    hashtable_set(env_rec->variables, key, new_cell);
+    return;
+  }
+  scm_cell_rec_t* cell_rec = (scm_cell_rec_t*)to_address(cell);
+  write_barrier(value);
+  cell_rec->value = value;
+}
+
+scm_obj_t object_heap_t::environment_variable_ref(scm_obj_t key) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
+  if (cell == scm_undef) {
+    scm_obj_t new_cell = make_cell(scm_undef);
+    hashtable_set(env_rec->variables, key, new_cell);
+    return scm_undef;
+  }
+  scm_cell_rec_t* cell_rec = (scm_cell_rec_t*)to_address(cell);
+  return cell_rec->value;
+}
+
+scm_obj_t object_heap_t::environment_variable_cell_ref(scm_obj_t key) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
+  if (cell == scm_undef) {
+    scm_obj_t new_cell = make_cell(scm_undef);
+    hashtable_set(env_rec->variables, key, new_cell);
+    return new_cell;
+  }
+  return cell;
+}
+
 void object_heap_t::shade(scm_obj_t obj) {
   if (is_cons(obj)) {
     m_concurrent_heap.shade((void*)obj);
@@ -161,6 +213,11 @@ void object_heap_t::trace(void* obj) {
     shade(rec->cdr);
     return;
   }
+  if (traits->cache == &m_cells) {
+    scm_cell_rec_t* rec = (scm_cell_rec_t*)obj;
+    shade(rec->value);
+    return;
+  }
   if (traits->cache == &m_vectors) {
     scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
     for (int i = 0; i < rec->nsize; i++) {
@@ -176,6 +233,18 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (traits->cache == &m_environments) {
+    scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
+    shade(rec->name);
+    shade(rec->variables);
+    shade(rec->macros);
+    return;
+  }
+  if (traits->cache == &m_subrs) {
+    scm_subr_rec_t* rec = (scm_subr_rec_t*)obj;
+    shade(rec->name);
+    return;
+  }
 
   uintptr_t tag = *(uintptr_t*)obj;
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
@@ -188,6 +257,10 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (tc6 == tc6_long_flonum || tc6 == tc6_symbol || tc6 == tc6_string || tc6 == tc6_u8vector) {
+    return;
+  }
+  assert(false);
 }
 
 void object_heap_t::finalize(void* obj) {
@@ -211,12 +284,27 @@ void object_heap_t::finalize(void* obj) {
   if (traits->cache == &m_hashtables) {
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     delete_private(rec->aux);
+    rec->lock.destroy();
     return;
   }
+  if (traits->cache == &m_vectors) {
+    scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
+    delete_private(rec->elts);
+    return;
+  }
+
+  uintptr_t tag = *(uintptr_t*)obj;
+  uintptr_t tc6 = (tag & 0x3f00) >> 8;
+
+  if (tc6 == tc6_closure) {
+    return;
+  }
+  assert(false);
 }
 
 void object_heap_t::snapshot_root() {
   for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) shade(*it);
+  shade(m_environment);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

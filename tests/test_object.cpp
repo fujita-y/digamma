@@ -1,3 +1,4 @@
+#include <cstring>
 #include "../src/core.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
@@ -118,6 +119,122 @@ static bool test_u8vector(int nsize) {
   return true;
 }
 
+static bool test_environment(const char* name) {
+  scm_obj_t x1 = make_symbol(name);
+  scm_obj_t x2 = make_environment(x1);
+  if (!is_environment(x2)) {
+    printf("\033[31m###### environment failed: not an environment\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_environment_rec_t* rec = (scm_environment_rec_t*)to_address(x2);
+  if (rec->name != x1) {
+    printf("\033[31m###### environment failed: name mismatch\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (!is_hashtable(rec->variables)) {
+    printf("\033[31m###### environment failed: variable is not hashtable\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_hashtable_rec_t* var_ht = (scm_hashtable_rec_t*)to_address(rec->variables);
+  if (var_ht->aux->used != 0) {
+    printf("\033[31m###### environment failed: variable hashtable not empty\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (!is_hashtable(rec->macros)) {
+    printf("\033[31m###### environment failed: macro is not hashtable\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_hashtable_rec_t* mac_ht = (scm_hashtable_rec_t*)to_address(rec->macros);
+  if (mac_ht->aux->used != 0) {
+    printf("\033[31m###### environment failed: macro hashtable not empty\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32menvironment passed: %s\033[0m\n", name);
+  return true;
+}
+
+static bool test_cell_heap(const char* val) {
+  scm_obj_t v = make_string(val);
+  scm_obj_t c = make_cell(v);
+  if (!is_cell(c)) {
+    printf("\033[31m###### cell heap failed: is_cell returned false\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (cell_value(c) != v) {
+    printf("\033[31m###### cell heap value failed: obj != obj\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t v2 = make_string("foobar");
+  cell_value_set(c, v2);
+  if (cell_value(c) != v2) {
+    printf("\033[31m###### cell heap value update failed: obj != obj\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcell heap passed: %s\033[0m\n", val);
+  return true;
+}
+
+static bool test_cell(int64_t val) {
+  scm_obj_t v = make_fixnum(val);
+  scm_obj_t c = make_cell(v);
+  if (!is_cell(c)) {
+    printf("\033[31m###### cell failed: is_cell returned false\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (cell_value(c) != v) {
+    printf("\033[31m###### cell value failed: %ld != %ld\033[0m\n", fixnum(cell_value(c)), val);
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t v2 = make_fixnum(val + 1);
+  cell_value_set(c, v2);
+  if (cell_value(c) != v2) {
+    printf("\033[31m###### cell value update failed: %ld != %ld\033[0m\n", fixnum(cell_value(c)), val + 1);
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcell passed: %ld\033[0m\n", val);
+  return true;
+}
+
+static bool test_subr(const char* name, int argc, int rest, void* code) {
+  scm_obj_t x1 = make_symbol(name);
+  scm_obj_t x2 = make_subr(x1, argc, rest, code);
+  if (!is_subr(x2)) {
+    printf("\033[31m###### subr failed: is_subr returned false\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_subr_rec_t* rec = (scm_subr_rec_t*)to_address(x2);
+  if (rec->name != x1) {
+    printf("\033[31m###### subr failed: name mismatch\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (rec->argc != argc) {
+    printf("\033[31m###### subr failed: argc mismatch\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (rec->code != code) {
+    printf("\033[31m###### subr failed: code mismatch\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32msubr passed: %s\033[0m\n", name);
+  return true;
+}
+
 int main(int argc, char** argv) {
   object_heap_t heap;
   heap.init(1024 * 1024 * 2, 1024 * 1024);
@@ -152,6 +269,15 @@ int main(int argc, char** argv) {
 
   test_u8vector(97);
   test_u8vector(122);
+
+  test_environment("interaction-environment");
+
+  test_cell(100);
+  test_cell(-50);
+  test_cell_heap("hello world");
+
+  test_subr("car", 1, 0, (void*)0x12345678);
+  test_subr("cdr", 1, 0, (void*)0x87654321);
 
   heap.destroy();
 

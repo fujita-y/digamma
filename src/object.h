@@ -48,22 +48,24 @@ constexpr uintptr_t tc6_vector = 3;
 constexpr uintptr_t tc6_u8vector = 4;
 constexpr uintptr_t tc6_hashtable = 5;
 constexpr uintptr_t tc6_closure = 6;
+constexpr uintptr_t tc6_environment = 7;
+constexpr uintptr_t tc6_cell = 8;
+constexpr uintptr_t tc6_subr = 9;
 /*
-constexpr uintptr_t tc6_bignum = 5;
-constexpr uintptr_t tc6_cont = 6;
-constexpr uintptr_t tc6_subr = 8;
-constexpr uintptr_t tc6_port = 9;
-constexpr uintptr_t tc6_values = 10;
-constexpr uintptr_t tc6_gloc = 12;
-constexpr uintptr_t tc6_tuple = 13;
-constexpr uintptr_t tc6_complex = 15;
-constexpr uintptr_t tc6_rational = 16;
-constexpr uintptr_t tc6_heapenv = 17;
-constexpr uintptr_t tc6_heapcont = 18;
-constexpr uintptr_t tc6_weakmapping = 19;
-constexpr uintptr_t tc6_weakhashtable = 20;
-constexpr uintptr_t tc6_environment = 21;
-constexpr uintptr_t tc6_socket = 22;
+constexpr uintptr_t tc6_bignum = ;
+constexpr uintptr_t tc6_cont = ;
+constexpr uintptr_t tc6_subr = ;
+constexpr uintptr_t tc6_port = ;
+constexpr uintptr_t tc6_values = ;
+constexpr uintptr_t tc6_gloc = ;
+constexpr uintptr_t tc6_tuple = ;
+constexpr uintptr_t tc6_complex = ;
+constexpr uintptr_t tc6_rational = ;
+constexpr uintptr_t tc6_heapenv = ;
+constexpr uintptr_t tc6_heapcont = ;
+constexpr uintptr_t tc6_weakmapping = ;
+constexpr uintptr_t tc6_weakhashtable = ;
+constexpr uintptr_t tc6_socket = ;
 */
 
 inline scm_obj_t singleton(uintptr_t val) {
@@ -80,11 +82,11 @@ const scm_obj_t scm_eof = singleton(7);
 const scm_obj_t scm_hash_free = singleton(8);
 const scm_obj_t scm_hash_deleted = singleton(9);
 /*
-const scm_obj_t scm_timeout = singleton(8);
-const scm_obj_t scm_shutdown = singleton(9);
-const scm_obj_t scm_proc_apply = singleton(12);
-const scm_obj_t scm_proc_callcc = singleton(13);
-const scm_obj_t scm_proc_apply_values = singleton(14);
+const scm_obj_t scm_timeout = singleton(?);
+const scm_obj_t scm_shutdown = singleton(?);
+const scm_obj_t scm_proc_apply = singleton(?);
+const scm_obj_t scm_proc_callcc = singleton(?);
+const scm_obj_t scm_proc_apply_values = singleton(?);
 */
 
 typedef unsigned int (*hash_proc_t)(scm_obj_t obj, unsigned int bound);
@@ -93,6 +95,11 @@ typedef bool (*equiv_proc_t)(scm_obj_t obj1, scm_obj_t obj2);
 struct scm_cons_rec_t {
   scm_obj_t car;
   scm_obj_t cdr;
+};
+
+struct scm_cell_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t value;
 };
 
 struct scm_long_flonum_rec_t {
@@ -147,6 +154,21 @@ struct scm_closure_rec_t {
   scm_obj_t env[1];  // free variables
 };
 
+struct scm_environment_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t name;       // symbol
+  scm_obj_t variables;  // hashtable
+  scm_obj_t macros;     // hashtable
+};
+
+struct scm_subr_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t name;
+  int argc;
+  int rest;
+  void* code;
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -176,11 +198,15 @@ inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
 inline bool is_u8vector(scm_obj_t x) { return is_tc6(x, tc6_u8vector); }
 inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
 inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
+inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
+inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
+inline bool is_subr(scm_obj_t x) { return is_tc6(x, tc6_subr); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
+scm_obj_t make_cell(scm_obj_t value);
 scm_obj_t make_list(int len, ...);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
@@ -189,6 +215,8 @@ scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+scm_obj_t make_environment(scm_obj_t name);
+scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
@@ -199,5 +227,7 @@ inline int vector_nsize(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))
 inline scm_obj_t* vector_elts(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->elts; }
 inline int u8vector_nsize(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->nsize; }
 inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->elts; }
+inline scm_obj_t cell_value(scm_obj_t x) { return ((scm_cell_rec_t*)to_address(x))->value; }
+void cell_value_set(scm_obj_t x, scm_obj_t v);
 
 #endif

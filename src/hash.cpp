@@ -124,6 +124,8 @@ static void rehash(scm_hashtable_rec_t* ht, int nsize) {
   swap(ht->aux, ht2->aux);
 }
 
+unsigned int address_hash(void* adrs, unsigned int bound) { return (((uintptr_t)adrs >> 3) * 2654435761U + ((uintptr_t)adrs & 7)) % bound; }
+
 unsigned int string_hash(scm_obj_t obj, unsigned int bound) {
   assert(is_string(obj));
   unsigned int hash = 5381;
@@ -137,6 +139,17 @@ bool string_equiv(scm_obj_t obj1, scm_obj_t obj2) {
   assert(is_string(obj1));
   assert(is_string(obj2));
   return strcmp((const char*)string_name(obj1), (const char*)string_name(obj2)) == 0;
+}
+
+unsigned int symbol_hash(scm_obj_t obj, unsigned int bound) {
+  assert(is_symbol(obj));
+  return address_hash((void*)obj, bound);
+}
+
+bool symbol_equiv(scm_obj_t obj1, scm_obj_t obj2) {
+  assert(is_symbol(obj1));
+  assert(is_symbol(obj2));
+  return obj1 == obj2;
 }
 
 scm_obj_t hashtable_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) {

@@ -2,26 +2,26 @@
 ;; Register-based VM for Scheme
 ;;
 ;; Bytecode Instruction Set:
-;;   (nop)                           - No operation
-;;   (const <reg> <idx>)             - Load constant at <idx> into <reg>
-;;   (mov <dst> <src>)               - Move value from <src> register to <dst> register
-;;   (if <t-label> <f-label>)        - Jump to <t-label> if r0 is true, else <f-label>
-;;   (global-ref <reg> <var>)        - Load global variable <var> into <reg>
-;;   (global-set! <var> <src>)       - Store <src> register into global variable <var>
-;;   (jump <label>)                  - Unconditional jump to <label>
-;;   (call <proc-reg> <n-args>)      - Call procedure in <proc-reg> with <n-args>
-;;   (tail-call <proc-reg> <n-args>) - Tail call procedure in <proc-reg> with <n-args>
-;;   (ret)                           - Return from procedure (result in r0)
-;;   (make-closure <dst> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
-;;                                   - Create a closure from <label> and free variables
-;;   (closure-ref <reg> <idx>)       - Load free variable at <idx> from current closure into <reg>
-;;   (closure-cell-ref <reg> <idx>)  - Load value from cell at <idx> in current closure into <reg>
-;;   (closure-set! <idx> <src>)      - Store <src> into free variable at <idx> in current closure
-;;   (closure-cell-set! <idx> <src>) - Store <src> into cell at <idx> in current closure
-;;   (reg-cell-ref <dst> <src>)      - Extract value from cell in <src> register into <dst> register
-;;   (reg-cell-set! <dst> <src>)     - Store <src> register value into cell in <dst> register
-;;   (make-cell <src> <dst>)         - Create a cell from <src> register and store in <dst> register
-;;   (closure-self <dst>)            - Load current closure into <dst> register
+;;   (nop)                                 - No operation
+;;   (const <reg> <idx>)                   - Load constant at <idx> into <reg>
+;;   (mov <dst-reg> <src-reg>)             - Move value from <src-reg> to <dst-reg>
+;;   (if <t-label> <f-label>)              - Jump to <t-label> if r0 is true, else <f-label>
+;;   (global-ref <reg> <var>)              - Load global variable <var> into <reg>
+;;   (global-set! <var> <reg>)             - Store <reg> into global variable <var>
+;;   (jump <label>)                        - Unconditional jump to <label>
+;;   (call <proc-reg> <n-args>)            - Call procedure in <proc-reg> with <n-args> arguments
+;;   (tail-call <proc-reg> <n-args>)       - Tail call procedure in <proc-reg> with <n-args> arguments
+;;   (ret)                                 - Return from procedure (result in r0)
+;;   (make-closure <dst-reg> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
+;;                                         - Create closure at <label> capturing free vars from <free-indices>
+;;   (closure-ref <reg> <idx>)             - Load free variable at env[<idx>] into <reg>
+;;   (closure-cell-ref <reg> <idx>)        - Load value from cell at env[<idx>] into <reg>
+;;   (closure-set! <idx> <reg>)            - Store <reg> into free variable at env[<idx>]
+;;   (closure-cell-set! <idx> <reg>)       - Store <reg> into cell at env[<idx>]
+;;   (reg-cell-ref <dst-reg> <src-reg>)    - Extract value from cell in <src-reg> into <dst-reg>
+;;   (reg-cell-set! <dst-reg> <src-reg>)   - Store <src-reg> into cell in <dst-reg>
+;;   (make-cell <reg>)                     - Create cell from <reg> value and store back in <reg>
+;;   (closure-self <reg>)                  - Load current closure into <reg>
 
 (define-record-type <context>
   (make-context code pc stack cl regs)
@@ -262,10 +262,9 @@
 
 ;; (make-cell <src> <dst>)
 (define (vm:op-make-cell ctx inst)
-  (let ((src (vector-ref inst 1))
-        (dst (vector-ref inst 2)))
-    (let ((cell (make-cell-box (vm:reg-ref ctx src))))
-      (vm:reg-set! ctx dst cell))
+  (let ((reg (vector-ref inst 1)))
+    (let ((cell (make-cell-box (vm:reg-ref ctx reg))))
+      (vm:reg-set! ctx reg cell))
     *vm:continue*))
 
 ;; (closure-self <dst>)

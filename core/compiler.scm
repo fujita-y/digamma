@@ -436,7 +436,7 @@
                                      (if (and (pair? scope) (not (memq (car scope) '(cl num-params))))
                                          (filter (lambda (b) (eq? (cdr b) 'self)) scope)
                                          '())))))
-           (for-each (lambda (p) (if (memq (car p) (compiler-ctx-mutated ctx)) (compiler-ctx-emit! ctx `(make-cell ,(cdr p) ,(cdr p))))) new-scope)
+           (for-each (lambda (p) (if (memq (car p) (compiler-ctx-mutated ctx)) (compiler-ctx-emit! ctx `(make-cell ,(cdr p))))) new-scope)
            (codegen `(begin ,@body) (cons (list (cons 'num-params n-total-params)) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-total-params) #t ctx))
          (compiler-ctx-add-closure! ctx (reverse (compiler-ctx-code ctx)))
          (compiler-ctx-set-code! ctx prev-code)
@@ -501,7 +501,7 @@
                     (codegen (car vs) env (+ r 1) #f ctx))
                 (compiler-ctx-emit! ctx `(mov ,reg r0))
                 (if (memq (car vars) (compiler-ctx-mutated ctx))
-                    (compiler-ctx-emit! ctx `(make-cell ,reg ,reg)))
+                    (compiler-ctx-emit! ctx `(make-cell ,reg)))
                 (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope))))))))
 
 (define (codegen expr env next-reg tail? ctx)

@@ -19,12 +19,15 @@ class object_heap_t {
   concurrent_pool_t m_concurrent_pool;
   concurrent_heap_t m_concurrent_heap;
   concurrent_slab_t m_cons;
+  concurrent_slab_t m_cells;
   concurrent_slab_t m_flonums;
   concurrent_slab_t m_symbols;
   concurrent_slab_t m_strings;
   concurrent_slab_t m_vectors;
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
+  concurrent_slab_t m_environments;
+  concurrent_slab_t m_subrs;
   concurrent_slab_t m_collectibles[8];  // 16-32-64-128-256-512-1024-2048
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
@@ -50,17 +53,25 @@ class object_heap_t {
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
   void* alloc_cons() { return alloc_object(m_cons); }
+  void* alloc_cell() { return alloc_object(m_cells); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
   void* alloc_symbol() { return alloc_object(m_symbols); }
   void* alloc_string() { return alloc_object(m_strings); }
   void* alloc_vector() { return alloc_object(m_vectors); }
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
+  void* alloc_environment() { return alloc_object(m_environments); }
+  void* alloc_subr() { return alloc_object(m_subrs); }
   void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
 
   std::mutex m_symbol_table_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_table;
+
+  void environment_variable_set(scm_obj_t key, scm_obj_t value);
+  scm_obj_t environment_variable_ref(scm_obj_t key);
+  scm_obj_t environment_variable_cell_ref(scm_obj_t key);
+  scm_obj_t m_environment;
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {
@@ -82,6 +93,9 @@ class object_heap_t {
   object_heap_t(object_heap_t&&) = delete;
   object_heap_t& operator=(object_heap_t&&) = delete;
 
-  static object_heap_t* current() { return s_current; }
+  static object_heap_t* current() {
+    assert(s_current);
+    return s_current;
+  }
 };
 #endif

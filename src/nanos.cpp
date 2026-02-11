@@ -1,5 +1,8 @@
+#include "object.h"
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
+#include "codegen_aux.h"
+#include "codegen_subr.h"
 #include "object_heap.h"
 #include "printer.h"
 #include "reader.h"
@@ -22,6 +25,18 @@ int main() {
 
   object_heap_t heap;
   heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+
+  // setup SUBR
+
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("+"), scm_subr_num_add);
+
+  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("-"), scm_subr_num_sub);
+
+  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("="), scm_subr_num_eq);
+
   puts(";; nanos - a small scheme interpreter for bootstrapping");
 
 #if USE_TBI
@@ -30,7 +45,7 @@ int main() {
   puts(";; USE_TBI == 0");
 #endif
 
-  codegen_t codegen(context, module, engine);
+  codegen_t codegen(context, engine);
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
@@ -56,12 +71,14 @@ int main() {
     if (is_cons(obj)) {
       try {
         intptr_t result = codegen.compile(obj);
-        printf("%ld\n", result);
+        printf("(0x%016lx)\n", result);
+        printer.print((scm_obj_t)result);
+        puts("");
       } catch (std::exception& e) {
         printf("Error: %s\n", e.what());
       }
     } else {
-      printer.format(obj);
+      printer.print(obj);
       puts("");
     }
     heap.safepoint();

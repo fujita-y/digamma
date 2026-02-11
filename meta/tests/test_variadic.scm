@@ -6,7 +6,7 @@
 
 (define (test name expr expected)
   (format #t "Testing ~a: ~s\n" name expr)
-  (let* ((code (compile expr))
+  (let* ((code (generate-bytecode (compile expr)))
          (ctx (vm:init-context code)))
     (global-variable-set! '+ +)
     (global-variable-set! '- -)
