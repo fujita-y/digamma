@@ -63,16 +63,15 @@ void concurrent_heap_t::terminate() {
   GCTRACE(";; [collector: terminated]\n");
 }
 
-void concurrent_heap_t::safepoint() {
-  if (!m_stop_the_world) return;
-
+void concurrent_heap_t::snapshot_stack() {
   uint64_t regs[11];
   capture_arm64_core_state(regs);
   for (int i = 0; i < array_sizeof(m_captured_regs); i++) m_captured_regs[i] = regs[i];
   m_thread_stack_top = (void*)regs[array_sizeof(regs) - 1];  // last reg is stack pointer
   m_thread_stack_bottom = capture_thread_stack_bottom();
+
 #ifndef NDEBUG
-  printf(";; [safepoint] mode %d\n", m_root_snapshot_mode);
+  printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
   printf(";; thread stack bottom: %p\n", m_thread_stack_bottom);
   printf(";; thread stack top: %p\n", m_thread_stack_top);
   printf(";; thread stack size: %ld\n", (uintptr_t)m_thread_stack_bottom - (uintptr_t)m_thread_stack_top);
@@ -80,6 +79,27 @@ void concurrent_heap_t::safepoint() {
   for (int i = 0; i < array_sizeof(m_captured_regs); i++) printf("%p ", (void*)m_captured_regs[i]);
   printf("]\n");
 #endif
+}
+
+void concurrent_heap_t::safepoint() {
+  if (!m_stop_the_world) return;
+
+  switch (m_root_snapshot_mode) {
+    case ROOT_SNAPSHOT_MODE_GLOBALS:
+      snapshot_root();
+      break;
+    case ROOT_SNAPSHOT_MODE_LOCALS:
+      snapshot_stack();
+      break;
+    case ROOT_SNAPSHOT_MODE_EVERYTHING:
+      snapshot_root();
+      snapshot_stack();
+      break;
+    case ROOT_SNAPSHOT_MODE_RETRY:
+      snapshot_root();
+      snapshot_stack();
+      break;
+  }
 
   while (m_stop_the_world) {
     m_collector_lock.lock();
@@ -108,7 +128,6 @@ void concurrent_heap_t::collect() {
 
 void concurrent_heap_t::synchronized_collect() {
   clear_trip_bytes();
-  snapshot_root();
 
   // mark
   assert(m_mutator_stopped == false);
@@ -194,10 +213,6 @@ void concurrent_heap_t::concurrent_collect() {
   double t2 = msec();
   GCTRACE(";; [collector: concurrent-mark phase 1]\n");
 
-  concurrent_mark();
-
-  // mark phase 1+
-  snapshot_root();
   concurrent_mark();
 
   // mark phase 2

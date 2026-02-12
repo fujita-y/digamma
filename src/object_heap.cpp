@@ -302,9 +302,17 @@ void object_heap_t::finalize(void* obj) {
   assert(false);
 }
 
+void object_heap_t::enqueue_root(scm_obj_t obj) {
+  if (is_cons(obj)) {
+    m_concurrent_heap.enqueue_root((void*)obj);
+  } else if (is_heap_object(obj)) {
+    m_concurrent_heap.enqueue_root(to_address(obj));
+  }
+}
+
 void object_heap_t::snapshot_root() {
-  for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) shade(*it);
-  shade(m_environment);
+  for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) enqueue_root(*it);
+  enqueue_root(m_environment);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

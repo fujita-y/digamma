@@ -43,7 +43,7 @@ class object_heap_t {
   void update_weak_reference();
   void sweep_symbol_table();
   void delete_private(void* obj);
-  void* get_thread_stack_bottom();
+  void enqueue_root(scm_obj_t obj);
 #if HPDEBUG
   void consistency_check();
   void validate_concurrent_slab(void* slab);
