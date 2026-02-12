@@ -43,6 +43,7 @@ class object_heap_t {
   void update_weak_reference();
   void sweep_symbol_table();
   void delete_private(void* obj);
+  void* get_thread_stack_bottom();
 #if HPDEBUG
   void consistency_check();
   void validate_concurrent_slab(void* slab);

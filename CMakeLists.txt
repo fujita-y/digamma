@@ -136,6 +136,7 @@ set(NANOS_CORE_SOURCES
   src/codegen.cpp
   src/codegen_aux.cpp
   src/codegen_subr.cpp
+  src/arch_arm64.cpp
 )
 
 # ==============================================================================

@@ -19,9 +19,6 @@
 #define ROOT_SNAPSHOT_MODE_LOCALS     1
 #define ROOT_SNAPSHOT_MODE_EVERYTHING 2
 #define ROOT_SNAPSHOT_MODE_RETRY      3
-#if HPDEBUG
-  #define ROOT_SNAPSHOT_MODE_CONSISTENCY_CHECK 4
-#endif
 
 class collector_usage_t {
  public:
@@ -83,6 +80,10 @@ class concurrent_heap_t {
   bool m_collector_kicked;
   bool m_mutator_stopped;
   bool m_stop_the_world;
+
+  void* m_thread_stack_bottom;
+  void* m_thread_stack_top;
+  uint64_t m_captured_regs[10];  // x19-x28
 
   void set_snapshot_root_proc(std::function<void()> callback) { m_snapshot_root_proc = callback; }
   void set_trace_proc(std::function<void(void* obj)> callback) { m_trace_proc = callback; }

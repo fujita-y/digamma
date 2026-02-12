@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
+#include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
@@ -63,6 +64,23 @@ void concurrent_heap_t::terminate() {
 }
 
 void concurrent_heap_t::safepoint() {
+  if (!m_stop_the_world) return;
+
+  uint64_t regs[11];
+  capture_arm64_core_state(regs);
+  for (int i = 0; i < array_sizeof(m_captured_regs); i++) m_captured_regs[i] = regs[i];
+  m_thread_stack_top = (void*)regs[array_sizeof(regs) - 1];  // last reg is stack pointer
+  m_thread_stack_bottom = capture_thread_stack_bottom();
+#ifndef NDEBUG
+  printf(";; [safepoint] mode %d\n", m_root_snapshot_mode);
+  printf(";; thread stack bottom: %p\n", m_thread_stack_bottom);
+  printf(";; thread stack top: %p\n", m_thread_stack_top);
+  printf(";; thread stack size: %ld\n", (uintptr_t)m_thread_stack_bottom - (uintptr_t)m_thread_stack_top);
+  printf(";; x19-x28: [");
+  for (int i = 0; i < array_sizeof(m_captured_regs); i++) printf("%p ", (void*)m_captured_regs[i]);
+  printf("]\n");
+#endif
+
   while (m_stop_the_world) {
     m_collector_lock.lock();
     while (m_stop_the_world) {
