@@ -51,12 +51,6 @@ class concurrent_pool_t {
     assert(index >= 0 && index < m_pool_watermark);
     return (m_pool[index] & (PTAG_SLAB | PTAG_GC)) == (PTAG_SLAB | PTAG_GC);
   }
-  bool is_not_collectible(void* obj) {
-    assert(obj);
-    int index = ((uint8_t*)obj - m_pool) >> SLAB_SIZE_SHIFT;
-    assert(index >= 0 && index < m_pool_watermark);
-    return (m_pool[index] & (PTAG_SLAB | PTAG_GC)) == PTAG_SLAB;
-  }
 };
 
 #endif

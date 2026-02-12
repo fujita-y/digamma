@@ -6,7 +6,7 @@
 
 #include "core.h"
 
-void* capture_thread_stack_bottom();
+uint64_t capture_thread_stack_bottom();
 void capture_arm64_core_state(uint64_t regs[11]);
 
 #endif

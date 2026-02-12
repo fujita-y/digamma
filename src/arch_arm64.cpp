@@ -21,12 +21,12 @@ void capture_arm64_core_state(uint64_t regs[11]) {
       : "x9", "memory");
 }
 
-void* capture_thread_stack_bottom() {
+uint64_t capture_thread_stack_bottom() {
   pthread_attr_t attr;
   pthread_getattr_np(pthread_self(), &attr);
   void* stackaddr;
   size_t stacksize;
   pthread_attr_getstack(&attr, &stackaddr, &stacksize);
   pthread_attr_destroy(&attr);
-  return (uint8_t*)stackaddr + stacksize;
+  return (uint64_t)stackaddr + stacksize;
 }

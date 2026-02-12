@@ -126,7 +126,7 @@ void* object_heap_t::alloc_private(size_t size) {
 }
 
 void object_heap_t::delete_private(void* obj) {
-  assert(m_concurrent_pool.is_not_collectible(obj));
+  assert(m_concurrent_pool.in_slab(obj) && !m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
   traits->cache->delete_object(obj);
 }

@@ -81,10 +81,6 @@ class concurrent_heap_t {
   bool m_mutator_stopped;
   bool m_stop_the_world;
 
-  void* m_thread_stack_bottom;
-  void* m_thread_stack_top;
-  uint64_t m_captured_regs[10];  // x19-x28
-
   void set_snapshot_root_proc(std::function<void()> callback) { m_snapshot_root_proc = callback; }
   void set_trace_proc(std::function<void(void* obj)> callback) { m_trace_proc = callback; }
   void set_finalize_proc(std::function<void(void* obj)> callback) { m_finalize_proc = callback; }

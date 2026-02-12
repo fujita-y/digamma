@@ -7,6 +7,8 @@
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
+#include <algorithm>
+
 #define DEBUG_CONCURRENT_COLLECT 0
 #define ENSURE_REALTIME          (5.0)  // in msec (1.0 == 0.001sec)
 #define TIMEOUT_CHECK_EACH       (500)
@@ -66,18 +68,32 @@ void concurrent_heap_t::terminate() {
 void concurrent_heap_t::snapshot_stack() {
   uint64_t regs[11];
   capture_arm64_core_state(regs);
-  for (int i = 0; i < array_sizeof(m_captured_regs); i++) m_captured_regs[i] = regs[i];
-  m_thread_stack_top = (void*)regs[array_sizeof(regs) - 1];  // last reg is stack pointer
-  m_thread_stack_bottom = capture_thread_stack_bottom();
+  uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];  // last reg is stack pointer
+  uint64_t thread_stack_bottom = capture_thread_stack_bottom();
+
+  std::vector<uint64_t> raw;
+  raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) raw.push_back(regs[i]);
+  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
+    raw.push_back(addr);
+  }
+  std::vector<uint64_t> candidates;
+  std::copy_if(raw.begin(), raw.end(), std::back_inserter(candidates), [this](uint64_t addr) {
+    if (!m_concurrent_pool->in_pool((void*)addr)) return false;
+    if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
+    return true;
+  });
 
 #ifndef NDEBUG
   printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
-  printf(";; thread stack bottom: %p\n", m_thread_stack_bottom);
-  printf(";; thread stack top: %p\n", m_thread_stack_top);
-  printf(";; thread stack size: %ld\n", (uintptr_t)m_thread_stack_bottom - (uintptr_t)m_thread_stack_top);
+  printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
+  printf(";; thread stack top: %p\n", (void*)thread_stack_top);
+  printf(";; thread stack size: %ld\n", thread_stack_bottom - thread_stack_top);
   printf(";; x19-x28: [");
-  for (int i = 0; i < array_sizeof(m_captured_regs); i++) printf("%p ", (void*)m_captured_regs[i]);
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
+  printf(";; raw size: %ld\n", raw.size());
+  printf(";; candidates size: %ld\n", candidates.size());
 #endif
 }
 
