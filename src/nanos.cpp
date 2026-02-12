@@ -2,10 +2,21 @@
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
 #include "codegen_aux.h"
-#include "codegen_subr.h"
+#include "nanos_subr.h"
 #include "object_heap.h"
 #include "printer.h"
 #include "reader.h"
+
+static void setup_subr() {
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("+"), scm_subr_num_add);
+  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("-"), scm_subr_num_sub);
+  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 2, 0, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("="), scm_subr_num_eq);
+  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil);
+  c_global_set(make_symbol("list"), scm_subr_list);
+}
 
 int main() {
   llvm::InitializeNativeTarget();
@@ -27,15 +38,7 @@ int main() {
   heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 
   // setup SUBR
-
-  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 2, 0, 0, nullptr, scm_nil);
-  c_global_set(make_symbol("+"), scm_subr_num_add);
-
-  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 2, 0, 0, nullptr, scm_nil);
-  c_global_set(make_symbol("-"), scm_subr_num_sub);
-
-  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 2, 0, 0, nullptr, scm_nil);
-  c_global_set(make_symbol("="), scm_subr_num_eq);
+  setup_subr();
 
   puts(";; nanos - a small scheme interpreter for bootstrapping");
 
