@@ -13,6 +13,12 @@
 #endif
 
 uint64_t capture_thread_stack_bottom();
-void capture_arm64_core_state(uint64_t regs[11]);
+void capture_arm64_core_state(uint64_t regs[11]);  // x19-x28, sp
+
+#if USE_TBI
+inline uint64_t prune_memory_address(uint64_t addr) { return addr & ~((uint64_t)0xff << 56); }
+#else
+inline uint64_t prune_memory_address(uint64_t addr) { return addr; }
+#endif
 
 #endif

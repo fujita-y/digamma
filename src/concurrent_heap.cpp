@@ -69,35 +69,29 @@ void concurrent_heap_t::snapshot_stack() {
   capture_arm64_core_state(regs);
   uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];  // last reg is stack pointer
   uint64_t thread_stack_bottom = capture_thread_stack_bottom();
-
   std::vector<uint64_t> raw;
   raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
   for (int i = 0; i < array_sizeof(regs) - 1; i++) {
-#if USE_TBI
-    raw.push_back(regs[i] & 0x1ffffffffffffff);
-#else
-    raw.push_back(regs[i]);
-#endif
+    raw.push_back(prune_memory_address(regs[i]));
   }
   for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
-#if USE_TBI
-    raw.push_back(addr & 0x1ffffffffffffff);
-#else
-    raw.push_back(addr);
-#endif
+    raw.push_back(prune_memory_address(addr));
   }
   std::vector<uint64_t> candidates;
   std::copy_if(raw.begin(), raw.end(), std::back_inserter(candidates), [this](uint64_t addr) {
     if (!m_concurrent_pool->in_pool((void*)addr)) return false;
     if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
     slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
-    uint64_t tag_addr = addr & ~(traits->owner->m_object_size - 1);
-    // bitmap boundary check
-    // check if free
-
+    int object_size = traits->owner->m_object_size;
+    uint64_t aligned = addr & ~(object_size - 1);
+    uint64_t boundary = (uint64_t)traits - traits->owner->m_bitmap_size;
+    if (aligned + object_size >= boundary) return false;
+    if (*(uint64_t*)aligned == 0) return false;
     return true;
   });
-
+  for (uint64_t addr : candidates) {
+    enqueue_root((void*)addr);
+  }
 #ifndef NDEBUG
   printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
   printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
@@ -106,8 +100,7 @@ void concurrent_heap_t::snapshot_stack() {
   printf(";; x19-x28: [");
   for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
-  printf(";; raw size: %ld\n", raw.size());
-  printf(";; candidates size: %ld\n", candidates.size());
+  printf(";; raw size: %ld candidates size: %ld\n", raw.size(), candidates.size());
 #endif
 }
 
