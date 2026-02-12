@@ -5,13 +5,8 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
+#include "arch_arm64.h"
 #include "mutex.h"
-
-#if defined(NDEBUG)
-  #define USE_TBI 1
-#else
-  #define USE_TBI 0
-#endif
 
 /*
 

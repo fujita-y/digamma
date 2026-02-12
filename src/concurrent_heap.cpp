@@ -3,11 +3,10 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
+#include <algorithm>
 #include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
-
-#include <algorithm>
 
 #define DEBUG_CONCURRENT_COLLECT 0
 #define ENSURE_REALTIME          (5.0)  // in msec (1.0 == 0.001sec)
@@ -73,14 +72,29 @@ void concurrent_heap_t::snapshot_stack() {
 
   std::vector<uint64_t> raw;
   raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
-  for (int i = 0; i < array_sizeof(regs) - 1; i++) raw.push_back(regs[i]);
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) {
+#if USE_TBI
+    raw.push_back(regs[i] & 0x1ffffffffffffff);
+#else
+    raw.push_back(regs[i]);
+#endif
+  }
   for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
+#if USE_TBI
+    raw.push_back(addr & 0x1ffffffffffffff);
+#else
     raw.push_back(addr);
+#endif
   }
   std::vector<uint64_t> candidates;
   std::copy_if(raw.begin(), raw.end(), std::back_inserter(candidates), [this](uint64_t addr) {
     if (!m_concurrent_pool->in_pool((void*)addr)) return false;
     if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
+    slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
+    uint64_t tag_addr = addr & ~(traits->cache->m_object_size - 1);
+    // bitmap boundary check
+    // check if free
+
     return true;
   });
 

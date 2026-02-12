@@ -199,7 +199,6 @@ void object_heap_t::shade(scm_obj_t obj) {
     return;
   }
   if (!is_heap_object(obj)) return;
-  // TODO: add additional early return if TBI enabled
   m_concurrent_heap.shade(to_address(obj));
 }
 

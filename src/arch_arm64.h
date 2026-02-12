@@ -6,6 +6,12 @@
 
 #include "core.h"
 
+#if defined(NDEBUG)
+  #define USE_TBI 1
+#else
+  #define USE_TBI 0
+#endif
+
 uint64_t capture_thread_stack_bottom();
 void capture_arm64_core_state(uint64_t regs[11]);
 
