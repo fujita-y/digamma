@@ -69,7 +69,7 @@ void object_heap_t::destroy() {
   slab_traits_t* traits = SLAB_TRAITS_OF(m_concurrent_pool.m_pool);
   for (int i = 0; i < m_concurrent_pool.m_pool_watermark; i++) {
     if (GCSLABP(m_concurrent_pool.m_pool[i])) {
-      traits->cache->iterate(m_concurrent_pool.m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT), renounce, NULL);
+      traits->owner->iterate(m_concurrent_pool.m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT), renounce, NULL);
     }
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
@@ -128,7 +128,7 @@ void* object_heap_t::alloc_private(size_t size) {
 void object_heap_t::delete_private(void* obj) {
   assert(m_concurrent_pool.in_slab(obj) && !m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
-  traits->cache->delete_object(obj);
+  traits->owner->delete_object(obj);
 }
 
 void object_heap_t::sweep_symbol_table() {
@@ -139,7 +139,7 @@ void object_heap_t::sweep_symbol_table() {
     assert(is_symbol(value));
     void* p = to_address(value);
     slab_traits_t* traits = SLAB_TRAITS_OF(p);
-    if (traits->cache->state(p)) {
+    if (traits->owner->state(p)) {
       ++it;
     } else {
       it = m_symbol_table.erase(it);
@@ -205,26 +205,26 @@ void object_heap_t::shade(scm_obj_t obj) {
 void object_heap_t::trace(void* obj) {
   assert(m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
-  if (traits->cache->test_and_set_mark(obj)) return;
-  if (traits->cache == &m_cons) {
+  if (traits->owner->test_and_set_mark(obj)) return;
+  if (traits->owner == &m_cons) {
     scm_cons_rec_t* rec = (scm_cons_rec_t*)obj;
     shade(rec->car);
     shade(rec->cdr);
     return;
   }
-  if (traits->cache == &m_cells) {
+  if (traits->owner == &m_cells) {
     scm_cell_rec_t* rec = (scm_cell_rec_t*)obj;
     shade(rec->value);
     return;
   }
-  if (traits->cache == &m_vectors) {
+  if (traits->owner == &m_vectors) {
     scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
     for (int i = 0; i < rec->nsize; i++) {
       shade(rec->elts[i]);
     }
     return;
   }
-  if (traits->cache == &m_hashtables) {
+  if (traits->owner == &m_hashtables) {
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     hashtable_aux_t* aux = rec->aux;
     for (int i = 0; i < aux->capacity * 2; i++) {
@@ -232,14 +232,14 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
-  if (traits->cache == &m_environments) {
+  if (traits->owner == &m_environments) {
     scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
     shade(rec->name);
     shade(rec->variables);
     shade(rec->macros);
     return;
   }
-  if (traits->cache == &m_subrs) {
+  if (traits->owner == &m_subrs) {
     scm_subr_rec_t* rec = (scm_subr_rec_t*)obj;
     shade(rec->name);
     return;
@@ -265,28 +265,28 @@ void object_heap_t::trace(void* obj) {
 void object_heap_t::finalize(void* obj) {
   assert(m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
-  if (traits->cache == &m_symbols) {
+  if (traits->owner == &m_symbols) {
     scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
     delete_private(rec->name);
     return;
   }
-  if (traits->cache == &m_strings) {
+  if (traits->owner == &m_strings) {
     scm_string_rec_t* rec = (scm_string_rec_t*)obj;
     delete_private(rec->name);
     return;
   }
-  if (traits->cache == &m_u8vectors) {
+  if (traits->owner == &m_u8vectors) {
     scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
     delete_private(rec->elts);
     return;
   }
-  if (traits->cache == &m_hashtables) {
+  if (traits->owner == &m_hashtables) {
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     delete_private(rec->aux);
     rec->lock.destroy();
     return;
   }
-  if (traits->cache == &m_vectors) {
+  if (traits->owner == &m_vectors) {
     scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
     delete_private(rec->elts);
     return;

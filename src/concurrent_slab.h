@@ -42,7 +42,7 @@ struct slab_traits_t {  // <- locate to bottom of each slab
   freelist_t* free;
   slab_traits_t* next;
   slab_traits_t* prev;
-  concurrent_slab_t* cache;
+  concurrent_slab_t* owner;
 };
 
 typedef void (*object_iter_proc_t)(void* obj, int size, void* refcon);

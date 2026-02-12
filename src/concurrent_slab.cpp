@@ -141,7 +141,7 @@ void* concurrent_slab_t::new_collectible_object() {
       slab_traits_t* traits = (slab_traits_t*)(slab + SLAB_SIZE - sizeof(slab_traits_t));
       traits->next = traits->prev = traits;
       traits->refc = 1;
-      traits->cache = this;
+      traits->owner = this;
       uint8_t* bitmap = (uint8_t*)traits - m_bitmap_size;
       for (int i = 0; i < m_bitmap_size; i++) bitmap[i] = 0;
       init_freelist(slab, bitmap, traits);
@@ -176,7 +176,7 @@ void* concurrent_slab_t::new_object() {
       slab_traits_t* traits = (slab_traits_t*)(slab + SLAB_SIZE - sizeof(slab_traits_t));
       traits->next = traits->prev = traits;
       traits->refc = 1;
-      traits->cache = this;
+      traits->owner = this;
       init_freelist(slab, (uint8_t*)traits, traits);
       m_vacant = traits;
     }
@@ -307,7 +307,7 @@ void concurrent_slab_t::sweep(void* slab) {
   uint8_t* p = bitmap;
   int refc = traits->refc;
   freelist_t* freelist = traits->free;
-  concurrent_slab_t* cache = traits->cache;
+  concurrent_slab_t* cache = traits->owner;
   do {
     uint8_t bit = 1;
     uint8_t bits = p[0];

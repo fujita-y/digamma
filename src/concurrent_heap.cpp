@@ -91,7 +91,7 @@ void concurrent_heap_t::snapshot_stack() {
     if (!m_concurrent_pool->in_pool((void*)addr)) return false;
     if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
     slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
-    uint64_t tag_addr = addr & ~(traits->cache->m_object_size - 1);
+    uint64_t tag_addr = addr & ~(traits->owner->m_object_size - 1);
     // bitmap boundary check
     // check if free
 
@@ -189,7 +189,7 @@ void concurrent_heap_t::synchronized_collect() {
     if (m_collector_terminating) return;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       uint8_t* slab = m_concurrent_pool->m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT);
-      traits->cache->sweep(slab);
+      traits->owner->sweep(slab);
     }
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
@@ -331,13 +331,13 @@ fallback:
     if (m_collector_terminating) return;
     int memo = m_concurrent_pool->m_pool_usage;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
-      if (SLAB_TRAITS_OF(slab)->cache == NULL) {
+      if (SLAB_TRAITS_OF(slab)->owner == NULL) {
         GCTRACE(";; [collector: wait for mutator complete slab init]\n");
         sched_yield();
         continue;
       }
       debug_check_slab(slab);
-      SLAB_TRAITS_OF(slab)->cache->sweep(slab);
+      SLAB_TRAITS_OF(slab)->owner->sweep(slab);
       slab += SLAB_SIZE;
       i++;
     } else {
@@ -448,7 +448,7 @@ bool concurrent_heap_t::synchronized_mark() {
 void concurrent_heap_t::shade(void* obj) {
   if (SLAB_DATUM_BITS_TEST(obj)) {
     if (m_concurrent_pool->in_pool(obj)) {
-      if (SLAB_TRAITS_OF(obj)->cache->state(obj) == false) {
+      if (SLAB_TRAITS_OF(obj)->owner->state(obj) == false) {
         if (m_mark_sp < m_mark_stack + m_mark_stack_size) {
           *m_mark_sp++ = obj;
           return;
@@ -473,7 +473,7 @@ void concurrent_heap_t::shade(void* obj) {
 void concurrent_heap_t::interior_shade(void* ref) {
   if (ref) {
     assert(m_concurrent_pool->is_collectible(ref));
-    shade(SLAB_TRAITS_OF(ref)->cache->lookup(ref));
+    shade(SLAB_TRAITS_OF(ref)->owner->lookup(ref));
   }
 }
 
@@ -510,9 +510,9 @@ void concurrent_heap_t::write_barrier(void* rhs) {
   if (m_write_barrier) {
     if (SLAB_DATUM_BITS_TEST(rhs)) {
       if (m_concurrent_pool->in_pool(rhs)) {
-        if (SLAB_TRAITS_OF(rhs)->cache->state(rhs) == false) {
+        if (SLAB_TRAITS_OF(rhs)->owner->state(rhs) == false) {
           while (m_shade_queue.wait_lock_try_put(rhs) == false) {
-            if (SLAB_TRAITS_OF(rhs)->cache->state(rhs)) break;
+            if (SLAB_TRAITS_OF(rhs)->owner->state(rhs)) break;
             if (m_stop_the_world) {
               GCTRACE(";; [write-barrier: m_shade_queue overflow, during stop-the-world]\n");
               m_collector_lock.lock();
