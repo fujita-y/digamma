@@ -1173,7 +1173,10 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 void codegen_t::emit_call(const Instruction& inst) { emit_call_common(inst, false); }
 
 // Tail call a closure with arguments from registers
-void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst, true); }
+void codegen_t::emit_tail_call(const Instruction& inst) {
+  emit_call_common(inst, true);
+  //  emit_ret(inst);
+}
 
 // Load free variable from closure environment
 void codegen_t::emit_closure_ref(const Instruction& inst) {
