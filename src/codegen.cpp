@@ -594,9 +594,110 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
   set_reg(fixed_argc, rest_list);
 }
 
+void codegen_t::analyze_closure_labels() {
+  struct State {
+    std::map<int, scm_obj_t> regs;
+    std::map<scm_obj_t, scm_obj_t> globals;
+
+    bool merge(const State& other) {
+      bool changed = false;
+      for (auto const& [reg, label] : other.regs) {
+        if (regs.find(reg) == regs.end()) {
+          regs[reg] = label;
+          changed = true;
+        } else if (regs[reg] != label) {
+          if (regs[reg] != scm_nil) {
+            regs[reg] = scm_nil;
+            changed = true;
+          }
+        }
+      }
+      for (auto const& [var, label] : other.globals) {
+        if (globals.find(var) == globals.end()) {
+          globals[var] = label;
+          changed = true;
+        } else if (globals[var] != label) {
+          if (globals[var] != scm_nil) {
+            globals[var] = scm_nil;
+            changed = true;
+          }
+        }
+      }
+      return changed;
+    }
+  };
+
+  for (auto& func : functions) {
+    std::map<scm_obj_t, State> block_entry_states;
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      State current_state;
+
+      for (size_t i = 0; i < func.instructions.size(); ++i) {
+        auto& inst = func.instructions[i];
+
+        if (inst.op == Opcode::LABEL) {
+          if (block_entry_states[inst.opr1].merge(current_state)) {
+            changed = true;
+          }
+          current_state = block_entry_states[inst.opr1];
+        }
+
+        switch (inst.op) {
+          case Opcode::MAKE_CLOSURE:
+            current_state.regs[inst.rn1] = inst.opr1;
+            break;
+          case Opcode::CLOSURE_SELF:
+            current_state.regs[inst.rn1] = func.label;
+            break;
+          case Opcode::MOV:
+            current_state.regs[inst.rn1] = (current_state.regs.count(inst.rn2) ? current_state.regs[inst.rn2] : scm_nil);
+            break;
+          case Opcode::GLOBAL_SET:
+            current_state.globals[inst.opr1] = (current_state.regs.count(inst.rn1) ? current_state.regs[inst.rn1] : scm_nil);
+            break;
+          case Opcode::GLOBAL_REF:
+            current_state.regs[inst.rn1] = (current_state.globals.count(inst.opr2) ? current_state.globals[inst.opr2] : scm_nil);
+            break;
+          case Opcode::CALL:
+          case Opcode::TAIL_CALL:
+            if (current_state.regs.count(inst.rn1)) {
+              inst.closure_label = current_state.regs[inst.rn1];
+            } else {
+              inst.closure_label = scm_nil;
+            }
+            break;
+          case Opcode::JUMP:
+            if (block_entry_states[inst.opr1].merge(current_state)) {
+              changed = true;
+            }
+            current_state = State();  // Conservative: reset state after jump if not fall-through
+            break;
+          case Opcode::IF:
+            if (block_entry_states[inst.opr1].merge(current_state)) {
+              changed = true;
+            }
+            if (block_entry_states[inst.opr2].merge(current_state)) {
+              changed = true;
+            }
+            // State continues for fall-through (though in this IR IF usually has two labels)
+            break;
+          default:
+            if (inst.rn1 != -1) {
+              current_state.regs[inst.rn1] = scm_nil;
+            }
+            break;
+        }
+      }
+    }
+  }
+}
+
 intptr_t codegen_t::compile(scm_obj_t inst_list) {
   phase0_create_module();
   phase1_parse_instructions(inst_list);
+  analyze_closure_labels();
   phase2_create_functions();
   phase3_generate_code();
   phase4_optimize_and_verify();

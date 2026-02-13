@@ -50,6 +50,7 @@ struct Instruction {
   int argc = 0;
   bool has_rest = false;
   scm_obj_t free_indices = scm_nil;
+  scm_obj_t closure_label = scm_nil;
 };
 
 class codegen_t {
@@ -181,6 +182,9 @@ class codegen_t {
 
   // Opcode map for faster lookup
   std::map<scm_obj_t, Opcode> opcode_map;
+
+  // Analysis pass
+  void analyze_closure_labels();
 
   // Compilation phases
   void phase0_create_module();
