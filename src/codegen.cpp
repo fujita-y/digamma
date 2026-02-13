@@ -664,6 +664,7 @@ void codegen_t::phase2_create_functions() {
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
     llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, label_name_str, module);
+    closure_func->setCallingConv(llvm::CallingConv::Tail);
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
 
@@ -1115,10 +1116,10 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 
     llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
     llvm::CallInst* call = builder.CreateCall(funcType, func_ptr, args, is_tail ? "rest_tail_call_result" : "rest_call_result");
+    call->setCallingConv(llvm::CallingConv::Tail);
     rest_result = call;
 
     if (is_tail) {
-      call->setTailCallKind(llvm::CallInst::TCK_Tail);
       builder.CreateRet(call);
     } else {
       builder.CreateBr(merge_block);
@@ -1145,11 +1146,11 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
     llvm::Value* normal_func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(normalFuncType, 0));
     llvm::CallInst* call =
         builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, is_tail ? "normal_tail_call_result" : "normal_call_result");
+    call->setCallingConv(llvm::CallingConv::Tail);
     normal_result = call;
 
     if (is_tail) {
-      // call->setTailCallKind(llvm::CallInst::TCK_MustTail);
-      call->setTailCallKind(llvm::CallInst::TCK_Tail);
+      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
       builder.CreateRet(call);
     } else {
       builder.CreateBr(merge_block);
@@ -1173,10 +1174,7 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 void codegen_t::emit_call(const Instruction& inst) { emit_call_common(inst, false); }
 
 // Tail call a closure with arguments from registers
-void codegen_t::emit_tail_call(const Instruction& inst) {
-  emit_call_common(inst, true);
-  //  emit_ret(inst);
-}
+void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst, true); }
 
 // Load free variable from closure environment
 void codegen_t::emit_closure_ref(const Instruction& inst) {
