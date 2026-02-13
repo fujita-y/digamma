@@ -186,6 +186,9 @@ class codegen_t {
   // Analysis pass
   void analyze_closure_labels();
 
+  // Dump instructions for debugging
+  void dump_instructions(const std::vector<Instruction>& instructions);
+
   // Compilation phases
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);

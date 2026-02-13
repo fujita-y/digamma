@@ -4,6 +4,9 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "object_heap.h"
+#include "printer.h"
+
+#include <fstream>
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
@@ -694,10 +697,31 @@ void codegen_t::analyze_closure_labels() {
   }
 }
 
+void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) {
+  std::ofstream ofs("/tmp/nanous.ins", std::ios::app);
+  if (!ofs.is_open()) return;
+  printer_t printer(ofs);
+  for (const auto& inst : instructions) {
+    printer.print(inst.original);
+    if (inst.closure_label != scm_nil) {
+      ofs << " ; closure_label: ";
+      printer.print(inst.closure_label);
+    }
+    ofs << "\n";
+  }
+}
+
 intptr_t codegen_t::compile(scm_obj_t inst_list) {
   phase0_create_module();
   phase1_parse_instructions(inst_list);
   analyze_closure_labels();
+  // Clear the file before dumping all functions
+  {
+    std::ofstream ofs("/tmp/nanous.ins", std::ios::trunc);
+  }
+  for (const auto& func : functions) {
+    dump_instructions(func.instructions);
+  }
   phase2_create_functions();
   phase3_generate_code();
   phase4_optimize_and_verify();
@@ -1272,10 +1296,28 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 }
 
 // Call a closure with arguments from registers
-void codegen_t::emit_call(const Instruction& inst) { emit_call_common(inst, false); }
+void codegen_t::emit_call(const Instruction& inst) {
+  if (inst.closure_label == scm_nil) {
+    printf("emit_call: no\n");
+  } else {
+    scm_symbol_rec_t* sym = (scm_symbol_rec_t*)to_address(inst.closure_label);
+    printf("emit_call: %s\n", sym->name);
+  }
+
+  emit_call_common(inst, false);
+}
 
 // Tail call a closure with arguments from registers
-void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst, true); }
+void codegen_t::emit_tail_call(const Instruction& inst) {
+  if (inst.closure_label == scm_nil) {
+    printf("emit_tail_call: no\n");
+  } else {
+    scm_symbol_rec_t* sym = (scm_symbol_rec_t*)to_address(inst.closure_label);
+    printf("emit_tail_call: %s\n", sym->name);
+  }
+
+  emit_call_common(inst, true);
+}
 
 // Load free variable from closure environment
 void codegen_t::emit_closure_ref(const Instruction& inst) {
