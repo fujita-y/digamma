@@ -104,6 +104,8 @@ class codegen_t {
   // The 'self' argument of the current closure function
   llvm::Value* current_closure_self = nullptr;
 
+  friend class ClosureAnalysisTest;
+
   struct FunctionInfo {
     llvm::Function* llvm_function = nullptr;
     std::vector<Instruction> instructions;

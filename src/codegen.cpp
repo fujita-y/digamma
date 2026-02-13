@@ -598,6 +598,8 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
 }
 
 void codegen_t::analyze_closure_labels() {
+  std::map<scm_obj_t, scm_obj_t> global_closure_defs;
+
   struct State {
     std::map<int, scm_obj_t> regs;
     std::map<scm_obj_t, scm_obj_t> globals;
@@ -659,9 +661,18 @@ void codegen_t::analyze_closure_labels() {
             break;
           case Opcode::GLOBAL_SET:
             current_state.globals[inst.opr1] = (current_state.regs.count(inst.rn1) ? current_state.regs[inst.rn1] : scm_nil);
+            if (current_state.regs.count(inst.rn1) && current_state.regs[inst.rn1] != scm_nil) {
+              global_closure_defs[inst.opr1] = current_state.regs[inst.rn1];
+            }
             break;
           case Opcode::GLOBAL_REF:
-            current_state.regs[inst.rn1] = (current_state.globals.count(inst.opr2) ? current_state.globals[inst.opr2] : scm_nil);
+            if (current_state.globals.count(inst.opr2)) {
+              current_state.regs[inst.rn1] = current_state.globals[inst.opr2];
+            } else if (global_closure_defs.count(inst.opr2)) {
+              current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
+            } else {
+              current_state.regs[inst.rn1] = scm_nil;
+            }
             break;
           case Opcode::CALL:
           case Opcode::TAIL_CALL:
@@ -1296,28 +1307,10 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 }
 
 // Call a closure with arguments from registers
-void codegen_t::emit_call(const Instruction& inst) {
-  if (inst.closure_label == scm_nil) {
-    printf("emit_call: no\n");
-  } else {
-    scm_symbol_rec_t* sym = (scm_symbol_rec_t*)to_address(inst.closure_label);
-    printf("emit_call: %s\n", sym->name);
-  }
-
-  emit_call_common(inst, false);
-}
+void codegen_t::emit_call(const Instruction& inst) { emit_call_common(inst, false); }
 
 // Tail call a closure with arguments from registers
-void codegen_t::emit_tail_call(const Instruction& inst) {
-  if (inst.closure_label == scm_nil) {
-    printf("emit_tail_call: no\n");
-  } else {
-    scm_symbol_rec_t* sym = (scm_symbol_rec_t*)to_address(inst.closure_label);
-    printf("emit_tail_call: %s\n", sym->name);
-  }
-
-  emit_call_common(inst, true);
-}
+void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst, true); }
 
 // Load free variable from closure environment
 void codegen_t::emit_closure_ref(const Instruction& inst) {
