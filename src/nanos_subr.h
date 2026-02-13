@@ -19,5 +19,5 @@ extern "C" scm_obj_t subr_pair_p(scm_obj_t self, scm_obj_t a1);
 extern "C" scm_obj_t subr_null_p(scm_obj_t self, scm_obj_t a1);
 extern "C" scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1);
 extern "C" scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1);
-
+extern "C" scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 #endif  // CODEGEN_SUBR_H_INCLUDED

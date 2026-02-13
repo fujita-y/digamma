@@ -1148,7 +1148,8 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
     normal_result = call;
 
     if (is_tail) {
-      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      // call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      call->setTailCallKind(llvm::CallInst::TCK_Tail);
       builder.CreateRet(call);
     } else {
       builder.CreateBr(merge_block);

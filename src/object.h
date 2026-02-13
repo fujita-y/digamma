@@ -225,4 +225,7 @@ inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_add
 inline scm_obj_t cell_value(scm_obj_t x) { return ((scm_cell_rec_t*)to_address(x))->value; }
 void cell_value_set(scm_obj_t x, scm_obj_t v);
 
+inline int closure_argc(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->argc; }
+inline int closure_rest(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->rest; }
+inline int closure_nsize(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nsize; }
 #endif

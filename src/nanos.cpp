@@ -32,6 +32,8 @@ static void setup_subr() {
   c_global_set(make_symbol("cadr"), scm_subr_cadr);
   scm_obj_t scm_subr_caddr = c_make_closure_s1((void*)subr_caddr, 1);
   c_global_set(make_symbol("caddr"), scm_subr_caddr);
+  scm_obj_t scm_subr_cons = c_make_closure_s1((void*)subr_cons, 2);
+  c_global_set(make_symbol("cons"), scm_subr_cons);
 }
 
 int main() {

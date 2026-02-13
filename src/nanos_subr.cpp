@@ -51,6 +51,8 @@ extern "C" scm_obj_t subr_cdr(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("cdr: argument must be a cons cell");
 }
 
+extern "C" scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1, a2); }
+
 extern "C" scm_obj_t subr_not(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_false) ? scm_true : scm_false; }
 
 extern "C" scm_obj_t subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return (a1 == a2) ? scm_true : scm_false; }
