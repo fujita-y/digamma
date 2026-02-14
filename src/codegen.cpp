@@ -6,6 +6,7 @@
 #include "object_heap.h"
 #include "printer.h"
 
+#include <cstddef>
 #include <fstream>
 
 #include <llvm/Analysis/CGSCCPassManager.h>
@@ -62,13 +63,15 @@ extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]);
 extern "C" void c_write_barrier(scm_obj_t obj);
 
 // Constants
-static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;      // Offset to untag heap objects
-static constexpr int CLOSURE_CODE_FIELD_OFFSET = 16;  // Offset to 'code' field in scm_closure_rec_t
-static constexpr int CLOSURE_ARGC_FIELD_OFFSET = 24;  // Offset to 'argc' field in scm_closure_rec_t
-static constexpr int CLOSURE_REST_FIELD_OFFSET = 28;  // Offset to 'rest' field in scm_closure_rec_t
-static constexpr int CLOSURE_ENV_FIELD_OFFSET = 40;   // Offset to 'env' field in scm_closure_rec_t
-static constexpr int CELL_VALUE_FIELD_OFFSET = 8;     // Offset to 'value' field in scm_cell_rec_t
-static constexpr int VALIST_BUFFER_SIZE = 256;        // Buffer size for va_list on all platforms
+static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;  // Offset to untag heap objects
+static constexpr int CLOSURE_LITERALS_FIELD_OFFSET = offsetof(scm_closure_rec_t, literals);
+static constexpr int CLOSURE_CODE_FIELD_OFFSET = offsetof(scm_closure_rec_t, code);
+static constexpr int CLOSURE_ARGC_FIELD_OFFSET = offsetof(scm_closure_rec_t, argc);
+static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, rest);
+static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
+static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
+static constexpr int CELL_VALUE_FIELD_OFFSET = offsetof(scm_cell_rec_t, value);
+static constexpr int VALIST_BUFFER_SIZE = 256;  // Buffer size for va_list on all platforms
 
 // scm_closure_rec_t struct layout (for reference):
 //   offset 0:  scm_tc6_t tag       (8 bytes)
