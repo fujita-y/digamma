@@ -316,6 +316,107 @@ int main() {
     return true;
   });
 
+  run_test("GlobalHeapClosure", [](ClosureAnalysisTest& env) -> bool {
+    // Manually bind a closure to a global symbol in the heap
+    scm_obj_t sym = make_symbol("heap-func");
+    scm_obj_t closure = make_closure(nullptr, 2, 0, 0, nullptr, scm_nil);
+    object_heap_t::current()->environment_variable_set(sym, closure);
+
+    // Analyze code that references this heap closure
+    // ((global-ref r0 heap-func) (call r0 2) (ret))
+    env.analyze("((global-ref r0 heap-func) (call r0 2) (ret))");
+
+    const Instruction* call_inst = env.find_first_instruction(Opcode::CALL);
+    if (!call_inst) return false;
+
+    if (call_inst->closure_label == scm_nil) {
+      printf("  closure_label is nil (expected G_heap-func)\n");
+      return false;
+    }
+
+    const char* label_name = (const char*)((scm_symbol_rec_t*)to_address(call_inst->closure_label))->name;
+    if (strcmp(label_name, "heap-func") != 0) {
+      printf("  Expected heap-func, got %s\n", label_name);
+      return false;
+    }
+
+    return true;
+  });
+
+  run_test("GlobalHeapClosureRest", [](ClosureAnalysisTest& env) -> bool {
+    // Manually bind a closure with rest arguments to a global symbol in the heap
+    scm_obj_t sym = make_symbol("heap-func-rest");
+    // make_closure(code, argc, rest, nsize, env, literals)
+    // argc=1, rest=1
+    scm_obj_t closure = make_closure(nullptr, 1, 1, 0, nullptr, scm_nil);
+    object_heap_t::current()->environment_variable_set(sym, closure);
+
+    // Analyze code that references this heap closure
+    // ((global-ref r0 heap-func-rest) (call r0 3) (ret))
+    // Note: call argument count (3) > fixed argc (1), which is valid for rest
+    env.analyze("((global-ref r0 heap-func-rest) (call r0 3) (ret))");
+
+    const Instruction* call_inst = env.find_first_instruction(Opcode::CALL);
+    if (!call_inst) return false;
+
+    if (call_inst->closure_label == scm_nil) {
+      printf("  closure_label is nil (expected G_heap-func-rest)\n");
+      return false;
+    }
+
+    const char* label_name = (const char*)((scm_symbol_rec_t*)to_address(call_inst->closure_label))->name;
+    if (strcmp(label_name, "heap-func-rest") != 0) {
+      printf("  Expected heap-func-rest, got %s\n", label_name);
+      return false;
+    }
+
+    // Check that we correctly identified it has rest arguments
+    if (env.codegen->closure_params.find(call_inst->closure_label) == env.codegen->closure_params.end()) {
+      printf("  closure_params not populated for heap-func-rest\n");
+      return false;
+    }
+    auto params = env.codegen->closure_params[call_inst->closure_label];
+    if (params.first != 1 || params.second != true) {
+      printf("  Expected argc=1, rest=true. Got argc=%d, rest=%d\n", params.first, params.second);
+      return false;
+    }
+
+    return true;
+  });
+
+  run_test("GlobalHeapClosure_WriteRead", [](ClosureAnalysisTest& env) -> bool {
+    // ((make-closure r5 C9 () #f 0 #f)
+    //  (global-set! foo r5)
+    //  (global-ref r3 foo)
+    //  (call r3 0)
+    //  (ret)
+    //  (label C9) (ret))
+    env.analyze(
+        "((make-closure r5 C9 () #f 0 #f) "
+        "(global-set! foo r5) "
+        "(global-ref r3 foo) "
+        "(call r3 0) (ret) "
+        "(label C9) (ret))");
+
+    const Instruction* call_inst = env.find_first_instruction(Opcode::CALL);
+    if (!call_inst) return false;
+
+    if (call_inst->closure_label == scm_nil) {
+      printf("  closure_label is nil (expected C9)\n");
+      return false;
+    }
+
+    // In this case, it should be C9 (the original label), not 'foo' (the global name),
+    // because logic detected it locally.
+    const char* label_name = (const char*)symbol_name(call_inst->closure_label);
+    if (strcmp(label_name, "C9") != 0) {
+      printf("  Expected C9, got %s\n", label_name);
+      return false;
+    }
+
+    return true;
+  });
+
   heap.destroy();
   return some_test_failed ? 1 : 0;
 }

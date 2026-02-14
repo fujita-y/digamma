@@ -673,7 +673,15 @@ void codegen_t::analyze_closure_labels() {
             } else if (global_closure_defs.count(inst.opr2)) {
               current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
             } else {
-              current_state.regs[inst.rn1] = scm_nil;
+              // Try to look up in the global environment
+              scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.opr2);
+              if (is_closure(val)) {
+                current_state.regs[inst.rn1] = inst.opr2;
+                closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
+                // function_map[inst.opr2] = ???
+              } else {
+                current_state.regs[inst.rn1] = scm_nil;
+              }
             }
             break;
           case Opcode::CALL:
@@ -1204,6 +1212,14 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
   // 1. Loading the code pointer from the closure object
   // 2. Checking the rest argument flag at runtime (we know it at compile time)
   // 3. Branching based on the rest flag
+
+  if (inst.closure_label != scm_nil) {
+    printf("closure_label: %s, target_function_map_count: %ld\n", ((scm_symbol_rec_t*)to_address(inst.closure_label))->name,
+           function_map.count(inst.closure_label));
+  } else {
+    printf("closure_label: scm_nil\n");
+  }
+
   if (inst.closure_label != scm_nil && function_map.count(inst.closure_label)) {
     llvm::Function* target_func = function_map[inst.closure_label];
 

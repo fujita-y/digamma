@@ -92,9 +92,6 @@ class codegen_t {
   // Closure literals: label symbol -> literals vector
   std::map<scm_obj_t, scm_obj_t> closure_literals;
 
-  // Closure parameters: label symbol -> {fixed_argc, has_rest}
-  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
-
   // Tracks closure entry points: label symbol -> llvm function
   std::map<scm_obj_t, llvm::Function*> function_map;
 
@@ -204,6 +201,11 @@ class codegen_t {
 
   // Compile a list of instructions
   intptr_t compile(scm_obj_t inst_list);
+
+  // Closure parameters: label symbol -> {fixed_argc, has_rest}
+  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
+
+  friend class ClosureAnalysisTest;
 };
 
 #endif
