@@ -678,7 +678,6 @@ void codegen_t::analyze_closure_labels() {
               if (is_closure(val)) {
                 current_state.regs[inst.rn1] = inst.opr2;
                 closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
-                // function_map[inst.opr2] = ???
               } else {
                 current_state.regs[inst.rn1] = scm_nil;
               }
@@ -1278,6 +1277,97 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
       set_reg(0, call);
     }
     return;
+  }
+
+  // Optimization: global heap closure call
+  // If we know the closure signature but don't have the LLVM Function (because it's outside this module),
+  // we can still emit a direct call to the code pointer, bypassing the runtime check.
+  if (inst.closure_label != scm_nil && closure_params.count(inst.closure_label)) {
+    auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
+
+    // Get closure object from register
+    llvm::Value* closure = get_reg(inst.rn1);
+
+    // Get code pointer from closure struct
+    llvm::Value* code_void_ptr = getClosureCodePtr(closure);
+
+    // Prepare arguments
+    std::vector<llvm::Value*> args;
+
+    // 1. Closure object (self)
+    // For direct calls via pointer, we still need to pass 'self'
+    args.push_back(closure);
+
+    if (has_rest) {
+      // Target expects: (self, argc, argv[])
+      args.push_back(createInt64Constant(context, inst.argc));
+
+      llvm::Value* argv_array = nullptr;
+      if (inst.argc > 0) {
+        argv_array = builder.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+        for (int i = 0; i < inst.argc; i++) {
+          llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
+          builder.CreateStore(get_reg(i), arg_ptr);
+        }
+      } else {
+        argv_array = llvm::ConstantPointerNull::get(llvm::PointerType::get(this->getInt64Type(), 0));
+      }
+      args.push_back(argv_array);
+
+      // Function Type: (int64, int64, int64*) -> int64
+      std::vector<llvm::Type*> paramTypes;
+      paramTypes.push_back(this->getInt64Type());                             // self
+      paramTypes.push_back(this->getInt64Type());                             // argc
+      paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+      llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+
+      // Cast void* code ptr to function ptr
+      llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
+
+      llvm::CallInst* call = builder.CreateCall(funcType, func_ptr, args, is_tail ? "rest_tail_call_opt" : "rest_call_opt");
+      call->setCallingConv(llvm::CallingConv::Tail);
+
+      if (is_tail) {
+        call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+        builder.CreateRet(call);
+      } else {
+        set_reg(0, call);
+      }
+      return;
+
+    } else {
+      // Target expects: (self, arg0, arg1, ...)
+      // Check argument count match
+      if (inst.argc != fixed_argc) {
+        goto fallback;
+      }
+
+      for (int i = 0; i < inst.argc; i++) {
+        args.push_back(get_reg(i));
+      }
+
+      // Function Type: (int64, int64, ...) -> int64
+      std::vector<llvm::Type*> paramTypes;
+      paramTypes.push_back(this->getInt64Type());  // self
+      for (int i = 0; i < fixed_argc; i++) {
+        paramTypes.push_back(this->getInt64Type());
+      }
+      llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+
+      // Cast void* code ptr to function ptr
+      llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
+
+      llvm::CallInst* call = builder.CreateCall(funcType, func_ptr, args, is_tail ? "direct_tail_call_opt" : "direct_call_opt");
+      call->setCallingConv(llvm::CallingConv::Tail);
+
+      if (is_tail) {
+        call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+        builder.CreateRet(call);
+      } else {
+        set_reg(0, call);
+      }
+      return;
+    }
   }
 
 fallback:

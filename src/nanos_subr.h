@@ -7,17 +7,19 @@
 #include "core.h"
 #include "object.h"
 
-extern "C" scm_obj_t subr_num_add(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-extern "C" scm_obj_t subr_num_sub(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-extern "C" scm_obj_t subr_num_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-extern "C" scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
-extern "C" scm_obj_t subr_car(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_cdr(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_not(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-extern "C" scm_obj_t subr_pair_p(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_null_p(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1);
-extern "C" scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-#endif  // CODEGEN_SUBR_H_INCLUDED
+#define SUBR extern "C" __attribute__((preserve_most))
+
+SUBR scm_obj_t subr_num_add(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR scm_obj_t subr_num_sub(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR scm_obj_t subr_num_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR scm_obj_t subr_car(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_cdr(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_not(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR scm_obj_t subr_pair_p(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_null_p(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+#endif  // NANOS_SUBR_H_INCLUDED
