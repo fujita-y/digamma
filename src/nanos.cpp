@@ -1,4 +1,5 @@
 #include "object.h"
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
 #include "codegen_aux.h"
@@ -46,7 +47,8 @@ int main() {
   llvm::Module* module = module_uptr.get();
 
   std::string err_str;
-  llvm::ExecutionEngine* engine = llvm::EngineBuilder(std::move(module_uptr)).setErrorStr(&err_str).create();
+  llvm::ExecutionEngine* engine =
+      llvm::EngineBuilder(std::move(module_uptr)).setErrorStr(&err_str).setCodeModel(llvm::CodeModel::Small).create();
   if (!engine) {
     fprintf(stderr, "Failed to create ExecutionEngine: %s\n", err_str.c_str());
     return 1;
