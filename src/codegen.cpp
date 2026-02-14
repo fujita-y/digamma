@@ -1382,8 +1382,14 @@ fallback:
   llvm::Value* rest_field_ptr_i32 = builder.CreateBitCast(rest_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
   llvm::Value* rest_flag = builder.CreateLoad(builder.getInt32Ty(), rest_field_ptr_i32, "rest");
 
+  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
+  llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+  llvm::Value* cdecl_field_ptr_i32 = builder.CreateBitCast(cdecl_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
+  llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
+
   // Branch based on rest flag
   llvm::Value* is_rest = builder.CreateICmpNE(rest_flag, builder.getInt32(0), "is_rest");
+  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_flag, builder.getInt32(0), "is_cdecl");
 
   llvm::BasicBlock* rest_block = llvm::BasicBlock::Create(context, is_tail ? "rest_tail_call" : "rest_call", current_function);
   llvm::BasicBlock* normal_block = llvm::BasicBlock::Create(context, is_tail ? "normal_tail_call" : "normal_call", current_function);
@@ -1426,13 +1432,46 @@ fallback:
     args.push_back(argv_array);
 
     llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
-    llvm::CallInst* call = builder.CreateCall(funcType, func_ptr, args, is_tail ? "rest_tail_call_result" : "rest_call_result");
-    call->setCallingConv(llvm::CallingConv::Tail);
-    rest_result = call;
 
+    // Handle CDECL vs SCHEME (Tail) calling convention
+    llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(context, "rest_cdecl", current_function);
+    llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(context, "rest_scheme", current_function);
+    llvm::BasicBlock* local_merge = nullptr;
+
+    if (!is_tail) {
+      local_merge = llvm::BasicBlock::Create(context, "rest_local_merge", current_function);
+    }
+
+    // Check cdecl flag
+    builder.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
+
+    // CDECL path - no musttail
+    builder.SetInsertPoint(cdecl_block);
+    llvm::CallInst* call_c = builder.CreateCall(funcType, func_ptr, args, "rest_call_c");
+    call_c->setCallingConv(llvm::CallingConv::C);
     if (is_tail) {
-      builder.CreateRet(call);
+      builder.CreateRet(call_c);
     } else {
+      builder.CreateBr(local_merge);
+    }
+
+    // Scheme path - musttail if tail
+    builder.SetInsertPoint(scheme_block);
+    llvm::CallInst* call_s = builder.CreateCall(funcType, func_ptr, args, "rest_call_s");
+    call_s->setCallingConv(llvm::CallingConv::Tail);
+    if (is_tail) {
+      call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      builder.CreateRet(call_s);
+    } else {
+      builder.CreateBr(local_merge);
+    }
+
+    if (!is_tail) {
+      builder.SetInsertPoint(local_merge);
+      llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "rest_res");
+      phi->addIncoming(call_c, cdecl_block);
+      phi->addIncoming(call_s, scheme_block);
+      rest_result = phi;
       builder.CreateBr(merge_block);
     }
   }
@@ -1455,15 +1494,46 @@ fallback:
     }
 
     llvm::Value* normal_func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(normalFuncType, 0));
-    llvm::CallInst* call =
-        builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, is_tail ? "normal_tail_call_result" : "normal_call_result");
-    call->setCallingConv(llvm::CallingConv::Tail);
-    normal_result = call;
 
+    // Handle CDECL vs SCHEME (Tail) calling convention
+    llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(context, "norm_cdecl", current_function);
+    llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(context, "norm_scheme", current_function);
+    llvm::BasicBlock* local_merge = nullptr;
+
+    if (!is_tail) {
+      local_merge = llvm::BasicBlock::Create(context, "norm_local_merge", current_function);
+    }
+
+    // Check cdecl flag
+    builder.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
+
+    // CDECL path - no musttail
+    builder.SetInsertPoint(cdecl_block);
+    llvm::CallInst* call_c = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_c");
+    call_c->setCallingConv(llvm::CallingConv::C);
     if (is_tail) {
-      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
-      builder.CreateRet(call);
+      builder.CreateRet(call_c);
     } else {
+      builder.CreateBr(local_merge);
+    }
+
+    // Scheme path - musttail if tail
+    builder.SetInsertPoint(scheme_block);
+    llvm::CallInst* call_s = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_s");
+    call_s->setCallingConv(llvm::CallingConv::Tail);
+    if (is_tail) {
+      call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      builder.CreateRet(call_s);
+    } else {
+      builder.CreateBr(local_merge);
+    }
+
+    if (!is_tail) {
+      builder.SetInsertPoint(local_merge);
+      llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "norm_res");
+      phi->addIncoming(call_c, cdecl_block);
+      phi->addIncoming(call_s, scheme_block);
+      normal_result = phi;
       builder.CreateBr(merge_block);
     }
   }
