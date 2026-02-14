@@ -39,32 +39,32 @@ void trace(const char* fmt, ...) {
 
 class ClosureAnalysisTest {
  public:
-  llvm::LLVMContext context;
-  llvm::Module* module;
-  llvm::ExecutionEngine* engine;
+  std::unique_ptr<llvm::orc::LLJIT> jit;
   codegen_t* codegen;
 
   ClosureAnalysisTest() {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
-    module = new llvm::Module("test_module", context);
-    std::string err;
-    engine = llvm::EngineBuilder(std::unique_ptr<llvm::Module>(module)).setErrorStr(&err).setEngineKind(llvm::EngineKind::JIT).create();
-
-    if (!engine) {
-      fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+    auto jit_expected = llvm::orc::LLJITBuilder().create();
+    if (!jit_expected) {
+      fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
       exit(1);
     }
+    jit = std::move(*jit_expected);
 
-    codegen = new codegen_t(context, engine);
+    auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
+    if (!gen) {
+      fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
+      exit(1);
+    }
+    jit->getMainJITDylib().addGenerator(std::move(*gen));
+
+    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+    codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
   }
 
-  ~ClosureAnalysisTest() {
-    delete codegen;
-    // engine takes ownership of module
-    delete engine;
-  }
+  ~ClosureAnalysisTest() { delete codegen; }
 
   scm_obj_t read_code(const std::string& input) {
     std::istringstream is(input);

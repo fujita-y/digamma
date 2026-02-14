@@ -11,11 +11,11 @@
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/OptimizationLevel.h>
 #include <llvm/Passes/PassBuilder.h>
-#include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
@@ -27,7 +27,8 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
-codegen_t::codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee) : context(ctx), builder(ctx), engine(ee) {
+codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
+    : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
   sym_const = make_symbol("const");
   sym_mov = make_symbol("mov");
   sym_if = make_symbol("if");
@@ -49,8 +50,6 @@ codegen_t::codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee) : contex
   sym_make_cell = make_symbol("make-cell");
 
   init_opcode_map();
-
-  llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
 }
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
@@ -527,8 +526,13 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
   if (!func) {
     func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, module);
   }
-  // Map the function to its implementation
-  engine->addGlobalMapping(func, symbol_ptr);
+  // Register the symbol with the JIT's main dylib via absoluteSymbols
+  llvm::orc::SymbolMap symbols;
+  symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
+                                         llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable};
+  if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
+    llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
+  }
   return func;
 }
 
@@ -791,7 +795,7 @@ void codegen_t::phase2_create_functions() {
     FunctionInfo& info = functions[i];
     if (info.label == scm_nil) continue;
 
-    const char* label_name_str = (const char*)symbol_name(info.label);
+    std::string func_name = std::string((const char*)symbol_name(info.label)) + "_" + std::to_string(std::rand());
 
     std::vector<llvm::Type*> paramTypes;
     paramTypes.push_back(this->getInt64Type());  // self
@@ -808,7 +812,7 @@ void codegen_t::phase2_create_functions() {
     }
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
-    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, label_name_str, module);
+    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, module);
     closure_func->setCallingConv(llvm::CallingConv::Tail);
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
@@ -946,21 +950,24 @@ void codegen_t::phase4_optimize_and_verify() {
 }
 
 intptr_t codegen_t::phase5_finalize() {
-  // Transfer module ownership to execution engine and finalize
-  engine->addModule(std::move(current_module_uptr));
-  engine->finalizeObject();
+  // Transfer module to LLJIT
+  std::string main_func_name = main_function->getName().str();
+  auto tsm = llvm::orc::ThreadSafeModule(std::move(current_module_uptr), ts_context);
+  if (auto err = jit->addIRModule(std::move(tsm))) {
+    fatal("%s:%u codegen: failed to add module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+  }
 
-  // Get executable code for main function
-  void* funcPtr = engine->getPointerToFunction(main_function);
-  if (!funcPtr) {
-    fatal("%s:%u codegen: failed to get function pointer for compiled code", __FILE__, __LINE__);
+  // Look up the compiled function
+  auto sym = jit->lookup(main_func_name);
+  if (!sym) {
+    fatal("%s:%u codegen: failed to look up compiled function: %s", __FILE__, __LINE__, llvm::toString(sym.takeError()).c_str());
   }
 
   // Clear local module pointers
   this->module = nullptr;
   this->main_function = nullptr;
 
-  auto func = (intptr_t (*)())funcPtr;
+  auto func = sym->toPtr<intptr_t()>();
   return func();
 }
 
@@ -1211,13 +1218,6 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
   // 1. Loading the code pointer from the closure object
   // 2. Checking the rest argument flag at runtime (we know it at compile time)
   // 3. Branching based on the rest flag
-
-  if (inst.closure_label != scm_nil) {
-    printf("closure_label: %s, target_function_map_count: %ld\n", ((scm_symbol_rec_t*)to_address(inst.closure_label))->name,
-           function_map.count(inst.closure_label));
-  } else {
-    printf("closure_label: scm_nil\n");
-  }
 
   // Check if it is a global closure (known at compile time but not in this module's function_map)
   if (inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) {

@@ -7,7 +7,7 @@
 #include "core.h"
 #include "object.h"
 
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -54,8 +54,9 @@ struct Instruction {
 };
 
 class codegen_t {
+  llvm::orc::ThreadSafeContext ts_context;
   llvm::LLVMContext& context;
-  llvm::ExecutionEngine* engine;
+  llvm::orc::LLJIT* jit;
   llvm::IRBuilder<> builder;
   llvm::Module* module = nullptr;  // Current module being compiled
   std::unique_ptr<llvm::Module> current_module_uptr;
@@ -197,7 +198,7 @@ class codegen_t {
   intptr_t phase5_finalize();
 
  public:
-  codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee);
+  codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit);
 
   // Compile a list of instructions
   intptr_t compile(scm_obj_t inst_list);

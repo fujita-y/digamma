@@ -1,5 +1,5 @@
 #include "object.h"
-#include <llvm/Support/CodeGen.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
 #include "codegen_aux.h"
@@ -42,17 +42,20 @@ int main() {
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
 
-  llvm::LLVMContext context;
-  auto module_uptr = std::make_unique<llvm::Module>("nanos_module", context);
-  llvm::Module* module = module_uptr.get();
-
-  std::string err_str;
-  llvm::ExecutionEngine* engine =
-      llvm::EngineBuilder(std::move(module_uptr)).setErrorStr(&err_str).setCodeModel(llvm::CodeModel::Small).create();
-  if (!engine) {
-    fprintf(stderr, "Failed to create ExecutionEngine: %s\n", err_str.c_str());
+  auto jit_expected = llvm::orc::LLJITBuilder().create();
+  if (!jit_expected) {
+    fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
     return 1;
   }
+  auto jit = std::move(*jit_expected);
+
+  // Allow the JIT to find symbols in the current process
+  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
+  if (!gen) {
+    fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
+    return 1;
+  }
+  jit->getMainJITDylib().addGenerator(std::move(*gen));
 
   object_heap_t heap;
   heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
@@ -68,7 +71,8 @@ int main() {
   puts(";; USE_TBI == 0");
 #endif
 
-  codegen_t codegen(context, engine);
+  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+  codegen_t codegen(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
