@@ -145,6 +145,7 @@ struct scm_closure_rec_t {
   void* code;
   int argc;
   int rest;
+  int cdecl;
   int nsize;
   scm_obj_t env[1];  // free variables
 };
@@ -201,7 +202,7 @@ scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
-scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }

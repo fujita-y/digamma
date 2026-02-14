@@ -72,7 +72,7 @@ static bool test_gc_allocation(int num_loops) {
   scm_obj_t ht = make_hashtable(string_hash, string_equiv, 16);
   hashtable_set(ht, make_string("key"), make_string("value"));
 
-  scm_obj_t clos = make_closure(subr_stub_ptr, 1, 0, 0, NULL, scm_unspecified);
+  scm_obj_t clos = make_closure(subr_stub_ptr, 1, 0, 0, NULL, scm_unspecified, 0);
 
   scm_obj_t env = make_environment(make_string("my-env"));
 
@@ -100,7 +100,7 @@ static bool test_gc_allocation(int num_loops) {
     scm_obj_t closure_env[2];
     closure_env[0] = make_fixnum(10);
     closure_env[1] = make_symbol("hello");
-    make_closure(NULL, 0, 0, 2, closure_env, scm_true);
+    make_closure(NULL, 0, 0, 2, closure_env, scm_true, 0);
 
     // Additional garbage types
     make_vector(10, make_fixnum(i));
@@ -108,7 +108,7 @@ static bool test_gc_allocation(int num_loops) {
     make_flonum(1.2345 + i);
     make_u8vector(100);
     make_hashtable(string_hash, string_equiv, 4);
-    make_closure(NULL, 0, 0, 0, NULL, scm_false);
+    make_closure(NULL, 0, 0, 0, NULL, scm_false, 0);
     make_environment(make_string("garbage-env"));
 
     if (!is_cons(obj)) {

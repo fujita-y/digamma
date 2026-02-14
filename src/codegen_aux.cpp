@@ -7,12 +7,12 @@
 #include "object_heap.h"
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals) {
-  return make_closure(code, argc, rest, nsize, env, literals);
+  return make_closure(code, argc, rest, nsize, env, literals, 0);
 }
 
-extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil); }
+extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil, 0); }
 
-extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, literals); }
+extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, literals, 0); }
 
 extern "C" void c_global_set(scm_obj_t key, scm_obj_t value) {
   assert(is_symbol(key));
