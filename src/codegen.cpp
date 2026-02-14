@@ -1219,6 +1219,96 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
     printf("closure_label: scm_nil\n");
   }
 
+  // Check if it is a global closure (known at compile time but not in this module's function_map)
+  if (inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) {
+    // Attempt to resolve it as a global closure
+    if (closure_params.find(inst.closure_label) != closure_params.end()) {
+      auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
+
+      // Retrieve the actual closure object to get code pointer and cdecl
+      scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.closure_label);
+      if (is_closure(val)) {
+        scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
+        void* code_ptr = closure_rec->code;
+        int cdecl = closure_rec->cdecl;
+
+        // Construct function type
+        llvm::Type* retType = this->getInt64Type();
+        std::vector<llvm::Type*> paramTypes;
+
+        // Self argument
+        paramTypes.push_back(this->getInt64Type());
+
+        if (has_rest) {
+          // (self, argc, argv[])
+          paramTypes.push_back(this->getInt64Type());                             // argc
+          paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+        } else {
+          // (self, arg0, arg1, ...)
+          for (int i = 0; i < fixed_argc; i++) {
+            paramTypes.push_back(this->getInt64Type());
+          }
+        }
+
+        llvm::FunctionType* funcType = llvm::FunctionType::get(retType, paramTypes, false);
+
+        // Prepare arguments
+        std::vector<llvm::Value*> args;
+        args.push_back(get_reg(inst.rn1));  // self
+
+        if (has_rest) {
+          args.push_back(createInt64Constant(context, inst.argc));
+          llvm::Value* argv_array = nullptr;
+          if (inst.argc > 0) {
+            argv_array = builder.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+            for (int i = 0; i < inst.argc; i++) {
+              llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
+              builder.CreateStore(get_reg(i), arg_ptr);
+            }
+          } else {
+            argv_array = llvm::ConstantPointerNull::get(llvm::PointerType::get(this->getInt64Type(), 0));
+          }
+          args.push_back(argv_array);
+        } else {
+          if (inst.argc != fixed_argc) {
+            // Mismatch in argument count for fixed-arity function -> fallback to runtime error
+            goto fallback;
+          }
+          for (int i = 0; i < inst.argc; i++) {
+            args.push_back(get_reg(i));
+          }
+        }
+
+        // Create function pointer
+        llvm::Value* funcPtr = createInt64Constant(context, (uint64_t)code_ptr);
+        llvm::Value* typedFuncPtr = builder.CreateIntToPtr(funcPtr, llvm::PointerType::get(funcType, 0));
+
+        // Emit call
+        // If cdecl == 0 (Scheme), use tailcc. If cdecl == 1 (C), use generic ccc.
+        llvm::CallInst* call = builder.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
+
+        if (cdecl == 0) {
+          call->setCallingConv(llvm::CallingConv::Tail);
+          if (is_tail) {
+            call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+            builder.CreateRet(call);
+          } else {
+            set_reg(0, call);
+          }
+        } else {
+          // cdecl == 1: C calling convention (default)
+          call->setCallingConv(llvm::CallingConv::C);
+          if (is_tail) {
+            builder.CreateRet(call);
+          } else {
+            set_reg(0, call);
+          }
+        }
+        return;
+      }
+    }
+  }
+
   if (inst.closure_label != scm_nil && function_map.count(inst.closure_label)) {
     llvm::Function* target_func = function_map[inst.closure_label];
 
