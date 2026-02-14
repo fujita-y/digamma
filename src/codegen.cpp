@@ -55,7 +55,6 @@ codegen_t::codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee) : contex
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
 extern "C" void c_global_set(scm_obj_t key, scm_obj_t value);
-extern "C" scm_obj_t c_global_ref(scm_obj_t key);
 extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
 
 extern "C" scm_obj_t c_make_cell(scm_obj_t value);
@@ -1197,7 +1196,75 @@ void codegen_t::emit_global_ref(const Instruction& inst) {
   set_reg(inst.rn1, val);
 }
 
+// Common logic for call and tail-call
 void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
+  // Optimization: specific closure call
+  // If we know the closure label, we can call the function directly
+  // This avoids:
+  // 1. Loading the code pointer from the closure object
+  // 2. Checking the rest argument flag at runtime (we know it at compile time)
+  // 3. Branching based on the rest flag
+  if (inst.closure_label != scm_nil && function_map.count(inst.closure_label)) {
+    llvm::Function* target_func = function_map[inst.closure_label];
+
+    // Get closure parameters from compile-time info
+    if (closure_params.find(inst.closure_label) == closure_params.end()) {
+      fatal("%s:%u codegen: closure params not found for label", __FILE__, __LINE__);
+    }
+    auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
+
+    // Prepare arguments
+    std::vector<llvm::Value*> args;
+
+    // 1. Closure object (self)
+    args.push_back(get_reg(inst.rn1));
+
+    if (has_rest) {
+      // Target expects: (self, argc, argv[])
+      // We need to pack our register arguments into an array
+
+      args.push_back(createInt64Constant(context, inst.argc));
+
+      llvm::Value* argv_array = nullptr;
+      if (inst.argc > 0) {
+        argv_array = builder.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+        for (int i = 0; i < inst.argc; i++) {
+          llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
+          builder.CreateStore(get_reg(i), arg_ptr);
+        }
+      } else {
+        argv_array = llvm::ConstantPointerNull::get(llvm::PointerType::get(this->getInt64Type(), 0));
+      }
+      args.push_back(argv_array);
+
+    } else {
+      // Target expects: (self, arg0, arg1, ...)
+      // Pass arguments directly
+      // Note: target function has fixed_argc + 1 parameters (including self).
+      // The call instruction has inst.argc arguments.
+      // If inst.argc != fixed_argc, fall back to generic call to let runtime handle error.
+      if (inst.argc != fixed_argc) {
+        goto fallback;
+      }
+
+      for (int i = 0; i < inst.argc; i++) {
+        args.push_back(get_reg(i));
+      }
+    }
+
+    llvm::CallInst* call = builder.CreateCall(target_func, args, is_tail ? "tail_call_opt" : "call_opt");
+    call->setCallingConv(llvm::CallingConv::Tail);
+
+    if (is_tail) {
+      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      builder.CreateRet(call);
+    } else {
+      set_reg(0, call);
+    }
+    return;
+  }
+
+fallback:
   // Get closure object from register
   llvm::Value* closure = get_reg(inst.rn1);
 
