@@ -8,31 +8,31 @@
 #include "reader.h"
 
 static void setup_subr() {
-  scm_obj_t scm_subr_num_add = c_make_closure_s1((void*)subr_num_add, 2);
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 2, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("+"), scm_subr_num_add);
-  scm_obj_t scm_subr_num_sub = c_make_closure_s1((void*)subr_num_sub, 2);
+  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 2, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("-"), scm_subr_num_sub);
-  scm_obj_t scm_subr_num_eq = c_make_closure_s1((void*)subr_num_eq, 2);
+  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 2, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("="), scm_subr_num_eq);
-  scm_obj_t scm_subr_list = c_make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil);
+  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil);
   c_global_set(make_symbol("list"), scm_subr_list);
-  scm_obj_t scm_subr_car = c_make_closure_s1((void*)subr_car, 1);
+  scm_obj_t scm_subr_car = make_closure((void*)subr_car, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("car"), scm_subr_car);
-  scm_obj_t scm_subr_cdr = c_make_closure_s1((void*)subr_cdr, 1);
+  scm_obj_t scm_subr_cdr = make_closure((void*)subr_cdr, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("cdr"), scm_subr_cdr);
-  scm_obj_t scm_subr_not = c_make_closure_s1((void*)subr_not, 1);
+  scm_obj_t scm_subr_not = make_closure((void*)subr_not, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("not"), scm_subr_not);
-  scm_obj_t scm_subr_eq_p = c_make_closure_s1((void*)subr_eq_p, 2);
+  scm_obj_t scm_subr_eq_p = make_closure((void*)subr_eq_p, 2, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("eq?"), scm_subr_eq_p);
-  scm_obj_t scm_subr_pair_p = c_make_closure_s1((void*)subr_pair_p, 1);
+  scm_obj_t scm_subr_pair_p = make_closure((void*)subr_pair_p, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("pair?"), scm_subr_pair_p);
-  scm_obj_t scm_subr_null_p = c_make_closure_s1((void*)subr_null_p, 1);
+  scm_obj_t scm_subr_null_p = make_closure((void*)subr_null_p, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("null?"), scm_subr_null_p);
-  scm_obj_t scm_subr_cadr = c_make_closure_s1((void*)subr_cadr, 1);
+  scm_obj_t scm_subr_cadr = make_closure((void*)subr_cadr, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("cadr"), scm_subr_cadr);
-  scm_obj_t scm_subr_caddr = c_make_closure_s1((void*)subr_caddr, 1);
+  scm_obj_t scm_subr_caddr = make_closure((void*)subr_caddr, 1, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("caddr"), scm_subr_caddr);
-  scm_obj_t scm_subr_cons = c_make_closure_s1((void*)subr_cons, 2);
+  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil);
   c_global_set(make_symbol("cons"), scm_subr_cons);
 }
 

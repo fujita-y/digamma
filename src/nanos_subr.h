@@ -7,7 +7,7 @@
 #include "core.h"
 #include "object.h"
 
-#define SUBR extern "C" __attribute__((preserve_most))
+#define SUBR extern "C"
 
 SUBR scm_obj_t subr_num_add(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR scm_obj_t subr_num_sub(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
