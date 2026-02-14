@@ -156,14 +156,6 @@ struct scm_environment_rec_t {
   scm_obj_t macros;     // hashtable
 };
 
-struct scm_subr_rec_t {
-  scm_tc6_t tag;
-  scm_obj_t name;
-  int argc;
-  int rest;
-  void* code;
-};
-
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -211,7 +203,6 @@ scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
 scm_obj_t make_environment(scm_obj_t name);
-scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

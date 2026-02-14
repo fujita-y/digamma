@@ -55,7 +55,6 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
   m_environments.init(&m_concurrent_heap, clp2(sizeof(scm_environment_rec_t)), true, false);
-  m_subrs.init(&m_concurrent_heap, clp2(sizeof(scm_subr_rec_t)), true, false);
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
@@ -237,11 +236,6 @@ void object_heap_t::trace(void* obj) {
     shade(rec->name);
     shade(rec->variables);
     shade(rec->macros);
-    return;
-  }
-  if (traits->owner == &m_subrs) {
-    scm_subr_rec_t* rec = (scm_subr_rec_t*)obj;
-    shade(rec->name);
     return;
   }
 

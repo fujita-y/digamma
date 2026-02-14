@@ -207,34 +207,6 @@ static bool test_cell(int64_t val) {
   return true;
 }
 
-static bool test_subr(const char* name, int argc, int rest, void* code) {
-  scm_obj_t x1 = make_symbol(name);
-  scm_obj_t x2 = make_subr(x1, argc, rest, code);
-  if (!is_subr(x2)) {
-    printf("\033[31m###### subr failed: is_subr returned false\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  scm_subr_rec_t* rec = (scm_subr_rec_t*)to_address(x2);
-  if (rec->name != x1) {
-    printf("\033[31m###### subr failed: name mismatch\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  if (rec->argc != argc) {
-    printf("\033[31m###### subr failed: argc mismatch\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  if (rec->code != code) {
-    printf("\033[31m###### subr failed: code mismatch\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32msubr passed: %s\033[0m\n", name);
-  return true;
-}
-
 int main(int argc, char** argv) {
   object_heap_t heap;
   heap.init(1024 * 1024 * 2, 1024 * 1024);
@@ -275,9 +247,6 @@ int main(int argc, char** argv) {
   test_cell(100);
   test_cell(-50);
   test_cell_heap("hello world");
-
-  test_subr("car", 1, 0, (void*)0x12345678);
-  test_subr("cdr", 1, 0, (void*)0x87654321);
 
   heap.destroy();
 

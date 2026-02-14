@@ -209,14 +209,3 @@ scm_obj_t make_list(int len, ...) {
   va_end(ap);
   return (scm_obj_t)rec;
 }
-
-scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code) {
-  object_heap_t& heap = *object_heap_t::current();
-  scm_subr_rec_t* rec = (scm_subr_rec_t*)heap.alloc_subr();
-  rec->tag = tc6_tag(tc6_subr);
-  rec->name = name;
-  rec->argc = argc;
-  rec->rest = rest;
-  rec->code = code;
-  return tc6_pointer(rec, tc6_subr);
-}
