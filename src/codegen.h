@@ -144,6 +144,37 @@ class codegen_t {
   // Helper to setup rest arguments for a closure function
   void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
 
+  // Helper to parse individual instructions
+  void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
+                   std::vector<scm_obj_t>& current_literals);
+  void parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_jump(const scm_obj_t& inst_obj, Instruction& inst);
+  void parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
+  void parse_ret(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_global_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_global_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_call(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_tail_call(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_self(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_cell_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_cell_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_reg_cell_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_reg_cell_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_make_cell(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+
+  // Helper methods for emit_call_common decomposition
+  void emit_apply_call(const Instruction& inst, bool is_tail);
+  void emit_known_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                              llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block);
+  void emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                                llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
+
   // LLVM type helpers to reduce code duplication
   llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(context); }
   llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(context); }
