@@ -6,6 +6,7 @@
 #include <sstream>
 #include "codegen.h"
 #include "hash.h"
+#include "nanos_subr.h"
 #include "object_heap.h"
 #include "reader.h"
 
@@ -38,6 +39,13 @@ void trace(const char* fmt, ...) {
 }
 
 static bool some_test_failed = false;
+
+static void c_global_set(scm_obj_t sym, scm_obj_t val) {
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  hashtable_set(env_rec->variables, sym, make_cell(val));
+}
 
 class CodegenTest {
  public:
@@ -701,6 +709,58 @@ int main(int argc, char** argv) {
       printf("TailCall: expected 42, got %ld\n", result);
       return false;
     }
+    return true;
+  });
+
+  run_test("ApplyTest", [](CodegenTest& env) -> bool {
+    // Register primitives
+    nanos_set_codegen(env.codegen);
+
+    scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
+    c_global_set(make_symbol("+"), scm_subr_num_add);
+
+    scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
+    c_global_set(make_symbol("list"), scm_subr_list);
+
+    scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+    c_global_set(make_symbol("apply"), scm_subr_apply);
+
+    // Test: (apply + '(1 2))
+    scm_obj_t code1 = env.read_code(
+        "((const r10 (1 2)) "
+        "(global-ref r11 +) "
+        "(global-ref r12 apply) "
+        "(mov r0 r11) "
+        "(mov r1 r10) "
+        "(call r12 2) "
+        "(ret))");
+
+    intptr_t result1 = env.codegen->compile(code1);
+    if (result1 != make_fixnum(3)) {
+      printf("ApplyTest 1 (apply + '(1 2)): expected 3, got %ld\n", result1);
+      return false;
+    }
+
+    // Test: (apply + 1 2 '(3)) => 6
+    scm_obj_t code2 = env.read_code(
+        "((const r10 (3)) "
+        "(const r11 1) "
+        "(const r12 2) "
+        "(global-ref r13 +) "
+        "(global-ref r14 apply) "
+        "(mov r0 r13) "
+        "(mov r1 r11) "
+        "(mov r2 r12) "
+        "(mov r3 r10) "
+        "(call r14 4) "
+        "(ret))");
+
+    intptr_t result2 = env.codegen->compile(code2);
+    if (result2 != make_fixnum(6)) {
+      printf("ApplyTest 2 (apply + 1 2 '(3)): expected 6, got %ld\n", result2);
+      return false;
+    }
+
     return true;
   });
 

@@ -9,11 +9,11 @@
 #include "reader.h"
 
 static void setup_subr() {
-  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 2, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
-  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 2, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("-"), scm_subr_num_sub);
-  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 2, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("="), scm_subr_num_eq);
   scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("list"), scm_subr_list);
@@ -35,6 +35,8 @@ static void setup_subr() {
   c_global_set(make_symbol("caddr"), scm_subr_caddr);
   scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("cons"), scm_subr_cons);
+  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("apply"), scm_subr_apply);
 }
 
 int main() {
@@ -73,6 +75,7 @@ int main() {
 
   auto ts_ctx = std::make_unique<llvm::LLVMContext>();
   codegen_t codegen(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+  nanos_set_codegen(&codegen);
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
