@@ -220,6 +220,3 @@ target_link_libraries(test_closure_analysis PRIVATE nanos_io)
 
 add_nanos_test(test_codegen tests/test_codegen.cpp)
 target_link_libraries(test_codegen PRIVATE nanos_io)
-
-add_nanos_test(repro_musttail_apply tests/repro_musttail_apply.cpp)
-target_link_libraries(repro_musttail_apply PRIVATE nanos_io)

@@ -432,17 +432,17 @@ test_codegen/fast:
 .PHONY : test_codegen/fast
 
 #=============================================================================
-# Target rules for targets named repro_apply
+# Target rules for targets named repro_musttail_apply
 
 # Build rule for target.
-repro_apply: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 repro_apply
-.PHONY : repro_apply
+repro_musttail_apply: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 repro_musttail_apply
+.PHONY : repro_musttail_apply
 
 # fast build rule for target.
-repro_apply/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_apply.dir/build.make CMakeFiles/repro_apply.dir/build
-.PHONY : repro_apply/fast
+repro_musttail_apply/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_musttail_apply.dir/build.make CMakeFiles/repro_musttail_apply.dir/build
+.PHONY : repro_musttail_apply/fast
 
 src/arch_arm64.o: src/arch_arm64.cpp.o
 .PHONY : src/arch_arm64.o
@@ -828,29 +828,29 @@ src/vector.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/nanos_core.dir/build.make CMakeFiles/nanos_core.dir/src/vector.cpp.s
 .PHONY : src/vector.cpp.s
 
-tests/repro_apply.o: tests/repro_apply.cpp.o
-.PHONY : tests/repro_apply.o
+tests/repro_musttail_apply.o: tests/repro_musttail_apply.cpp.o
+.PHONY : tests/repro_musttail_apply.o
 
 # target to build an object file
-tests/repro_apply.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_apply.dir/build.make CMakeFiles/repro_apply.dir/tests/repro_apply.cpp.o
-.PHONY : tests/repro_apply.cpp.o
+tests/repro_musttail_apply.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_musttail_apply.dir/build.make CMakeFiles/repro_musttail_apply.dir/tests/repro_musttail_apply.cpp.o
+.PHONY : tests/repro_musttail_apply.cpp.o
 
-tests/repro_apply.i: tests/repro_apply.cpp.i
-.PHONY : tests/repro_apply.i
+tests/repro_musttail_apply.i: tests/repro_musttail_apply.cpp.i
+.PHONY : tests/repro_musttail_apply.i
 
 # target to preprocess a source file
-tests/repro_apply.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_apply.dir/build.make CMakeFiles/repro_apply.dir/tests/repro_apply.cpp.i
-.PHONY : tests/repro_apply.cpp.i
+tests/repro_musttail_apply.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_musttail_apply.dir/build.make CMakeFiles/repro_musttail_apply.dir/tests/repro_musttail_apply.cpp.i
+.PHONY : tests/repro_musttail_apply.cpp.i
 
-tests/repro_apply.s: tests/repro_apply.cpp.s
-.PHONY : tests/repro_apply.s
+tests/repro_musttail_apply.s: tests/repro_musttail_apply.cpp.s
+.PHONY : tests/repro_musttail_apply.s
 
 # target to generate assembly for a file
-tests/repro_apply.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_apply.dir/build.make CMakeFiles/repro_apply.dir/tests/repro_apply.cpp.s
-.PHONY : tests/repro_apply.cpp.s
+tests/repro_musttail_apply.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/repro_musttail_apply.dir/build.make CMakeFiles/repro_musttail_apply.dir/tests/repro_musttail_apply.cpp.s
+.PHONY : tests/repro_musttail_apply.cpp.s
 
 tests/test_closure_analysis.o: tests/test_closure_analysis.cpp.o
 .PHONY : tests/test_closure_analysis.o
@@ -1138,7 +1138,7 @@ help:
 	@echo "... nanos"
 	@echo "... nanos_core"
 	@echo "... nanos_io"
-	@echo "... repro_apply"
+	@echo "... repro_musttail_apply"
 	@echo "... test_closure_analysis"
 	@echo "... test_codegen"
 	@echo "... test_gc"
@@ -1198,9 +1198,9 @@ help:
 	@echo "... src/vector.o"
 	@echo "... src/vector.i"
 	@echo "... src/vector.s"
-	@echo "... tests/repro_apply.o"
-	@echo "... tests/repro_apply.i"
-	@echo "... tests/repro_apply.s"
+	@echo "... tests/repro_musttail_apply.o"
+	@echo "... tests/repro_musttail_apply.i"
+	@echo "... tests/repro_musttail_apply.s"
 	@echo "... tests/test_closure_analysis.o"
 	@echo "... tests/test_closure_analysis.i"
 	@echo "... tests/test_closure_analysis.s"
