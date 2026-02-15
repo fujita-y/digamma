@@ -44,7 +44,15 @@ int main() {
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
 
-  auto jit_expected = llvm::orc::LLJITBuilder().create();
+  // Configure JIT target machine with small code model
+  auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+  if (!jtmb) {
+    fprintf(stderr, "Failed to detect host target: %s\n", llvm::toString(jtmb.takeError()).c_str());
+    return 1;
+  }
+  jtmb->setCodeModel(llvm::CodeModel::Small);
+
+  auto jit_expected = llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(*jtmb)).create();
   if (!jit_expected) {
     fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
     return 1;
