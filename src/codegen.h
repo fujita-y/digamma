@@ -82,7 +82,8 @@ class codegen_t {
   scm_obj_t sym_tail_call;
   scm_obj_t sym_closure_ref;
   scm_obj_t sym_closure_set;
-  scm_obj_t sym_closure_cell_set;  // Added this line
+  scm_obj_t sym_closure_cell_set;
+  scm_obj_t sym_apply;  // Added sym_apply
 
   scm_obj_t sym_closure_self;
   scm_obj_t sym_closure_cell_ref;
@@ -134,6 +135,9 @@ class codegen_t {
 
   // Helper to get or create an external function declaration in the current module
   llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
+
+  // Helper to get or create the fixed-arity apply stub
+  llvm::Function* get_or_create_fixed_apply_stub();
 
   // Helper to create allocas at function entry
   void create_allocas(llvm::Function* f, int num_regs);

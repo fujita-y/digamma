@@ -48,6 +48,7 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
   sym_reg_cell_ref = make_symbol("reg-cell-ref");
   sym_reg_cell_set = make_symbol("reg-cell-set!");
   sym_make_cell = make_symbol("make-cell");
+  sym_apply = make_symbol("apply");  // Added initialization for sym_apply
 
   init_opcode_map();
 }
@@ -102,6 +103,22 @@ static inline scm_obj_t list_nth(scm_obj_t list, int n) {
     curr = CDR(curr);
   }
   return is_cons(curr) ? CAR(curr) : scm_nil;
+}
+
+extern "C" int c_list_length(scm_obj_t list) {
+  int count = 0;
+  while (is_cons(list)) {
+    count++;
+    list = CDR(list);
+  }
+  return count;
+}
+
+extern "C" void c_copy_list_to_array(scm_obj_t list, scm_obj_t* arr) {
+  while (is_cons(list)) {
+    *arr++ = CAR(list);
+    list = CDR(list);
+  }
 }
 
 // Helper function for instruction operand access (1-indexed: operand 1 is first after opcode)
@@ -1210,9 +1227,230 @@ void codegen_t::emit_global_ref(const Instruction& inst) {
   set_reg(inst.rn1, val);
 }
 
-// Common logic for call and tail-call
+// Helper to get or create the fixed-arity apply stub
+llvm::Function* codegen_t::get_or_create_fixed_apply_stub() {
+  const char* stub_name = "__nanos_fixed_apply_stub";
+  llvm::Function* f = module->getFunction(stub_name);
+  if (f) return f;
+
+  // Signature: i64 (i64 closure, i64 argc, i64* argv)
+  llvm::Type* i64 = this->getInt64Type();
+  llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
+  std::vector<llvm::Type*> params = {i64, i64, i64_ptr};
+  llvm::FunctionType* ft = llvm::FunctionType::get(i64, params, false);
+
+  f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, stub_name, module);
+
+  // Save current insert point
+  llvm::BasicBlock* saved_block = builder.GetInsertBlock();
+
+  llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
+  builder.SetInsertPoint(entry);
+
+  // Get args
+  auto args = f->arg_begin();
+  llvm::Value* closure = args++;
+  closure->setName("closure");
+  llvm::Value* argc = args++;
+  argc->setName("argc");
+  llvm::Value* argv = args++;
+  argv->setName("argv");
+
+  // Get code ptr and cdecl flag from closure
+  llvm::Value* code_void_ptr = getClosureCodePtr(closure);
+  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
+
+  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
+  llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+  llvm::Value* cdecl_field_ptr_i32 = builder.CreateBitCast(cdecl_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
+  llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
+  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_flag, builder.getInt32(0), "is_cdecl");
+
+  llvm::BasicBlock* def_b = llvm::BasicBlock::Create(context, "def", f);
+
+  // Switch on argc
+  llvm::SwitchInst* sw = builder.CreateSwitch(argc, def_b, 6);
+
+  for (int n = 0; n <= 5; ++n) {
+    llvm::BasicBlock* bb = llvm::BasicBlock::Create(context, "case_" + std::to_string(n), f);
+    sw->addCase(llvm::cast<llvm::ConstantInt>(createInt32Constant(context, n)), bb);
+    builder.SetInsertPoint(bb);
+
+    std::vector<llvm::Type*> pts(n + 1, i64);
+    llvm::FunctionType* target_ft = llvm::FunctionType::get(i64, pts, false);
+    llvm::Value* fp = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(target_ft, 0));
+
+    std::vector<llvm::Value*> call_args;
+    call_args.push_back(closure);
+    for (int i = 0; i < n; ++i) {
+      llvm::Value* ptr = builder.CreateGEP(i64, argv, createInt32Constant(context, i));
+      call_args.push_back(builder.CreateLoad(i64, ptr));
+    }
+
+    llvm::BasicBlock* cdecl_b = llvm::BasicBlock::Create(context, "cdecl_" + std::to_string(n), f);
+    llvm::BasicBlock* scheme_b = llvm::BasicBlock::Create(context, "scheme_" + std::to_string(n), f);
+    builder.CreateCondBr(is_cdecl, cdecl_b, scheme_b);
+
+    builder.SetInsertPoint(cdecl_b);
+    llvm::CallInst* call_c = builder.CreateCall(target_ft, fp, call_args);
+    call_c->setCallingConv(llvm::CallingConv::C);
+    builder.CreateRet(call_c);
+
+    builder.SetInsertPoint(scheme_b);
+    llvm::CallInst* call_s = builder.CreateCall(target_ft, fp, call_args);
+    call_s->setCallingConv(llvm::CallingConv::Tail);
+    call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
+    builder.CreateRet(call_s);
+  }
+
+  builder.SetInsertPoint(def_b);
+  builder.CreateRet(getScmFalseValue());
+
+  // Restore insert point
+  if (saved_block) builder.SetInsertPoint(saved_block);
+
+  return f;
+}
+
 void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
+  if (inst.closure_label == sym_apply) {
+    // (apply proc arg0 ... list)
+    // proc is in r0
+    // args are in r1 .. r(n-2)
+    // list is in r(n-1)
+
+    int fixed_argc = inst.argc - 2;
+    llvm::Value* list_arg = get_reg(inst.argc - 1);
+    llvm::Value* proc = get_reg(0);
+
+    // Get list length
+    llvm::FunctionType* lenFT = llvm::FunctionType::get(builder.getInt32Ty(), {this->getInt64Type()}, false);
+    llvm::Function* list_len_func = get_or_create_external_function("c_list_length", lenFT, (void*)&c_list_length);
+    llvm::Value* list_len = builder.CreateCall(list_len_func, {list_arg}, "list_len");
+
+    // Total argc
+    llvm::Value* total_argc = builder.CreateAdd(createInt32Constant(context, fixed_argc), list_len, "total_argc");
+
+    // Allocate array
+    llvm::Value* argv_array = builder.CreateAlloca(this->getInt64Type(), total_argc, "apply_argv");
+
+    // Copy fixed args
+    for (int i = 0; i < fixed_argc; ++i) {
+      llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
+      builder.CreateStore(get_reg(i + 1), arg_ptr);
+    }
+
+    // Copy list args
+    llvm::Value* list_dest_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, fixed_argc));
+    llvm::FunctionType* copyFT =
+        llvm::FunctionType::get(builder.getVoidTy(), {this->getInt64Type(), llvm::PointerType::get(this->getInt64Type(), 0)}, false);
+    llvm::Function* list_copy_func = get_or_create_external_function("c_copy_list_to_array", copyFT, (void*)&c_copy_list_to_array);
+    builder.CreateCall(list_copy_func, {list_arg, list_dest_ptr});
+
+    // Inspect proc
+    llvm::Value* closure = proc;
+    llvm::Value* code_void_ptr = getClosureCodePtr(closure);
+    llvm::Value* closure_ptr = untagPointer(builder, context, closure);
+
+    llvm::Value* rest_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
+    llvm::Value* rest_field_ptr_i32 = builder.CreateBitCast(rest_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
+    llvm::Value* rest_flag = builder.CreateLoad(builder.getInt32Ty(), rest_field_ptr_i32, "rest");
+
+    static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
+    llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+    llvm::Value* cdecl_field_ptr_i32 = builder.CreateBitCast(cdecl_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
+    llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
+
+    llvm::Value* is_rest = builder.CreateICmpNE(rest_flag, builder.getInt32(0), "is_rest");
+    llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_flag, builder.getInt32(0), "is_cdecl");
+
+    llvm::BasicBlock* rest_block = llvm::BasicBlock::Create(context, "apply_rest", current_function);
+    llvm::BasicBlock* fixed_block = llvm::BasicBlock::Create(context, "apply_fixed", current_function);
+
+    llvm::BasicBlock* merge_block = nullptr;
+    llvm::Value* result_slot = nullptr;
+
+    if (!is_tail) {
+      merge_block = llvm::BasicBlock::Create(context, "apply_merge", current_function);
+      result_slot = builder.CreateAlloca(this->getInt64Type(), nullptr, "apply_res_slot");
+    }
+
+    builder.CreateCondBr(is_rest, rest_block, fixed_block);
+
+    // --- Rest Block ---
+    builder.SetInsertPoint(rest_block);
+    {
+      std::vector<llvm::Type*> paramTypes = {this->getInt64Type(), this->getInt64Type(), llvm::PointerType::get(this->getInt64Type(), 0)};
+      llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+      llvm::Value* func_ptr = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(funcType, 0));
+
+      std::vector<llvm::Value*> args = {proc, builder.CreateZExt(total_argc, this->getInt64Type()), argv_array};
+
+      llvm::BasicBlock* cdecl_b = llvm::BasicBlock::Create(context, "apply_rest_cdecl", current_function);
+      llvm::BasicBlock* scheme_b = llvm::BasicBlock::Create(context, "apply_rest_scheme", current_function);
+
+      builder.CreateCondBr(is_cdecl, cdecl_b, scheme_b);
+
+      // CDECL
+      builder.SetInsertPoint(cdecl_b);
+      llvm::CallInst* call_c = builder.CreateCall(funcType, func_ptr, args);
+      call_c->setCallingConv(llvm::CallingConv::C);
+      if (is_tail)
+        builder.CreateRet(call_c);
+      else {
+        builder.CreateStore(call_c, result_slot);
+        builder.CreateBr(merge_block);
+      }
+
+      // SCHEME
+      builder.SetInsertPoint(scheme_b);
+      llvm::CallInst* call_s = builder.CreateCall(funcType, func_ptr, args);
+      call_s->setCallingConv(llvm::CallingConv::Tail);
+      if (is_tail) {
+        call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
+        builder.CreateRet(call_s);
+      } else {
+        builder.CreateStore(call_s, result_slot);
+        builder.CreateBr(merge_block);
+      }
+    }
+
+    // --- Fixed Block ---
+    builder.SetInsertPoint(fixed_block);
+    {
+      llvm::Function* stub = get_or_create_fixed_apply_stub();
+
+      std::vector<llvm::Value*> stub_args = {proc, builder.CreateZExt(total_argc, this->getInt64Type()), argv_array};
+
+      llvm::CallInst* call = builder.CreateCall(stub, stub_args);
+
+      // The stub generally uses tail calls internally, but here we can't easily tail-call the stub
+      // if we are not in a tail position OR if the stub calling convention doesn't match.
+      // The stub is a normal C function (internal linkage or external).
+      // So we just call it.
+
+      // Improve: if is_tail, we could tail-call the stub if we set up the stub to allow it?
+      // But the stub returns i64, so it's fine.
+
+      if (is_tail) {
+        builder.CreateRet(call);
+      } else {
+        builder.CreateStore(call, result_slot);
+        builder.CreateBr(merge_block);
+      }
+    }
+
+    if (!is_tail) {
+      builder.SetInsertPoint(merge_block);
+      llvm::Value* res = builder.CreateLoad(this->getInt64Type(), result_slot, "apply_res");
+      set_reg(0, res);
+    }
+    return;
+  }
+
+  // Existing code starts here...
   // Optimization: specific closure call
+
   // If we know the closure label, we can call the function directly
   // This avoids:
   // 1. Loading the code pointer from the closure object
