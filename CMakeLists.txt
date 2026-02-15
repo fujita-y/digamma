@@ -220,3 +220,9 @@ target_link_libraries(test_closure_analysis PRIVATE nanos_io)
 
 add_nanos_test(test_codegen tests/test_codegen.cpp)
 target_link_libraries(test_codegen PRIVATE nanos_io)
+
+add_nanos_test(test_closure_patterns tests/test_closure_patterns.cpp)
+target_link_libraries(test_closure_patterns PRIVATE nanos_io)
+
+add_nanos_test(test_apply_patterns tests/test_apply_patterns.cpp)
+target_link_libraries(test_apply_patterns PRIVATE nanos_io)

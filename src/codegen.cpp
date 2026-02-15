@@ -104,22 +104,6 @@ static inline scm_obj_t list_nth(scm_obj_t list, int n) {
   return is_cons(curr) ? CAR(curr) : scm_nil;
 }
 
-extern "C" int c_list_length(scm_obj_t list) {
-  int count = 0;
-  while (is_cons(list)) {
-    count++;
-    list = CDR(list);
-  }
-  return count;
-}
-
-extern "C" void c_copy_list_to_array(scm_obj_t list, scm_obj_t* arr) {
-  while (is_cons(list)) {
-    *arr++ = CAR(list);
-    list = CDR(list);
-  }
-}
-
 // Helper function for instruction operand access (1-indexed: operand 1 is first after opcode)
 static inline scm_obj_t operand(scm_obj_t inst, int n) { return list_nth(CDR(inst), n); }
 
