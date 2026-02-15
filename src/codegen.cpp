@@ -1299,7 +1299,6 @@ llvm::Function* codegen_t::get_or_create_fixed_apply_stub() {
     builder.SetInsertPoint(scheme_b);
     llvm::CallInst* call_s = builder.CreateCall(target_ft, fp, call_args);
     call_s->setCallingConv(llvm::CallingConv::Tail);
-    call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     builder.CreateRet(call_s);
   }
 
@@ -1312,7 +1311,185 @@ llvm::Function* codegen_t::get_or_create_fixed_apply_stub() {
   return f;
 }
 
+llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
+  const char* name = "__nanos_call_closure_bridge";
+  llvm::Function* f = module->getFunction(name);
+  if (f) return f;
+
+  // Signature: i64 (i64 closure, i64 argc, i64* argv)
+  llvm::Type* i64 = this->getInt64Type();
+  llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
+  llvm::FunctionType* ft = llvm::FunctionType::get(i64, {i64, i64, i64_ptr}, false);
+  f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+
+  llvm::BasicBlock* saved_block = builder.GetInsertBlock();
+  llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
+  builder.SetInsertPoint(entry);
+
+  auto args = f->arg_begin();
+  llvm::Value* closure = args++;
+  closure->setName("closure");
+  llvm::Value* argc = args++;
+  argc->setName("argc");
+  llvm::Value* argv = args++;
+  argv->setName("argv");
+
+  llvm::Value* code_ptr = getClosureCodePtr(closure);
+  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
+
+  // Load rest and cdecl flags
+  llvm::Value* rest_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
+  llvm::Value* rest_field =
+      builder.CreateLoad(builder.getInt32Ty(), builder.CreateBitCast(rest_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0)), "rest");
+  llvm::Value* is_rest = builder.CreateICmpNE(rest_field, builder.getInt32(0), "is_rest");
+
+  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
+  llvm::Value* cdecl_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+  llvm::Value* cdecl_field =
+      builder.CreateLoad(builder.getInt32Ty(), builder.CreateBitCast(cdecl_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0)), "cdecl");
+  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_field, builder.getInt32(0), "is_cdecl");
+
+  llvm::BasicBlock* rest_b = llvm::BasicBlock::Create(context, "rest", f);
+  llvm::BasicBlock* fixed_b = llvm::BasicBlock::Create(context, "fixed", f);
+  builder.CreateCondBr(is_rest, rest_b, fixed_b);
+
+  // Rest path: (self, argc, argv[])
+  builder.SetInsertPoint(rest_b);
+  {
+    llvm::FunctionType* rest_ft = llvm::FunctionType::get(i64, {i64, i64, i64_ptr}, false);
+    llvm::Value* fp = builder.CreateBitCast(code_ptr, llvm::PointerType::get(rest_ft, 0));
+
+    llvm::BasicBlock* cdecl_path = llvm::BasicBlock::Create(context, "rest_cdecl", f);
+    llvm::BasicBlock* scheme_path = llvm::BasicBlock::Create(context, "rest_scheme", f);
+    builder.CreateCondBr(is_cdecl, cdecl_path, scheme_path);
+
+    builder.SetInsertPoint(cdecl_path);
+    auto call_c = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
+    call_c->setCallingConv(llvm::CallingConv::C);
+    builder.CreateRet(call_c);
+
+    builder.SetInsertPoint(scheme_path);
+    auto call_s = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
+    call_s->setCallingConv(llvm::CallingConv::Tail);
+    builder.CreateRet(call_s);
+  }
+
+  // Fixed path: (self, arg0, arg1, ...)
+  builder.SetInsertPoint(fixed_b);
+  {
+    llvm::BasicBlock* def_b = llvm::BasicBlock::Create(context, "fixed_def", f);
+    llvm::SwitchInst* sw = builder.CreateSwitch(argc, def_b, 11);
+    for (int n = 0; n <= 10; ++n) {
+      llvm::BasicBlock* bb = llvm::BasicBlock::Create(context, "fixed_" + std::to_string(n), f);
+      sw->addCase(llvm::cast<llvm::ConstantInt>(createInt64Constant(context, (uint64_t)n)), bb);
+      builder.SetInsertPoint(bb);
+
+      std::vector<llvm::Type*> pts(n + 1, i64);
+      llvm::FunctionType* fixed_ft = llvm::FunctionType::get(i64, pts, false);
+      llvm::Value* fp = builder.CreateBitCast(code_ptr, llvm::PointerType::get(fixed_ft, 0));
+
+      std::vector<llvm::Value*> call_args;
+      call_args.push_back(closure);
+      for (int i = 0; i < n; ++i) {
+        llvm::Value* p = builder.CreateGEP(i64, argv, createInt32Constant(context, i));
+        call_args.push_back(builder.CreateLoad(i64, p));
+      }
+
+      llvm::BasicBlock* cdecl_p = llvm::BasicBlock::Create(context, "fixed_cdecl_" + std::to_string(n), f);
+      llvm::BasicBlock* scheme_p = llvm::BasicBlock::Create(context, "fixed_scheme_" + std::to_string(n), f);
+      builder.CreateCondBr(is_cdecl, cdecl_p, scheme_p);
+
+      builder.SetInsertPoint(cdecl_p);
+      auto c = builder.CreateCall(fixed_ft, fp, call_args);
+      c->setCallingConv(llvm::CallingConv::C);
+      builder.CreateRet(c);
+
+      builder.SetInsertPoint(scheme_p);
+      auto s = builder.CreateCall(fixed_ft, fp, call_args);
+      s->setCallingConv(llvm::CallingConv::Tail);
+      builder.CreateRet(s);
+    }
+    builder.SetInsertPoint(def_b);
+    builder.CreateRet(getScmFalseValue());
+  }
+
+  if (saved_block) builder.SetInsertPoint(saved_block);
+  return f;
+}
+
+void* codegen_t::get_call_closure_bridge_ptr() {
+  const char* name = "__nanos_call_closure_bridge";
+  auto sym = jit->lookup(name);
+  if (sym) return (void*)sym->getValue();
+
+  // If the bridge is not in the JIT, we need to compile it.
+  // We must save the current module state because this might be called during another compilation or at runtime.
+  auto saved_module_uptr = std::move(current_module_uptr);
+  auto* saved_module = module;
+  auto* saved_main_func = main_function;
+  auto saved_builder_ip = builder.saveIP();
+
+  // Create a temporary module for the bridge
+  current_module_uptr = std::make_unique<llvm::Module>("bridge_module", context);
+  module = current_module_uptr.get();
+  module->setDataLayout(jit->getDataLayout());
+
+  (void)get_or_create_call_closure_bridge();
+
+  // Finalize the temporary module
+  auto tsm = llvm::orc::ThreadSafeModule(std::move(current_module_uptr), ts_context);
+  if (auto err = jit->addIRModule(std::move(tsm))) {
+    fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+  }
+
+  // Restore previous state
+  current_module_uptr = std::move(saved_module_uptr);
+  module = saved_module;
+  main_function = saved_main_func;
+  builder.restoreIP(saved_builder_ip);
+
+  // Re-lookup the symbol
+  sym = jit->lookup(name);
+  if (!sym) {
+    fatal("%s:%u codegen: failed to look up closure bridge after compilation", __FILE__, __LINE__);
+  }
+  return (void*)sym->getValue();
+}
+
 void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
+  if (inst.closure_label == sym_apply) {
+    // Optimized apply
+    // Signature: i64 c_apply_helper(i64 proc, i32 argc, i64* argv)
+    llvm::Type* i64 = this->getInt64Type();
+    llvm::Type* i32 = this->getInt32Type();
+    llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
+    llvm::FunctionType* ft = llvm::FunctionType::get(i64, {i64, i32, i64_ptr}, false);
+    llvm::Function* apply_helper = get_or_create_external_function("c_apply_helper", ft, (void*)&c_apply_helper);
+
+    // Prepare arguments for c_apply_helper
+    // proc in r0, arguments in r1...r(argc-1)
+    llvm::Value* proc = get_reg(0);
+    llvm::Value* argc_val = createInt32Constant(context, inst.argc - 1);
+    llvm::Value* argv_array = nullptr;
+    if (inst.argc > 1) {
+      argv_array = builder.CreateAlloca(i64, createInt32Constant(context, inst.argc - 1), "apply_argv");
+      for (int i = 1; i < inst.argc; i++) {
+        llvm::Value* p = builder.CreateGEP(i64, argv_array, createInt32Constant(context, i - 1));
+        builder.CreateStore(get_reg(i), p);
+      }
+    } else {
+      argv_array = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i64_ptr));
+    }
+
+    auto call = builder.CreateCall(ft, apply_helper, {proc, argc_val, argv_array}, "apply_opt");
+    if (is_tail) {
+      builder.CreateRet(call);
+    } else {
+      set_reg(0, call);
+    }
+    return;
+  }
+
   // Optimization: specific closure call
   // If we know the closure label, we can call the function directly
   // This avoids:

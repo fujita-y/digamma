@@ -207,6 +207,12 @@ class codegen_t {
   // Compile a list of instructions
   intptr_t compile(scm_obj_t inst_list);
 
+  // Helper to get or create the general call closure bridge
+  llvm::Function* get_or_create_call_closure_bridge();
+
+  // Helper to get the compiled address of the call closure bridge
+  void* get_call_closure_bridge_ptr();
+
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::map<scm_obj_t, std::pair<int, bool>> closure_params;
 
