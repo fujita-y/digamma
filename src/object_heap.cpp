@@ -7,6 +7,8 @@
 #include "bit.h"
 #include "hash.h"
 
+thread_local object_heap_t* object_heap_t::s_current;
+
 static constexpr int symbol_table_reserve_size = 4096;
 
 inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
@@ -25,8 +27,6 @@ inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
   } while (c != 0);
   return n + x - 4;
 }
-
-thread_local object_heap_t* object_heap_t::s_current;
 
 void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_pool.init(pool_size, init_size);

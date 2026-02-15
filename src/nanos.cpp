@@ -75,7 +75,6 @@ int main() {
 
   auto ts_ctx = std::make_unique<llvm::LLVMContext>();
   codegen_t codegen(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
-  nanos_set_codegen(&codegen);
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);

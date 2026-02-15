@@ -23,5 +23,4 @@ SUBR scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1);
 SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1);
 SUBR scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
-void nanos_set_codegen(void* cg);
 #endif  // NANOS_SUBR_H_INCLUDED

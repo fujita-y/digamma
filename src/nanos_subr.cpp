@@ -7,10 +7,6 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 
-static thread_local codegen_t* s_codegen = nullptr;
-
-void nanos_set_codegen(void* cg) { s_codegen = (codegen_t*)cg; }
-
 SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t sum = 0;
   for (int i = 0; i < argc; i++) {
@@ -94,35 +90,4 @@ SUBR scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, s
 
 SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
-
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
-
-extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) {
-  if (argc < 1) {
-    throw std::runtime_error("apply: too few arguments");
-  }
-
-  scm_obj_t list = argv[argc - 1];  // Last argument must be a list
-
-  std::vector<scm_obj_t> args;
-  for (int i = 0; i < argc - 1; i++) {
-    args.push_back(argv[i]);
-  }
-
-  scm_obj_t curr = list;
-  while (is_cons(curr)) {
-    args.push_back(CAR(curr));
-    curr = CDR(curr);
-  }
-  if (curr != scm_nil) throw std::runtime_error("apply: last argument must be a proper list");
-
-  if (!s_codegen) throw std::runtime_error("apply: JIT not initialized");
-
-  void* bridge_ptr = s_codegen->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
-
-  return (scm_obj_t)bridge(proc, args.size(), args.data());
-}

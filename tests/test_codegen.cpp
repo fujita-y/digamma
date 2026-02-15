@@ -714,7 +714,6 @@ int main(int argc, char** argv) {
 
   run_test("ApplyTest", [](CodegenTest& env) -> bool {
     // Register primitives
-    nanos_set_codegen(env.codegen);
 
     scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
     c_global_set(make_symbol("+"), scm_subr_num_add);

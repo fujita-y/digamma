@@ -54,6 +54,8 @@ struct Instruction {
 };
 
 class codegen_t {
+  thread_local static codegen_t* s_current;
+
   llvm::orc::ThreadSafeContext ts_context;
   llvm::LLVMContext& context;
   llvm::orc::LLJIT* jit;
@@ -136,9 +138,6 @@ class codegen_t {
   // Helper to get or create an external function declaration in the current module
   llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
 
-  // Helper to get or create the fixed-arity apply stub
-  llvm::Function* get_or_create_fixed_apply_stub();
-
   // Helper to create allocas at function entry
   void create_allocas(llvm::Function* f, int num_regs);
 
@@ -149,6 +148,7 @@ class codegen_t {
   llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(context); }
   llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(context); }
   llvm::Type* getVoidPtrType() { return builder.getPtrTy(); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::get(getInt64Type(), 0); }
   llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(context, llvm::APInt(64, (uint64_t)scm_false)); }
 
   // Helper to get code pointer from closure object
@@ -217,6 +217,11 @@ class codegen_t {
   std::map<scm_obj_t, std::pair<int, bool>> closure_params;
 
   friend class ClosureAnalysisTest;
+
+  static codegen_t* current() {
+    assert(s_current);
+    return s_current;
+  }
 };
 
 #endif

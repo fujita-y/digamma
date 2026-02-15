@@ -27,6 +27,8 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
+thread_local codegen_t* codegen_t::s_current;
+
 codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
     : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
   sym_const = make_symbol("const");
@@ -51,6 +53,8 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
   sym_apply = make_symbol("apply");  // Added initialization for sym_apply
 
   init_opcode_map();
+
+  s_current = this;
 }
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
@@ -67,6 +71,7 @@ static constexpr int CLOSURE_LITERALS_FIELD_OFFSET = offsetof(scm_closure_rec_t,
 static constexpr int CLOSURE_CODE_FIELD_OFFSET = offsetof(scm_closure_rec_t, code);
 static constexpr int CLOSURE_ARGC_FIELD_OFFSET = offsetof(scm_closure_rec_t, argc);
 static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, rest);
+static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
 static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
 static constexpr int CELL_VALUE_FIELD_OFFSET = offsetof(scm_cell_rec_t, value);
@@ -79,21 +84,14 @@ static constexpr int VALIST_BUFFER_SIZE = 256;  // Buffer size for va_list on al
 //   offset 24: int argc            (4 bytes)
 //   offset 28: int rest            (4 bytes)
 //   offset 32: int nsize           (4 bytes)
+//   offset 36: int cdecl           (4 bytes)
 //   offset 40: scm_obj_t env[...]
 
 static constexpr char CLOSURE_LABEL_PREFIX = 'C';
 
 // Helper macros for cons access
-#define CAR(x)     (((scm_cons_rec_t*)(x))->car)
-#define CDR(x)     (((scm_cons_rec_t*)(x))->cdr)
-#define CAAR(x)    CAR(CAR(x))
-#define CADR(x)    CAR(CDR(x))
-#define CDAR(x)    CDR(CAR(x))
-#define CDDR(x)    CDR(CDR(x))
-#define CADDR(x)   CAR(CDDR(x))
-#define CDDDR(x)   CDR(CDDDR(x))
-#define CADDDR(x)  CAR(CDDDR(x))
-#define CADDDDR(x) CAR(CDR(CDDDR(x)))
+#define CAR(x) (((scm_cons_rec_t*)(x))->car)
+#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
 
 // Helper function to get nth element of a list (1-indexed, like car/cdr convention)
 static inline scm_obj_t list_nth(scm_obj_t list, int n) {
@@ -164,7 +162,7 @@ static inline llvm::Value* createInt64Constant(llvm::LLVMContext& ctx, uint64_t 
   return llvm::ConstantInt::get(ctx, llvm::APInt(64, val));
 }
 
-// Helper function to create 32-bit  integer constant
+// Helper function to create 32-bit integer constant
 static inline llvm::Value* createInt32Constant(llvm::LLVMContext& ctx, int32_t val) { return llvm::ConstantInt::get(ctx, llvm::APInt(32, val)); }
 
 // Helper function to update max register index
@@ -597,7 +595,7 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
   // Get c_construct_rest_list helper function
   // This C function builds a Scheme list from an array of arguments
   llvm::Type* intptrTy = this->getInt64Type();
-  llvm::Type* intptrPtrTy = llvm::PointerType::get(intptrTy, 0);
+  llvm::Type* intptrPtrTy = this->getInt64PtrType();
   llvm::Type* int32Ty = this->getInt32Type();
 
   // Ensure count uses int32 for C call
@@ -819,8 +817,8 @@ void codegen_t::phase2_create_functions() {
 
     if (info.has_rest) {
       // (self, argc, argv[])
-      paramTypes.push_back(this->getInt64Type());                             // argc
-      paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+      paramTypes.push_back(this->getInt64Type());     // argc
+      paramTypes.push_back(this->getInt64PtrType());  // argv[]
     } else {
       // (self, arg0, arg1, ...)
       for (int k = 0; k < info.argc; k++) {
@@ -1227,90 +1225,6 @@ void codegen_t::emit_global_ref(const Instruction& inst) {
   set_reg(inst.rn1, val);
 }
 
-// Helper to get or create the fixed-arity apply stub
-llvm::Function* codegen_t::get_or_create_fixed_apply_stub() {
-  const char* stub_name = "__nanos_fixed_apply_stub";
-  llvm::Function* f = module->getFunction(stub_name);
-  if (f) return f;
-
-  // Signature: i64 (i64 closure, i64 argc, i64* argv)
-  llvm::Type* i64 = this->getInt64Type();
-  llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
-  std::vector<llvm::Type*> params = {i64, i64, i64_ptr};
-  llvm::FunctionType* ft = llvm::FunctionType::get(i64, params, false);
-
-  f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, stub_name, module);
-
-  // Save current insert point
-  llvm::BasicBlock* saved_block = builder.GetInsertBlock();
-
-  llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
-  builder.SetInsertPoint(entry);
-
-  // Get args
-  auto args = f->arg_begin();
-  llvm::Value* closure = args++;
-  closure->setName("closure");
-  llvm::Value* argc = args++;
-  argc->setName("argc");
-  llvm::Value* argv = args++;
-  argv->setName("argv");
-
-  // Get code ptr and cdecl flag from closure
-  llvm::Value* code_void_ptr = getClosureCodePtr(closure);
-  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
-
-  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
-  llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
-  llvm::Value* cdecl_field_ptr_i32 = builder.CreateBitCast(cdecl_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
-  llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
-  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_flag, builder.getInt32(0), "is_cdecl");
-
-  llvm::BasicBlock* def_b = llvm::BasicBlock::Create(context, "def", f);
-
-  // Switch on argc
-  llvm::SwitchInst* sw = builder.CreateSwitch(argc, def_b, 6);
-
-  for (int n = 0; n <= 5; ++n) {
-    llvm::BasicBlock* bb = llvm::BasicBlock::Create(context, "case_" + std::to_string(n), f);
-    sw->addCase(llvm::cast<llvm::ConstantInt>(createInt32Constant(context, n)), bb);
-    builder.SetInsertPoint(bb);
-
-    std::vector<llvm::Type*> pts(n + 1, i64);
-    llvm::FunctionType* target_ft = llvm::FunctionType::get(i64, pts, false);
-    llvm::Value* fp = builder.CreateBitCast(code_void_ptr, llvm::PointerType::get(target_ft, 0));
-
-    std::vector<llvm::Value*> call_args;
-    call_args.push_back(closure);
-    for (int i = 0; i < n; ++i) {
-      llvm::Value* ptr = builder.CreateGEP(i64, argv, createInt32Constant(context, i));
-      call_args.push_back(builder.CreateLoad(i64, ptr));
-    }
-
-    llvm::BasicBlock* cdecl_b = llvm::BasicBlock::Create(context, "cdecl_" + std::to_string(n), f);
-    llvm::BasicBlock* scheme_b = llvm::BasicBlock::Create(context, "scheme_" + std::to_string(n), f);
-    builder.CreateCondBr(is_cdecl, cdecl_b, scheme_b);
-
-    builder.SetInsertPoint(cdecl_b);
-    llvm::CallInst* call_c = builder.CreateCall(target_ft, fp, call_args);
-    call_c->setCallingConv(llvm::CallingConv::C);
-    builder.CreateRet(call_c);
-
-    builder.SetInsertPoint(scheme_b);
-    llvm::CallInst* call_s = builder.CreateCall(target_ft, fp, call_args);
-    call_s->setCallingConv(llvm::CallingConv::Tail);
-    builder.CreateRet(call_s);
-  }
-
-  builder.SetInsertPoint(def_b);
-  builder.CreateRet(getScmFalseValue());
-
-  // Restore insert point
-  if (saved_block) builder.SetInsertPoint(saved_block);
-
-  return f;
-}
-
 llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   const char* name = "__nanos_call_closure_bridge";
   llvm::Function* f = module->getFunction(name);
@@ -1318,7 +1232,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
   // Signature: i64 (i64 closure, i64 argc, i64* argv)
   llvm::Type* i64 = this->getInt64Type();
-  llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
+  llvm::Type* i64_ptr = this->getInt64PtrType();
   llvm::FunctionType* ft = llvm::FunctionType::get(i64, {i64, i64, i64_ptr}, false);
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
 
@@ -1343,7 +1257,6 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
       builder.CreateLoad(builder.getInt32Ty(), builder.CreateBitCast(rest_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0)), "rest");
   llvm::Value* is_rest = builder.CreateICmpNE(rest_field, builder.getInt32(0), "is_rest");
 
-  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
   llvm::Value* cdecl_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
   llvm::Value* cdecl_field =
       builder.CreateLoad(builder.getInt32Ty(), builder.CreateBitCast(cdecl_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0)), "cdecl");
@@ -1462,7 +1375,7 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
     // Signature: i64 c_apply_helper(i64 proc, i32 argc, i64* argv)
     llvm::Type* i64 = this->getInt64Type();
     llvm::Type* i32 = this->getInt32Type();
-    llvm::Type* i64_ptr = llvm::PointerType::get(i64, 0);
+    llvm::Type* i64_ptr = this->getInt64PtrType();
     llvm::FunctionType* ft = llvm::FunctionType::get(i64, {i64, i32, i64_ptr}, false);
     llvm::Function* apply_helper = get_or_create_external_function("c_apply_helper", ft, (void*)&c_apply_helper);
 
@@ -1519,8 +1432,8 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
 
         if (has_rest) {
           // (self, argc, argv[])
-          paramTypes.push_back(this->getInt64Type());                             // argc
-          paramTypes.push_back(llvm::PointerType::get(this->getInt64Type(), 0));  // argv[]
+          paramTypes.push_back(this->getInt64Type());     // argc
+          paramTypes.push_back(this->getInt64PtrType());  // argv[]
         } else {
           // (self, arg0, arg1, ...)
           for (int i = 0; i < fixed_argc; i++) {
@@ -1660,7 +1573,7 @@ fallback:
   llvm::Value* rest_field_ptr_i32 = builder.CreateBitCast(rest_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
   llvm::Value* rest_flag = builder.CreateLoad(builder.getInt32Ty(), rest_field_ptr_i32, "rest");
 
-  static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
+  // Load cdecl field (already defined at top of file)
   llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
   llvm::Value* cdecl_field_ptr_i32 = builder.CreateBitCast(cdecl_field_ptr, llvm::PointerType::get(builder.getInt32Ty(), 0));
   llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
