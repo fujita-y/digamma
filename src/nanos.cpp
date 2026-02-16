@@ -37,6 +37,8 @@ static void setup_subr() {
   c_global_set(make_symbol("cons"), scm_subr_cons);
   scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("apply"), scm_subr_apply);
+  scm_obj_t scm_subr_append = make_closure((void*)subr_append, 0, 1, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("append"), scm_subr_append);
 }
 
 int main() {

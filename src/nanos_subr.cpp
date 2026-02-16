@@ -7,6 +7,9 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 
+#define CAR(x) (((scm_cons_rec_t*)(x))->car)
+#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+
 SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t sum = 0;
   for (int i = 0; i < argc; i++) {
@@ -108,6 +111,33 @@ SUBR scm_obj_t subr_cdr(scm_obj_t self, scm_obj_t a1) {
     return cons->cdr;
   }
   throw std::runtime_error("cdr: argument must be a cons cell");
+}
+
+static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
+  if (lst1 == scm_nil) return lst2;
+  scm_obj_t head = make_cons(CAR(lst1), scm_nil);
+  scm_obj_t tail = head;
+  lst1 = CDR(lst1);
+  while (lst1 != scm_nil) {
+    CDR(tail) = make_cons(CAR(lst1), scm_nil);
+    tail = CDR(tail);
+    lst1 = CDR(lst1);
+  }
+  CDR(tail) = lst2;
+  return head;
+}
+
+SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return scm_nil;
+  if (argc == 1) return argv[0];
+  scm_obj_t obj = scm_undef;
+  for (int i = argc - 1; i >= 0; i--) {
+    if (obj == scm_undef)
+      obj = argv[i];
+    else
+      obj = append2(argv[i], obj);
+  }
+  return obj;
 }
 
 SUBR scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1, a2); }

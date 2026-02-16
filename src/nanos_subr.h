@@ -25,4 +25,5 @@ SUBR scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
 #endif  // NANOS_SUBR_H_INCLUDED
