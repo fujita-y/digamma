@@ -52,6 +52,40 @@ SUBR scm_obj_t subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
+SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  intptr_t p = 1;
+  for (int i = 0; i < argc; i++) {
+    if (is_fixnum(argv[i])) {
+      p *= fixnum(argv[i]);
+    } else {
+      throw std::runtime_error("*: arguments must be fixnums");
+    }
+  }
+  return make_fixnum(p);
+}
+
+SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) throw std::runtime_error("/: too few arguments");
+  if (!is_fixnum(argv[0])) throw std::runtime_error("/: arguments must be fixnums");
+
+  intptr_t result = fixnum(argv[0]);
+
+  if (argc == 1) {
+    return make_fixnum(1 / result);
+  }
+
+  for (int i = 1; i < argc; i++) {
+    if (is_fixnum(argv[i])) {
+      intptr_t d = fixnum(argv[i]);
+      if (d == 0) throw std::runtime_error("/: division by zero");
+      result /= d;
+    } else {
+      throw std::runtime_error("/: arguments must be fixnums");
+    }
+  }
+  return make_fixnum(result);
+}
+
 SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t list = scm_nil;
   for (int i = argc - 1; i >= 0; i--) {
