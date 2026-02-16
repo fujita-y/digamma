@@ -149,7 +149,7 @@ class concurrent_heap_t {
   bool m_collector_terminating;
   bool m_alloc_barrier;
 
-  void snapshot_stack();
+  void snapshot_stack() __attribute__((no_sanitize("address", "hwaddress")));
   void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
   void deallocate(void* p) { m_concurrent_pool->deallocate(p); }
 };

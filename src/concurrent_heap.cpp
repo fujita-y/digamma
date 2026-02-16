@@ -75,7 +75,7 @@ void concurrent_heap_t::snapshot_stack() {
     raw.push_back(prune_memory_address(regs[i]));
   }
   for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
-    raw.push_back(prune_memory_address(addr));
+    raw.push_back(prune_memory_address(*(uint64_t*)addr));
   }
   std::vector<uint64_t> candidates;
   std::copy_if(raw.begin(), raw.end(), std::back_inserter(candidates), [this](uint64_t addr) {
