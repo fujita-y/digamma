@@ -137,6 +137,7 @@ set(NANOS_CORE_SOURCES
   src/codegen_aux.cpp
   src/nanos_subr.cpp
   src/arch_arm64.cpp
+  src/equiv.cpp
 )
 
 # ==============================================================================
@@ -230,4 +231,7 @@ target_link_libraries(test_apply_patterns PRIVATE nanos_io)
 
 add_nanos_test(test_deriv tests/test_deriv.cpp)
 target_link_libraries(test_deriv PRIVATE nanos_io)
+
+add_nanos_test(test_equiv tests/test_equiv.cpp)
+target_link_libraries(test_equiv PRIVATE nanos_io)
 
