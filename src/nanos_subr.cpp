@@ -5,6 +5,7 @@
 #include "object.h"
 #include "nanos_subr.h"
 #include "codegen_aux.h"
+#include "object_heap.h"
 #include "printer.h"
 
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -163,5 +164,10 @@ SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
 
 SUBR scm_obj_t subr_newline(scm_obj_t self) {
   std::cout << std::endl;
+  return scm_undef;
+}
+
+SUBR scm_obj_t subr_collect(scm_obj_t self) {
+  object_heap_t::current()->collect();
   return scm_undef;
 }

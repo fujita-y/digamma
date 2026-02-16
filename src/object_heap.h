@@ -52,6 +52,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
+  void collect() { m_concurrent_heap.collect(); }
   void* alloc_cons() { return alloc_object(m_cons); }
   void* alloc_cell() { return alloc_object(m_cells); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
