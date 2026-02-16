@@ -196,6 +196,7 @@ inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
 scm_obj_t make_cell(scm_obj_t value);
 scm_obj_t make_list(int len, ...);
+scm_obj_t make_list2(scm_obj_t first, scm_obj_t second);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
 scm_obj_t make_string(const char* name);

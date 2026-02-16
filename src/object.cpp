@@ -210,3 +210,5 @@ scm_obj_t make_list(int len, ...) {
   va_end(ap);
   return (scm_obj_t)rec;
 }
+
+scm_obj_t make_list2(scm_obj_t first, scm_obj_t second) { return make_cons(first, make_cons(second, scm_nil)); }
