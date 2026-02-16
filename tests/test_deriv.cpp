@@ -111,16 +111,6 @@ void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
   }
 }
 
-static scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).print(a1);
-  return scm_undef;
-}
-
-static scm_obj_t subr_newline(scm_obj_t self) {
-  std::cout << std::endl;
-  return scm_undef;
-}
-
 void register_core_primitives() {
   c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1));
   c_global_set(make_symbol("-"), make_closure((void*)subr_num_sub, 0, 1, 0, nullptr, scm_nil, 1));

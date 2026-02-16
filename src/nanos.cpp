@@ -39,6 +39,10 @@ static void setup_subr() {
   c_global_set(make_symbol("apply"), scm_subr_apply);
   scm_obj_t scm_subr_append = make_closure((void*)subr_append, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("append"), scm_subr_append);
+  scm_obj_t scm_subr_write = make_closure((void*)subr_write, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("write"), scm_subr_write);
+  scm_obj_t scm_subr_newline = make_closure((void*)subr_newline, 0, 1, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("newline"), scm_subr_newline);
 }
 
 int main() {

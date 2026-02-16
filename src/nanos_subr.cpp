@@ -4,8 +4,8 @@
 #include "core.h"
 #include "object.h"
 #include "nanos_subr.h"
-#include "codegen.h"
 #include "codegen_aux.h"
+#include "printer.h"
 
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
 #define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
@@ -155,3 +155,13 @@ SUBR scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, s
 SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
+
+SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
+  printer_t(std::cout).print(a1);
+  return scm_undef;
+}
+
+SUBR scm_obj_t subr_newline(scm_obj_t self) {
+  std::cout << std::endl;
+  return scm_undef;
+}
