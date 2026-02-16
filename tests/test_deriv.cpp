@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
 
     object_heap_t* heap = object_heap_t::current();
     scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
-    if (!equal_p(heap, visited, result, expected)) {
+    if (!equal_p(visited, result, expected)) {
       printf("DerivTest failed: result does not match expected.\n");
       printf("Expected: %s\n", expected_sexp);
       // Note: We don't have a printer here to show result easily :()
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
 
     object_heap_t* heap = object_heap_t::current();
     scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
-    if (!equal_p(heap, visited, result, expected)) {
+    if (!equal_p(visited, result, expected)) {
       printf("MapClosureTest1 failed: result != (4 3 2)\n");
       return false;
     }
@@ -315,7 +315,7 @@ int main(int argc, char** argv) {
 
     object_heap_t* heap = object_heap_t::current();
     scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
-    if (!equal_p(heap, visited, result, expected)) {
+    if (!equal_p(visited, result, expected)) {
       printf("MapClosureTest2 failed: result != ((5 1) (5 2) (5 3))\n");
       return false;
     }

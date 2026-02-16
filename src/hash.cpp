@@ -4,12 +4,15 @@
 #include "core.h"
 #include "object.h"
 #include "hash.h"
+#include "equiv.h"
 #include "object_heap.h"
 
 static inline int hash_busy_threshold(int nsize) { return nsize - (nsize >> 3); }         // 87.5%
 static inline int hash_dense_threshold(int nsize) { return nsize - (nsize >> 2); }        // 75%
 static inline int hash_sparse_threshold(int nsize) { return nsize >> 2; }                 // 25%
 static inline int hash_renew_size(int live) { return live + (live >> 1) + (live >> 2); }  // 175%
+
+static constexpr int EQUAL_HASH_DEPTH_LIMIT = 50;
 
 static constexpr int primes[] = {7,         13,        29,        59,        113,        223,        431,       821,      1567,     2999,
                                  5701,      10837,     20593,     39133,     74353,      141277,     268439,    510047,   969097,   1841291,
@@ -40,6 +43,50 @@ static unsigned int second_hash(unsigned int hash, int nsize) {
 unsigned int address_hash(scm_obj_t obj, unsigned int bound) { return (((uintptr_t)obj >> 3) * 2654435761U + ((uintptr_t)obj & 7)) % bound; }
 
 bool address_equiv(scm_obj_t obj1, scm_obj_t obj2) { return obj1 == obj2; }
+
+unsigned int eqv_hash(scm_obj_t obj, unsigned int bound) {
+  if (is_heap_object(obj)) {
+    if (is_long_flonum(obj)) {
+      scm_long_flonum_rec_t* flonum = (scm_long_flonum_rec_t*)to_address(obj);
+      assert(sizeof(flonum->value) == 8);
+      uint32_t* datum = (uint32_t*)(&flonum->value);
+      return (datum[0] + datum[1] * 5) % bound;
+    }
+    // BIGNUM, RATIONAL, COMPLEX not supported yet
+  }
+  return address_hash(obj, bound);
+}
+
+static unsigned int obj_hash(scm_obj_t obj, int depth) {
+  if (depth > EQUAL_HASH_DEPTH_LIMIT) return 17;
+  if (is_cons(obj)) {
+    scm_cons_rec_t* cons = (scm_cons_rec_t*)obj;
+    uint32_t hash1 = obj_hash(cons->car, depth + 2);
+    uint32_t hash2 = obj_hash(cons->cdr, depth + 1);
+    return (hash1 + hash2 * 64 - hash2);
+  }
+  if (is_heap_object(obj)) {
+    if (is_vector(obj)) {
+      int n = vector_nsize(obj);
+      scm_obj_t* elts = vector_elts(obj);
+      uint32_t hash = 1;
+      for (int i = 0; i < n; i++) {
+        hash = hash * 32 - hash + obj_hash(elts[i], depth + 1);
+      }
+      return hash;
+    }
+    if (is_symbol(obj)) return symbol_hash(obj, INT32_MAX);
+    if (is_string(obj)) return string_hash(obj, INT32_MAX);
+    if (is_short_flonum(obj) || is_long_flonum(obj)) return eqv_hash(obj, INT32_MAX);
+  }
+  return address_hash(obj, INT32_MAX);
+}
+
+unsigned int equal_hash(scm_obj_t obj, unsigned int bound) { return obj_hash(obj, 0) % bound; }
+
+bool eqv_equiv(scm_obj_t obj1, scm_obj_t obj2) { return eqv_p(obj1, obj2); }
+
+bool equal_equiv(scm_obj_t obj1, scm_obj_t obj2) { return equal_p(make_hashtable(address_hash, address_equiv, 32), obj1, obj2); }
 
 unsigned int string_hash(scm_obj_t obj, unsigned int bound) {
   assert(is_string(obj));

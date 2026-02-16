@@ -60,27 +60,27 @@ bool test_address_equiv(scm_obj_t obj1, scm_obj_t obj2) { return obj1 == obj2; }
 
 void test_eqv_simple() {
   printf("test_eqv_simple\n");
-  ASSERT_TRUE(eqv_pred(scm_true, scm_true));
-  ASSERT_FALSE(eqv_pred(scm_true, scm_false));
-  ASSERT_TRUE(eqv_pred(make_fixnum(123), make_fixnum(123)));
-  ASSERT_FALSE(eqv_pred(make_fixnum(123), make_fixnum(124)));
-  ASSERT_TRUE(eqv_pred(scm_nil, scm_nil));
-  ASSERT_FALSE(eqv_pred(scm_nil, scm_undef));
+  ASSERT_TRUE(eqv_p(scm_true, scm_true));
+  ASSERT_FALSE(eqv_p(scm_true, scm_false));
+  ASSERT_TRUE(eqv_p(make_fixnum(123), make_fixnum(123)));
+  ASSERT_FALSE(eqv_p(make_fixnum(123), make_fixnum(124)));
+  ASSERT_TRUE(eqv_p(scm_nil, scm_nil));
+  ASSERT_FALSE(eqv_p(scm_nil, scm_undef));
 }
 
 void test_eqv_flonum() {
   printf("test_eqv_flonum\n");
   // Short flonum (if fits)
-  ASSERT_TRUE(eqv_pred(make_flonum(1.5), make_flonum(1.5)));
-  ASSERT_FALSE(eqv_pred(make_flonum(1.5), make_flonum(1.6)));
+  ASSERT_TRUE(eqv_p(make_flonum(1.5), make_flonum(1.5)));
+  ASSERT_FALSE(eqv_p(make_flonum(1.5), make_flonum(1.6)));
 
   // Long flonum
   scm_obj_t f1 = make_flonum(1.23e100);
   scm_obj_t f2 = make_flonum(1.23e100);
-  ASSERT_TRUE(eqv_pred(f1, f2));
-  ASSERT_FALSE(eqv_pred(f1, make_flonum(1.24e100)));
+  ASSERT_TRUE(eqv_p(f1, f2));
+  ASSERT_FALSE(eqv_p(f1, make_flonum(1.24e100)));
 
-  ASSERT_TRUE(eqv_pred(make_flonum(0.0), make_flonum(-0.0)));
+  ASSERT_TRUE(eqv_p(make_flonum(0.0), make_flonum(-0.0)));
 }
 
 void test_equal_list(object_heap_t* heap) {
@@ -90,10 +90,10 @@ void test_equal_list(object_heap_t* heap) {
   scm_obj_t l3 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(4));
 
   scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(heap, visited, l1, l2));
+  ASSERT_TRUE(equal_p(visited, l1, l2));
 
   visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(heap, visited, l1, l3));
+  ASSERT_FALSE(equal_p(visited, l1, l3));
 }
 
 void test_equal_vector(object_heap_t* heap) {
@@ -107,10 +107,10 @@ void test_equal_vector(object_heap_t* heap) {
   elts2[0] = make_fixnum(10);
 
   scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(heap, visited, v1, v2));
+  ASSERT_TRUE(equal_p(visited, v1, v2));
 
   visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(heap, visited, v1, v3));
+  ASSERT_FALSE(equal_p(visited, v1, v3));
 }
 
 void test_equal_string(object_heap_t* heap) {
@@ -120,10 +120,10 @@ void test_equal_string(object_heap_t* heap) {
   scm_obj_t s3 = make_string("world");
 
   scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(heap, visited, s1, s2));
+  ASSERT_TRUE(equal_p(visited, s1, s2));
 
   visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(heap, visited, s1, s3));
+  ASSERT_FALSE(equal_p(visited, s1, s3));
 }
 
 void test_equal_circular(object_heap_t* heap) {
@@ -143,11 +143,11 @@ void test_equal_circular(object_heap_t* heap) {
 
   scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
 
-  ASSERT_TRUE(equal_p(heap, visited, pair1, pair2));
+  ASSERT_TRUE(equal_p(visited, pair1, pair2));
 
   // Reset visited for next check
   visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(heap, visited, pair1, pair3_head));
+  ASSERT_TRUE(equal_p(visited, pair1, pair3_head));
 }
 
 int main(int argc, char** argv) {
