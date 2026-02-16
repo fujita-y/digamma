@@ -31,29 +31,11 @@ thread_local codegen_t* codegen_t::s_current;
 
 codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
     : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
-  sym_const = make_symbol("const");
-  sym_mov = make_symbol("mov");
-  sym_if = make_symbol("if");
-  sym_jump = make_symbol("jump");
-  sym_label = make_symbol("label");
-  sym_ret = make_symbol("ret");
-  sym_make_closure = make_symbol("make-closure");
-  sym_global_set = make_symbol("global-set!");
-  sym_global_ref = make_symbol("global-ref");
-  sym_call = make_symbol("call");
-  sym_tail_call = make_symbol("tail-call");
-  sym_closure_ref = make_symbol("closure-ref");
-  sym_closure_set = make_symbol("closure-set!");
-  sym_closure_cell_set = make_symbol("closure-cell-set!");
-  sym_closure_self = make_symbol("closure-self");
-  sym_closure_cell_ref = make_symbol("closure-cell-ref");
-  sym_reg_cell_ref = make_symbol("reg-cell-ref");
-  sym_reg_cell_set = make_symbol("reg-cell-set!");
-  sym_make_cell = make_symbol("make-cell");
-  sym_apply = make_symbol("apply");  // Added initialization for sym_apply
-
+  cached_symbol_label = make_symbol("label");
+  cached_symbol_apply = make_symbol("apply");
+  object_heap_t::current()->add_root(cached_symbol_label);
+  object_heap_t::current()->add_root(cached_symbol_apply);
   init_opcode_map();
-
   s_current = this;
 }
 
@@ -68,6 +50,9 @@ extern "C" void c_write_barrier(scm_obj_t obj);
 // Constants
 static constexpr int BRIDGE_MAX_ARGS = 10;
 static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;  // Offset to untag heap objects
+static constexpr char CLOSURE_LABEL_PREFIX = 'C';
+
+static constexpr int CELL_VALUE_FIELD_OFFSET = offsetof(scm_cell_rec_t, value);
 static constexpr int CLOSURE_LITERALS_FIELD_OFFSET = offsetof(scm_closure_rec_t, literals);
 static constexpr int CLOSURE_CODE_FIELD_OFFSET = offsetof(scm_closure_rec_t, code);
 static constexpr int CLOSURE_ARGC_FIELD_OFFSET = offsetof(scm_closure_rec_t, argc);
@@ -75,20 +60,6 @@ static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, res
 static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
 static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
-static constexpr int CELL_VALUE_FIELD_OFFSET = offsetof(scm_cell_rec_t, value);
-static constexpr int VALIST_BUFFER_SIZE = 256;  // Buffer size for va_list on all platforms
-
-// scm_closure_rec_t struct layout (for reference):
-//   offset 0:  scm_tc6_t tag       (8 bytes)
-//   offset 8:  scm_obj_t literals  (8 bytes)
-//   offset 16: void* code          (8 bytes)
-//   offset 24: int argc            (4 bytes)
-//   offset 28: int rest            (4 bytes)
-//   offset 32: int nsize           (4 bytes)
-//   offset 36: int cdecl           (4 bytes)
-//   offset 40: scm_obj_t env[...]
-
-static constexpr char CLOSURE_LABEL_PREFIX = 'C';
 
 // Helper macros for cons access
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -195,25 +166,29 @@ void codegen_t::finish_closure_literals(scm_obj_t& current_closure_label, std::v
 
 // Initialize opcode map for faster lookup
 void codegen_t::init_opcode_map() {
-  opcode_map[sym_const] = Opcode::CONST;
-  opcode_map[sym_mov] = Opcode::MOV;
-  opcode_map[sym_if] = Opcode::IF;
-  opcode_map[sym_jump] = Opcode::JUMP;
-  opcode_map[sym_label] = Opcode::LABEL;
-  opcode_map[sym_ret] = Opcode::RET;
-  opcode_map[sym_make_closure] = Opcode::MAKE_CLOSURE;
-  opcode_map[sym_global_set] = Opcode::GLOBAL_SET;
-  opcode_map[sym_global_ref] = Opcode::GLOBAL_REF;
-  opcode_map[sym_call] = Opcode::CALL;
-  opcode_map[sym_tail_call] = Opcode::TAIL_CALL;
-  opcode_map[sym_closure_ref] = Opcode::CLOSURE_REF;
-  opcode_map[sym_closure_set] = Opcode::CLOSURE_SET;
-  opcode_map[sym_closure_cell_set] = Opcode::CLOSURE_CELL_SET;
-  opcode_map[sym_closure_self] = Opcode::CLOSURE_SELF;
-  opcode_map[sym_closure_cell_ref] = Opcode::CLOSURE_CELL_REF;
-  opcode_map[sym_reg_cell_ref] = Opcode::REG_CELL_REF;
-  opcode_map[sym_reg_cell_set] = Opcode::REG_CELL_SET;
-  opcode_map[sym_make_cell] = Opcode::MAKE_CELL;
+  opcode_map[make_symbol("const")] = Opcode::CONST;
+  opcode_map[make_symbol("mov")] = Opcode::MOV;
+  opcode_map[make_symbol("if")] = Opcode::IF;
+  opcode_map[make_symbol("jump")] = Opcode::JUMP;
+  opcode_map[make_symbol("label")] = Opcode::LABEL;
+  opcode_map[make_symbol("ret")] = Opcode::RET;
+  opcode_map[make_symbol("make-closure")] = Opcode::MAKE_CLOSURE;
+  opcode_map[make_symbol("global-set!")] = Opcode::GLOBAL_SET;
+  opcode_map[make_symbol("global-ref")] = Opcode::GLOBAL_REF;
+  opcode_map[make_symbol("call")] = Opcode::CALL;
+  opcode_map[make_symbol("tail-call")] = Opcode::TAIL_CALL;
+  opcode_map[make_symbol("closure-ref")] = Opcode::CLOSURE_REF;
+  opcode_map[make_symbol("closure-set!")] = Opcode::CLOSURE_SET;
+  opcode_map[make_symbol("closure-cell-set!")] = Opcode::CLOSURE_CELL_SET;
+  opcode_map[make_symbol("closure-self")] = Opcode::CLOSURE_SELF;
+  opcode_map[make_symbol("closure-cell-ref")] = Opcode::CLOSURE_CELL_REF;
+  opcode_map[make_symbol("reg-cell-ref")] = Opcode::REG_CELL_REF;
+  opcode_map[make_symbol("reg-cell-set!")] = Opcode::REG_CELL_SET;
+  opcode_map[make_symbol("make-cell")] = Opcode::MAKE_CELL;
+  object_heap_t* heap = object_heap_t::current();
+  for (const auto& pair : opcode_map) {
+    heap->add_root(pair.first);
+  }
 }
 
 // Helper to parse individual instructions
@@ -421,6 +396,8 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
     inst.op = it->second;
   } else {
     // Unknown opcode or not in map
+    assert(is_symbol(op_sym));
+    fatal("%s:%u codegen: unknown opcode '%s'", __FILE__, __LINE__, symbol_name(op_sym));
     return;
   }
 
@@ -483,6 +460,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
       parse_make_cell(inst_obj, inst, func_info);
       break;
     default:
+      fatal("%s:%u codegen: unknown opcode %ld", __FILE__, __LINE__, inst.op);
       break;
   }
 
@@ -518,7 +496,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
     curr = CDR(curr);
 
     // Check for LABEL opcode to detect function switch
-    if (is_cons(inst_obj) && CAR(inst_obj) == sym_label) {
+    if (is_cons(inst_obj) && CAR(inst_obj) == cached_symbol_label) {
       scm_obj_t label = operand(inst_obj, 1);
       if (is_closure_label(label)) {
         // Finish previous closure literals
@@ -1859,7 +1837,7 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
 }
 
 void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
-  if (inst.closure_label == sym_apply) {
+  if (inst.closure_label == cached_symbol_apply) {
     emit_apply_call(inst, is_tail);
     return;
   }

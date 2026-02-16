@@ -71,27 +71,8 @@ class codegen_t {
   std::map<scm_obj_t, llvm::BasicBlock*> labels;
 
   // Cached symbols
-  scm_obj_t sym_const;
-  scm_obj_t sym_mov;
-  scm_obj_t sym_if;
-  scm_obj_t sym_jump;
-  scm_obj_t sym_label;
-  scm_obj_t sym_ret;
-  scm_obj_t sym_make_closure;
-  scm_obj_t sym_global_set;
-  scm_obj_t sym_global_ref;
-  scm_obj_t sym_call;
-  scm_obj_t sym_tail_call;
-  scm_obj_t sym_closure_ref;
-  scm_obj_t sym_closure_set;
-  scm_obj_t sym_closure_cell_set;
-  scm_obj_t sym_apply;  // Added sym_apply
-
-  scm_obj_t sym_closure_self;
-  scm_obj_t sym_closure_cell_ref;
-  scm_obj_t sym_reg_cell_ref;
-  scm_obj_t sym_reg_cell_set;
-  scm_obj_t sym_make_cell;
+  scm_obj_t cached_symbol_label;
+  scm_obj_t cached_symbol_apply;
 
   // Closure literals: label symbol -> literals vector
   std::map<scm_obj_t, scm_obj_t> closure_literals;
