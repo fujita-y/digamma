@@ -5,6 +5,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
 #include "codegen.h"
+#include "equiv.h"
 #include "hash.h"
 #include "nanos_subr.h"
 #include "object_heap.h"
@@ -199,26 +200,18 @@ int main(int argc, char** argv) {
     intptr_t result = env.codegen->compile(test_case);
 
     // Check result
-    // Expected: (+ (* (* 3 x x) (+ (/ 0 3) (/ 1 x) (/ 1 x))) (* (* a x x) (+ (/ 0 a) (/ 1 x) (/ 1 x))) (* (* b x) (+ (/ 0 b) (/ 1 x))) 0)
-    // Note: Since I don't have a reliable s-expression printer/comparator immediately available in this context,
-    // I can inspect the structure or just rely on manual verification from user output if they run it.
-    // But ideally I should valid structure.
+    const char* expected_sexp =
+        "(+ (* (* 3 x x) (+ (/ 0 3) (/ 1 x) (/ 1 x))) (* (* a x x) (+ (/ 0 a) (/ 1 x) (/ 1 x))) (* (* b x) (+ (/ 0 b) (/ 1 x))) 0)";
+    scm_obj_t expected = env.read_code(expected_sexp);
 
-    // For now, let's just assert that it returns a list and try to minimally validate the head.
-    if (!is_cons(result)) {
-      printf("Result is not a list.\n");
+    object_heap_t* heap = object_heap_t::current();
+    scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
+    if (!equal_p(heap, visited, result, expected)) {
+      printf("DerivTest failed: result does not match expected.\n");
+      printf("Expected: %s\n", expected_sexp);
+      // Note: We don't have a printer here to show result easily :()
       return false;
     }
-
-    scm_obj_t car = CAR(result);
-    scm_obj_t plus_sym = make_symbol("+");
-    if (car != plus_sym) {
-      printf("Result CAR is not +. Got something else.\n");
-      return false;
-    }
-
-    // Further deep validation could be added if needed, but the structure is complex.
-    // If it ran without crashing and returned (+ ...), it's a very good sign given the complexity.
     return true;
   });
 
@@ -289,40 +282,15 @@ int main(int argc, char** argv) {
     intptr_t result = env.codegen->compile(test_case);
 
     // Expected: (4 3 2)
-    if (!is_cons(result)) {
-      printf("Result is not a list\n");
-      return false;
-    }
-    if (fixnum(CAR(result)) != 4) {
-      printf("CAR(result) != 4\n");
-      return false;
-    }
+    const char* expected_sexp = "(4 3 2)";
+    scm_obj_t expected = env.read_code(expected_sexp);
 
-    scm_obj_t r2 = CDR(result);
-    if (!is_cons(r2)) {
-      printf("CDR(result) is not a list\n");
+    object_heap_t* heap = object_heap_t::current();
+    scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
+    if (!equal_p(heap, visited, result, expected)) {
+      printf("MapClosureTest1 failed: result != (4 3 2)\n");
       return false;
     }
-    if (fixnum(CAR(r2)) != 3) {
-      printf("CADR(result) != 3\n");
-      return false;
-    }
-
-    scm_obj_t r3 = CDR(r2);
-    if (!is_cons(r3)) {
-      printf("CDDR(result) is not a list\n");
-      return false;
-    }
-    if (fixnum(CAR(r3)) != 2) {
-      printf("CADDR(result) != 2\n");
-      return false;
-    }
-
-    if (CDR(r3) != scm_nil) {
-      printf("List length != 3\n");
-      return false;
-    }
-
     return true;
   });
 
@@ -342,39 +310,13 @@ int main(int argc, char** argv) {
     intptr_t result = env.codegen->compile(test_case);
 
     // Expected: ((5 1) (5 2) (5 3))
-    auto check_pair = [&](scm_obj_t pair, int val) {
-      if (!is_cons(pair)) {
-        printf("check_pair: not a list\n");
-        return false;
-      }
-      scm_obj_t head = CAR(pair);
-      if (!is_cons(head)) {
-        printf("check_pair: head not a list\n");
-        return false;
-      }
-      if (fixnum(CAR(head)) != 5) {
-        printf("check_pair: CAR(head) != 5\n");
-        return false;
-      }
-      scm_obj_t tail = CDR(head);
-      if (!is_cons(tail)) {
-        printf("check_pair: tail not a list\n");
-        return false;
-      }
-      if (fixnum(CAR(tail)) != val) {
-        printf("check_pair: CAR(tail) != %d\n", val);
-        return false;
-      }
-      return true;
-    };
+    const char* expected_sexp = "((5 1) (5 2) (5 3))";
+    scm_obj_t expected = env.read_code(expected_sexp);
 
-    if (!check_pair(result, 1)) return false;
-    scm_obj_t r2 = CDR(result);
-    if (!check_pair(r2, 2)) return false;
-    scm_obj_t r3 = CDR(r2);
-    if (!check_pair(r3, 3)) return false;
-    if (CDR(r3) != scm_nil) {
-      printf("List length != 3\n");
+    object_heap_t* heap = object_heap_t::current();
+    scm_obj_t visited = make_hashtable(address_hash, address_equiv, 16);
+    if (!equal_p(heap, visited, result, expected)) {
+      printf("MapClosureTest2 failed: result != ((5 1) (5 2) (5 3))\n");
       return false;
     }
 
