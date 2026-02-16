@@ -82,11 +82,13 @@ void concurrent_heap_t::snapshot_stack() {
     if (!m_concurrent_pool->in_pool((void*)addr)) return false;
     if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
     slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
+    if (traits->refc == 0) return false;
     int object_size = traits->owner->m_object_size;
     uint64_t aligned = addr & ~(object_size - 1);
-    uint64_t boundary = (uint64_t)traits - traits->owner->m_bitmap_size;
-    if (aligned + object_size >= boundary) return false;
-    if (*(uint64_t*)aligned == 0) return false;
+    uint64_t limit = (uint64_t)traits - traits->owner->m_bitmap_size - object_size;
+    if (aligned > limit) return false;
+    uint64_t tag = *(uint64_t*)aligned;
+    if (tag == 0) return false;
     return true;
   });
   for (uint64_t addr : candidates) {
