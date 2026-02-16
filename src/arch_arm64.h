@@ -21,4 +21,6 @@ inline uint64_t prune_memory_address(uint64_t addr) { return addr & ~((uint64_t)
 inline uint64_t prune_memory_address(uint64_t addr) { return addr; }
 #endif
 
+#define MEM_STORE_FENCE __asm__ __volatile__("dsb sy" ::: "memory")
+
 #endif
