@@ -90,7 +90,8 @@ void concurrent_heap_t::snapshot_stack() {
     return true;
   });
   for (uint64_t addr : candidates) {
-    enqueue_root((void*)addr);
+    void* pruned = (void*)((uint64_t)prune_memory_address(addr) & ~((uint64_t)0xf));
+    enqueue_root(pruned);
   }
 #ifndef NDEBUG
   printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
@@ -457,6 +458,7 @@ void concurrent_heap_t::shade(void* obj) {
         *m_mark_sp++ = obj;
       }
     } else {
+      // object not fully constructed ?
       fatal("%s:%u object not in pool %p", __FILE__, __LINE__, obj);
     }
   }
