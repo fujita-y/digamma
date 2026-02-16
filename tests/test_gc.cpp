@@ -76,7 +76,7 @@ static bool test_gc_allocation(int num_loops) {
 
   scm_obj_t env = make_environment(make_string("my-env"));
 
-  scm_obj_t root_list = make_list(11, make_fixnum(2), make_symbol("bar"), make_string("baz"), vec, c, f, u8, ht, clos, env);
+  scm_obj_t root_list = make_list(10, make_fixnum(2), make_symbol("bar"), make_string("baz"), vec, c, f, u8, ht, clos, env);
 
   scm_obj_t root = make_cons(make_symbol("foo"), root_list);
 
