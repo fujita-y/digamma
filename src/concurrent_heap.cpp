@@ -3,6 +3,9 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
+#include <algorithm>
+#include <unordered_set>
+#include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
@@ -62,8 +65,67 @@ void concurrent_heap_t::terminate() {
   GCTRACE(";; [collector: terminated]\n");
 }
 
+void concurrent_heap_t::snapshot_stack() {
+  uint64_t regs[11];
+  capture_arm64_core_state(regs);
+  uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];  // last reg is stack pointer
+  uint64_t thread_stack_bottom = capture_thread_stack_bottom();
+  std::unordered_set<uint64_t> raw;
+  raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) {
+    raw.insert(prune_memory_address(regs[i]));
+  }
+  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
+    raw.insert(prune_memory_address(*(uint64_t*)addr));
+  }
+  std::unordered_set<uint64_t> candidates;
+  for (const auto& addr : raw) {
+    if (!m_concurrent_pool->in_pool((void*)addr)) continue;
+    if (!m_concurrent_pool->is_collectible((void*)addr)) continue;
+    slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
+    int object_size = traits->owner->m_object_size;
+    uint64_t tag = addr & ~(object_size - 1);
+    uint64_t limit = (uint64_t)traits - traits->owner->m_bitmap_size - object_size;
+    if (tag > limit) continue;
+    if (*(uint64_t*)tag == 0) continue;
+    candidates.insert(tag);
+  }
+  for (uint64_t addr : candidates) {
+    enqueue_root((void*)addr);
+  }
+#ifndef NDEBUG
+  printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
+  printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
+  printf(";; thread stack top: %p\n", (void*)thread_stack_top);
+  printf(";; thread stack size: %ld\n", thread_stack_bottom - thread_stack_top);
+  printf(";; x19-x28: [");
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
+  printf("]\n");
+  printf(";; raw size: %ld candidates size: %ld\n", raw.size(), candidates.size());
+#endif
+}
+
 void concurrent_heap_t::safepoint() {
   while (m_stop_the_world) {
+    switch (m_root_snapshot_mode) {
+      case ROOT_SNAPSHOT_MODE_GLOBALS:
+        snapshot_root();
+        break;
+      case ROOT_SNAPSHOT_MODE_LOCALS:
+        snapshot_stack();
+        break;
+      case ROOT_SNAPSHOT_MODE_EVERYTHING:
+        snapshot_root();
+        snapshot_stack();
+        break;
+      case ROOT_SNAPSHOT_MODE_RETRY:
+        snapshot_root();
+        snapshot_stack();
+        break;
+      default:
+        fatal("%s:%u unknown snapshot mode: %d", __FILE__, __LINE__, m_root_snapshot_mode);
+        break;
+    }
     m_collector_lock.lock();
     while (m_stop_the_world) {
       m_mutator_stopped = true;
@@ -90,7 +152,6 @@ void concurrent_heap_t::collect() {
 
 void concurrent_heap_t::synchronized_collect() {
   clear_trip_bytes();
-  snapshot_root();
 
   // mark
   assert(m_mutator_stopped == false);
@@ -122,7 +183,7 @@ void concurrent_heap_t::synchronized_collect() {
     if (m_collector_terminating) return;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       uint8_t* slab = m_concurrent_pool->m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT);
-      traits->cache->sweep(slab);
+      traits->owner->sweep(slab);
     }
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
@@ -178,10 +239,6 @@ void concurrent_heap_t::concurrent_collect() {
 
   concurrent_mark();
 
-  // mark phase 1+
-  snapshot_root();
-  concurrent_mark();
-
   // mark phase 2
   m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_LOCALS;
   m_stop_the_world = true;
@@ -214,9 +271,9 @@ fallback:
 
   // final mark
   assert(m_mutator_stopped == false);
+
   m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world final]\n");
-
   while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
@@ -268,13 +325,13 @@ fallback:
     if (m_collector_terminating) return;
     int memo = m_concurrent_pool->m_pool_usage;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
-      if (SLAB_TRAITS_OF(slab)->cache == NULL) {
+      if (SLAB_TRAITS_OF(slab)->owner == NULL) {
         GCTRACE(";; [collector: wait for mutator complete slab init]\n");
         sched_yield();
         continue;
       }
       debug_check_slab(slab);
-      SLAB_TRAITS_OF(slab)->cache->sweep(slab);
+      SLAB_TRAITS_OF(slab)->owner->sweep(slab);
       slab += SLAB_SIZE;
       i++;
     } else {
@@ -385,7 +442,7 @@ bool concurrent_heap_t::synchronized_mark() {
 void concurrent_heap_t::shade(void* obj) {
   if (SLAB_DATUM_BITS_TEST(obj)) {
     if (m_concurrent_pool->in_pool(obj)) {
-      if (SLAB_TRAITS_OF(obj)->cache->state(obj) == false) {
+      if (SLAB_TRAITS_OF(obj)->owner->state(obj) == false) {
         if (m_mark_sp < m_mark_stack + m_mark_stack_size) {
           *m_mark_sp++ = obj;
           return;
@@ -401,6 +458,7 @@ void concurrent_heap_t::shade(void* obj) {
         *m_mark_sp++ = obj;
       }
     } else {
+      // object not fully constructed ?
       fatal("%s:%u object not in pool %p", __FILE__, __LINE__, obj);
     }
   }
@@ -410,7 +468,7 @@ void concurrent_heap_t::shade(void* obj) {
 void concurrent_heap_t::interior_shade(void* ref) {
   if (ref) {
     assert(m_concurrent_pool->is_collectible(ref));
-    shade(SLAB_TRAITS_OF(ref)->cache->lookup(ref));
+    shade(SLAB_TRAITS_OF(ref)->owner->lookup(ref));
   }
 }
 
@@ -447,9 +505,9 @@ void concurrent_heap_t::write_barrier(void* rhs) {
   if (m_write_barrier) {
     if (SLAB_DATUM_BITS_TEST(rhs)) {
       if (m_concurrent_pool->in_pool(rhs)) {
-        if (SLAB_TRAITS_OF(rhs)->cache->state(rhs) == false) {
+        if (SLAB_TRAITS_OF(rhs)->owner->state(rhs) == false) {
           while (m_shade_queue.wait_lock_try_put(rhs) == false) {
-            if (SLAB_TRAITS_OF(rhs)->cache->state(rhs)) break;
+            if (SLAB_TRAITS_OF(rhs)->owner->state(rhs)) break;
             if (m_stop_the_world) {
               GCTRACE(";; [write-barrier: m_shade_queue overflow, during stop-the-world]\n");
               m_collector_lock.lock();

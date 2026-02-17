@@ -5,13 +5,8 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
+#include "arch_arm64.h"
 #include "mutex.h"
-
-#if defined(NDEBUG)
-  #define USE_TBI 1
-#else
-  #define USE_TBI 0
-#endif
 
 /*
 
@@ -150,6 +145,7 @@ struct scm_closure_rec_t {
   void* code;
   int argc;
   int rest;
+  int cdecl;
   int nsize;
   scm_obj_t env[1];  // free variables
 };
@@ -159,14 +155,6 @@ struct scm_environment_rec_t {
   scm_obj_t name;       // symbol
   scm_obj_t variables;  // hashtable
   scm_obj_t macros;     // hashtable
-};
-
-struct scm_subr_rec_t {
-  scm_tc6_t tag;
-  scm_obj_t name;
-  int argc;
-  int rest;
-  void* code;
 };
 
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
@@ -208,15 +196,15 @@ inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
 scm_obj_t make_cell(scm_obj_t value);
 scm_obj_t make_list(int len, ...);
+scm_obj_t make_list2(scm_obj_t first, scm_obj_t second);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
 scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
-scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
-scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
@@ -230,4 +218,7 @@ inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_add
 inline scm_obj_t cell_value(scm_obj_t x) { return ((scm_cell_rec_t*)to_address(x))->value; }
 void cell_value_set(scm_obj_t x, scm_obj_t v);
 
+inline int closure_argc(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->argc; }
+inline int closure_rest(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->rest; }
+inline int closure_nsize(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nsize; }
 #endif

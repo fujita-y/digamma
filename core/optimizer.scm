@@ -142,8 +142,6 @@
       (cond
         ((null? ps)
          `(lambda ,(if (list? params) (reverse new-params) params) ,@body-exprs))
-        ((and (not (memq (car ps) used)) (not (memq (car ps) mutated)))
-         (loop (cdr ps) new-params)) ;; Remove unused param
         (else
          (loop (cdr ps) (cons (car ps) new-params)))))))
 

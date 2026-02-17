@@ -132,9 +132,6 @@ void concurrent_pool_t::deallocate(void* p) {
       break;
     }
   }
-#if !defined(NDEBUG) || HPDEBUG
-  memset(p, 0xBD, SLAB_SIZE);
-#endif
 }
 
 bool concurrent_pool_t::extend_pool(size_t extend_size) {

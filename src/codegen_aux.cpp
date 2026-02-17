@@ -4,15 +4,19 @@
 #include "core.h"
 #include "object.h"
 #include "codegen_aux.h"
+#include "codegen.h"
 #include "object_heap.h"
 
+#define CAR(x) (((scm_cons_rec_t*)(x))->car)
+#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals) {
-  return make_closure(code, argc, rest, nsize, env, literals);
+  return make_closure(code, argc, rest, nsize, env, literals, 0);
 }
 
-extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil); }
+extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil, 0); }
 
-extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, literals); }
+extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, literals, 0); }
 
 extern "C" void c_global_set(scm_obj_t key, scm_obj_t value) {
   assert(is_symbol(key));
@@ -33,4 +37,33 @@ extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]) {
     list = make_cons(argv[i], list);
   }
   return list;
+}
+
+extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) {
+  if (argc < 1) {
+    throw std::runtime_error("apply: too few arguments");
+  }
+
+  scm_obj_t list = argv[argc - 1];  // Last argument must be a list
+
+  std::vector<scm_obj_t> args;
+  for (int i = 0; i < argc - 1; i++) {
+    args.push_back(argv[i]);
+  }
+
+  scm_obj_t curr = list;
+  while (is_cons(curr)) {
+    args.push_back(CAR(curr));
+    curr = CDR(curr);
+  }
+  if (curr != scm_nil) throw std::runtime_error("apply: last argument must be a proper list");
+
+  codegen_t* cg = codegen_t::current();
+  if (!cg) throw std::runtime_error("apply: JIT not initialized");
+
+  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
+  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
+  auto bridge = (bridge_func_t)bridge_ptr;
+
+  return (scm_obj_t)bridge(proc, args.size(), args.data());
 }

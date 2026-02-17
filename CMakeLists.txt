@@ -135,7 +135,9 @@ set(NANOS_CORE_SOURCES
   src/vector.cpp
   src/codegen.cpp
   src/codegen_aux.cpp
-  src/codegen_subr.cpp
+  src/nanos_subr.cpp
+  src/arch_arm64.cpp
+  src/equiv.cpp
 )
 
 # ==============================================================================
@@ -214,5 +216,21 @@ target_link_libraries(test_hash PRIVATE nanos_io)
 
 add_nanos_test(test_symbol tests/test_symbol.cpp)
 
+add_nanos_test(test_closure_analysis tests/test_closure_analysis.cpp)
+target_link_libraries(test_closure_analysis PRIVATE nanos_io)
+
 add_nanos_test(test_codegen tests/test_codegen.cpp)
 target_link_libraries(test_codegen PRIVATE nanos_io)
+
+add_nanos_test(test_closure_patterns tests/test_closure_patterns.cpp)
+target_link_libraries(test_closure_patterns PRIVATE nanos_io)
+
+
+add_nanos_test(test_apply_patterns tests/test_apply_patterns.cpp)
+target_link_libraries(test_apply_patterns PRIVATE nanos_io)
+
+add_nanos_test(test_deriv tests/test_deriv.cpp)
+target_link_libraries(test_deriv PRIVATE nanos_io)
+
+add_nanos_test(test_equiv tests/test_equiv.cpp)
+target_link_libraries(test_equiv PRIVATE nanos_io)

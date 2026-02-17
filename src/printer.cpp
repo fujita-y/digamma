@@ -154,7 +154,8 @@ void printer_t::print(scm_obj_t obj) {
     return;
   }
   if (is_closure(obj)) {
-    out << "#<closure 0x" << std::hex << obj << std::dec << ">";
+    out << "#<closure 0x" << std::hex << obj << std::dec << " argc:" << closure_argc(obj) << " rest:" << closure_rest(obj)
+        << " nsize:" << closure_nsize(obj) << ">";
     return;
   }
 

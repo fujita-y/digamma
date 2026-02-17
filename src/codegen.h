@@ -7,7 +7,7 @@
 #include "core.h"
 #include "object.h"
 
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -50,11 +50,15 @@ struct Instruction {
   int argc = 0;
   bool has_rest = false;
   scm_obj_t free_indices = scm_nil;
+  scm_obj_t closure_label = scm_nil;
 };
 
 class codegen_t {
+  thread_local static codegen_t* s_current;
+
+  llvm::orc::ThreadSafeContext ts_context;
   llvm::LLVMContext& context;
-  llvm::ExecutionEngine* engine;
+  llvm::orc::LLJIT* jit;
   llvm::IRBuilder<> builder;
   llvm::Module* module = nullptr;  // Current module being compiled
   std::unique_ptr<llvm::Module> current_module_uptr;
@@ -67,32 +71,11 @@ class codegen_t {
   std::map<scm_obj_t, llvm::BasicBlock*> labels;
 
   // Cached symbols
-  scm_obj_t sym_const;
-  scm_obj_t sym_mov;
-  scm_obj_t sym_if;
-  scm_obj_t sym_jump;
-  scm_obj_t sym_label;
-  scm_obj_t sym_ret;
-  scm_obj_t sym_make_closure;
-  scm_obj_t sym_global_set;
-  scm_obj_t sym_global_ref;
-  scm_obj_t sym_call;
-  scm_obj_t sym_tail_call;
-  scm_obj_t sym_closure_ref;
-  scm_obj_t sym_closure_set;
-  scm_obj_t sym_closure_cell_set;  // Added this line
-
-  scm_obj_t sym_closure_self;
-  scm_obj_t sym_closure_cell_ref;
-  scm_obj_t sym_reg_cell_ref;
-  scm_obj_t sym_reg_cell_set;
-  scm_obj_t sym_make_cell;
+  scm_obj_t cached_symbol_label;
+  scm_obj_t cached_symbol_apply;
 
   // Closure literals: label symbol -> literals vector
   std::map<scm_obj_t, scm_obj_t> closure_literals;
-
-  // Closure parameters: label symbol -> {fixed_argc, has_rest}
-  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
 
   // Tracks closure entry points: label symbol -> llvm function
   std::map<scm_obj_t, llvm::Function*> function_map;
@@ -102,6 +85,8 @@ class codegen_t {
 
   // The 'self' argument of the current closure function
   llvm::Value* current_closure_self = nullptr;
+
+  friend class ClosureAnalysisTest;
 
   struct FunctionInfo {
     llvm::Function* llvm_function = nullptr;
@@ -140,10 +125,42 @@ class codegen_t {
   // Helper to setup rest arguments for a closure function
   void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
 
+  // Helper to parse individual instructions
+  void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
+                   std::vector<scm_obj_t>& current_literals);
+  void parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_jump(const scm_obj_t& inst_obj, Instruction& inst);
+  void parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
+  void parse_ret(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_global_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_global_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_call(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_tail_call(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_self(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_cell_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_closure_cell_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_reg_cell_ref(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_reg_cell_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+  void parse_make_cell(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
+
+  // Helper methods for emit_call_common decomposition
+  void emit_apply_call(const Instruction& inst, bool is_tail);
+  void emit_known_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                              llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block);
+  void emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                                llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
+
   // LLVM type helpers to reduce code duplication
   llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(context); }
   llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(context); }
   llvm::Type* getVoidPtrType() { return builder.getPtrTy(); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::get(getInt64Type(), 0); }
   llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(context, llvm::APInt(64, (uint64_t)scm_false)); }
 
   // Helper to get code pointer from closure object
@@ -182,6 +199,12 @@ class codegen_t {
   // Opcode map for faster lookup
   std::map<scm_obj_t, Opcode> opcode_map;
 
+  // Analysis pass
+  void analyze_closure_labels();
+
+  // Dump instructions for debugging
+  void dump_instructions(const std::vector<Instruction>& instructions);
+
   // Compilation phases
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);
@@ -191,10 +214,26 @@ class codegen_t {
   intptr_t phase5_finalize();
 
  public:
-  codegen_t(llvm::LLVMContext& ctx, llvm::ExecutionEngine* ee);
+  codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit);
 
   // Compile a list of instructions
   intptr_t compile(scm_obj_t inst_list);
+
+  // Helper to get or create the general call closure bridge
+  llvm::Function* get_or_create_call_closure_bridge();
+
+  // Helper to get the compiled address of the call closure bridge
+  void* get_call_closure_bridge_ptr();
+
+  // Closure parameters: label symbol -> {fixed_argc, has_rest}
+  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
+
+  friend class ClosureAnalysisTest;
+
+  static codegen_t* current() {
+    assert(s_current);
+    return s_current;
+  }
 };
 
 #endif

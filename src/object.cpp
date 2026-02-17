@@ -54,8 +54,8 @@ scm_obj_t make_flonum(double d) {
   if (u64 == 0) {
     object_heap_t& heap = *object_heap_t::current();
     scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)heap.alloc_flonum();
-    rec->tag = tc6_tag(tc6_long_flonum);
     rec->value = d;
+    rec->tag = tc6_tag(tc6_long_flonum);
     return tc6_pointer(rec, tc6_long_flonum);
   }
   return u64;
@@ -99,8 +99,8 @@ scm_obj_t make_string(const char* name) {
   int n = strlen(name) + 1;
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
   memcpy(datum, name, n);
-  rec->tag = tc6_tag(tc6_string);
   rec->name = datum;
+  rec->tag = tc6_tag(tc6_string);
   return tc6_pointer(rec, tc6_string);
 }
 
@@ -112,12 +112,12 @@ uint8_t* string_name(scm_obj_t x) {
 scm_obj_t make_vector(int nsize, scm_obj_t init) {
   object_heap_t& heap = *object_heap_t::current();
   scm_vector_rec_t* rec = (scm_vector_rec_t*)heap.alloc_vector();
-  rec->tag = tc6_tag(tc6_vector);
   rec->elts = (scm_obj_t*)heap.alloc_private(nsize * sizeof(scm_obj_t));
   rec->nsize = nsize;
   for (int i = 0; i < nsize; i++) {
     rec->elts[i] = init;
   }
+  rec->tag = tc6_tag(tc6_vector);
   return tc6_pointer(rec, tc6_vector);
 }
 
@@ -126,17 +126,16 @@ scm_obj_t make_u8vector(int nsize) {
   scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)heap.alloc_u8vector(nsize);
   uint8_t* elts = (uint8_t*)heap.alloc_private(nsize * sizeof(uint8_t));
   memset(elts, 0, nsize * sizeof(uint8_t));
-  rec->tag = tc6_tag(tc6_u8vector);
   rec->elts = elts;
   rec->nsize = nsize;
+  rec->tag = tc6_tag(tc6_u8vector);
   return tc6_pointer(rec, tc6_u8vector);
 }
 
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   object_heap_t& heap = *object_heap_t::current();
   scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)heap.alloc_hashtable();
-  int nsize = find_hashtable_size(capacity);
-  rec->tag = tc6_tag(tc6_hashtable);
+  int nsize = calc_hashtable_size(capacity);
   rec->lock.init();
   rec->hash = hash;
   rec->equiv = equiv;
@@ -146,39 +145,41 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   rec->aux->used = 0;
   rec->aux->live = 0;
   for (int i = 0; i < (nsize * 2); i++) rec->aux->elts[i] = scm_hash_free;
+  rec->tag = tc6_tag(tc6_hashtable);
   return tc6_pointer(rec, tc6_hashtable);
 }
 
-scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals) {
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl) {
   object_heap_t& heap = *object_heap_t::current();
   scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) + (nsize - 1) * sizeof(scm_obj_t));
-  rec->tag = tc6_tag(tc6_closure);
   rec->literals = literals;
   rec->code = code;
   rec->argc = argc;
   rec->rest = rest;
   rec->nsize = nsize;
+  rec->cdecl = cdecl;
   for (int i = 0; i < nsize; i++) {
     rec->env[i] = env[i];
   }
+  rec->tag = tc6_tag(tc6_closure);
   return tc6_pointer(rec, tc6_closure);
 }
 
 scm_obj_t make_environment(scm_obj_t name) {
   object_heap_t& heap = *object_heap_t::current();
   scm_environment_rec_t* rec = (scm_environment_rec_t*)heap.alloc_environment();
-  rec->tag = tc6_tag(tc6_environment);
   rec->name = name;
   rec->variables = make_hashtable(symbol_hash, symbol_equiv, 16);
   rec->macros = make_hashtable(symbol_hash, symbol_equiv, 16);
+  rec->tag = tc6_tag(tc6_environment);
   return tc6_pointer(rec, tc6_environment);
 }
 
 scm_obj_t make_cell(scm_obj_t value) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();
-  rec->tag = tc6_tag(tc6_cell);
   rec->value = value;
+  rec->tag = tc6_tag(tc6_cell);
   return tc6_pointer(rec, tc6_cell);
 }
 
@@ -190,8 +191,8 @@ void cell_value_set(scm_obj_t x, scm_obj_t v) {
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cons_rec_t* rec = (scm_cons_rec_t*)heap.alloc_cons();
-  rec->car = car;
   rec->cdr = cdr;
+  rec->car = car;
   return (scm_obj_t)rec;
 }
 
@@ -210,13 +211,4 @@ scm_obj_t make_list(int len, ...) {
   return (scm_obj_t)rec;
 }
 
-scm_obj_t make_subr(scm_obj_t name, int argc, int rest, void* code) {
-  object_heap_t& heap = *object_heap_t::current();
-  scm_subr_rec_t* rec = (scm_subr_rec_t*)heap.alloc_subr();
-  rec->tag = tc6_tag(tc6_subr);
-  rec->name = name;
-  rec->argc = argc;
-  rec->rest = rest;
-  rec->code = code;
-  return tc6_pointer(rec, tc6_subr);
-}
+scm_obj_t make_list2(scm_obj_t first, scm_obj_t second) { return make_cons(first, make_cons(second, scm_nil)); }

@@ -7,8 +7,8 @@
 #include "core.h"
 #include "object.h"
 #include <mutex>
-#include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -27,22 +27,22 @@ class object_heap_t {
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
   concurrent_slab_t m_environments;
-  concurrent_slab_t m_subrs;
   concurrent_slab_t m_collectibles[8];  // 16-32-64-128-256-512-1024-2048
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
   uint64_t m_trip_bytes;
-  std::set<scm_obj_t> m_root_set;
+  std::unordered_set<scm_obj_t> m_root_set;
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void shade(scm_obj_t obj);
-  void trace(void* obj);
+  void trace(void* obj) __attribute__((no_sanitize("address", "hwaddress")));
   void finalize(void* obj);
   void snapshot_root();
   void update_weak_reference();
   void sweep_symbol_table();
   void delete_private(void* obj);
+  void enqueue_root(scm_obj_t obj);
 #if HPDEBUG
   void consistency_check();
   void validate_concurrent_slab(void* slab);
@@ -52,6 +52,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
+  void collect() { m_concurrent_heap.collect(); }
   void* alloc_cons() { return alloc_object(m_cons); }
   void* alloc_cell() { return alloc_object(m_cells); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
@@ -61,7 +62,6 @@ class object_heap_t {
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_environment() { return alloc_object(m_environments); }
-  void* alloc_subr() { return alloc_object(m_subrs); }
   void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
 

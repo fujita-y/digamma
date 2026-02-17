@@ -571,23 +571,23 @@ scm_obj_t reader_t::read_char(bool& err) {
 scm_obj_t reader_t::read_quote(bool& err) {
   scm_obj_t obj = read(err);
   if (err) return scm_undef;
-  return make_list(2, make_symbol("quote"), obj);
+  return make_list2(make_symbol("quote"), obj);
 }
 
 scm_obj_t reader_t::read_quasiquote(bool& err) {
   scm_obj_t obj = read(err);
   if (err) return scm_undef;
-  return make_list(2, make_symbol("quasiquote"), obj);
+  return make_list2(make_symbol("quasiquote"), obj);
 }
 
 scm_obj_t reader_t::read_unquote(bool& err) {
   scm_obj_t obj = read(err);
   if (err) return scm_undef;
-  return make_list(2, make_symbol("unquote"), obj);
+  return make_list2(make_symbol("unquote"), obj);
 }
 
 scm_obj_t reader_t::read_unquote_splicing(bool& err) {
   scm_obj_t obj = read(err);
   if (err) return scm_undef;
-  return make_list(2, make_symbol("unquote-splicing"), obj);
+  return make_list2(make_symbol("unquote-splicing"), obj);
 }
