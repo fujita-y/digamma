@@ -106,26 +106,26 @@ void concurrent_heap_t::snapshot_stack() {
 }
 
 void concurrent_heap_t::safepoint() {
-  if (!m_stop_the_world) return;
-
-  switch (m_root_snapshot_mode) {
-    case ROOT_SNAPSHOT_MODE_GLOBALS:
-      snapshot_root();
-      break;
-    case ROOT_SNAPSHOT_MODE_LOCALS:
-      snapshot_stack();
-      break;
-    case ROOT_SNAPSHOT_MODE_EVERYTHING:
-      snapshot_root();
-      snapshot_stack();
-      break;
-    case ROOT_SNAPSHOT_MODE_RETRY:
-      snapshot_root();
-      snapshot_stack();
-      break;
-  }
-
   while (m_stop_the_world) {
+    switch (m_root_snapshot_mode) {
+      case ROOT_SNAPSHOT_MODE_GLOBALS:
+        snapshot_root();
+        break;
+      case ROOT_SNAPSHOT_MODE_LOCALS:
+        snapshot_stack();
+        break;
+      case ROOT_SNAPSHOT_MODE_EVERYTHING:
+        snapshot_root();
+        snapshot_stack();
+        break;
+      case ROOT_SNAPSHOT_MODE_RETRY:
+        snapshot_root();
+        snapshot_stack();
+        break;
+      default:
+        fatal("%s:%u unknown snapshot mode: %d", __FILE__, __LINE__, m_root_snapshot_mode);
+        break;
+    }
     m_collector_lock.lock();
     while (m_stop_the_world) {
       m_mutator_stopped = true;
@@ -271,9 +271,9 @@ fallback:
 
   // final mark
   assert(m_mutator_stopped == false);
+
   m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world final]\n");
-
   while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);

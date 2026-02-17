@@ -55,7 +55,6 @@ scm_obj_t make_flonum(double d) {
     object_heap_t& heap = *object_heap_t::current();
     scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)heap.alloc_flonum();
     rec->value = d;
-    MEM_STORE_FENCE;
     rec->tag = tc6_tag(tc6_long_flonum);
     return tc6_pointer(rec, tc6_long_flonum);
   }
@@ -101,7 +100,6 @@ scm_obj_t make_string(const char* name) {
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
   memcpy(datum, name, n);
   rec->name = datum;
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_string);
   return tc6_pointer(rec, tc6_string);
 }
@@ -119,7 +117,6 @@ scm_obj_t make_vector(int nsize, scm_obj_t init) {
   for (int i = 0; i < nsize; i++) {
     rec->elts[i] = init;
   }
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_vector);
   return tc6_pointer(rec, tc6_vector);
 }
@@ -131,7 +128,6 @@ scm_obj_t make_u8vector(int nsize) {
   memset(elts, 0, nsize * sizeof(uint8_t));
   rec->elts = elts;
   rec->nsize = nsize;
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_u8vector);
   return tc6_pointer(rec, tc6_u8vector);
 }
@@ -149,7 +145,6 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   rec->aux->used = 0;
   rec->aux->live = 0;
   for (int i = 0; i < (nsize * 2); i++) rec->aux->elts[i] = scm_hash_free;
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_hashtable);
   return tc6_pointer(rec, tc6_hashtable);
 }
@@ -166,7 +161,6 @@ scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[
   for (int i = 0; i < nsize; i++) {
     rec->env[i] = env[i];
   }
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_closure);
   return tc6_pointer(rec, tc6_closure);
 }
@@ -177,7 +171,6 @@ scm_obj_t make_environment(scm_obj_t name) {
   rec->name = name;
   rec->variables = make_hashtable(symbol_hash, symbol_equiv, 16);
   rec->macros = make_hashtable(symbol_hash, symbol_equiv, 16);
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_environment);
   return tc6_pointer(rec, tc6_environment);
 }
@@ -186,7 +179,6 @@ scm_obj_t make_cell(scm_obj_t value) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();
   rec->value = value;
-  MEM_STORE_FENCE;
   rec->tag = tc6_tag(tc6_cell);
   return tc6_pointer(rec, tc6_cell);
 }
@@ -200,7 +192,6 @@ scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cons_rec_t* rec = (scm_cons_rec_t*)heap.alloc_cons();
   rec->cdr = cdr;
-  MEM_STORE_FENCE;
   rec->car = car;
   return (scm_obj_t)rec;
 }
