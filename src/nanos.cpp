@@ -45,6 +45,8 @@ static void setup_subr() {
   c_global_set(make_symbol("newline"), scm_subr_newline);
   scm_obj_t scm_subr_collect = make_closure((void*)subr_collect, 0, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("collect"), scm_subr_collect);
+  scm_obj_t scm_subr_safepoint = make_closure((void*)subr_safepoint, 0, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("safepoint"), scm_subr_safepoint);
 }
 
 int main() {

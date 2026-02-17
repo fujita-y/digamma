@@ -171,3 +171,8 @@ SUBR scm_obj_t subr_collect(scm_obj_t self) {
   object_heap_t::current()->collect();
   return scm_undef;
 }
+
+SUBR scm_obj_t subr_safepoint(scm_obj_t self) {
+  object_heap_t::current()->safepoint();
+  return scm_undef;
+}
