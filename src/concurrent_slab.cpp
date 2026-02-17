@@ -307,7 +307,6 @@ void concurrent_slab_t::sweep(void* slab) {
   uint8_t* p = bitmap;
   int refc = traits->refc;
   freelist_t* freelist = traits->free;
-  concurrent_slab_t* cache = traits->owner;
   do {
     uint8_t bit = 1;
     uint8_t bits = p[0];

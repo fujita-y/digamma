@@ -61,7 +61,7 @@ class concurrent_heap_t {
   void init(concurrent_pool_t* pool);
   void terminate();
   void collect();
-  void shade(void* obj);
+  void shade(void* obj) __attribute__((no_sanitize("address", "hwaddress")));
   void interior_shade(void* ref);
   void dequeue_root();
   void enqueue_root(void* obj);

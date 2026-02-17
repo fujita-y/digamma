@@ -53,7 +53,6 @@ class concurrent_slab_t {
  private:
   concurrent_heap_t* m_concurrent_heap;
   int m_object_size_shift;
-  int m_bitmap_size;
   int m_cache_count;
   bool m_finalize;
   void init_freelist(uint8_t* top, uint8_t* bottom, slab_traits_t* traits);
@@ -65,6 +64,7 @@ class concurrent_slab_t {
   mutex_t m_lock;
   slab_traits_t* m_vacant;
   slab_traits_t* m_occupied;
+  int m_bitmap_size;
   int m_object_size;
   int m_cache_limit;
   concurrent_slab_t();
@@ -83,7 +83,7 @@ class concurrent_slab_t {
     return (void*)((intptr_t)ref & ~(m_object_size - 1));
   }
 
-  bool state(void* obj) {
+  bool state(void* obj) __attribute__((no_sanitize("address", "hwaddress"))) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
     int bit_n = ((intptr_t)obj & (SLAB_SIZE - 1)) >> m_object_size_shift;

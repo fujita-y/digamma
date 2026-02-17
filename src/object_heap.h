@@ -7,8 +7,8 @@
 #include "core.h"
 #include "object.h"
 #include <mutex>
-#include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -31,7 +31,7 @@ class object_heap_t {
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
   uint64_t m_trip_bytes;
-  std::set<scm_obj_t> m_root_set;
+  std::unordered_set<scm_obj_t> m_root_set;
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);

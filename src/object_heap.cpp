@@ -246,6 +246,12 @@ void object_heap_t::trace(void* obj) {
   if (traits->owner == &m_environments) {
 #ifndef NDEBUG
     puts("trace environment");
+    printf("SLAB_TOP_OF(obj): %lx\n", (uint64_t)SLAB_TOP_OF(obj));
+    printf("SLAB_TRAITS_OF(obj): %lx\n", (uint64_t)SLAB_TRAITS_OF(obj));
+    printf("traits->refc: %lu\n", traits->refc);
+    printf("traits->owner->m_object_size: %u\n", traits->owner->m_object_size);
+    printf("obj modulo object_size (must be 0): %lu\n", (uint64_t)obj % traits->owner->m_object_size);
+    printf("limit: %lx\n", (uint64_t)traits - traits->owner->m_bitmap_size);
 #endif
     scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
 #ifndef NDEBUG
