@@ -36,7 +36,7 @@ class object_heap_t {
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void shade(scm_obj_t obj);
-  void trace(void* obj);
+  void trace(void* obj) __attribute__((no_sanitize("address", "hwaddress")));
   void finalize(void* obj);
   void snapshot_root();
   void update_weak_reference();

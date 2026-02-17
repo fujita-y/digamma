@@ -105,57 +105,6 @@ void concurrent_heap_t::snapshot_stack() {
 #endif
 }
 
-/*
-void concurrent_heap_t::snapshot_stack() {
-  uint64_t regs[11];
-  capture_arm64_core_state(regs);
-  uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];  // last reg is stack pointer
-  uint64_t thread_stack_bottom = capture_thread_stack_bottom();
-  std::vector<uint64_t> raw;
-  raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
-  for (int i = 0; i < array_sizeof(regs) - 1; i++) {
-    raw.push_back(prune_memory_address(regs[i]));
-  }
-  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
-    raw.push_back(prune_memory_address(*(uint64_t*)addr));
-  }
-  std::vector<uint64_t> candidates;
-  std::copy_if(raw.begin(), raw.end(), std::back_inserter(candidates), [this](uint64_t addr) {
-    if (!m_concurrent_pool->in_pool((void*)addr)) return false;
-    if (!m_concurrent_pool->is_collectible((void*)addr)) return false;
-    slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
-    if (traits->refc == 0) return false;
-    int object_size = traits->owner->m_object_size;
-    uint64_t aligned = addr & ~(object_size - 1);
-    uint64_t limit = (uint64_t)traits - traits->owner->m_bitmap_size - object_size;
-    if (aligned > limit) return false;
-    uint64_t tag = *(uint64_t*)aligned;
-    if (tag == 0) return false;
-    return true;
-  });
-  for (uint64_t addr : candidates) {
-    void* pruned = (void*)((uint64_t)prune_memory_address(addr) & ~((uint64_t)0xf));
-
-    slab_traits_t* traits = SLAB_TRAITS_OF((void*)pruned);
-    int object_size = traits->owner->m_object_size;
-    uint64_t aligned = (uint64_t)pruned & ~(object_size - 1);
-
-    enqueue_root((void*)aligned);
-  }
-#ifndef NDEBUG
-  printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
-  printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
-  printf(";; thread stack top: %p\n", (void*)thread_stack_top);
-  printf(";; thread stack size: %ld\n", thread_stack_bottom - thread_stack_top);
-  printf(";; x19-x28: [");
-  for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
-  printf("]\n");
-  printf(";; raw size: %ld candidates size: %ld\n", raw.size(), candidates.size());
-#endif
-}
-
-*/
-
 void concurrent_heap_t::safepoint() {
   if (!m_stop_the_world) return;
 

@@ -206,26 +206,17 @@ void object_heap_t::trace(void* obj) {
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
   if (traits->owner->test_and_set_mark(obj)) return;
   if (traits->owner == &m_cons) {
-#ifndef NDEBUG
-    puts("trace cons");
-#endif
     scm_cons_rec_t* rec = (scm_cons_rec_t*)obj;
     shade(rec->car);
     shade(rec->cdr);
     return;
   }
   if (traits->owner == &m_cells) {
-#ifndef NDEBUG
-    puts("trace cell");
-#endif
     scm_cell_rec_t* rec = (scm_cell_rec_t*)obj;
     shade(rec->value);
     return;
   }
   if (traits->owner == &m_vectors) {
-#ifndef NDEBUG
-    puts("trace vector");
-#endif
     scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
     for (int i = 0; i < rec->nsize; i++) {
       shade(rec->elts[i]);
@@ -233,9 +224,6 @@ void object_heap_t::trace(void* obj) {
     return;
   }
   if (traits->owner == &m_hashtables) {
-#ifndef NDEBUG
-    puts("trace hashtable");
-#endif
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     hashtable_aux_t* aux = rec->aux;
     for (int i = 0; i < aux->capacity * 2; i++) {
@@ -244,29 +232,9 @@ void object_heap_t::trace(void* obj) {
     return;
   }
   if (traits->owner == &m_environments) {
-#ifndef NDEBUG
-    puts("trace environment");
-    printf("SLAB_TOP_OF(obj): %lx\n", (uint64_t)SLAB_TOP_OF(obj));
-    printf("SLAB_TRAITS_OF(obj): %lx\n", (uint64_t)SLAB_TRAITS_OF(obj));
-    printf("traits->refc: %lu\n", traits->refc);
-    printf("traits->owner->m_object_size: %u\n", traits->owner->m_object_size);
-    printf("obj modulo object_size (must be 0): %lu\n", (uint64_t)obj % traits->owner->m_object_size);
-    printf("limit: %lx\n", (uint64_t)traits - traits->owner->m_bitmap_size);
-#endif
     scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
-#ifndef NDEBUG
-    printf("trace environment address: %lx\n", (uintptr_t)obj);
-    printf("trace environment.tag: %lx\n", rec->tag);
-    printf("trace environment.name: %s\n", ((scm_string_rec_t*)to_address(rec->name))->name);
-#endif
     shade(rec->name);
-#ifndef NDEBUG
-    puts("trace environment.variables");
-#endif
     shade(rec->variables);
-#ifndef NDEBUG
-    puts("trace environment.macros");
-#endif
     shade(rec->macros);
     return;
   }
@@ -275,9 +243,6 @@ void object_heap_t::trace(void* obj) {
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
 
   if (tc6 == tc6_closure) {
-#ifndef NDEBUG
-    puts("trace closure");
-#endif
     scm_closure_rec_t* rec = (scm_closure_rec_t*)obj;
     shade(rec->literals);
     for (int i = 0; i < rec->nsize; i++) {
