@@ -446,8 +446,8 @@
       '(define loop (lambda (x) (if (pair? x) ((begin 'type:procedure loop) (cdr (begin 'type:pair x)))))))
 
 (test "Recursive procedure (let)"
-      '((let ((loop '*undefined*)) (set! loop (lambda (i) (if (= i 10) #t (loop (+ i 1)))) loop) 1))
-      '((let ((loop '*undefined*)) (set! loop (lambda (i) (if (= i 10) #t ((begin 'type:procedure loop) (+ (begin 'type:number i) 1))))) 1)))
+      '((let ((loop #f)) (set! loop (lambda (i) (if (= i 10) #t (loop (+ i 1)))) loop) 1))
+      '((let ((loop #f)) (set! loop (lambda (i) (if (= i 10) #t ((begin 'type:procedure loop) (+ (begin 'type:number i) 1))))) 1)))
 
 ;; --- Display Results ---
 (newline)

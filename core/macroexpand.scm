@@ -342,7 +342,7 @@
          (expanded-vals (map (lambda (x) (expand x m-env new-s-env new-r-env)) vals))
          (new-bindings (map list new-vars expanded-vals)))
     (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
-    `(let ,(map (lambda (v) (list v ''*undefined*)) new-vars)
+    `(let ,(map (lambda (v) (list v #f)) new-vars)
        ,@(map (lambda (v val) `(set! ,v ,val)) new-vars expanded-vals)
        ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) r-body)))))
 

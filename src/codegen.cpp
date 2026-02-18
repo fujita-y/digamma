@@ -62,7 +62,9 @@ static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, ns
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
 
 #if LLVM_VERSION_MAJOR >= 19
-static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::PreserveNone;
+static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::Tail;
+// need work to match param by adding undef
+// static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::PreserveNone;
 #else
 static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::Tail;
 #endif
