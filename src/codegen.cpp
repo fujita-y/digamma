@@ -851,8 +851,10 @@ void codegen_t::phase2_create_functions() {
     }
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
-    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, module);
+    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::InternalLinkage, func_name, module);
     closure_func->setCallingConv(closure_calling_conv);
+    closure_func->setDSOLocal(true);
+
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
 
