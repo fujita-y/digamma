@@ -61,6 +61,12 @@ static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cd
 static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
 
+#if LLVM_VERSION_MAJOR >= 19
+static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::PreserveNone;
+#else
+static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::Tail;
+#endif
+
 // Helper macros for cons access
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
 #define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
@@ -844,7 +850,7 @@ void codegen_t::phase2_create_functions() {
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
     llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, module);
-    closure_func->setCallingConv(llvm::CallingConv::Tail);
+    closure_func->setCallingConv(closure_calling_conv);
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
 
@@ -1309,7 +1315,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
     builder.SetInsertPoint(scheme_path);
     auto call_s = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
-    call_s->setCallingConv(llvm::CallingConv::Tail);
+    call_s->setCallingConv(closure_calling_conv);
     builder.CreateRet(call_s);
   }
 
@@ -1345,7 +1351,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
       builder.SetInsertPoint(scheme_p);
       auto s = builder.CreateCall(fixed_ft, fp, call_args);
-      s->setCallingConv(llvm::CallingConv::Tail);
+      s->setCallingConv(closure_calling_conv);
       builder.CreateRet(s);
     }
     builder.SetInsertPoint(def_b);
@@ -1498,7 +1504,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         llvm::CallInst* call = builder.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
 
         if (cdecl == 0) {
-          call->setCallingConv(llvm::CallingConv::Tail);
+          call->setCallingConv(closure_calling_conv);
           if (is_tail) {
             call->setTailCallKind(llvm::CallInst::TCK_MustTail);
             builder.CreateRet(call);
@@ -1569,7 +1575,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
 
     llvm::CallInst* call = builder.CreateCall(target_func, args, is_tail ? "tail_call_opt" : "call_opt");
-    call->setCallingConv(llvm::CallingConv::Tail);
+    call->setCallingConv(closure_calling_conv);
 
     if (is_tail) {
       call->setTailCallKind(llvm::CallInst::TCK_MustTail);
@@ -1637,7 +1643,7 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   // Scheme path - musttail if tail
   builder.SetInsertPoint(scheme_block);
   llvm::CallInst* call_s = builder.CreateCall(funcType, func_ptr, args, "rest_call_s");
-  call_s->setCallingConv(llvm::CallingConv::Tail);
+  call_s->setCallingConv(closure_calling_conv);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     builder.CreateRet(call_s);
@@ -1711,7 +1717,7 @@ void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code
   // Scheme path - musttail if tail
   builder.SetInsertPoint(scheme_block);
   llvm::CallInst* call_s = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_s");
-  call_s->setCallingConv(llvm::CallingConv::Tail);
+  call_s->setCallingConv(closure_calling_conv);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     builder.CreateRet(call_s);
