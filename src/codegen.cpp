@@ -564,6 +564,7 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
   llvm::Function* func = module->getFunction(name);
   if (!func) {
     func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, module);
+    func->setDSOLocal(true);
   }
   // Register the symbol with the JIT's main dylib via absoluteSymbols
   llvm::orc::SymbolMap symbols;
@@ -820,6 +821,7 @@ void codegen_t::phase2_create_functions() {
     llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), false);
     std::string func_name = "scheme_func_" + std::to_string(std::rand());
     this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, module);
+    this->main_function->setDSOLocal(true);
     if (!this->main_function) {
       fatal("%s:%u codegen: failed to create main function", __FILE__, __LINE__);
     }
@@ -1264,13 +1266,16 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   // Check if the bridge is already defined in the JIT
   if (auto sym = jit->lookup(name)) {
     // Symbol exists in JIT, just provide external declaration in this module
-    return llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+    auto f2 = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+    f2->setDSOLocal(true);
+    return f2;
   } else {
     // Consume the error (symbol not found)
     llvm::consumeError(sym.takeError());
   }
 
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+  f->setDSOLocal(true);
 
   llvm::BasicBlock* saved_block = builder.GetInsertBlock();
   llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
