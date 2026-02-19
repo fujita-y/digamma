@@ -61,6 +61,7 @@ int main() {
     return 1;
   }
   jtmb->setCodeModel(llvm::CodeModel::Small);
+  jtmb->getOptions().GuaranteedTailCallOpt = true;
 
   auto jit_expected = llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(*jtmb)).create();
   if (!jit_expected) {
