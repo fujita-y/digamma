@@ -36,6 +36,7 @@ enum class Opcode {
   MAKE_CELL,
   GLOBAL_SET,
   GLOBAL_REF,
+  SAFEPOINT,
   UNKNOWN
 };
 
@@ -73,6 +74,7 @@ class codegen_t {
   // Cached symbols
   scm_obj_t cached_symbol_label;
   scm_obj_t cached_symbol_apply;
+  scm_obj_t cached_symbol_safepoint;
 
   // Closure literals: label symbol -> literals vector
   std::map<scm_obj_t, scm_obj_t> closure_literals;
@@ -170,6 +172,7 @@ class codegen_t {
   void emitWriteBarrier(llvm::Value* value);
 
   void emit_inst(const Instruction& inst);
+  void emit_safepoint(const Instruction& inst);
   void emit_const(const Instruction& inst);
   void emit_mov(const Instruction& inst);
   void emit_if(const Instruction& inst);

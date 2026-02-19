@@ -33,8 +33,10 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
     : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
+  cached_symbol_safepoint = make_symbol("safepoint");
   object_heap_t::current()->add_root(cached_symbol_label);
   object_heap_t::current()->add_root(cached_symbol_apply);
+  object_heap_t::current()->add_root(cached_symbol_safepoint);
   init_opcode_map();
   s_current = this;
 }
@@ -193,6 +195,7 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("reg-cell-ref")] = Opcode::REG_CELL_REF;
   opcode_map[make_symbol("reg-cell-set!")] = Opcode::REG_CELL_SET;
   opcode_map[make_symbol("make-cell")] = Opcode::MAKE_CELL;
+  opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
   object_heap_t* heap = object_heap_t::current();
   for (const auto& pair : opcode_map) {
     heap->add_root(pair.first);
@@ -467,8 +470,11 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
     case Opcode::MAKE_CELL:
       parse_make_cell(inst_obj, inst, func_info);
       break;
+    case Opcode::SAFEPOINT:
+      // No operands for safepoint
+      break;
     default:
-      fatal("%s:%u codegen: unknown opcode %ld", __FILE__, __LINE__, inst.op);
+      fatal("%s:%u codegen: unknown opcode %ld", __FILE__, __LINE__, (long)inst.op);
       break;
   }
 
@@ -515,6 +521,17 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
         current_func = &functions.back();
         current_func->label = label;
         current_closure_label = label;
+
+        // label instruction
+        parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+
+        // Insert safepoint before the first instruction of the closure
+        Instruction safepoint_inst;
+        safepoint_inst.op = Opcode::SAFEPOINT;
+        safepoint_inst.original = make_cons(cached_symbol_safepoint, scm_nil);
+        current_func->instructions.push_back(safepoint_inst);
+
+        continue;
       }
     }
 
@@ -1073,10 +1090,19 @@ void codegen_t::emit_inst(const Instruction& inst) {
     case Opcode::MAKE_CELL:
       emit_make_cell(inst);
       break;
+    case Opcode::SAFEPOINT:
+      emit_safepoint(inst);
+      break;
     default:
       fatal("%s:%u codegen: unknown opcode encountered during emission", __FILE__, __LINE__);
       break;
   }
+}
+
+void codegen_t::emit_safepoint(const Instruction& inst) {
+  llvm::FunctionType* ft = llvm::FunctionType::get(builder.getVoidTy(), false);
+  llvm::Function* safepoint_func = get_or_create_external_function("c_safepoint", ft, (void*)&c_safepoint);
+  builder.CreateCall(safepoint_func);
 }
 
 // Emit a constant value to a register
