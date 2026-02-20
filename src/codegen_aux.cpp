@@ -10,6 +10,20 @@
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
 #define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
 
+static thread_local bool* s_stop_the_world = nullptr;
+
+extern "C" void c_safepoint(void) {
+  if (s_stop_the_world != nullptr) [[likely]] {
+    if (*s_stop_the_world) [[unlikely]] {
+      object_heap_t::current()->safepoint();
+    }
+    return;
+  }
+  object_heap_t* heap = object_heap_t::current();
+  s_stop_the_world = heap->stop_the_world_ptr();
+  if (*s_stop_the_world) heap->safepoint();
+}
+
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals) {
   return make_closure(code, argc, rest, nsize, env, literals, 0);
 }

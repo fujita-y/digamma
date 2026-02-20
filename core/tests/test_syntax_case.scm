@@ -138,7 +138,7 @@
                         (* n (fact (- n 1))))))
              '(1 2 3 4 5))
        'strip)
-      '(map (let ((fact '*undefined*))
+      '(map (let ((fact #f))
               (set! fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))
               fact)
             '(1 2 3 4 5)))

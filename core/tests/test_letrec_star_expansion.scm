@@ -17,7 +17,7 @@
   (display "Expanded: ") (write expanded) (newline)
   (test "letrec* expansion to let/set!"
         expanded
-        '(let ((a '*undefined*) (b '*undefined*))
+        '(let ((a #f) (b #f))
            (set! a 1)
            (set! b (+ a 1))
            (list a b))))
@@ -28,7 +28,7 @@
   (test "internal define expansion to let/set!"
         expanded
         '(let ()
-           (let ((f '*undefined*))
+           (let ((f #f))
              (set! f (lambda (x) (if (= x 0) 1 (* x (f (- x 1))))))
              (f 5)))))
 

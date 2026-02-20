@@ -33,8 +33,10 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
     : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
+  cached_symbol_safepoint = make_symbol("safepoint");
   object_heap_t::current()->add_root(cached_symbol_label);
   object_heap_t::current()->add_root(cached_symbol_apply);
+  object_heap_t::current()->add_root(cached_symbol_safepoint);
   init_opcode_map();
   s_current = this;
 }
@@ -60,6 +62,14 @@ static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, res
 static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
 static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
+
+#if LLVM_VERSION_MAJOR >= 19
+static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::Tail;
+// need work to match param by adding undef
+// static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::PreserveNone;
+#else
+static constexpr llvm::CallingConv::ID closure_calling_conv = llvm::CallingConv::Tail;
+#endif
 
 // Helper macros for cons access
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -185,6 +195,7 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("reg-cell-ref")] = Opcode::REG_CELL_REF;
   opcode_map[make_symbol("reg-cell-set!")] = Opcode::REG_CELL_SET;
   opcode_map[make_symbol("make-cell")] = Opcode::MAKE_CELL;
+  opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
   object_heap_t* heap = object_heap_t::current();
   for (const auto& pair : opcode_map) {
     heap->add_root(pair.first);
@@ -459,8 +470,11 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
     case Opcode::MAKE_CELL:
       parse_make_cell(inst_obj, inst, func_info);
       break;
+    case Opcode::SAFEPOINT:
+      // No operands for safepoint
+      break;
     default:
-      fatal("%s:%u codegen: unknown opcode %ld", __FILE__, __LINE__, inst.op);
+      fatal("%s:%u codegen: unknown opcode %ld", __FILE__, __LINE__, (long)inst.op);
       break;
   }
 
@@ -507,6 +521,17 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
         current_func = &functions.back();
         current_func->label = label;
         current_closure_label = label;
+
+        // label instruction
+        parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+
+        // Insert safepoint before the first instruction of the closure
+        Instruction safepoint_inst;
+        safepoint_inst.op = Opcode::SAFEPOINT;
+        safepoint_inst.original = make_cons(cached_symbol_safepoint, scm_nil);
+        current_func->instructions.push_back(safepoint_inst);
+
+        continue;
       }
     }
 
@@ -556,6 +581,7 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
   llvm::Function* func = module->getFunction(name);
   if (!func) {
     func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, module);
+    func->setDSOLocal(true);
   }
   // Register the symbol with the JIT's main dylib via absoluteSymbols
   llvm::orc::SymbolMap symbols;
@@ -812,6 +838,7 @@ void codegen_t::phase2_create_functions() {
     llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), false);
     std::string func_name = "scheme_func_" + std::to_string(std::rand());
     this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, module);
+    this->main_function->setDSOLocal(true);
     if (!this->main_function) {
       fatal("%s:%u codegen: failed to create main function", __FILE__, __LINE__);
     }
@@ -843,8 +870,10 @@ void codegen_t::phase2_create_functions() {
     }
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
-    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, module);
-    closure_func->setCallingConv(llvm::CallingConv::Tail);
+    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::InternalLinkage, func_name, module);
+    closure_func->setCallingConv(closure_calling_conv);
+    closure_func->setDSOLocal(true);
+
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
 
@@ -1061,10 +1090,19 @@ void codegen_t::emit_inst(const Instruction& inst) {
     case Opcode::MAKE_CELL:
       emit_make_cell(inst);
       break;
+    case Opcode::SAFEPOINT:
+      emit_safepoint(inst);
+      break;
     default:
       fatal("%s:%u codegen: unknown opcode encountered during emission", __FILE__, __LINE__);
       break;
   }
+}
+
+void codegen_t::emit_safepoint(const Instruction& inst) {
+  llvm::FunctionType* ft = llvm::FunctionType::get(builder.getVoidTy(), false);
+  llvm::Function* safepoint_func = get_or_create_external_function("c_safepoint", ft, (void*)&c_safepoint);
+  builder.CreateCall(safepoint_func);
 }
 
 // Emit a constant value to a register
@@ -1254,13 +1292,16 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   // Check if the bridge is already defined in the JIT
   if (auto sym = jit->lookup(name)) {
     // Symbol exists in JIT, just provide external declaration in this module
-    return llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+    auto f2 = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+    f2->setDSOLocal(true);
+    return f2;
   } else {
     // Consume the error (symbol not found)
     llvm::consumeError(sym.takeError());
   }
 
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, module);
+  f->setDSOLocal(true);
 
   llvm::BasicBlock* saved_block = builder.GetInsertBlock();
   llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
@@ -1309,7 +1350,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
     builder.SetInsertPoint(scheme_path);
     auto call_s = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
-    call_s->setCallingConv(llvm::CallingConv::Tail);
+    call_s->setCallingConv(closure_calling_conv);
     builder.CreateRet(call_s);
   }
 
@@ -1345,7 +1386,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
       builder.SetInsertPoint(scheme_p);
       auto s = builder.CreateCall(fixed_ft, fp, call_args);
-      s->setCallingConv(llvm::CallingConv::Tail);
+      s->setCallingConv(closure_calling_conv);
       builder.CreateRet(s);
     }
     builder.SetInsertPoint(def_b);
@@ -1498,7 +1539,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         llvm::CallInst* call = builder.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
 
         if (cdecl == 0) {
-          call->setCallingConv(llvm::CallingConv::Tail);
+          call->setCallingConv(closure_calling_conv);
           if (is_tail) {
             call->setTailCallKind(llvm::CallInst::TCK_MustTail);
             builder.CreateRet(call);
@@ -1569,7 +1610,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
 
     llvm::CallInst* call = builder.CreateCall(target_func, args, is_tail ? "tail_call_opt" : "call_opt");
-    call->setCallingConv(llvm::CallingConv::Tail);
+    call->setCallingConv(closure_calling_conv);
 
     if (is_tail) {
       call->setTailCallKind(llvm::CallInst::TCK_MustTail);
@@ -1637,7 +1678,7 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   // Scheme path - musttail if tail
   builder.SetInsertPoint(scheme_block);
   llvm::CallInst* call_s = builder.CreateCall(funcType, func_ptr, args, "rest_call_s");
-  call_s->setCallingConv(llvm::CallingConv::Tail);
+  call_s->setCallingConv(closure_calling_conv);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     builder.CreateRet(call_s);
@@ -1711,7 +1752,7 @@ void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code
   // Scheme path - musttail if tail
   builder.SetInsertPoint(scheme_block);
   llvm::CallInst* call_s = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_s");
-  call_s->setCallingConv(llvm::CallingConv::Tail);
+  call_s->setCallingConv(closure_calling_conv);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     builder.CreateRet(call_s);

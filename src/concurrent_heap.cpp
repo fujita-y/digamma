@@ -3,7 +3,6 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
-#include <algorithm>
 #include <unordered_set>
 #include "arch_arm64.h"
 #include "concurrent_pool.h"
