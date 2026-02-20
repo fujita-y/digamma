@@ -85,6 +85,7 @@ target_compile_features(nanos_config INTERFACE cxx_std_17)
 # Define include directories
 target_include_directories(nanos_config INTERFACE
   ${LLVM_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -99,7 +100,6 @@ target_compile_definitions(nanos_config INTERFACE
 
 # Define compile options
 target_compile_options(nanos_config INTERFACE
-  -Wundef
   -Werror
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
@@ -112,7 +112,6 @@ target_compile_options(nanos_config INTERFACE
 
 # Define link options
 target_link_options(nanos_config INTERFACE
-  -Wundef
   -Werror
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
@@ -234,3 +233,6 @@ target_link_libraries(test_deriv PRIVATE nanos_io)
 
 add_nanos_test(test_equiv tests/test_equiv.cpp)
 target_link_libraries(test_equiv PRIVATE nanos_io)
+
+add_nanos_test(test_call_ec tests/test_call_ec.cpp)
+target_link_libraries(test_call_ec PRIVATE nanos_io)

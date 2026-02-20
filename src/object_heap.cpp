@@ -250,6 +250,11 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (tc6 == tc6_escape) {
+    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+    shade(rec->retval);
+    return;
+  }
   if (tc6 == tc6_long_flonum || tc6 == tc6_symbol || tc6 == tc6_string || tc6 == tc6_u8vector) {
     return;
   }
@@ -290,6 +295,12 @@ void object_heap_t::finalize(void* obj) {
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
 
   if (tc6 == tc6_closure) {
+    return;
+  }
+  if (tc6 == tc6_escape) {
+    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+    delete rec->cont;
+    rec->cont = nullptr;
     return;
   }
   assert(false);

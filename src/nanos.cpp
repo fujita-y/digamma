@@ -47,6 +47,8 @@ static void setup_subr() {
   c_global_set(make_symbol("collect"), scm_subr_collect);
   scm_obj_t scm_subr_safepoint = make_closure((void*)subr_safepoint, 0, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("safepoint"), scm_subr_safepoint);
+  scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
 }
 
 int main() {

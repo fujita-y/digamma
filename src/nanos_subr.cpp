@@ -4,6 +4,8 @@
 #include "core.h"
 #include "object.h"
 #include "nanos_subr.h"
+#include <boost/context/continuation.hpp>
+#include <boost/context/detail/fcontext.hpp>
 #include "codegen_aux.h"
 #include "object_heap.h"
 #include "printer.h"
@@ -175,4 +177,52 @@ SUBR scm_obj_t subr_collect(scm_obj_t self) {
 SUBR scm_obj_t subr_safepoint(scm_obj_t self) {
   object_heap_t::current()->safepoint();
   return scm_undef;
+}
+
+SUBR scm_obj_t subr_call_ec(scm_obj_t self, scm_obj_t proc) {
+  scm_obj_t cont_obj = make_escape(boost::context::continuation{});
+  scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
+
+  auto k = boost::context::callcc([proc, cont_obj, rec](boost::context::continuation&& sink) {
+    // Sink is the main continuation. We save it inside the continuation object.
+    delete rec->cont;  // Should be empty/default constructed initially
+    rec->cont = new boost::context::continuation(std::move(sink));
+
+    scm_obj_t argv[1] = {make_cons(cont_obj, scm_nil)};
+    scm_obj_t ret = scm_undef;
+    try {
+      ret = c_apply_helper(proc, 1, argv);
+    } catch (const boost::context::detail::forced_unwind& e) {
+      throw;
+    } catch (const std::exception& e) {
+      fprintf(stderr, "Exception while evaluating call/ec procedure: %s\n", e.what());
+      exit(EXIT_FAILURE);
+    } catch (...) {
+      fprintf(stderr, "Unknown exception while evaluating call/ec procedure\n");
+      exit(EXIT_FAILURE);
+    }
+
+    if (!rec->invoked) {
+      // Procedure returned normally
+      rec->retval = ret;
+      auto main_k = std::move(*(rec->cont));
+      delete rec->cont;
+      rec->cont = nullptr;
+      return main_k.resume();
+    } else {
+      // Unreachable if invoked directly.
+      fatal("%s:%u unreachable", __FILE__, __LINE__);
+      return std::move(*(rec->cont));
+    }
+  });
+
+  // We are back!
+  // At this point, rec->retval holds the value (either returned normally or passed to the continuation).
+  // The continuation is one-shot, so if it was used, it was destroyed.
+  // Actually, wait! The lambda returns `boost::context::continuation`, and `callcc` returns that!
+  // So `k` is the continuation that yielded to us. We don't really need it, or we can discard it.
+  // Wait! boost::context::continuation variables must be destroyed ONLY if they are valid?
+  // Yes, default destructor handles it.
+
+  return rec->retval;
 }
