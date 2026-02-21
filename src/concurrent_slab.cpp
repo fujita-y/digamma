@@ -124,6 +124,7 @@ void* concurrent_slab_t::new_collectible_object() {
   if (m_vacant) {
     slab_traits_t* traits = m_vacant;
     freelist_t* obj = traits->free;
+    assert(obj);
     traits->free = obj->next;
     traits->refc++;
     if (traits->free == NULL) unload_filled(traits);

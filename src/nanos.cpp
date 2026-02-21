@@ -53,8 +53,8 @@ static void setup_subr() {
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
 }
 
-static std::unique_ptr<llvm::orc::LLJIT> s_jit;
-static std::unique_ptr<codegen_t> s_codegen;
+static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;
+static thread_local std::unique_ptr<codegen_t> s_codegen;
 
 static codegen_t* init_jit() {
   if (s_codegen) return s_codegen.get();
@@ -97,11 +97,10 @@ static void destroy_jit() {
   s_jit.reset();
 }
 
-// TODO: continuation stack marking
+static thread_local object_heap_t s_heap;
 
 int main() {
-  object_heap_t heap;
-  heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  s_heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 
   // setup SUBR
   setup_subr();
@@ -122,7 +121,7 @@ int main() {
   while (true) {
     if (std::cin.eof()) break;
 
-    object_heap_t::current()->safepoint();
+    s_heap.safepoint();
 
     printf("> ");
     fflush(stdout);
@@ -154,11 +153,11 @@ int main() {
       printer.print(obj);
       puts("");
     }
-    heap.safepoint();
+    s_heap.safepoint();
   }
 
   destroy_jit();
-  heap.destroy();
+  s_heap.destroy();
   return 0;
 }
 
