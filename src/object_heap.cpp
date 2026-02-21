@@ -312,9 +312,9 @@ void object_heap_t::finalize(void* obj) {
   }
   if (tc6 == tc6_continuation) {
     scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-    if (rec->uctx) delete_private(rec->uctx);
-    if (rec->stack_copy) delete_private(rec->stack_copy);
-    if (rec->shadow_copy) delete_private(rec->shadow_copy);
+    if (rec->uctx) free(rec->uctx);
+    if (rec->stack_copy) free(rec->stack_copy);
+    if (rec->shadow_copy) free(rec->shadow_copy);
     rec->uctx = nullptr;
     rec->stack_copy = nullptr;
     rec->shadow_copy = nullptr;

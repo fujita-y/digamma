@@ -188,7 +188,7 @@ scm_obj_t make_escape(boost::context::continuation k) {
 scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom) {
   object_heap_t& heap = *object_heap_t::current();
   scm_continuation_rec_t* rec = (scm_continuation_rec_t*)heap.alloc_collectible(sizeof(scm_continuation_rec_t));
-  rec->uctx = (ucontext_t*)heap.alloc_private(sizeof(ucontext_t));
+  rec->uctx = (ucontext_t*)malloc(sizeof(ucontext_t));
   *rec->uctx = *uctx;
   rec->stack_size = stack_size;
   rec->stack_copy = stack_copy;

@@ -137,6 +137,19 @@ static thread_local scm_obj_t s_captured_retval = scm_undef;
 static thread_local bool s_restored = false;
 static thread_local scm_continuation_rec_t* s_restored_rec = nullptr;
 
+static void __attribute__((no_sanitize("hwaddress"))) copy_memory_hwasan_safe(void* dst, const void* src, size_t size) {
+  volatile uint64_t* d64 = (volatile uint64_t*)dst;
+  const volatile uint64_t* s64 = (const volatile uint64_t*)src;
+  size_t n64 = size / 8;
+  for (size_t i = 0; i < n64; i++) d64[i] = s64[i];
+  size_t rem = size % 8;
+  if (rem) {
+    volatile uint8_t* d8 = (volatile uint8_t*)dst + n64 * 8;
+    const volatile uint8_t* s8 = (const volatile uint8_t*)src + n64 * 8;
+    for (size_t i = 0; i < rem; i++) d8[i] = s8[i];
+  }
+}
+
 static uint8_t __attribute__((no_sanitize("hwaddress"))) get_mem_tag(void* p) {
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   p = (void*)((uintptr_t)p & ~0xF);
@@ -161,15 +174,15 @@ SUBR scm_obj_t __attribute__((no_sanitize("hwaddress"))) subr_call_cc(scm_obj_t 
       void* sp;
       __asm__ volatile("mov %0, sp" : "=r"(sp));
       size_t stack_size = stack_bottom - (uintptr_t)sp;
-      uint8_t* stack_copy = (uint8_t*)object_heap_t::current()->alloc_private(stack_size);
+      uint8_t* stack_copy = (uint8_t*)malloc(stack_size);
 
       uint8_t* d_ptr = (uint8_t*)prune_memory_address((uintptr_t)stack_copy);
       uint8_t* s_ptr = (uint8_t*)prune_memory_address((uintptr_t)sp);
-      for (size_t i = 0; i < stack_size; i++) d_ptr[i] = s_ptr[i];
+      copy_memory_hwasan_safe(d_ptr, s_ptr, stack_size);
 
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
       size_t shadow_size = (stack_size + 15) / 16;
-      uint8_t* shadow_copy = (uint8_t*)object_heap_t::current()->alloc_private(shadow_size);
+      uint8_t* shadow_copy = (uint8_t*)malloc(shadow_size);
       for (size_t i = 0; i < shadow_size; i++) {
         shadow_copy[i] = get_mem_tag((void*)((uintptr_t)sp + i * 16));
       }
@@ -205,7 +218,7 @@ extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) 
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   __hwasan_tag_memory(dst, 0, rec->stack_size);
 #endif
-  for (size_t i = 0; i < rec->stack_size; i++) dst[i] = src[i];
+  copy_memory_hwasan_safe(dst, src, rec->stack_size);
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   __hwasan_handle_vfork((void*)stack_top);
   for (size_t i = 0; i < (rec->stack_size + 15) / 16; i++) {
