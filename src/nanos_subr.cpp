@@ -135,13 +135,18 @@ static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
 
 static thread_local scm_obj_t s_captured_retval = scm_undef;
 static thread_local bool s_restored = false;
+static thread_local scm_continuation_rec_t* s_restored_rec = nullptr;
 
 static uint8_t __attribute__((no_sanitize("hwaddress"))) get_mem_tag(void* p) {
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   p = (void*)((uintptr_t)p & ~0xF);
-  for (int t = 0; t < 256; t++) {
+  // Pointer tag 0 is a wildcard in HWASAn and will always match in __hwasan_test_shadow.
+  // We must skip t=0 and check 1 to 255. If none match, the actual tag must be 00.
+  for (int t = 1; t < 256; t++) {
     void* pt = __hwasan_tag_pointer(p, t);
-    if (__hwasan_test_shadow(pt, 1) == -1) return (uint8_t)t;
+    if (__hwasan_test_shadow(pt, 1) == -1) {
+      return (uint8_t)t;
+    }
   }
 #endif
   return 0;
@@ -176,6 +181,15 @@ SUBR scm_obj_t __attribute__((no_sanitize("hwaddress"))) subr_call_cc(scm_obj_t 
       scm_obj_t proc_argv[1] = {make_cons(cont_obj, scm_nil)};
       return c_apply_helper(proc, 1, proc_argv);
     } else {
+#if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+      if (s_restored_rec) {
+        uintptr_t stack_top = s_restored_rec->stack_bottom - s_restored_rec->stack_size;
+        for (size_t i = 0; i < (s_restored_rec->stack_size + 15) / 16; i++) {
+          __hwasan_tag_memory((void*)(stack_top + i * 16), s_restored_rec->shadow_copy[i], 16);
+        }
+        s_restored_rec = nullptr;
+      }
+#endif
       return s_captured_retval;
     }
   }
@@ -193,10 +207,10 @@ extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) 
 #endif
   for (size_t i = 0; i < rec->stack_size; i++) dst[i] = src[i];
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+  __hwasan_handle_vfork((void*)stack_top);
   for (size_t i = 0; i < (rec->stack_size + 15) / 16; i++) {
     __hwasan_tag_memory((void*)(stack_top + i * 16), rec->shadow_copy[i], 16);
   }
-  __hwasan_handle_vfork((void*)stack_top);
 #endif
   setcontext(rec->uctx);
 }
@@ -204,6 +218,7 @@ extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) 
 extern "C" void __attribute__((no_sanitize("hwaddress"))) restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   s_captured_retval = val;
   s_restored = true;
+  s_restored_rec = rec;
   uintptr_t tmp_sp = (uintptr_t)s_restore_stack + sizeof(s_restore_stack) - 64;
   __asm__ volatile(
       "mov sp, %0\n"
