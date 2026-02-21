@@ -61,7 +61,7 @@ class concurrent_heap_t {
   void init(concurrent_pool_t* pool);
   void terminate();
   void collect();
-  void shade(void* obj) __attribute__((no_sanitize("address", "hwaddress")));
+  __attribute__((no_sanitize("hwaddress"))) void shade(void* obj);
   void interior_shade(void* ref);
   void dequeue_root();
   void enqueue_root(void* obj);
@@ -149,7 +149,7 @@ class concurrent_heap_t {
   bool m_collector_terminating;
   bool m_alloc_barrier;
 
-  void snapshot_stack() __attribute__((no_sanitize("address", "hwaddress")));
+  __attribute__((no_sanitize("hwaddress"))) void snapshot_stack();
   void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
   void deallocate(void* p) { m_concurrent_pool->deallocate(p); }
 };

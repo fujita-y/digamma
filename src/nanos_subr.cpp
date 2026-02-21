@@ -137,7 +137,7 @@ static thread_local scm_obj_t s_captured_retval = scm_undef;
 static thread_local bool s_restored = false;
 static thread_local scm_continuation_rec_t* s_restored_rec = nullptr;
 
-static void __attribute__((no_sanitize("hwaddress"))) copy_memory_hwasan_safe(void* dst, const void* src, size_t size) {
+__attribute__((no_sanitize("hwaddress"))) static void copy_memory_hwasan_safe(void* dst, const void* src, size_t size) {
   volatile uint64_t* d64 = (volatile uint64_t*)dst;
   const volatile uint64_t* s64 = (const volatile uint64_t*)src;
   size_t n64 = size / 8;
@@ -150,7 +150,7 @@ static void __attribute__((no_sanitize("hwaddress"))) copy_memory_hwasan_safe(vo
   }
 }
 
-static uint8_t __attribute__((no_sanitize("hwaddress"))) get_mem_tag(void* p) {
+static uint8_t get_mem_tag(void* p) {
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   p = (void*)((uintptr_t)p & ~0xF);
   // Pointer tag 0 is a wildcard in HWASAn and will always match in __hwasan_test_shadow.
@@ -165,7 +165,7 @@ static uint8_t __attribute__((no_sanitize("hwaddress"))) get_mem_tag(void* p) {
   return 0;
 }
 
-SUBR scm_obj_t __attribute__((no_sanitize("hwaddress"))) subr_call_cc(scm_obj_t self, scm_obj_t proc) {
+__attribute__((no_sanitize("hwaddress"))) SUBR scm_obj_t subr_call_cc(scm_obj_t self, scm_obj_t proc) {
   uint64_t stack_bottom = capture_thread_stack_bottom();
   ucontext_t uctx;
   s_restored = false;
@@ -209,9 +209,9 @@ SUBR scm_obj_t __attribute__((no_sanitize("hwaddress"))) subr_call_cc(scm_obj_t 
   fatal("getcontext failed");
 }
 
-static uint8_t s_restore_stack[64 * 1024] __attribute__((aligned(16)));
+__attribute__((aligned(16))) static uint8_t s_restore_stack[64 * 1024];
 
-extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) restore_trampoline(scm_continuation_rec_t* rec) {
+__attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void restore_trampoline(scm_continuation_rec_t* rec) {
   uintptr_t stack_top = rec->stack_bottom - rec->stack_size;
   uint8_t* dst = (uint8_t*)prune_memory_address(stack_top);
   uint8_t* src = (uint8_t*)prune_memory_address((uintptr_t)rec->stack_copy);
@@ -228,7 +228,7 @@ extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) 
   setcontext(rec->uctx);
 }
 
-extern "C" void __attribute__((no_sanitize("hwaddress"))) restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
+__attribute__((no_sanitize("hwaddress"))) extern "C" void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   s_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
