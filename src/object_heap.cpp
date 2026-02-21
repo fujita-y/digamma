@@ -260,6 +260,23 @@ void object_heap_t::trace(void* obj) {
     return;
   }
   if (tc6 == tc6_continuation) {
+    scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+    uint64_t captured_stack_bottom = rec->stack_bottom;
+    uint64_t captured_stack_top = captured_stack_bottom - rec->stack_size;
+    std::unordered_set<uint64_t> raw;
+    raw.reserve((captured_stack_bottom - captured_stack_top) / sizeof(uint64_t));
+    for (uint64_t addr = captured_stack_top; addr < captured_stack_bottom; addr += sizeof(uint64_t)) {
+      raw.insert(prune_memory_address(*(uint64_t*)addr));
+    }
+    std::unordered_set<uint64_t> candidates;
+    for (const auto& addr : raw) {
+      void* live = test_live_object(addr);
+      if (live) candidates.insert((uint64_t)live);
+    }
+    for (const auto& addr : candidates) {
+      shade((scm_obj_t)addr);
+    }
+
     return;
   }
   if (tc6 == tc6_long_flonum || tc6 == tc6_symbol || tc6 == tc6_string || tc6 == tc6_u8vector) {

@@ -64,6 +64,18 @@ void concurrent_heap_t::terminate() {
   GCTRACE(";; [collector: terminated]\n");
 }
 
+void* concurrent_heap_t::test_live_object(uint64_t addr) {
+  if (!m_concurrent_pool->in_pool((void*)addr)) return NULL;
+  if (!m_concurrent_pool->is_collectible((void*)addr)) return NULL;
+  slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
+  int object_size = traits->owner->m_object_size;
+  uint64_t p = (uint64_t)addr & ~(object_size - 1);
+  uint64_t limit = (uint64_t)traits - traits->owner->m_bitmap_size - object_size;
+  if (p > limit) return NULL;
+  if (*(uint64_t*)p == 0) return NULL;
+  return (void*)p;
+}
+
 void concurrent_heap_t::snapshot_stack() {
   uint64_t regs[11];
   capture_arm64_core_state(regs);
@@ -77,21 +89,11 @@ void concurrent_heap_t::snapshot_stack() {
   for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
     raw.insert(prune_memory_address(*(uint64_t*)addr));
   }
-  std::unordered_set<uint64_t> candidates;
   for (const auto& addr : raw) {
-    if (!m_concurrent_pool->in_pool((void*)addr)) continue;
-    if (!m_concurrent_pool->is_collectible((void*)addr)) continue;
-    slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
-    int object_size = traits->owner->m_object_size;
-    uint64_t tag = addr & ~(object_size - 1);
-    uint64_t limit = (uint64_t)traits - traits->owner->m_bitmap_size - object_size;
-    if (tag > limit) continue;
-    if (*(uint64_t*)tag == 0) continue;
-    candidates.insert(tag);
+    void* p = test_live_object(addr);
+    if (p) enqueue_root(p);
   }
-  for (uint64_t addr : candidates) {
-    enqueue_root((void*)addr);
-  }
+
 #ifndef NDEBUG
   printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
   printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
@@ -100,7 +102,7 @@ void concurrent_heap_t::snapshot_stack() {
   printf(";; x19-x28: [");
   for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
-  printf(";; raw size: %ld candidates size: %ld\n", raw.size(), candidates.size());
+  printf(";; raw size: %ld\n", raw.size());
 #endif
 }
 

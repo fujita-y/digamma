@@ -52,6 +52,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
+  void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
   void* alloc_cons() { return alloc_object(m_cons); }
