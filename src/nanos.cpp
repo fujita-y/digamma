@@ -123,7 +123,8 @@ int main() {
 
     if (is_cons(obj)) {
       try {
-        intptr_t result = codegen.compile(obj);
+        auto func = codegen.compile(obj);
+        intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.print((scm_obj_t)result);
         puts("");

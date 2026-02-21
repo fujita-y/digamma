@@ -792,7 +792,7 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
   }
 }
 
-intptr_t codegen_t::compile(scm_obj_t inst_list) {
+codegen_t::compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   phase0_create_module();
   phase1_parse_instructions(inst_list);
   analyze_closure_labels();
@@ -1009,7 +1009,7 @@ void codegen_t::phase4_optimize_and_verify() {
   }
 }
 
-intptr_t codegen_t::phase5_finalize() {
+codegen_t::compiled_code_t codegen_t::phase5_finalize() {
   // Transfer module to LLJIT
   std::string main_func_name = main_function->getName().str();
   auto tsm = llvm::orc::ThreadSafeModule(std::move(current_module_uptr), ts_context);
@@ -1027,8 +1027,7 @@ intptr_t codegen_t::phase5_finalize() {
   this->module = nullptr;
   this->main_function = nullptr;
 
-  auto func = sym->toPtr<intptr_t()>();
-  return func();
+  return sym->toPtr<intptr_t()>();
 }
 
 void codegen_t::emit_inst(const Instruction& inst) {

@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
         // call apply with 2 args: +, '(1 2)
         "(tail-call r3 2))");
 
-    intptr_t result = env.codegen->compile(correct_code);
+    intptr_t result = env.codegen->compile(correct_code)();
     return result == make_fixnum(3);
   });
 
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
         "(global-ref r2 +) "
         "(call r2 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(4);
   });
 
@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(3);
   });
 
@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 4) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(10);
   });
 
@@ -248,7 +248,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "  // apply itself
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(3);
   });
 
@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
     scm_obj_t setup = env.read_code(
         "((make-closure r0 C1 () #f 1 #f) (global-set! f r0) (ret) "
         "(label C1) (const r1 1) (global-ref r2 +) (call r2 2) (ret))");
-    env.codegen->compile(setup);
+    env.codegen->compile(setup)();
 
     scm_obj_t code = env.read_code(
         "((global-ref r0 f) "
@@ -268,7 +268,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(11);
   });
 

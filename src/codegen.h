@@ -57,6 +57,8 @@ struct Instruction {
 class codegen_t {
   thread_local static codegen_t* s_current;
 
+  using compiled_code_t = intptr_t (*)(void);
+
   llvm::orc::ThreadSafeContext ts_context;
   llvm::LLVMContext& context;
   llvm::orc::LLJIT* jit;
@@ -202,7 +204,6 @@ class codegen_t {
   // Opcode map for faster lookup
   std::map<scm_obj_t, Opcode> opcode_map;
 
-  // Analysis pass
   void analyze_closure_labels();
 
   // Dump instructions for debugging
@@ -214,13 +215,13 @@ class codegen_t {
   void phase2_create_functions();
   void phase3_generate_code();
   void phase4_optimize_and_verify();
-  intptr_t phase5_finalize();
+  compiled_code_t phase5_finalize();
 
  public:
   codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit);
 
   // Compile a list of instructions
-  intptr_t compile(scm_obj_t inst_list);
+  compiled_code_t compile(scm_obj_t inst_list);
 
   // Helper to get or create the general call closure bridge
   llvm::Function* get_or_create_call_closure_bridge();
