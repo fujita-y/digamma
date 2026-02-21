@@ -185,6 +185,19 @@ scm_obj_t make_escape(boost::context::continuation k) {
   return tc6_pointer(rec, tc6_escape);
 }
 
+scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_continuation_rec_t* rec = (scm_continuation_rec_t*)heap.alloc_collectible(sizeof(scm_continuation_rec_t));
+  rec->uctx = (ucontext_t*)heap.alloc_private(sizeof(ucontext_t));
+  *rec->uctx = *uctx;
+  rec->stack_size = stack_size;
+  rec->stack_copy = stack_copy;
+  rec->shadow_copy = shadow_copy;
+  rec->stack_bottom = stack_bottom;
+  rec->tag = tc6_tag(tc6_continuation);
+  return tc6_pointer(rec, tc6_continuation);
+}
+
 scm_obj_t make_cell(scm_obj_t value) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();

@@ -6,6 +6,7 @@
 #include "codegen_aux.h"
 #include <boost/context/continuation.hpp>
 #include "codegen.h"
+#include "nanos_subr.h"
 #include "object_heap.h"
 
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -90,6 +91,14 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
     k.resume();
     // We never return here after invoking the continuation that was captured in call/ec.
     // The stack is abandoned up to the point of call/ec.
+    return scm_undef;
+  }
+
+  if (is_continuation(proc)) {
+    if (args.size() > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
+    scm_continuation_rec_t* cont_rec = (scm_continuation_rec_t*)to_address(proc);
+    scm_obj_t val = args.empty() ? scm_undef : args[0];
+    restore_continuation(cont_rec, val);
     return scm_undef;
   }
 

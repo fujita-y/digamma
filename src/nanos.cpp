@@ -49,9 +49,16 @@ static void setup_subr() {
   c_global_set(make_symbol("safepoint"), scm_subr_safepoint);
   scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
+  scm_obj_t scm_subr_call_cc = make_closure((void*)subr_call_cc, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
 }
 
-int main() {
+static std::unique_ptr<llvm::orc::LLJIT> s_jit;
+static std::unique_ptr<codegen_t> s_codegen;
+
+static codegen_t* init_jit() {
+  if (s_codegen) return s_codegen.get();
+
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
@@ -60,7 +67,7 @@ int main() {
   auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!jtmb) {
     fprintf(stderr, "Failed to detect host target: %s\n", llvm::toString(jtmb.takeError()).c_str());
-    return 1;
+    exit(1);
   }
   jtmb->setCodeModel(llvm::CodeModel::Small);
   jtmb->getOptions().GuaranteedTailCallOpt = true;
@@ -68,18 +75,31 @@ int main() {
   auto jit_expected = llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(*jtmb)).create();
   if (!jit_expected) {
     fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
-    return 1;
+    exit(1);
   }
-  auto jit = std::move(*jit_expected);
+  s_jit = std::move(*jit_expected);
 
   // Allow the JIT to find symbols in the current process
-  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
+  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(s_jit->getDataLayout().getGlobalPrefix());
   if (!gen) {
     fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
-    return 1;
+    exit(1);
   }
-  jit->getMainJITDylib().addGenerator(std::move(*gen));
+  s_jit->getMainJITDylib().addGenerator(std::move(*gen));
 
+  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+  s_codegen = std::make_unique<codegen_t>(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), s_jit.get());
+  return s_codegen.get();
+}
+
+static void destroy_jit() {
+  s_codegen.reset();
+  s_jit.reset();
+}
+
+// TODO: continuation stack marking
+
+int main() {
   object_heap_t heap;
   heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 
@@ -94,8 +114,7 @@ int main() {
   puts(";; USE_TBI == 0");
 #endif
 
-  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  codegen_t codegen(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+  codegen_t* codegen = init_jit();
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
@@ -123,7 +142,7 @@ int main() {
 
     if (is_cons(obj)) {
       try {
-        auto func = codegen.compile(obj);
+        auto func = codegen->compile(obj);
         intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.print((scm_obj_t)result);
@@ -138,6 +157,7 @@ int main() {
     heap.safepoint();
   }
 
+  destroy_jit();
   heap.destroy();
   return 0;
 }

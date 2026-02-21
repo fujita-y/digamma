@@ -10,6 +10,17 @@ project(Nanos)
 # Configuration
 # ==============================================================================
 
+# --- LLVM ---
+execute_process(
+  COMMAND llvm-config --cmakedir
+  OUTPUT_VARIABLE llvm_cmakedir
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+find_package(LLVM REQUIRED CONFIG PATHS ${llvm_cmakedir} NO_DEFAULT_PATH)
+
+set(CMAKE_C_COMPILER "${LLVM_DIR}/../../../bin/clang")
+set(CMAKE_CXX_COMPILER "${LLVM_DIR}/../../../bin/clang++")
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -18,17 +29,6 @@ if(CMAKE_BUILD_TYPE)
   message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 endif()
 
-# ==============================================================================
-# Dependencies
-# ==============================================================================
-
-# --- LLVM ---
-execute_process(
-  COMMAND llvm-config --cmakedir
-  OUTPUT_VARIABLE llvm_cmakedir
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-find_package(LLVM REQUIRED CONFIG PATHS ${llvm_cmakedir} NO_DEFAULT_PATH)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
@@ -36,6 +36,11 @@ execute_process(
   COMMAND llvm-config --libs all
   OUTPUT_VARIABLE llvm_libs
   OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+
 
 # --- Boost (via vcpkg) ---
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -59,8 +64,6 @@ find_package(Boost CONFIG REQUIRED COMPONENTS context)
 # Compiler Configuration
 # ==============================================================================
 
-set(CMAKE_C_COMPILER "${LLVM_DIR}/../../../bin/clang")
-set(CMAKE_CXX_COMPILER "${LLVM_DIR}/../../../bin/clang++")
 
 # Use LLD linker
 add_link_options("-fuse-ld=lld")
@@ -115,7 +118,7 @@ target_link_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
-  # RelWithDebInfo linker flags matched Debug in original, keeping consistent
+  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
 )
 
 # ==============================================================================
@@ -236,3 +239,6 @@ target_link_libraries(test_equiv PRIVATE nanos_io)
 
 add_nanos_test(test_call_ec tests/test_call_ec.cpp)
 target_link_libraries(test_call_ec PRIVATE nanos_io)
+
+add_nanos_test(test_call_cc tests/test_call_cc.cpp)
+target_link_libraries(test_call_cc PRIVATE nanos_io)

@@ -31,4 +31,8 @@ SUBR scm_obj_t subr_newline(scm_obj_t self);
 SUBR scm_obj_t subr_collect(scm_obj_t self);
 SUBR scm_obj_t subr_safepoint(scm_obj_t self);
 SUBR scm_obj_t subr_call_ec(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_call_cc(scm_obj_t self, scm_obj_t a1);
+
+extern "C" void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val);
+
 #endif  // NANOS_SUBR_H_INCLUDED

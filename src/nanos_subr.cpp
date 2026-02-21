@@ -6,6 +6,9 @@
 #include "nanos_subr.h"
 #include <boost/context/continuation.hpp>
 #include <boost/context/detail/fcontext.hpp>
+#include <cstdio>
+#include <sanitizer/hwasan_interface.h>
+#include <ucontext.h>
 #include "codegen_aux.h"
 #include "object_heap.h"
 #include "printer.h"
@@ -128,6 +131,87 @@ static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
   }
   CDR(tail) = lst2;
   return head;
+}
+
+static thread_local scm_obj_t s_captured_retval = scm_undef;
+static thread_local bool s_restored = false;
+
+static uint8_t __attribute__((no_sanitize("hwaddress"))) get_mem_tag(void* p) {
+#if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+  p = (void*)((uintptr_t)p & ~0xF);
+  for (int t = 0; t < 256; t++) {
+    void* pt = __hwasan_tag_pointer(p, t);
+    if (__hwasan_test_shadow(pt, 1) == -1) return (uint8_t)t;
+  }
+#endif
+  return 0;
+}
+
+SUBR scm_obj_t __attribute__((no_sanitize("hwaddress"))) subr_call_cc(scm_obj_t self, scm_obj_t proc) {
+  uint64_t stack_bottom = capture_thread_stack_bottom();
+  ucontext_t uctx;
+  s_restored = false;
+  if (getcontext(&uctx) == 0) {
+    if (!s_restored) {
+      void* sp;
+      __asm__ volatile("mov %0, sp" : "=r"(sp));
+      size_t stack_size = stack_bottom - (uintptr_t)sp;
+      uint8_t* stack_copy = (uint8_t*)object_heap_t::current()->alloc_private(stack_size);
+
+      uint8_t* d_ptr = (uint8_t*)prune_memory_address((uintptr_t)stack_copy);
+      uint8_t* s_ptr = (uint8_t*)prune_memory_address((uintptr_t)sp);
+      for (size_t i = 0; i < stack_size; i++) d_ptr[i] = s_ptr[i];
+
+#if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+      size_t shadow_size = (stack_size + 15) / 16;
+      uint8_t* shadow_copy = (uint8_t*)object_heap_t::current()->alloc_private(shadow_size);
+      for (size_t i = 0; i < shadow_size; i++) {
+        shadow_copy[i] = get_mem_tag((void*)((uintptr_t)sp + i * 16));
+      }
+#else
+      uint8_t* shadow_copy = nullptr;
+#endif
+
+      scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom);
+      scm_obj_t proc_argv[1] = {make_cons(cont_obj, scm_nil)};
+      return c_apply_helper(proc, 1, proc_argv);
+    } else {
+      return s_captured_retval;
+    }
+  }
+  fatal("getcontext failed");
+}
+
+static uint8_t s_restore_stack[64 * 1024] __attribute__((aligned(16)));
+
+extern "C" __attribute__((used)) void __attribute__((no_sanitize("hwaddress"))) restore_trampoline(scm_continuation_rec_t* rec) {
+  uintptr_t stack_top = rec->stack_bottom - rec->stack_size;
+  uint8_t* dst = (uint8_t*)prune_memory_address(stack_top);
+  uint8_t* src = (uint8_t*)prune_memory_address((uintptr_t)rec->stack_copy);
+#if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+  __hwasan_tag_memory(dst, 0, rec->stack_size);
+#endif
+  for (size_t i = 0; i < rec->stack_size; i++) dst[i] = src[i];
+#if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
+  for (size_t i = 0; i < (rec->stack_size + 15) / 16; i++) {
+    __hwasan_tag_memory((void*)(stack_top + i * 16), rec->shadow_copy[i], 16);
+  }
+  __hwasan_handle_vfork((void*)stack_top);
+#endif
+  setcontext(rec->uctx);
+}
+
+extern "C" void __attribute__((no_sanitize("hwaddress"))) restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
+  s_captured_retval = val;
+  s_restored = true;
+  uintptr_t tmp_sp = (uintptr_t)s_restore_stack + sizeof(s_restore_stack) - 64;
+  __asm__ volatile(
+      "mov sp, %0\n"
+      "mov x0, %1\n"
+      "bl restore_trampoline\n"
+      :
+      : "r"(tmp_sp), "r"(rec)
+      : "x0", "memory");
 }
 
 SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
