@@ -56,7 +56,7 @@ static void setup_subr() {
 static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;
 static thread_local std::unique_ptr<codegen_t> s_codegen;
 
-static codegen_t* init_jit() {
+static codegen_t* init_codegen() {
   if (s_codegen) return s_codegen.get();
 
   llvm::InitializeNativeTarget();
@@ -92,36 +92,31 @@ static codegen_t* init_jit() {
   return s_codegen.get();
 }
 
-static void destroy_jit() {
+static void destroy_codegen() {
   s_codegen.reset();
   s_jit.reset();
 }
 
-static thread_local object_heap_t s_heap;
-
 int main() {
-  s_heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
-
-  // setup SUBR
-  setup_subr();
-
   puts(";; nanos - a small scheme interpreter for bootstrapping");
-
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
   puts(";; USE_TBI == 0");
 #endif
 
-  codegen_t* codegen = init_jit();
+  object_heap_t* heap = new object_heap_t();
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+
+  codegen_t* codegen = init_codegen();
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
 
+  setup_subr();
+
   while (true) {
     if (std::cin.eof()) break;
-
-    s_heap.safepoint();
 
     printf("> ");
     fflush(stdout);
@@ -153,11 +148,11 @@ int main() {
       printer.print(obj);
       puts("");
     }
-    s_heap.safepoint();
   }
 
-  destroy_jit();
-  s_heap.destroy();
+  destroy_codegen();
+  heap->destroy();
+  delete heap;
   return 0;
 }
 

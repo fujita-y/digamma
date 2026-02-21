@@ -90,8 +90,8 @@ void concurrent_heap_t::snapshot_stack() {
     raw.insert(prune_memory_address(*(uint64_t*)addr));
   }
   for (const auto& addr : raw) {
-    void* p = test_live_object(addr);
-    if (p) enqueue_root(p);
+    void* live = test_live_object(addr);
+    if (live) enqueue_root(live);
   }
 
 #ifndef NDEBUG
