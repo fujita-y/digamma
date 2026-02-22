@@ -137,6 +137,7 @@ set(NANOS_CORE_SOURCES
   src/vector.cpp
   src/codegen.cpp
   src/codegen_aux.cpp
+  src/codegen_emit.cpp
   src/nanos_subr.cpp
   src/nanos_subr_cont.cpp
   src/arch_arm64.cpp
