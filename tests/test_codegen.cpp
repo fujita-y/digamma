@@ -117,21 +117,21 @@ int main(int argc, char** argv) {
   run_test("ConstantReturn", [](CodegenTest& env) -> bool {
     // ((const r0 3) (ret)) ;=> 3
     scm_obj_t code = env.read_code("((const r0 3) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(3);
   });
 
   run_test("MovInstruction", [](CodegenTest& env) -> bool {
     // ((const r0 10) (mov r1 r0) (mov r0 r1) (ret)) ;=> 10
     scm_obj_t code = env.read_code("((const r0 10) (mov r1 r0) (mov r0 r1) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(10);
   });
 
   run_test("ControlFlow", [](CodegenTest& env) -> bool {
     // ((const r0 2) (if L1 L2) (label L1) (const r0 1) (jump L3) (label L2) (const r0 3) (label L3) (ret)) ;=> 1
     scm_obj_t code = env.read_code("((const r0 2) (if L1 L2) (label L1) (const r0 1) (jump L3) (label L2) (const r0 3) (label L3) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     /* 2 is true */
     return result == make_fixnum(1);
   });
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
   run_test("ControlFlowFalse", [](CodegenTest& env) -> bool {
     // ((const r0 #f) (if L1 L2) (label L1) (const r0 1) (jump L3) (label L2) (const r0 3) (label L3) (ret)) ;=> 3
     scm_obj_t code = env.read_code("((const r0 #f) (if L1 L2) (label L1) (const r0 1) (jump L3) (label L2) (const r0 3) (label L3) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(3);
   });
 
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
     scm_obj_t code = env.read_code(
         "((const r0 #t) (if L1 L2) (label L1) (const r0 #f) (if L4 L5) (label L4) (const r0 1) (jump L6) (label L5) (const r0 2) (label L6) "
         "(jump L3) (label L2) (const r0 3) (label L3) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     // L1(#t)->L4(#f)->L5 -> 2, L2 -> 3
     return result == make_fixnum(2);
   });
@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
   run_test("HighRegisterCount", [](CodegenTest& env) -> bool {
     // ((const r100 123) (mov r0 r100) (ret)) ;=> 123
     scm_obj_t code = env.read_code("((const r100 123) (mov r0 r100) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     return result == make_fixnum(123);
   });
 
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
     // ((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 42) (ret)) ;=> closure address
     // We check if the result is a closure heap object.
     scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 42) (ret))");
-    scm_obj_t result = (scm_obj_t)env.codegen->compile(code);
+    scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     return is_closure(result);
   });
 
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
     // ((const r1 123) (make-closure r0 C1 (r1) #f 0 #f) (ret) (label C1) (const r0 42) (ret))
     // Check if closure captures r1 (val 123) at env[0]
     scm_obj_t code = env.read_code("((const r1 123) (make-closure r0 C1 (r1) #f 0 #f) (ret) (label C1) (const r0 42) (ret))");
-    scm_obj_t result = (scm_obj_t)env.codegen->compile(code);
+    scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
     // Check nsize and env[0]
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
     // ((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))
     // Check if closure has literals vector with (1 . 2)
     scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))");
-    scm_obj_t result = (scm_obj_t)env.codegen->compile(code);
+    scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
     // Check literals
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
     // ((make-closure r0 C1 () #f 5 #t) (ret) (label C1) (const r0 42) (ret))
     // Check argc=5, rest=1
     scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 5 #t) (ret) (label C1) (const r0 42) (ret))");
-    scm_obj_t result = (scm_obj_t)env.codegen->compile(code);
+    scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
     if (rec->argc != 5) {
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
     // ((const r0 123) (global-set! foo r0) (ret))
     // Check if interaction-environment has foo = 123
     scm_obj_t code = env.read_code("((const r2 123) (global-set! foo r2) (ret))");
-    env.codegen->compile(code);
+    env.codegen->compile(code)();
 
     object_heap_t* heap = object_heap_t::current();
     scm_obj_t env_obj = heap->m_environment;
@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
     // ((const r0 456) (global-set! bar r0) (global-ref r1 bar) (ret))
     // Check if r1 has 456
     scm_obj_t code = env.read_code("((const r0 100) (const r1 456) (global-set! bar r1) (global-ref r0 bar) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(456)) {
       printf("GlobalRef mismatch: expected 456, got %ld\n", result);
       return false;
@@ -276,7 +276,7 @@ int main(int argc, char** argv) {
     // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))
     // Call C1, result should be in r0 (42)
     scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))");
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(42)) {
       printf("CallInstruction mismatch: expected 42, got %ld\n", result);
       return false;
@@ -288,12 +288,12 @@ int main(int argc, char** argv) {
     // Sequence 1: Create closure and set to global 'a'
     // ((make-closure r0 C1 () #f 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))
     scm_obj_t code1 = env.read_code("((make-closure r0 C1 () #f 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))");
-    env.codegen->compile(code1);
+    env.codegen->compile(code1)();
 
     // Sequence 2: Get global 'a' and call it
     // ((const r1 10) (global-ref r2 a) (mov r0 r1) (call r2 1) (ret))
     scm_obj_t code2 = env.read_code("((const r1 10) (global-ref r2 a) (mov r0 r1) (call r2 1) (ret))");
-    intptr_t result = env.codegen->compile(code2);
+    intptr_t result = env.codegen->compile(code2)();
 
     // Result should be 10 (passed as argument r0 -> r1 -> ret)
     if (result != make_fixnum(10)) {
@@ -312,7 +312,7 @@ int main(int argc, char** argv) {
         "(label C1) (const r1 999) (make-closure r0 C2 (r1) #f 0 #f) (ret) "
         "(label C2) (ret))");
 
-    env.codegen->compile(code);
+    env.codegen->compile(code)();
 
     object_heap_t* heap = object_heap_t::current();
     scm_obj_t env_obj = heap->m_environment;
@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
         "(call r3 3) (ret) "
         "(label C1) (mov r0 r2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(30)) {
       printf("ClosureArgsSum: expected 30, got %ld\n", result);
       return false;
@@ -366,7 +366,7 @@ int main(int argc, char** argv) {
         "((const r0 100) (global-set! cnt r0) "
         "(global-ref r1 cnt) (mov r0 r1) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(100)) {
       printf("GlobalInc: expected 100, got %ld\n", result);
       return false;
@@ -385,7 +385,7 @@ int main(int argc, char** argv) {
         "(label L1) (const r0 1) (ret) "
         "(label L2) (const r0 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(2)) {
       printf("ClosureControlFlow: expected 2, got %ld\n", result);
       return false;
@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
         "(call r5 2) (ret) "
         "(label C1) (mov r0 r2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != scm_nil) {
       printf("RestArgumentsExact: expected nil, got %lx\n", result);
       return false;
@@ -427,7 +427,7 @@ int main(int argc, char** argv) {
         "(call r5 4) (ret) "
         "(label C1) (mov r0 r2) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     // Check if result is list (30 40)
     if (!is_cons(result)) {
       printf("RestArgumentsExtra: expected cons, got %lx\n", result);
@@ -459,7 +459,7 @@ int main(int argc, char** argv) {
     scm_obj_t SETUP_CODE = env.read_code(
         "((make-closure r0 C1 () #f 2 #t) (global-set! a r0) (ret) "
         "(label C1) (mov r3 r2) (mov r2 r1) (mov r1 r0) (mov r0 r3) (ret))");
-    env.codegen->compile(SETUP_CODE);
+    env.codegen->compile(SETUP_CODE)();
 
     // ((const r5 1) (const r6 2) (const r7 3) (const r8 4) (const r9 5)
     //  (global-ref r10 a)
@@ -481,7 +481,7 @@ int main(int argc, char** argv) {
         "(mov r0 r5) (mov r1 r6) (mov r2 r7) (mov r3 r8) (mov r4 r9) "
         "(call r10 5) (ret))");
 
-    intptr_t result = env.codegen->compile(CALL_CODE);
+    intptr_t result = env.codegen->compile(CALL_CODE)();
 
     // Check if result is (3 4 5)
     if (!is_cons(result)) {
@@ -510,7 +510,7 @@ int main(int argc, char** argv) {
         "(call r0 0) (ret) "
         "(label C1) (closure-ref r0 0) (ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(123)) {
       printf("ClosureRef: expected 123, got %ld\n", result);
       return false;
@@ -539,7 +539,7 @@ int main(int argc, char** argv) {
         "(mov r0 r2) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(20)) {
       printf("ClosureSet: expected 20, got %ld\n", result);
       return false;
@@ -559,7 +559,7 @@ int main(int argc, char** argv) {
         "(closure-self r0) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (!is_closure((scm_obj_t)result)) {
       printf("ClosureSelf: expected closure, got %lx\n", result);
       return false;
@@ -571,7 +571,7 @@ int main(int argc, char** argv) {
     // ((const r0 123) (make-cell r0) (ret))
     // r0 should contain a cell pointing to 123
     scm_obj_t code = env.read_code("((const r0 123) (make-cell r0) (ret))");
-    scm_obj_t result = (scm_obj_t)env.codegen->compile(code);
+    scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
 
     if (!is_cell(result)) {
       printf("MakeCell: expected cell, got %lx\n", result);
@@ -602,7 +602,7 @@ int main(int argc, char** argv) {
         "(closure-cell-ref r0 0) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(123)) {
       printf("ClosureCellRef: expected 123, got %ld\n", result);
       return false;
@@ -631,7 +631,7 @@ int main(int argc, char** argv) {
         "(closure-cell-ref r0 0) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(456)) {
       printf("ClosureCellSet: expected 456, got %ld\n", result);
       return false;
@@ -650,7 +650,7 @@ int main(int argc, char** argv) {
         "(reg-cell-ref r0 r1) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(123)) {
       printf("RegCellRef: expected 123, got %ld\n", result);
       return false;
@@ -673,7 +673,7 @@ int main(int argc, char** argv) {
         "(reg-cell-ref r0 r1) "
         "(ret))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(456)) {
       printf("RegCellSet: expected 456, got %ld\n", result);
       return false;
@@ -704,7 +704,7 @@ int main(int argc, char** argv) {
         "(closure-ref r0 0) "
         "(tail-call r0 0))");
 
-    intptr_t result = env.codegen->compile(code);
+    intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(42)) {
       printf("TailCall: expected 42, got %ld\n", result);
       return false;
@@ -734,7 +734,7 @@ int main(int argc, char** argv) {
         "(call r12 2) "
         "(ret))");
 
-    intptr_t result1 = env.codegen->compile(code1);
+    intptr_t result1 = env.codegen->compile(code1)();
     if (result1 != make_fixnum(3)) {
       printf("ApplyTest 1 (apply + '(1 2)): expected 3, got %ld\n", result1);
       return false;
@@ -754,7 +754,7 @@ int main(int argc, char** argv) {
         "(call r14 4) "
         "(ret))");
 
-    intptr_t result2 = env.codegen->compile(code2);
+    intptr_t result2 = env.codegen->compile(code2)();
     if (result2 != make_fixnum(6)) {
       printf("ApplyTest 2 (apply + 1 2 '(3)): expected 6, got %ld\n", result2);
       return false;

@@ -47,9 +47,18 @@ static void setup_subr() {
   c_global_set(make_symbol("collect"), scm_subr_collect);
   scm_obj_t scm_subr_safepoint = make_closure((void*)subr_safepoint, 0, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("safepoint"), scm_subr_safepoint);
+  scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
+  scm_obj_t scm_subr_call_cc = make_closure((void*)subr_call_cc, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
 }
 
-int main() {
+static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;
+static thread_local std::unique_ptr<codegen_t> s_codegen;
+
+static codegen_t* init_codegen() {
+  if (s_codegen) return s_codegen.get();
+
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
@@ -58,7 +67,7 @@ int main() {
   auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!jtmb) {
     fprintf(stderr, "Failed to detect host target: %s\n", llvm::toString(jtmb.takeError()).c_str());
-    return 1;
+    exit(1);
   }
   jtmb->setCodeModel(llvm::CodeModel::Small);
   jtmb->getOptions().GuaranteedTailCallOpt = true;
@@ -66,42 +75,48 @@ int main() {
   auto jit_expected = llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(*jtmb)).create();
   if (!jit_expected) {
     fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
-    return 1;
+    exit(1);
   }
-  auto jit = std::move(*jit_expected);
+  s_jit = std::move(*jit_expected);
 
   // Allow the JIT to find symbols in the current process
-  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
+  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(s_jit->getDataLayout().getGlobalPrefix());
   if (!gen) {
     fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
-    return 1;
+    exit(1);
   }
-  jit->getMainJITDylib().addGenerator(std::move(*gen));
+  s_jit->getMainJITDylib().addGenerator(std::move(*gen));
 
-  object_heap_t heap;
-  heap.init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+  s_codegen = std::make_unique<codegen_t>(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), s_jit.get());
+  return s_codegen.get();
+}
 
-  // setup SUBR
-  setup_subr();
+static void destroy_codegen() {
+  s_codegen.reset();
+  s_jit.reset();
+}
 
+int main() {
   puts(";; nanos - a small scheme interpreter for bootstrapping");
-
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
   puts(";; USE_TBI == 0");
 #endif
 
-  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  codegen_t codegen(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+  object_heap_t* heap = new object_heap_t();
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+
+  codegen_t* codegen = init_codegen();
 
   printer_t printer(std::cout);
   reader_t reader(std::cin);
 
+  setup_subr();
+
   while (true) {
     if (std::cin.eof()) break;
-
-    object_heap_t::current()->safepoint();
 
     printf("> ");
     fflush(stdout);
@@ -121,7 +136,8 @@ int main() {
 
     if (is_cons(obj)) {
       try {
-        intptr_t result = codegen.compile(obj);
+        auto func = codegen->compile(obj);
+        intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.print((scm_obj_t)result);
         puts("");
@@ -132,10 +148,11 @@ int main() {
       printer.print(obj);
       puts("");
     }
-    heap.safepoint();
   }
 
-  heap.destroy();
+  destroy_codegen();
+  heap->destroy();
+  delete heap;
   return 0;
 }
 

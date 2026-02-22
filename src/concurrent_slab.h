@@ -83,7 +83,7 @@ class concurrent_slab_t {
     return (void*)((intptr_t)ref & ~(m_object_size - 1));
   }
 
-  bool state(void* obj) __attribute__((no_sanitize("address", "hwaddress"))) {
+  __attribute__((no_sanitize("hwaddress"))) bool state(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
     int bit_n = ((intptr_t)obj & (SLAB_SIZE - 1)) >> m_object_size_shift;
@@ -99,7 +99,7 @@ class concurrent_slab_t {
     bitmap[bit_n >> 3] |= (1 << (bit_n & 7));
   }
 
-  bool test_and_set_mark(void* obj) __attribute__((no_sanitize("address", "hwaddress"))) {
+  __attribute__((no_sanitize("hwaddress"))) bool test_and_set_mark(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
     int bit_n = ((intptr_t)obj & (SLAB_SIZE - 1)) >> m_object_size_shift;

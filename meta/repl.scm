@@ -90,6 +90,8 @@
   (global-variable-set! 'closure-fixed-argc closure-fixed-argc)
   (global-variable-set! 'closure-has-rest closure-has-rest)
   (global-variable-set! 'closure? closure?)
+  (global-variable-set! 'call/cc call/cc)
+  (global-variable-set! 'call/1cc call/cc)
   #t)
 
 (define repl:prelude

@@ -5,6 +5,9 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
+#include <boost/context/continuation.hpp>
+#include <sanitizer/hwasan_interface.h>
+#include <ucontext.h>
 #include "arch_arm64.h"
 #include "mutex.h"
 
@@ -46,9 +49,11 @@ constexpr uintptr_t tc6_closure = 6;
 constexpr uintptr_t tc6_environment = 7;
 constexpr uintptr_t tc6_cell = 8;
 constexpr uintptr_t tc6_subr = 9;
+constexpr uintptr_t tc6_escape = 10;
+constexpr uintptr_t tc6_continuation = 11;
 /*
+constexpr uintptr_t tc6_continuation = ;
 constexpr uintptr_t tc6_bignum = ;
-constexpr uintptr_t tc6_cont = ;
 constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_port = ;
 constexpr uintptr_t tc6_values = ;
@@ -157,6 +162,22 @@ struct scm_environment_rec_t {
   scm_obj_t macros;     // hashtable
 };
 
+struct scm_escape_rec_t {
+  scm_tc6_t tag;
+  bool invoked;
+  scm_obj_t retval;
+  boost::context::continuation* cont;
+};
+
+struct scm_continuation_rec_t {
+  scm_tc6_t tag;
+  ucontext_t* uctx;
+  size_t stack_size;
+  uint8_t* stack_copy;
+  uint8_t* shadow_copy;
+  uint64_t stack_bottom;
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -189,6 +210,8 @@ inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
 inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
 inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
 inline bool is_subr(scm_obj_t x) { return is_tc6(x, tc6_subr); }
+inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
+inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
@@ -205,6 +228,8 @@ scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
+scm_obj_t make_escape(boost::context::continuation k);
+scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

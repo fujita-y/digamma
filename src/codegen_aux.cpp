@@ -4,7 +4,9 @@
 #include "core.h"
 #include "object.h"
 #include "codegen_aux.h"
+#include <boost/context/continuation.hpp>
 #include "codegen.h"
+#include "nanos_subr.h"
 #include "object_heap.h"
 
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -71,6 +73,34 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
     curr = CDR(curr);
   }
   if (curr != scm_nil) throw std::runtime_error("apply: last argument must be a proper list");
+
+  if (is_escape(proc)) {
+    if (args.size() > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
+    scm_escape_rec_t* cont_rec = (scm_escape_rec_t*)to_address(proc);
+    if (cont_rec->invoked) throw std::runtime_error("apply: one-shot continuation already invoked");
+    if (!cont_rec->cont) throw std::runtime_error("apply: invalid continuation");
+
+    // Set retval
+    cont_rec->retval = args.empty() ? scm_undef : args[0];
+    cont_rec->invoked = true;
+
+    // Jump back
+    auto k = std::move(*(cont_rec->cont));
+    delete cont_rec->cont;
+    cont_rec->cont = nullptr;
+    k.resume();
+    // We never return here after invoking the continuation that was captured in call/ec.
+    // The stack is abandoned up to the point of call/ec.
+    return scm_undef;
+  }
+
+  if (is_continuation(proc)) {
+    if (args.size() > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
+    scm_continuation_rec_t* cont_rec = (scm_continuation_rec_t*)to_address(proc);
+    scm_obj_t val = args.empty() ? scm_undef : args[0];
+    restore_continuation(cont_rec, val);
+    return scm_undef;
+  }
 
   codegen_t* cg = codegen_t::current();
   if (!cg) throw std::runtime_error("apply: JIT not initialized");

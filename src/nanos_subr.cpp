@@ -4,6 +4,11 @@
 #include "core.h"
 #include "object.h"
 #include "nanos_subr.h"
+#include <boost/context/continuation.hpp>
+#include <boost/context/detail/fcontext.hpp>
+#include <cstdio>
+#include <sanitizer/hwasan_interface.h>
+#include <ucontext.h>
 #include "codegen_aux.h"
 #include "object_heap.h"
 #include "printer.h"

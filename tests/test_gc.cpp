@@ -129,7 +129,7 @@ static bool test_gc_allocation(int num_loops) {
 static bool test_root_survivability() {
   printf("running test_root_survivability...\n");
   object_heap_t heap;
-  heap.init(1024 * 1024, 1024 * 256);
+  heap.init(1024 * 1024 * 4, 1024 * 256);
 
   // 1. Root a list of various objects
   scm_obj_t s = make_string("survivor-string");

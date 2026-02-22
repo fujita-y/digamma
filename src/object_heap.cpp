@@ -125,9 +125,13 @@ void* object_heap_t::alloc_private(size_t size) {
 }
 
 void object_heap_t::delete_private(void* obj) {
-  assert(m_concurrent_pool.in_slab(obj) && !m_concurrent_pool.is_collectible(obj));
-  slab_traits_t* traits = SLAB_TRAITS_OF(obj);
-  traits->owner->delete_object(obj);
+  if (m_concurrent_pool.in_slab(obj)) {
+    assert(!m_concurrent_pool.is_collectible(obj));
+    slab_traits_t* traits = SLAB_TRAITS_OF(obj);
+    traits->owner->delete_object(obj);
+  } else {
+    m_concurrent_pool.deallocate(obj);
+  }
 }
 
 void object_heap_t::sweep_symbol_table() {
@@ -250,6 +254,26 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (tc6 == tc6_escape) {
+    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+    shade(rec->retval);
+    return;
+  }
+  if (tc6 == tc6_continuation) {
+    scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+    uint64_t captured_stack_bottom = rec->stack_bottom;
+    uint64_t captured_stack_top = captured_stack_bottom - rec->stack_size;
+    std::unordered_set<uint64_t> raw;
+    raw.reserve((captured_stack_bottom - captured_stack_top) / sizeof(uint64_t));
+    for (uint64_t addr = captured_stack_top; addr < captured_stack_bottom; addr += sizeof(uint64_t)) {
+      raw.insert(prune_memory_address(*(uint64_t*)addr));
+    }
+    for (const auto& addr : raw) {
+      void* live = test_live_object(addr);
+      if (live) shade((scm_obj_t)live);
+    }
+    return;
+  }
   if (tc6 == tc6_long_flonum || tc6 == tc6_symbol || tc6 == tc6_string || tc6 == tc6_u8vector) {
     return;
   }
@@ -290,6 +314,22 @@ void object_heap_t::finalize(void* obj) {
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
 
   if (tc6 == tc6_closure) {
+    return;
+  }
+  if (tc6 == tc6_escape) {
+    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+    delete rec->cont;
+    rec->cont = nullptr;
+    return;
+  }
+  if (tc6 == tc6_continuation) {
+    scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+    if (rec->uctx) free(rec->uctx);
+    if (rec->stack_copy) free(rec->stack_copy);
+    if (rec->shadow_copy) free(rec->shadow_copy);
+    rec->uctx = nullptr;
+    rec->stack_copy = nullptr;
+    rec->shadow_copy = nullptr;
     return;
   }
   assert(false);

@@ -36,7 +36,7 @@ class object_heap_t {
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void shade(scm_obj_t obj);
-  void trace(void* obj) __attribute__((no_sanitize("address", "hwaddress")));
+  __attribute__((no_sanitize("hwaddress"))) void trace(void* obj);
   void finalize(void* obj);
   void snapshot_root();
   void update_weak_reference();
@@ -52,6 +52,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
+  void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
   void* alloc_cons() { return alloc_object(m_cons); }
