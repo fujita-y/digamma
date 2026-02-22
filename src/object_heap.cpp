@@ -7,6 +7,8 @@
 #include "bit.h"
 #include "hash.h"
 
+thread_local scm_obj_t object_heap_t::s_captured_retval = scm_undef;
+thread_local scm_obj_t object_heap_t::s_current_winders = scm_nil;
 thread_local object_heap_t* object_heap_t::s_current;
 
 static constexpr int symbol_table_reserve_size = 4096;
@@ -256,11 +258,13 @@ void object_heap_t::trace(void* obj) {
   }
   if (tc6 == tc6_escape) {
     scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+    shade(rec->winders);
     shade(rec->retval);
     return;
   }
   if (tc6 == tc6_continuation) {
     scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+    shade(rec->winders);
     uint64_t captured_stack_bottom = rec->stack_bottom;
     uint64_t captured_stack_top = captured_stack_bottom - rec->stack_size;
     std::unordered_set<uint64_t> raw;
@@ -318,8 +322,8 @@ void object_heap_t::finalize(void* obj) {
   }
   if (tc6 == tc6_escape) {
     scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-    delete rec->cont;
-    rec->cont = nullptr;
+    if (rec->uctx) free(rec->uctx);
+    rec->uctx = nullptr;
     return;
   }
   if (tc6 == tc6_continuation) {
@@ -346,6 +350,8 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 void object_heap_t::snapshot_root() {
   for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) enqueue_root(*it);
   enqueue_root(m_environment);
+  enqueue_root(s_current_winders);
+  enqueue_root(s_captured_retval);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

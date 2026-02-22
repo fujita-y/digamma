@@ -3,6 +3,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
 #include "codegen_aux.h"
+#include "nanos_context.h"
 #include "nanos_subr.h"
 #include "object_heap.h"
 #include "printer.h"
@@ -15,6 +16,8 @@ static void setup_subr() {
   c_global_set(make_symbol("-"), scm_subr_num_sub);
   scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("="), scm_subr_num_eq);
+  scm_obj_t scm_subr_num_lt = make_closure((void*)subr_num_lt, 0, 1, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("<"), scm_subr_num_lt);
   scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("list"), scm_subr_list);
   scm_obj_t scm_subr_car = make_closure((void*)subr_car, 1, 0, 0, nullptr, scm_nil, 1);
@@ -41,6 +44,7 @@ static void setup_subr() {
   c_global_set(make_symbol("append"), scm_subr_append);
   scm_obj_t scm_subr_write = make_closure((void*)subr_write, 1, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("write"), scm_subr_write);
+  c_global_set(make_symbol("display"), scm_subr_write);
   scm_obj_t scm_subr_newline = make_closure((void*)subr_newline, 0, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("newline"), scm_subr_newline);
   scm_obj_t scm_subr_collect = make_closure((void*)subr_collect, 0, 0, 0, nullptr, scm_nil, 1);
@@ -51,6 +55,11 @@ static void setup_subr() {
   c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
   scm_obj_t scm_subr_call_cc = make_closure((void*)subr_call_cc, 1, 0, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
+  c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
+  scm_obj_t scm_subr_dynamic_wind = make_closure((void*)subr_dynamic_wind, 3, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("dynamic-wind"), scm_subr_dynamic_wind);
+  scm_obj_t scm_subr_continuation_p = make_closure((void*)subr_continuation_p, 1, 0, 0, nullptr, scm_nil, 1);
+  c_global_set(make_symbol("continuation?"), scm_subr_continuation_p);
 }
 
 static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;

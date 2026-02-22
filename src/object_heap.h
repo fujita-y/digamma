@@ -14,6 +14,10 @@
 #include "concurrent_slab.h"
 
 class object_heap_t {
+ public:
+  thread_local static scm_obj_t s_captured_retval;
+  thread_local static scm_obj_t s_current_winders;
+
  private:
   thread_local static object_heap_t* s_current;
   concurrent_pool_t m_concurrent_pool;

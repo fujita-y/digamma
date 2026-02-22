@@ -5,7 +5,6 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
-#include <boost/context/continuation.hpp>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include "arch_arm64.h"
@@ -164,18 +163,21 @@ struct scm_environment_rec_t {
 
 struct scm_escape_rec_t {
   scm_tc6_t tag;
-  bool invoked;
+  scm_obj_t winders;
   scm_obj_t retval;
-  boost::context::continuation* cont;
+  ucontext_t* uctx;
+  uint64_t sp;
+  bool invoked;
 };
 
 struct scm_continuation_rec_t {
   scm_tc6_t tag;
+  scm_obj_t winders;
   ucontext_t* uctx;
-  size_t stack_size;
   uint8_t* stack_copy;
   uint8_t* shadow_copy;
   uint64_t stack_bottom;
+  size_t stack_size;
 };
 
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
@@ -228,8 +230,9 @@ scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
-scm_obj_t make_escape(boost::context::continuation k);
-scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom);
+scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
+scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,
+                            scm_obj_t winders);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

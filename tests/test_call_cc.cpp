@@ -3,7 +3,7 @@
 #include <sanitizer/hwasan_interface.h>
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
-#include "../src/nanos_subr.h"
+#include "../src/nanos_context.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 

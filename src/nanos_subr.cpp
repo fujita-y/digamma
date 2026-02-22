@@ -95,6 +95,23 @@ SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(result);
 }
 
+SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) throw std::runtime_error("<: too few arguments");
+
+  if (!is_fixnum(argv[0])) throw std::runtime_error("<: arguments must be fixnums");
+  scm_obj_t first = argv[0];
+
+  for (int i = 1; i < argc; i++) {
+    if (!is_fixnum(argv[i])) throw std::runtime_error("<: arguments must be fixnums");
+    if (first < argv[i]) {
+      first = argv[i];
+      continue;
+    }
+    return scm_false;
+  }
+  return scm_true;
+}
+
 SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t list = scm_nil;
   for (int i = argc - 1; i >= 0; i--) {

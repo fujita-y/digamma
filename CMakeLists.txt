@@ -139,7 +139,7 @@ set(NANOS_CORE_SOURCES
   src/codegen_aux.cpp
   src/codegen_emit.cpp
   src/nanos_subr.cpp
-  src/nanos_subr_cont.cpp
+  src/nanos_context.cpp
   src/arch_arm64.cpp
   src/equiv.cpp
 )
@@ -188,7 +188,7 @@ macro(add_nanos_test test_name test_source)
     ${test_source}
     ${ARGN}  # Additional sources
   )
-  target_link_libraries(${test_name} PRIVATE nanos_core nanos_config ${NANOS_LINK_LIBRARIES})
+  target_link_libraries(${test_name} PRIVATE nanos_core nanos_io nanos_config ${NANOS_LINK_LIBRARIES})
   add_test(
     NAME ${test_name}
     COMMAND $<TARGET_FILE:${test_name}>
@@ -199,48 +199,19 @@ endmacro()
 add_nanos_test(test_object tests/test_object.cpp)
 add_nanos_test(test_gc tests/test_gc.cpp)
 
-# Tests that need I/O library
 add_nanos_test(test_printer tests/test_printer.cpp)
-target_link_libraries(test_printer PRIVATE nanos_io)
-
 add_nanos_test(test_printer_printf tests/test_printer_printf.cpp)
-target_link_libraries(test_printer_printf PRIVATE nanos_io)
-
 add_nanos_test(test_reader tests/test_reader.cpp)
-target_link_libraries(test_reader PRIVATE nanos_io)
-
 add_nanos_test(test_r7rs tests/test_r7rs.cpp)
-target_link_libraries(test_r7rs PRIVATE nanos_io)
-
 add_nanos_test(test_radix tests/test_radix.cpp)
-target_link_libraries(test_radix PRIVATE nanos_io)
-
 add_nanos_test(test_hash tests/test_hash.cpp)
-target_link_libraries(test_hash PRIVATE nanos_io)
-
 add_nanos_test(test_symbol tests/test_symbol.cpp)
-
 add_nanos_test(test_closure_analysis tests/test_closure_analysis.cpp)
-target_link_libraries(test_closure_analysis PRIVATE nanos_io)
-
 add_nanos_test(test_codegen tests/test_codegen.cpp)
-target_link_libraries(test_codegen PRIVATE nanos_io)
-
 add_nanos_test(test_closure_patterns tests/test_closure_patterns.cpp)
-target_link_libraries(test_closure_patterns PRIVATE nanos_io)
-
-
 add_nanos_test(test_apply_patterns tests/test_apply_patterns.cpp)
-target_link_libraries(test_apply_patterns PRIVATE nanos_io)
-
 add_nanos_test(test_deriv tests/test_deriv.cpp)
-target_link_libraries(test_deriv PRIVATE nanos_io)
-
 add_nanos_test(test_equiv tests/test_equiv.cpp)
-target_link_libraries(test_equiv PRIVATE nanos_io)
-
 add_nanos_test(test_call_ec tests/test_call_ec.cpp)
-target_link_libraries(test_call_ec PRIVATE nanos_io)
-
 add_nanos_test(test_call_cc tests/test_call_cc.cpp)
-target_link_libraries(test_call_cc PRIVATE nanos_io)
+add_nanos_test(test_dynamic_wind tests/test_dynamic_wind.cpp)

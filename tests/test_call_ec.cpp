@@ -2,7 +2,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
-#include "../src/nanos_subr.h"
+#include "../src/nanos_context.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 
@@ -85,6 +85,12 @@ static bool test_double_invoke_fails() {
   printf("\033[32mcall/ec double invoke passed\033[0m\n");
   return true;
 }
+
+#ifdef __has_feature
+  #if __has_feature(hwaddress_sanitizer)
+extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0"; }
+  #endif
+#endif
 
 int main(int argc, char** argv) {
   object_heap_t heap;
