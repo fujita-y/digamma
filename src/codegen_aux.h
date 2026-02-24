@@ -18,5 +18,6 @@ extern "C" void c_write_barrier(scm_obj_t obj);
 extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]);
 extern "C" void c_safepoint(void);
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc);
+extern "C" void c_test_application(scm_obj_t proc, int argc);
 
 #endif  // CODEGEN_AUX_H_INCLUDED

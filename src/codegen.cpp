@@ -628,9 +628,11 @@ void codegen_t::analyze_closure_labels() {
             } else {
               // Try to look up in the global environment
               scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.opr2);
-              if (is_closure(val)) {
+              if (val != scm_undef) {
                 current_state.regs[inst.rn1] = inst.opr2;
-                closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
+                if (is_closure(val)) {
+                  closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
+                }
               } else {
                 current_state.regs[inst.rn1] = scm_nil;
               }

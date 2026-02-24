@@ -6,7 +6,6 @@
 #include "codegen_aux.h"
 #include <boost/context/continuation.hpp>
 #include "codegen.h"
-#include "nanos_subr.h"
 #include "object_heap.h"
 
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
@@ -91,4 +90,20 @@ extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {
   using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
   auto bridge = (bridge_func_t)bridge_ptr;
   return (scm_obj_t)bridge(proc, 0, nullptr);
+}
+
+extern "C" void c_test_application(scm_obj_t proc, int argc) {
+  if (!is_closure(proc)) [[unlikely]] {
+    throw std::runtime_error("error in codegen: attempt to call a non-procedure");
+  }
+  scm_closure_rec_t* closure = (scm_closure_rec_t*)to_address(proc);
+  if (closure->rest) [[unlikely]] {
+    if (argc < closure->argc) [[unlikely]] {
+      throw std::runtime_error("error in codegen: wrong number of arguments");
+    }
+  } else {
+    if (argc != closure->argc) [[unlikely]] {
+      throw std::runtime_error("error in codegen: wrong number of arguments");
+    }
+  }
 }

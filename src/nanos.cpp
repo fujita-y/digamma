@@ -12,11 +12,11 @@
 static void setup_subr() {
   scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
-  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 1, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("-"), scm_subr_num_sub);
-  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 1, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("="), scm_subr_num_eq);
-  scm_obj_t scm_subr_num_lt = make_closure((void*)subr_num_lt, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_lt = make_closure((void*)subr_num_lt, 1, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("<"), scm_subr_num_lt);
   scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("list"), scm_subr_list);
@@ -151,7 +151,7 @@ int main() {
         printer.print((scm_obj_t)result);
         puts("");
       } catch (std::exception& e) {
-        printf("error: %s\n", e.what());
+        printf("%s\n", e.what());
       }
     } else {
       printer.print(obj);

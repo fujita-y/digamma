@@ -430,6 +430,9 @@ void* codegen_t::get_call_closure_bridge_ptr() {
 }
 
 void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
+  if (inst.argc < 2) {
+    throw std::runtime_error("error in codegen: wrong number of arguments");
+  }
   // Optimized apply
   // Signature: i64 c_apply_helper(i64 proc, i32 argc, i64* argv)
   llvm::Type* i64 = this->getInt64Type();
@@ -500,6 +503,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         args.push_back(get_reg(inst.rn1));  // self
 
         if (has_rest) {
+          if (inst.argc < fixed_argc) {
+            throw std::runtime_error("error in codegen: wrong number of arguments");
+          }
           args.push_back(createInt64Constant(context, inst.argc));
           llvm::Value* argv_array = nullptr;
           if (inst.argc > 0) {
@@ -514,9 +520,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           args.push_back(argv_array);
         } else {
           if (inst.argc != fixed_argc) {
-            // Mismatch in argument count for fixed-arity function -> fallback to runtime error
-            emit_generic_closure_call(inst, is_tail);
-            return;
+            throw std::runtime_error("error in codegen: wrong number of arguments");
           }
           for (int i = 0; i < inst.argc; i++) {
             args.push_back(get_reg(i));
@@ -550,6 +554,11 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         }
         return;
       }
+    } else {
+      scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.closure_label);
+      if (val != scm_undef && !is_closure(val)) {
+        throw std::runtime_error("error in codegen: attempt to call a non-procedure");
+      }
     }
   }
 
@@ -569,6 +578,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     args.push_back(get_reg(inst.rn1));
 
     if (has_rest) {
+      if (inst.argc < fixed_argc) {
+        throw std::runtime_error("error in codegen: wrong number of arguments");
+      }
       // Target expects: (self, argc, argv[])
       // We need to pack our register arguments into an array
 
@@ -591,10 +603,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       // Pass arguments directly
       // Note: target function has fixed_argc + 1 parameters (including self).
       // The call instruction has inst.argc arguments.
-      // If inst.argc != fixed_argc, fall back to generic call to let runtime handle error.
       if (inst.argc != fixed_argc) {
-        emit_generic_closure_call(inst, is_tail);
-        return;
+        throw std::runtime_error("error in codegen: wrong number of arguments");
       }
 
       for (int i = 0; i < inst.argc; i++) {
@@ -764,6 +774,12 @@ void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code
 }
 
 void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail) {
+  llvm::Type* i64 = this->getInt64Type();
+  llvm::Type* i32 = this->getInt32Type();
+  llvm::FunctionType* test_ft = llvm::FunctionType::get(builder.getVoidTy(), {i64, i32}, false);
+  llvm::Function* test_func = get_or_create_external_function("c_test_application", test_ft, (void*)&c_test_application);
+  builder.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(context, inst.argc)});
+
   if (inst.argc <= BRIDGE_MAX_ARGS) {
     // Optimized generic call via bridge
     llvm::Function* bridge = get_or_create_call_closure_bridge();
@@ -877,8 +893,7 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
   }
 
   // Check if it's a known closure (global or local) call optimization
-  if ((inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end() &&
-       closure_params.count(inst.closure_label)) ||
+  if ((inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) ||
       (inst.closure_label != scm_nil && function_map.count(inst.closure_label))) {
     emit_known_closure_call(inst, is_tail);
     return;
