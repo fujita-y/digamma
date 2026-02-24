@@ -3,9 +3,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int nanos_main();
+#include "nanos.h"
 
-int main() { return nanos_main(); }
+int main() {
+  nanos_t* nanos = new nanos_t();
+  nanos->init();
+  nanos->run();
+  nanos->destroy();
+  delete nanos;
+  return 0;
+}
 
 void fatal(const char* fmt, ...) {
   va_list ap;

@@ -106,7 +106,23 @@ static void destroy_codegen() {
   s_jit.reset();
 }
 
-int nanos_main() {
+#include "nanos.h"
+
+void nanos_t::init() {
+  heap = new object_heap_t();
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+
+  codegen = init_codegen();
+  setup_subr();
+}
+
+void nanos_t::destroy() {
+  destroy_codegen();
+  heap->destroy();
+  delete heap;
+}
+
+void nanos_t::run() {
   puts(";; nanos - a small scheme interpreter for bootstrapping");
 #if USE_TBI
   puts(";; USE_TBI == 1");
@@ -114,15 +130,8 @@ int nanos_main() {
   puts(";; USE_TBI == 0");
 #endif
 
-  object_heap_t* heap = new object_heap_t();
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
-
-  codegen_t* codegen = init_codegen();
-
   printer_t printer(std::cout);
   reader_t reader(std::cin);
-
-  setup_subr();
 
   while (true) {
     if (std::cin.eof()) break;
@@ -158,9 +167,4 @@ int nanos_main() {
       puts("");
     }
   }
-
-  destroy_codegen();
-  heap->destroy();
-  delete heap;
-  return 0;
 }
