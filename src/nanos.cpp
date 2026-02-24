@@ -11,56 +11,43 @@
 #include "reader.h"
 
 void nanos_t::init_subr() {
-  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("+"), scm_subr_num_add);
-  scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 1, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("-"), scm_subr_num_sub);
-  scm_obj_t scm_subr_num_eq = make_closure((void*)subr_num_eq, 1, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("="), scm_subr_num_eq);
-  scm_obj_t scm_subr_num_lt = make_closure((void*)subr_num_lt, 1, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("<"), scm_subr_num_lt);
-  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("list"), scm_subr_list);
-  scm_obj_t scm_subr_car = make_closure((void*)subr_car, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("car"), scm_subr_car);
-  scm_obj_t scm_subr_cdr = make_closure((void*)subr_cdr, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("cdr"), scm_subr_cdr);
-  scm_obj_t scm_subr_not = make_closure((void*)subr_not, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("not"), scm_subr_not);
-  scm_obj_t scm_subr_eq_p = make_closure((void*)subr_eq_p, 2, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("eq?"), scm_subr_eq_p);
-  scm_obj_t scm_subr_pair_p = make_closure((void*)subr_pair_p, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("pair?"), scm_subr_pair_p);
-  scm_obj_t scm_subr_null_p = make_closure((void*)subr_null_p, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("null?"), scm_subr_null_p);
-  scm_obj_t scm_subr_cadr = make_closure((void*)subr_cadr, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("cadr"), scm_subr_cadr);
-  scm_obj_t scm_subr_caddr = make_closure((void*)subr_caddr, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("caddr"), scm_subr_caddr);
-  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("cons"), scm_subr_cons);
-  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("apply"), scm_subr_apply);
-  scm_obj_t scm_subr_append = make_closure((void*)subr_append, 0, 1, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("append"), scm_subr_append);
-  scm_obj_t scm_subr_write = make_closure((void*)subr_write, 1, 0, 0, nullptr, scm_nil, 1);
+  auto reg = [](const char* name, void* func, int req, int opt) {
+    c_global_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
+  };
+  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, scm_nil, 1); };
+
+  reg("+", (void*)subr_num_add, 0, 1);
+  reg("-", (void*)subr_num_sub, 1, 1);
+  reg("=", (void*)subr_num_eq, 1, 1);
+  reg("<", (void*)subr_num_lt, 1, 1);
+  reg("list", (void*)subr_list, 0, 1);
+  reg("car", (void*)subr_car, 1, 0);
+  reg("cdr", (void*)subr_cdr, 1, 0);
+  reg("not", (void*)subr_not, 1, 0);
+  reg("eq?", (void*)subr_eq_p, 2, 0);
+  reg("pair?", (void*)subr_pair_p, 1, 0);
+  reg("null?", (void*)subr_null_p, 1, 0);
+  reg("cadr", (void*)subr_cadr, 1, 0);
+  reg("caddr", (void*)subr_caddr, 1, 0);
+  reg("cons", (void*)subr_cons, 2, 0);
+  reg("apply", (void*)subr_apply, 0, 1);
+  reg("append", (void*)subr_append, 0, 1);
+
+  scm_obj_t scm_subr_write = make_subr((void*)subr_write, 1, 0);
   c_global_set(make_symbol("write"), scm_subr_write);
   c_global_set(make_symbol("display"), scm_subr_write);
-  scm_obj_t scm_subr_newline = make_closure((void*)subr_newline, 0, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("newline"), scm_subr_newline);
-  scm_obj_t scm_subr_collect = make_closure((void*)subr_collect, 0, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("collect"), scm_subr_collect);
-  scm_obj_t scm_subr_safepoint = make_closure((void*)subr_safepoint, 0, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("safepoint"), scm_subr_safepoint);
-  scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
-  scm_obj_t scm_subr_call_cc = make_closure((void*)subr_call_cc, 1, 0, 0, nullptr, scm_nil, 1);
+
+  reg("newline", (void*)subr_newline, 0, 0);
+  reg("collect", (void*)subr_collect, 0, 0);
+  reg("safepoint", (void*)subr_safepoint, 0, 0);
+  reg("call/ec", (void*)subr_call_ec, 1, 0);
+
+  scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
   c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
-  scm_obj_t scm_subr_dynamic_wind = make_closure((void*)subr_dynamic_wind, 3, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("dynamic-wind"), scm_subr_dynamic_wind);
-  scm_obj_t scm_subr_continuation_p = make_closure((void*)subr_continuation_p, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("continuation?"), scm_subr_continuation_p);
+
+  reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
+  reg("continuation?", (void*)subr_continuation_p, 1, 0);
 }
 
 void nanos_t::init_codegen() {
@@ -71,24 +58,21 @@ void nanos_t::init_codegen() {
   // Configure JIT target machine with small code model
   auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!jtmb) {
-    fprintf(stderr, "Failed to detect host target: %s\n", llvm::toString(jtmb.takeError()).c_str());
-    exit(1);
+    fatal("Failed to detect host target: %s\n", llvm::toString(jtmb.takeError()).c_str());
   }
   jtmb->setCodeModel(llvm::CodeModel::Small);
   jtmb->getOptions().GuaranteedTailCallOpt = true;
 
   auto jit_expected = llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(*jtmb)).create();
   if (!jit_expected) {
-    fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
-    exit(1);
+    fatal("Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
   }
   m_jit = std::move(*jit_expected);
 
   // Allow the JIT to find symbols in the current process
   auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_jit->getDataLayout().getGlobalPrefix());
   if (!gen) {
-    fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
-    exit(1);
+    fatal("Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
   }
   m_jit->getMainJITDylib().addGenerator(std::move(*gen));
 
