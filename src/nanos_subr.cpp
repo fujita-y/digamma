@@ -180,7 +180,7 @@ SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, 
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
 
 SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).print(a1);
+  printer_t(std::cout).write(a1);
   return scm_undef;
 }
 

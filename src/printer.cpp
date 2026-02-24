@@ -4,7 +4,7 @@
 #include "core.h"
 #include "printer.h"
 
-void printer_t::print(scm_obj_t obj) {
+void printer_t::write(scm_obj_t obj) {
   if (is_fixnum(obj)) {
     out << fixnum(obj);
     return;
@@ -66,7 +66,7 @@ void printer_t::print(scm_obj_t obj) {
       scm_obj_t* elts = vector_elts(obj);
       for (int i = 0; i < n; i++) {
         if (i > 0) out << " ";
-        print(elts[i]);
+        write(elts[i]);
       }
       out << ")";
       return;
@@ -86,16 +86,16 @@ void printer_t::print(scm_obj_t obj) {
 
   if (is_cons(obj)) {
     out << "(";
-    print(((scm_cons_rec_t*)obj)->car);
+    write(((scm_cons_rec_t*)obj)->car);
     obj = ((scm_cons_rec_t*)obj)->cdr;
     while (is_cons(obj)) {
       out << " ";
-      print(((scm_cons_rec_t*)obj)->car);
+      write(((scm_cons_rec_t*)obj)->car);
       obj = ((scm_cons_rec_t*)obj)->cdr;
     }
     if (obj != scm_nil) {
       out << " . ";
-      print(obj);
+      write(obj);
     }
     out << ")";
     return;
@@ -184,7 +184,7 @@ void printer_t::format(const char* fmt, ...) {
       if (*p == 'w') {
         // '%w' -> format a Scheme object
         scm_obj_t obj = va_arg(ap, scm_obj_t);
-        print(obj);
+        write(obj);
         p++;
         continue;
       }

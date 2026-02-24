@@ -42,50 +42,50 @@ void test_printer() {
 
   // Test fixnum
   ss.str("");
-  printer.print(make_fixnum(123));
+  printer.write(make_fixnum(123));
   assert(ss.str() == "123");
   std::cout << "Fixnum test passed" << std::endl;
 
   // Test simple boolean
   ss.str("");
-  printer.print(scm_true);
+  printer.write(scm_true);
   assert(ss.str() == "#t");
   std::cout << "Boolean #t test passed" << std::endl;
 
   ss.str("");
-  printer.print(scm_false);
+  printer.write(scm_false);
   assert(ss.str() == "#f");
   std::cout << "Boolean #f test passed" << std::endl;
 
   // Test nil
   ss.str("");
-  printer.print(scm_nil);
+  printer.write(scm_nil);
   assert(ss.str() == "()");
   std::cout << "Nil test passed" << std::endl;
 
   // Test string
   ss.str("");
-  printer.print(make_string("hello"));
+  printer.write(make_string("hello"));
   assert(ss.str() == "\"hello\"");
   std::cout << "String test passed" << std::endl;
 
   // Test symbol
   ss.str("");
-  printer.print(make_symbol("foo"));
+  printer.write(make_symbol("foo"));
   assert(ss.str() == "foo");
   std::cout << "Symbol test passed" << std::endl;
 
   // Test list (1 2 3)
   ss.str("");
   scm_obj_t list = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
-  printer.print(list);
+  printer.write(list);
   assert(ss.str() == "(1 2 3)");
   std::cout << "List test passed" << std::endl;
 
   // Test improper list (1 . 2)
   ss.str("");
   scm_obj_t pair = make_cons(make_fixnum(1), make_fixnum(2));
-  printer.print(pair);
+  printer.write(pair);
   assert(ss.str() == "(1 . 2)");
   std::cout << "Improper list test passed" << std::endl;
 
@@ -94,7 +94,7 @@ void test_printer() {
   scm_obj_t vec = make_vector(2, scm_nil);
   ((scm_vector_rec_t*)to_address(vec))->elts[0] = make_fixnum(1);
   ((scm_vector_rec_t*)to_address(vec))->elts[1] = make_fixnum(2);
-  printer.print(vec);
+  printer.write(vec);
   assert(ss.str() == "#(1 2)");
   std::cout << "Vector test passed" << std::endl;
 

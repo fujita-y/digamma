@@ -141,7 +141,7 @@ void test_r7rs_strings() {
     std::stringstream ss;
     printer_t printer(ss);
     scm_obj_t str = make_string("foo \"bar\" baz");
-    printer.print(str);
+    printer.write(str);
     CHECK(ss.str() == "\"foo \\\"bar\\\" baz\"");
     std::cout << "String escape output passed" << std::endl;
   }
@@ -158,7 +158,7 @@ void test_r7rs_symbols() {
     std::stringstream ss;
     printer_t printer(ss);
     scm_obj_t sym = make_symbol("foo bar");
-    printer.print(sym);
+    printer.write(sym);
     CHECK(ss.str() == "|foo bar|");
     std::cout << "Symbol escape output passed" << std::endl;
   }
@@ -168,7 +168,7 @@ void test_r7rs_symbols() {
     std::stringstream ss;
     printer_t printer(ss);
     scm_obj_t sym = make_symbol("foo|bar");
-    printer.print(sym);
+    printer.write(sym);
     CHECK(ss.str() == "|foo\\|bar|");  // expecting |foo\|bar|
     std::cout << "Symbol pipe escape output passed" << std::endl;
   }

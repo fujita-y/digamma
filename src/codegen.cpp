@@ -677,10 +677,10 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
   if (!ofs.is_open()) return;
   printer_t printer(ofs);
   for (const auto& inst : instructions) {
-    printer.print(inst.original);
+    printer.write(inst.original);
     if (inst.closure_label != scm_nil) {
       ofs << " ; closure_label: ";
-      printer.print(inst.closure_label);
+      printer.write(inst.closure_label);
     }
     ofs << "\n";
   }

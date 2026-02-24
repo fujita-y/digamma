@@ -127,13 +127,13 @@ void nanos_t::run() {
         auto func = codegen_t::current()->compile(obj);
         intptr_t result = func();
         printf("(0x%016lx)\n", result);
-        printer.print((scm_obj_t)result);
+        printer.write((scm_obj_t)result);
         puts("");
       } catch (std::exception& e) {
         printf("%s\n", e.what());
       }
     } else {
-      printer.print(obj);
+      printer.write(obj);
       puts("");
     }
   }

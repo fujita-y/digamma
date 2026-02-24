@@ -12,7 +12,7 @@ class printer_t {
 
  public:
   printer_t(std::ostream& os) : out(os) {}
-  void print(scm_obj_t obj);
+  void write(scm_obj_t obj);
   void format(const char* fmt, ...);
 };
 
