@@ -1,4 +1,5 @@
 #include "object.h"
+#include "nanos.h"
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
@@ -9,7 +10,7 @@
 #include "printer.h"
 #include "reader.h"
 
-static void setup_subr() {
+void nanos_t::setup_subr() {
   scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
   scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 1, 1, 0, nullptr, scm_nil, 1);
@@ -65,7 +66,7 @@ static void setup_subr() {
 static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;
 static thread_local std::unique_ptr<codegen_t> s_codegen;
 
-static codegen_t* init_codegen() {
+codegen_t* nanos_t::init_codegen() {
   if (s_codegen) return s_codegen.get();
 
   llvm::InitializeNativeTarget();
@@ -101,25 +102,23 @@ static codegen_t* init_codegen() {
   return s_codegen.get();
 }
 
-static void destroy_codegen() {
+void nanos_t::destroy_codegen() {
   s_codegen.reset();
   s_jit.reset();
 }
 
-#include "nanos.h"
-
 void nanos_t::init() {
-  heap = new object_heap_t();
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  m_heap = new object_heap_t();
+  m_heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 
-  codegen = init_codegen();
+  m_codegen = init_codegen();
   setup_subr();
 }
 
 void nanos_t::destroy() {
   destroy_codegen();
-  heap->destroy();
-  delete heap;
+  m_heap->destroy();
+  delete m_heap;
 }
 
 void nanos_t::run() {
@@ -154,7 +153,7 @@ void nanos_t::run() {
 
     if (is_cons(obj)) {
       try {
-        auto func = codegen->compile(obj);
+        auto func = m_codegen->compile(obj);
         intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.print((scm_obj_t)result);

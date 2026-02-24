@@ -10,8 +10,12 @@ class object_heap_t;
 class codegen_t;
 
 class nanos_t {
-  object_heap_t* heap;
-  codegen_t* codegen;
+  object_heap_t* m_heap;
+  codegen_t* m_codegen;
+
+  void setup_subr();
+  codegen_t* init_codegen();
+  void destroy_codegen();
 
  public:
   void init();
