@@ -165,7 +165,7 @@ add_library(nanos_io STATIC src/reader.cpp src/printer.cpp)
 target_link_libraries(nanos_io PUBLIC nanos_config)
 
 # --- Main Executable ---
-add_executable(nanos src/main.cpp)
+add_executable(nanos src/main.cpp src/nanos.cpp)
 target_link_libraries(nanos PRIVATE nanos_core nanos_io nanos_config ${NANOS_LINK_LIBRARIES})
 
 # ==============================================================================
