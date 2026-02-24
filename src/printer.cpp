@@ -4,7 +4,11 @@
 #include "core.h"
 #include "printer.h"
 
-void printer_t::write(scm_obj_t obj) {
+void printer_t::write(scm_obj_t obj) { print(obj, false); }
+
+void printer_t::display(scm_obj_t obj) { print(obj, true); }
+
+void printer_t::print(scm_obj_t obj, bool display_mode) {
   if (is_fixnum(obj)) {
     out << fixnum(obj);
     return;
@@ -18,6 +22,10 @@ void printer_t::write(scm_obj_t obj) {
   if (is_heap_object(obj)) {
     if (is_symbol(obj)) {
       std::string s = (char*)symbol_name(obj);
+      if (display_mode) {
+        out << s;
+        return;
+      }
       bool special = false;
       if (s.empty())
         special = true;
@@ -43,6 +51,10 @@ void printer_t::write(scm_obj_t obj) {
       return;
     }
     if (is_string(obj)) {
+      if (display_mode) {
+        out << (char*)string_name(obj);
+        return;
+      }
       out << '"';
       std::string s = (char*)string_name(obj);
       for (char c : s) {
@@ -66,7 +78,7 @@ void printer_t::write(scm_obj_t obj) {
       scm_obj_t* elts = vector_elts(obj);
       for (int i = 0; i < n; i++) {
         if (i > 0) out << " ";
-        write(elts[i]);
+        print(elts[i], display_mode);
       }
       out << ")";
       return;
@@ -86,16 +98,16 @@ void printer_t::write(scm_obj_t obj) {
 
   if (is_cons(obj)) {
     out << "(";
-    write(((scm_cons_rec_t*)obj)->car);
+    print(((scm_cons_rec_t*)obj)->car, display_mode);
     obj = ((scm_cons_rec_t*)obj)->cdr;
     while (is_cons(obj)) {
       out << " ";
-      write(((scm_cons_rec_t*)obj)->car);
+      print(((scm_cons_rec_t*)obj)->car, display_mode);
       obj = ((scm_cons_rec_t*)obj)->cdr;
     }
     if (obj != scm_nil) {
       out << " . ";
-      write(obj);
+      print(obj, display_mode);
     }
     out << ")";
     return;
@@ -128,8 +140,12 @@ void printer_t::write(scm_obj_t obj) {
   }
 
   if (is_char(obj)) {
-    out << "#\\";
     uint32_t c = (uint32_t)(obj >> 32);
+    if (display_mode) {
+      out << (char)c;
+      return;
+    }
+    out << "#\\";
     if (c > 32 && c < 127) {
       out << (char)c;
     } else {
@@ -155,7 +171,7 @@ void printer_t::write(scm_obj_t obj) {
   }
   if (is_closure(obj)) {
     out << "#<closure 0x" << std::hex << obj << std::dec << " argc:" << closure_argc(obj) << " rest:" << closure_rest(obj)
-        << " nsize:" << closure_nsize(obj) << ">";
+        << " nenv:" << closure_nenv(obj) << ">";
     return;
   }
 

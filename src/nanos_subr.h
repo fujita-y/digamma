@@ -28,6 +28,7 @@ SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1);
+SUBR scm_obj_t subr_display(scm_obj_t self, scm_obj_t a1);
 SUBR scm_obj_t subr_newline(scm_obj_t self);
 SUBR scm_obj_t subr_collect(scm_obj_t self);
 SUBR scm_obj_t subr_safepoint(scm_obj_t self);

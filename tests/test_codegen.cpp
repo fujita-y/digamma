@@ -178,8 +178,8 @@ int main(int argc, char** argv) {
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
     // Check nsize and env[0]
     // 123 is fixnum -> (123 << 1) | 1 = 247
-    if (rec->nsize != 1) {
-      printf("Closure nsize mismatch: expected 1, got %d\n", rec->nsize);
+    if (rec->nenv != 1) {
+      printf("Closure nsize mismatch: expected 1, got %d\n", rec->nenv);
       return false;
     }
     if (rec->env[0] != make_fixnum(123)) {
@@ -331,8 +331,8 @@ int main(int argc, char** argv) {
     }
 
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(val);
-    if (rec->nsize != 1) {
-      printf("NestedClosure: nsize mismatch, expected 1, got %d\n", rec->nsize);
+    if (rec->nenv != 1) {
+      printf("NestedClosure: nsize mismatch, expected 1, got %d\n", rec->nenv);
       return false;
     }
     if (rec->env[0] != make_fixnum(999)) {

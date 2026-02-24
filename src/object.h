@@ -150,7 +150,7 @@ struct scm_closure_rec_t {
   int argc;
   int rest;
   int cdecl;
-  int nsize;
+  int nenv;
   scm_obj_t env[1];  // free variables
 };
 
@@ -248,5 +248,5 @@ void cell_value_set(scm_obj_t x, scm_obj_t v);
 
 inline int closure_argc(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->argc; }
 inline int closure_rest(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->rest; }
-inline int closure_nsize(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nsize; }
+inline int closure_nenv(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nenv; }
 #endif

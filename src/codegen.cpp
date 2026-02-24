@@ -41,7 +41,7 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
   s_current = this;
 }
 
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals);
 extern "C" void c_global_set(scm_obj_t key, scm_obj_t value);
 extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
 

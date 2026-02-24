@@ -32,22 +32,18 @@ void nanos_t::init_subr() {
   reg("cons", (void*)subr_cons, 2, 0);
   reg("apply", (void*)subr_apply, 0, 1);
   reg("append", (void*)subr_append, 0, 1);
-
-  scm_obj_t scm_subr_write = make_subr((void*)subr_write, 1, 0);
-  c_global_set(make_symbol("write"), scm_subr_write);
-  c_global_set(make_symbol("display"), scm_subr_write);
-
+  reg("write", (void*)subr_write, 1, 0);
+  reg("display", (void*)subr_display, 1, 0);
   reg("newline", (void*)subr_newline, 0, 0);
   reg("collect", (void*)subr_collect, 0, 0);
   reg("safepoint", (void*)subr_safepoint, 0, 0);
   reg("call/ec", (void*)subr_call_ec, 1, 0);
+  reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
+  reg("continuation?", (void*)subr_continuation_p, 1, 0);
 
   scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
   c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
-
-  reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
-  reg("continuation?", (void*)subr_continuation_p, 1, 0);
 }
 
 void nanos_t::init_codegen() {

@@ -184,6 +184,11 @@ SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
   return scm_undef;
 }
 
+SUBR scm_obj_t subr_display(scm_obj_t self, scm_obj_t a1) {
+  printer_t(std::cout).display(a1);
+  return scm_undef;
+}
+
 SUBR scm_obj_t subr_newline(scm_obj_t self) {
   std::cout << std::endl;
   return scm_undef;

@@ -9,10 +9,12 @@
 
 class printer_t {
   std::ostream& out;
+  void print(scm_obj_t obj, bool display_mode);
 
  public:
   printer_t(std::ostream& os) : out(os) {}
   void write(scm_obj_t obj);
+  void display(scm_obj_t obj);
   void format(const char* fmt, ...);
 };
 

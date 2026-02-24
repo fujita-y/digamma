@@ -19,7 +19,7 @@ static constexpr int CLOSURE_CODE_FIELD_OFFSET = offsetof(scm_closure_rec_t, cod
 static constexpr int CLOSURE_ARGC_FIELD_OFFSET = offsetof(scm_closure_rec_t, argc);
 static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, rest);
 static constexpr int CLOSURE_CDECL_FIELD_OFFSET = offsetof(scm_closure_rec_t, cdecl);
-static constexpr int CLOSURE_NSIZE_FIELD_OFFSET = offsetof(scm_closure_rec_t, nsize);
+static constexpr int CLOSURE_NENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, nenv);
 static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env);
 
 static constexpr llvm::CallingConv::ID CLOSURE_CALLING_CONV = llvm::CallingConv::Tail;
