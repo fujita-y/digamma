@@ -5,17 +5,14 @@
 #define NANOS_H_INCLUDED
 
 #include "core.h"
-
-class object_heap_t;
-class codegen_t;
+#include <llvm-19/llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <memory>
 
 class nanos_t {
-  object_heap_t* m_heap;
-  codegen_t* m_codegen;
+  std::unique_ptr<llvm::orc::LLJIT> m_jit;
 
-  void setup_subr();
-  codegen_t* init_codegen();
-  void destroy_codegen();
+  void init_subr();
+  void init_codegen();
 
  public:
   void init();

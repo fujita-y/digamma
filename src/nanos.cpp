@@ -10,7 +10,7 @@
 #include "printer.h"
 #include "reader.h"
 
-void nanos_t::setup_subr() {
+void nanos_t::init_subr() {
   scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
   scm_obj_t scm_subr_num_sub = make_closure((void*)subr_num_sub, 1, 1, 0, nullptr, scm_nil, 1);
@@ -63,12 +63,7 @@ void nanos_t::setup_subr() {
   c_global_set(make_symbol("continuation?"), scm_subr_continuation_p);
 }
 
-static thread_local std::unique_ptr<llvm::orc::LLJIT> s_jit;
-static thread_local std::unique_ptr<codegen_t> s_codegen;
-
-codegen_t* nanos_t::init_codegen() {
-  if (s_codegen) return s_codegen.get();
-
+void nanos_t::init_codegen() {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
@@ -87,38 +82,30 @@ codegen_t* nanos_t::init_codegen() {
     fprintf(stderr, "Failed to create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
     exit(1);
   }
-  s_jit = std::move(*jit_expected);
+  m_jit = std::move(*jit_expected);
 
   // Allow the JIT to find symbols in the current process
-  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(s_jit->getDataLayout().getGlobalPrefix());
+  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_jit->getDataLayout().getGlobalPrefix());
   if (!gen) {
     fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
     exit(1);
   }
-  s_jit->getMainJITDylib().addGenerator(std::move(*gen));
+  m_jit->getMainJITDylib().addGenerator(std::move(*gen));
 
   auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  s_codegen = std::make_unique<codegen_t>(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), s_jit.get());
-  return s_codegen.get();
-}
-
-void nanos_t::destroy_codegen() {
-  s_codegen.reset();
-  s_jit.reset();
+  new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), m_jit.get());
 }
 
 void nanos_t::init() {
-  m_heap = new object_heap_t();
-  m_heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
-
-  m_codegen = init_codegen();
-  setup_subr();
+  object_heap_t* heap = new object_heap_t();
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  init_codegen();
+  init_subr();
 }
 
 void nanos_t::destroy() {
-  destroy_codegen();
-  m_heap->destroy();
-  delete m_heap;
+  object_heap_t::current()->destroy();
+  m_jit.reset();
 }
 
 void nanos_t::run() {
@@ -153,7 +140,7 @@ void nanos_t::run() {
 
     if (is_cons(obj)) {
       try {
-        auto func = m_codegen->compile(obj);
+        auto func = codegen_t::current()->compile(obj);
         intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.print((scm_obj_t)result);
