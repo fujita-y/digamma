@@ -165,7 +165,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   }
 
   // Count free variables
-  int nsize = count_list_length(inst.free_indices);
+  int nenv = count_list_length(inst.free_indices);
 
   // Get literals vector if available
   scm_obj_t literals = scm_nil;
@@ -184,7 +184,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   llvm::Value* argc = createInt32Constant(context, inst.argc);
 
   llvm::Value* closure;
-  if (!inst.has_rest && nsize == 0) {
+  if (!inst.has_rest && nenv == 0) {
     if (literals == scm_nil) {
       // Simple closure optimization (no literals)
       std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
@@ -201,10 +201,10 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   } else {
     // General case: Prepare environment array
     llvm::Value* env_array = nullptr;
-    if (nsize > 0) {
-      env_array = builder.CreateAlloca(intptrTy, createInt32Constant(context, nsize), "env");
+    if (nenv > 0) {
+      env_array = builder.CreateAlloca(intptrTy, createInt32Constant(context, nenv), "env");
       scm_obj_t curr = inst.free_indices;
-      for (int i = 0; i < nsize; i++) {
+      for (int i = 0; i < nenv; i++) {
         int reg_idx = parse_reg(CAR(curr));
         llvm::Value* reg_val = get_reg(reg_idx);
         llvm::Value* ptr = builder.CreateGEP(builder.getInt64Ty(), env_array, createInt32Constant(context, i));
@@ -219,10 +219,10 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
     llvm::Function* make_closure_func = get_or_create_external_function("c_make_closure", ft, (void*)&c_make_closure);
 
     llvm::Value* rest = createInt32Constant(context, inst.has_rest ? 1 : 0);
-    llvm::Value* nsize_val = createInt32Constant(context, nsize);
+    llvm::Value* nenv_val = createInt32Constant(context, nenv);
     llvm::Value* env_ptr = builder.CreateBitCast(env_array, voidPtrTy);
 
-    std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nsize_val, env_ptr, literals_val};
+    std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nenv_val, env_ptr, literals_val};
     closure = builder.CreateCall(make_closure_func, callArgs, "closure");
   }
 

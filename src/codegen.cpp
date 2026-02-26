@@ -41,7 +41,7 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
   s_current = this;
 }
 
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals);
+extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals);
 extern "C" void c_global_set(scm_obj_t key, scm_obj_t value);
 extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
 
@@ -677,10 +677,10 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
   if (!ofs.is_open()) return;
   printer_t printer(ofs);
   for (const auto& inst : instructions) {
-    printer.print(inst.original);
+    printer.write(inst.original);
     if (inst.closure_label != scm_nil) {
       ofs << " ; closure_label: ";
-      printer.print(inst.closure_label);
+      printer.write(inst.closure_label);
     }
     ofs << "\n";
   }

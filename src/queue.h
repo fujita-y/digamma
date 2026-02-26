@@ -7,8 +7,10 @@
 #include "core.h"
 
 template <typename T> class concurrent_queue_t {
-  concurrent_queue_t(const concurrent_queue_t&);
-  concurrent_queue_t& operator=(const concurrent_queue_t&);
+  concurrent_queue_t(const concurrent_queue_t&) = delete;
+  concurrent_queue_t& operator=(const concurrent_queue_t&) = delete;
+  concurrent_queue_t(concurrent_queue_t&&) = delete;
+  concurrent_queue_t& operator=(concurrent_queue_t&&) = delete;
 
   typedef T element_t;
   pthread_mutex_t lock;
@@ -36,7 +38,8 @@ template <typename T> class concurrent_queue_t {
   }
 
  public:
-  concurrent_queue_t() {}
+  concurrent_queue_t() = default;
+  ~concurrent_queue_t() = default;
 
   void init(int nelts) {
     terminate = false;

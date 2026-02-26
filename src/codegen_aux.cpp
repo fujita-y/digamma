@@ -25,8 +25,8 @@ extern "C" void c_safepoint(void) {
   if (*s_stop_the_world) heap->safepoint();
 }
 
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals) {
-  return make_closure(code, argc, rest, nsize, env, literals, 0);
+extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals) {
+  return make_closure(code, argc, rest, nenv, env, literals, 0);
 }
 
 extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil, 0); }

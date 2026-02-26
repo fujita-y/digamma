@@ -156,7 +156,7 @@ scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[
   rec->code = code;
   rec->argc = argc;
   rec->rest = rest;
-  rec->nsize = nsize;
+  rec->nenv = nsize;
   rec->cdecl = cdecl;
   for (int i = 0; i < nsize; i++) {
     rec->env[i] = env[i];

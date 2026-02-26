@@ -83,7 +83,7 @@ set(NANOS_SITELIB_DIRECTORY ${NANOS_SHARE_DIRECTORY}/sitelib)
 add_library(nanos_config INTERFACE)
 
 # Define compile features
-target_compile_features(nanos_config INTERFACE cxx_std_17)
+target_compile_features(nanos_config INTERFACE cxx_std_20)
 
 # Define include directories
 target_include_directories(nanos_config INTERFACE
@@ -165,7 +165,7 @@ add_library(nanos_io STATIC src/reader.cpp src/printer.cpp)
 target_link_libraries(nanos_io PUBLIC nanos_config)
 
 # --- Main Executable ---
-add_executable(nanos src/nanos.cpp)
+add_executable(nanos src/main.cpp src/nanos.cpp)
 target_link_libraries(nanos PRIVATE nanos_core nanos_io nanos_config ${NANOS_LINK_LIBRARIES})
 
 # ==============================================================================

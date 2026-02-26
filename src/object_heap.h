@@ -92,8 +92,8 @@ class object_heap_t {
 
   uint64_t m_collect_trip_bytes;
 
-  object_heap_t() {};
-  ~object_heap_t() {};
+  object_heap_t() = default;
+  ~object_heap_t() = default;
   object_heap_t(const object_heap_t&) = delete;
   object_heap_t& operator=(const object_heap_t&) = delete;
   object_heap_t(object_heap_t&&) = delete;

@@ -16,10 +16,12 @@
 #define CAR(x) (((scm_cons_rec_t*)(x))->car)
 #define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
 
+// numerics
+
 SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t sum = 0;
   for (int i = 0; i < argc; i++) {
-    if (is_fixnum(argv[i])) {
+    if (is_fixnum(argv[i])) [[likely]] {
       sum += fixnum(argv[i]);
     } else {
       throw std::runtime_error("+: arguments must be fixnums");
@@ -29,17 +31,19 @@ SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 SUBR scm_obj_t subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  if (argc == 0) throw std::runtime_error("-: too few arguments");
-  if (!is_fixnum(argv[0])) throw std::runtime_error("-: arguments must be fixnums");
+  if (argc == 0) [[unlikely]]
+    throw std::runtime_error("-: too few arguments");
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error("-: arguments must be fixnums");
 
   intptr_t result = fixnum(argv[0]);
 
-  if (argc == 1) {
+  if (argc == 1) [[unlikely]] {
     return make_fixnum(-result);
   }
 
   for (int i = 1; i < argc; i++) {
-    if (is_fixnum(argv[i])) {
+    if (is_fixnum(argv[i])) [[likely]] {
       result -= fixnum(argv[i]);
     } else {
       throw std::runtime_error("-: arguments must be fixnums");
@@ -48,23 +52,10 @@ SUBR scm_obj_t subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(result);
 }
 
-SUBR scm_obj_t subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  if (argc < 1) throw std::runtime_error("=: too few arguments");
-
-  if (!is_fixnum(argv[0])) throw std::runtime_error("=: arguments must be fixnums");
-  scm_obj_t first = argv[0];
-
-  for (int i = 1; i < argc; i++) {
-    if (!is_fixnum(argv[i])) throw std::runtime_error("=: arguments must be fixnums");
-    if (argv[i] != first) return scm_false;
-  }
-  return scm_true;
-}
-
 SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t p = 1;
   for (int i = 0; i < argc; i++) {
-    if (is_fixnum(argv[i])) {
+    if (is_fixnum(argv[i])) [[likely]] {
       p *= fixnum(argv[i]);
     } else {
       throw std::runtime_error("*: arguments must be fixnums");
@@ -74,19 +65,22 @@ SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  if (argc == 0) throw std::runtime_error("/: too few arguments");
-  if (!is_fixnum(argv[0])) throw std::runtime_error("/: arguments must be fixnums");
+  if (argc == 0) [[unlikely]]
+    throw std::runtime_error("/: too few arguments");
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error("/: arguments must be fixnums");
 
   intptr_t result = fixnum(argv[0]);
 
-  if (argc == 1) {
+  if (argc == 1) [[unlikely]] {
     return make_fixnum(1 / result);
   }
 
   for (int i = 1; i < argc; i++) {
-    if (is_fixnum(argv[i])) {
+    if (is_fixnum(argv[i])) [[likely]] {
       intptr_t d = fixnum(argv[i]);
-      if (d == 0) throw std::runtime_error("/: division by zero");
+      if (d == 0) [[unlikely]]
+        throw std::runtime_error("/: division by zero");
       result /= d;
     } else {
       throw std::runtime_error("/: arguments must be fixnums");
@@ -95,14 +89,33 @@ SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(result);
 }
 
-SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  if (argc < 1) throw std::runtime_error("<: too few arguments");
+SUBR scm_obj_t subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) [[unlikely]]
+    throw std::runtime_error("=: too few arguments");
 
-  if (!is_fixnum(argv[0])) throw std::runtime_error("<: arguments must be fixnums");
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error("=: arguments must be fixnums");
   scm_obj_t first = argv[0];
 
   for (int i = 1; i < argc; i++) {
-    if (!is_fixnum(argv[i])) throw std::runtime_error("<: arguments must be fixnums");
+    if (!is_fixnum(argv[i])) [[unlikely]]
+      throw std::runtime_error("=: arguments must be fixnums");
+    if (argv[i] != first) return scm_false;
+  }
+  return scm_true;
+}
+
+SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) [[unlikely]]
+    throw std::runtime_error("<: too few arguments");
+
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error("<: arguments must be fixnums");
+  scm_obj_t first = argv[0];
+
+  for (int i = 1; i < argc; i++) {
+    if (!is_fixnum(argv[i])) [[unlikely]]
+      throw std::runtime_error("<: arguments must be fixnums");
     if (first < argv[i]) {
       first = argv[i];
       continue;
@@ -111,6 +124,68 @@ SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
   }
   return scm_true;
 }
+
+SUBR scm_obj_t subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) [[unlikely]]
+    throw std::runtime_error(">: too few arguments");
+
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error(">: arguments must be fixnums");
+  scm_obj_t first = argv[0];
+
+  for (int i = 1; i < argc; i++) {
+    if (!is_fixnum(argv[i])) [[unlikely]]
+      throw std::runtime_error(">: arguments must be fixnums");
+    if (first > argv[i]) {
+      first = argv[i];
+      continue;
+    }
+    return scm_false;
+  }
+  return scm_true;
+}
+
+SUBR scm_obj_t subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) [[unlikely]]
+    throw std::runtime_error("<=: too few arguments");
+
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error("<=: arguments must be fixnums");
+  scm_obj_t first = argv[0];
+
+  for (int i = 1; i < argc; i++) {
+    if (!is_fixnum(argv[i])) [[unlikely]]
+      throw std::runtime_error("<=: arguments must be fixnums");
+    if (first <= argv[i]) {
+      first = argv[i];
+      continue;
+    }
+    return scm_false;
+  }
+  return scm_true;
+}
+
+SUBR scm_obj_t subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) [[unlikely]]
+    throw std::runtime_error(">=: too few arguments");
+
+  if (!is_fixnum(argv[0])) [[unlikely]]
+    throw std::runtime_error(">=: arguments must be fixnums");
+  scm_obj_t first = argv[0];
+
+  for (int i = 1; i < argc; i++) {
+    if (!is_fixnum(argv[i])) [[unlikely]]
+      throw std::runtime_error(">=: arguments must be fixnums");
+    if (first >= argv[i]) {
+      first = argv[i];
+      continue;
+    }
+    return scm_false;
+  }
+  return scm_true;
+}
+
+// lists
 
 SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t list = scm_nil;
@@ -180,7 +255,12 @@ SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, 
 SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
 
 SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).print(a1);
+  printer_t(std::cout).write(a1);
+  return scm_undef;
+}
+
+SUBR scm_obj_t subr_display(scm_obj_t self, scm_obj_t a1) {
+  printer_t(std::cout).display(a1);
   return scm_undef;
 }
 
