@@ -7,11 +7,11 @@
 #include "core.h"
 #include "object.h"
 
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
+#include "nanos_jit.h"
 
 #include <map>
 #include <vector>
@@ -54,17 +54,40 @@ struct Instruction {
   scm_obj_t closure_label = scm_nil;
 };
 
+struct compiled_code_t {
+  intptr_t (*func_ptr)(void) = nullptr;
+  llvm::orc::ResourceTrackerSP tracker;
+
+  compiled_code_t() = default;
+  compiled_code_t(intptr_t (*f)(void), llvm::orc::ResourceTrackerSP rt) : func_ptr(f), tracker(std::move(rt)) {}
+  ~compiled_code_t();
+
+  compiled_code_t(const compiled_code_t&) = delete;
+  compiled_code_t& operator=(const compiled_code_t&) = delete;
+
+  compiled_code_t(compiled_code_t&& other);
+  compiled_code_t& operator=(compiled_code_t&& other);
+
+  intptr_t operator()() const {
+    if (func_ptr) return func_ptr();
+    return 0;
+  }
+
+  operator bool() const { return func_ptr != nullptr; }
+};
+
 class codegen_t {
   thread_local static codegen_t* s_current;
 
-  using compiled_code_t = intptr_t (*)(void);
-
   llvm::orc::ThreadSafeContext ts_context;
   llvm::LLVMContext& context;
-  llvm::orc::LLJIT* jit;
+  nanos_jit_t* jit;
   llvm::IRBuilder<> builder;
-  llvm::Module* module = nullptr;  // Current module being compiled
-  std::unique_ptr<llvm::Module> current_module_uptr;
+  llvm::Module* main_module = nullptr;  // Current module being compiled
+  std::unique_ptr<llvm::Module> main_module_uptr;
+
+  llvm::Module* closure_module = nullptr;
+  std::unique_ptr<llvm::Module> closure_module_uptr;
   llvm::Function* main_function = nullptr;
 
   // Register allocas: index -> alloca
@@ -77,6 +100,9 @@ class codegen_t {
   scm_obj_t cached_symbol_label;
   scm_obj_t cached_symbol_apply;
   scm_obj_t cached_symbol_safepoint;
+
+  // Cached call closure bridge
+  void* cached_call_closure_bridge = nullptr;
 
   // Closure literals: label symbol -> literals vector
   std::map<scm_obj_t, scm_obj_t> closure_literals;
@@ -164,7 +190,7 @@ class codegen_t {
   llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(context); }
   llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(context); }
   llvm::Type* getVoidPtrType() { return builder.getPtrTy(); }
-  llvm::Type* getInt64PtrType() { return llvm::PointerType::get(getInt64Type(), 0); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(context); }
   llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(context, llvm::APInt(64, (uint64_t)scm_false)); }
 
   // Helper to get code pointer from closure object
@@ -218,7 +244,7 @@ class codegen_t {
   compiled_code_t phase5_finalize();
 
  public:
-  codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit);
+  codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit);
 
   // Compile a list of instructions
   compiled_code_t compile(scm_obj_t inst_list);

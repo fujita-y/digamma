@@ -110,11 +110,9 @@ int main(int argc, char** argv) {
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
-  auto jit_expected = llvm::orc::LLJITBuilder().create();
+  auto jit_expected = nanos_jit_t::Create();
   if (!jit_expected) exit(1);
   auto jit = std::move(*jit_expected);
-  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
-  jit->getMainJITDylib().addGenerator(std::move(*gen));
   auto ts_ctx = std::make_unique<llvm::LLVMContext>();
   codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
 

@@ -10,17 +10,18 @@
 #include "codegen_aux.h"
 #include "object_heap.h"
 
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
-
 static thread_local bool s_restored = false;
 static thread_local scm_continuation_rec_t* s_restored_rec = nullptr;
 __attribute__((aligned(16))) static thread_local uint8_t s_restore_stack[8192];
 
-SUBR {
+extern "C" {
   static scm_obj_t subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]);
   static scm_obj_t subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[]);
 }
+
+// ============================================================================
+// State Handling & Winders
+// ============================================================================
 
 scm_obj_t get_current_winders() { return object_heap_t::s_current_winders; }
 
@@ -88,6 +89,10 @@ static void do_wind(scm_obj_t target_winders) {
   wind_recursive(wind_recursive, target);
 }
 
+// ============================================================================
+// Hardware Address Sanitizer & Utilities
+// ============================================================================
+
 __attribute__((no_sanitize("hwaddress"))) static void copy_memory_hwasan_safe(void* dst, const void* src, size_t size) {
   volatile uint64_t* d64 = (volatile uint64_t*)dst;
   const volatile uint64_t* s64 = (const volatile uint64_t*)src;
@@ -115,6 +120,10 @@ static uint8_t get_mem_tag(void* p) {
 #endif
   return 0;
 }
+
+// ============================================================================
+// Continuations & call/cc
+// ============================================================================
 
 __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void restore_trampoline(scm_continuation_rec_t* rec) {
   uintptr_t stack_top = rec->stack_bottom - rec->stack_size;
@@ -149,7 +158,7 @@ __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continua
       : "x0", "memory");
 }
 
-SUBR scm_obj_t subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
   scm_continuation_rec_t* cont_rec = (scm_continuation_rec_t*)to_address(cont_obj);
@@ -159,7 +168,7 @@ SUBR scm_obj_t subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv
   return scm_undef;
 }
 
-SUBR scm_obj_t subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
   scm_escape_rec_t* cont_rec = (scm_escape_rec_t*)to_address(cont_obj);
@@ -187,7 +196,7 @@ SUBR scm_obj_t subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj
   return scm_undef;
 }
 
-__attribute__((no_sanitize("hwaddress"))) SUBR scm_obj_t subr_call_cc(scm_obj_t self, scm_obj_t proc) {
+__attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_obj_t proc) {
   uint64_t stack_bottom = capture_thread_stack_bottom();
   ucontext_t uctx;
   s_restored = false;
@@ -232,7 +241,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR scm_obj_t subr_call_cc(scm_obj_t 
   fatal("getcontext failed");
 }
 
-__attribute__((no_sanitize("hwaddress"))) SUBR scm_obj_t subr_call_ec(scm_obj_t self, scm_obj_t proc) {
+__attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_obj_t proc) {
   ucontext_t uctx;
   s_restored = false;
   if (getcontext(&uctx) == 0) {
@@ -273,7 +282,11 @@ __attribute__((no_sanitize("hwaddress"))) SUBR scm_obj_t subr_call_ec(scm_obj_t 
   fatal("getcontext failed");
 }
 
-SUBR scm_obj_t subr_dynamic_wind(scm_obj_t self, scm_obj_t pre, scm_obj_t value, scm_obj_t post) {
+// ============================================================================
+// Dynamic Wind & Extensions
+// ============================================================================
+
+SUBR subr_dynamic_wind(scm_obj_t self, scm_obj_t pre, scm_obj_t value, scm_obj_t post) {
   c_call_closure_thunk_0(pre);
   scm_obj_t winder = make_cons(pre, post);
   scm_obj_t old_winders = get_current_winders();
@@ -284,7 +297,7 @@ SUBR scm_obj_t subr_dynamic_wind(scm_obj_t self, scm_obj_t pre, scm_obj_t value,
   return res;
 }
 
-SUBR scm_obj_t subr_continuation_p(scm_obj_t self, scm_obj_t a1) {
+SUBR subr_continuation_p(scm_obj_t self, scm_obj_t a1) {
   if (is_closure(a1)) {
     scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(a1);
     if (clo->code == (void*)subr_invoke_continuation || clo->code == (void*)subr_invoke_escape_continuation) {

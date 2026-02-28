@@ -24,10 +24,6 @@ static constexpr int CLOSURE_ENV_FIELD_OFFSET = offsetof(scm_closure_rec_t, env)
 
 static constexpr llvm::CallingConv::ID CLOSURE_CALLING_CONV = llvm::CallingConv::Tail;
 
-// Helper macros for cons access
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
-
 // Helper function to get nth element of a list (1-indexed, like car/cdr convention)
 static inline scm_obj_t list_nth(scm_obj_t list, int n) {
   if (n <= 0) return scm_nil;

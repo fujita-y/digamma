@@ -64,8 +64,6 @@ find_package(Boost CONFIG REQUIRED COMPONENTS context)
 # Compiler Configuration
 # ==============================================================================
 
-
-# Use LLD linker
 add_link_options("-fuse-ld=lld")
 
 # ==============================================================================
@@ -136,6 +134,7 @@ set(NANOS_CORE_SOURCES
   src/hash.cpp
   src/vector.cpp
   src/codegen.cpp
+  src/nanos_jit.cpp
   src/codegen_aux.cpp
   src/codegen_emit.cpp
   src/nanos_subr.cpp
@@ -198,7 +197,6 @@ endmacro()
 
 add_nanos_test(test_object tests/test_object.cpp)
 add_nanos_test(test_gc tests/test_gc.cpp)
-
 add_nanos_test(test_printer tests/test_printer.cpp)
 add_nanos_test(test_printer_printf tests/test_printer_printf.cpp)
 add_nanos_test(test_reader tests/test_reader.cpp)

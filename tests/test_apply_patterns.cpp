@@ -6,13 +6,14 @@
 #include <sstream>
 #include "codegen.h"
 #include "hash.h"
-#include "nanos_subr.h"
+#include "nanos.h"
 #include "object_heap.h"
 #include "reader.h"
 
-// Helper macros for cons access
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -49,26 +50,19 @@ static void c_global_set(scm_obj_t sym, scm_obj_t val) {
 
 class CodegenTest {
  public:
-  std::unique_ptr<llvm::orc::LLJIT> jit;
+  std::unique_ptr<nanos_jit_t> jit;
   codegen_t* codegen;
 
   CodegenTest() {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
-    auto jit_expected = llvm::orc::LLJITBuilder().create();
+    auto jit_expected = nanos_jit_t::Create();
     if (!jit_expected) {
       fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
       exit(1);
     }
     jit = std::move(*jit_expected);
-
-    auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
-    if (!gen) {
-      fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
-      exit(1);
-    }
-    jit->getMainJITDylib().addGenerator(std::move(*gen));
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
     codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());

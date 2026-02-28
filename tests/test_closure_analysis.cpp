@@ -9,10 +9,6 @@
 #include "object_heap.h"
 #include "reader.h"
 
-// Helper macros
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
-
 void fatal(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -39,26 +35,19 @@ void trace(const char* fmt, ...) {
 
 class ClosureAnalysisTest {
  public:
-  std::unique_ptr<llvm::orc::LLJIT> jit;
+  std::unique_ptr<nanos_jit_t> jit;
   codegen_t* codegen;
 
   ClosureAnalysisTest() {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
-    auto jit_expected = llvm::orc::LLJITBuilder().create();
+    auto jit_expected = nanos_jit_t::Create();
     if (!jit_expected) {
       fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
       exit(1);
     }
     jit = std::move(*jit_expected);
-
-    auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix());
-    if (!gen) {
-      fprintf(stderr, "Failed to create symbol generator: %s\n", llvm::toString(gen.takeError()).c_str());
-      exit(1);
-    }
-    jit->getMainJITDylib().addGenerator(std::move(*gen));
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
     codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());

@@ -3,22 +3,22 @@
 
 #include "core.h"
 #include "object.h"
-#include "nanos_subr.h"
 #include <boost/context/continuation.hpp>
 #include <boost/context/detail/fcontext.hpp>
 #include <cstdio>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include "codegen_aux.h"
+#include "nanos.h"
+#include "nanos_context.h"
 #include "object_heap.h"
 #include "printer.h"
 
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+// ============================================================================
+// Numerics (Math & Comparison)
+// ============================================================================
 
-// numerics
-
-SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t sum = 0;
   for (int i = 0; i < argc; i++) {
     if (is_fixnum(argv[i])) [[likely]] {
@@ -30,7 +30,7 @@ SUBR scm_obj_t subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(sum);
 }
 
-SUBR scm_obj_t subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) [[unlikely]]
     throw std::runtime_error("-: too few arguments");
   if (!is_fixnum(argv[0])) [[unlikely]]
@@ -52,7 +52,7 @@ SUBR scm_obj_t subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(result);
 }
 
-SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
   intptr_t p = 1;
   for (int i = 0; i < argc; i++) {
     if (is_fixnum(argv[i])) [[likely]] {
@@ -64,7 +64,7 @@ SUBR scm_obj_t subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(p);
 }
 
-SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) [[unlikely]]
     throw std::runtime_error("/: too few arguments");
   if (!is_fixnum(argv[0])) [[unlikely]]
@@ -89,7 +89,7 @@ SUBR scm_obj_t subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_fixnum(result);
 }
 
-SUBR scm_obj_t subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) [[unlikely]]
     throw std::runtime_error("=: too few arguments");
 
@@ -105,7 +105,7 @@ SUBR scm_obj_t subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
-SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) [[unlikely]]
     throw std::runtime_error("<: too few arguments");
 
@@ -125,7 +125,7 @@ SUBR scm_obj_t subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
-SUBR scm_obj_t subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) [[unlikely]]
     throw std::runtime_error(">: too few arguments");
 
@@ -145,7 +145,7 @@ SUBR scm_obj_t subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
-SUBR scm_obj_t subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) [[unlikely]]
     throw std::runtime_error("<=: too few arguments");
 
@@ -165,7 +165,7 @@ SUBR scm_obj_t subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
-SUBR scm_obj_t subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) [[unlikely]]
     throw std::runtime_error(">=: too few arguments");
 
@@ -185,9 +185,11 @@ SUBR scm_obj_t subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
-// lists
+// ============================================================================
+// Lists & Structural Operations
+// ============================================================================
 
-SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t list = scm_nil;
   for (int i = argc - 1; i >= 0; i--) {
     list = make_cons(argv[i], list);
@@ -195,7 +197,7 @@ SUBR scm_obj_t subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return list;
 }
 
-SUBR scm_obj_t subr_car(scm_obj_t self, scm_obj_t a1) {
+SUBR subr_car(scm_obj_t self, scm_obj_t a1) {
   if (is_cons(a1)) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
     return cons->car;
@@ -203,7 +205,7 @@ SUBR scm_obj_t subr_car(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("car: argument must be a cons cell");
 }
 
-SUBR scm_obj_t subr_cdr(scm_obj_t self, scm_obj_t a1) {
+SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   if (is_cons(a1)) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
     return cons->cdr;
@@ -225,7 +227,7 @@ static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
   return head;
 }
 
-SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return scm_nil;
   if (argc == 1) return argv[0];
   scm_obj_t obj = scm_undef;
@@ -238,43 +240,95 @@ SUBR scm_obj_t subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return obj;
 }
 
-SUBR scm_obj_t subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1, a2); }
+SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1, a2); }
 
-SUBR scm_obj_t subr_not(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_false) ? scm_true : scm_false; }
+SUBR subr_not(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_false) ? scm_true : scm_false; }
 
-SUBR scm_obj_t subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return (a1 == a2) ? scm_true : scm_false; }
+SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return (a1 == a2) ? scm_true : scm_false; }
 
-SUBR scm_obj_t subr_pair_p(scm_obj_t self, scm_obj_t a1) { return is_cons(a1) ? scm_true : scm_false; }
+SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1) { return is_cons(a1) ? scm_true : scm_false; }
 
-SUBR scm_obj_t subr_null_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_nil) ? scm_true : scm_false; }
+SUBR subr_null_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_nil) ? scm_true : scm_false; }
 
-SUBR scm_obj_t subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
+SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
 
-SUBR scm_obj_t subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 
-SUBR scm_obj_t subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
+SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
 
-SUBR scm_obj_t subr_write(scm_obj_t self, scm_obj_t a1) {
+// ============================================================================
+// I/O & System Utilities
+// ============================================================================
+
+SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).write(a1);
   return scm_undef;
 }
 
-SUBR scm_obj_t subr_display(scm_obj_t self, scm_obj_t a1) {
+SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).display(a1);
   return scm_undef;
 }
 
-SUBR scm_obj_t subr_newline(scm_obj_t self) {
+SUBR subr_newline(scm_obj_t self) {
   std::cout << std::endl;
   return scm_undef;
 }
 
-SUBR scm_obj_t subr_collect(scm_obj_t self) {
+SUBR subr_collect(scm_obj_t self) {
   object_heap_t::current()->collect();
   return scm_undef;
 }
 
-SUBR scm_obj_t subr_safepoint(scm_obj_t self) {
+SUBR subr_safepoint(scm_obj_t self) {
   object_heap_t::current()->safepoint();
   return scm_undef;
+}
+
+// ============================================================================
+// Initialization & Registration
+// ============================================================================
+
+void nanos_t::init_subr() {
+  auto reg = [](const char* name, void* func, int req, int opt) {
+    c_global_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
+  };
+  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, scm_nil, 1); };
+
+  // numerics
+  reg("+", (void*)subr_num_add, 0, 1);
+  reg("-", (void*)subr_num_sub, 1, 1);
+  reg("*", (void*)subr_num_mul, 0, 1);
+  reg("/", (void*)subr_num_div, 1, 1);
+  reg("=", (void*)subr_num_eq, 2, 1);
+  reg("<", (void*)subr_num_lt, 2, 1);
+  reg(">", (void*)subr_num_gt, 2, 1);
+  reg("<=", (void*)subr_num_le, 2, 1);
+  reg(">=", (void*)subr_num_ge, 2, 1);
+
+  // lists
+  reg("list", (void*)subr_list, 0, 1);
+  reg("car", (void*)subr_car, 1, 0);
+  reg("cdr", (void*)subr_cdr, 1, 0);
+  reg("not", (void*)subr_not, 1, 0);
+  reg("eq?", (void*)subr_eq_p, 2, 0);
+  reg("pair?", (void*)subr_pair_p, 1, 0);
+  reg("null?", (void*)subr_null_p, 1, 0);
+  reg("cadr", (void*)subr_cadr, 1, 0);
+  reg("caddr", (void*)subr_caddr, 1, 0);
+  reg("cons", (void*)subr_cons, 2, 0);
+  reg("apply", (void*)subr_apply, 0, 1);
+  reg("append", (void*)subr_append, 0, 1);
+  reg("write", (void*)subr_write, 1, 0);
+  reg("display", (void*)subr_display, 1, 0);
+  reg("newline", (void*)subr_newline, 0, 0);
+  reg("collect", (void*)subr_collect, 0, 0);
+  reg("safepoint", (void*)subr_safepoint, 0, 0);
+  reg("call/ec", (void*)subr_call_ec, 1, 0);
+  reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
+  reg("continuation?", (void*)subr_continuation_p, 1, 0);
+
+  scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
+  c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
+  c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
 }

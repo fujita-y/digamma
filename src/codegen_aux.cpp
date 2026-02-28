@@ -8,9 +8,6 @@
 #include "codegen.h"
 #include "object_heap.h"
 
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
-
 static thread_local bool* s_stop_the_world = nullptr;
 
 extern "C" void c_safepoint(void) {

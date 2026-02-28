@@ -249,4 +249,8 @@ void cell_value_set(scm_obj_t x, scm_obj_t v);
 inline int closure_argc(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->argc; }
 inline int closure_rest(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->rest; }
 inline int closure_nenv(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nenv; }
+
+#define CAR(x) (((scm_cons_rec_t*)(x))->car)
+#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+
 #endif

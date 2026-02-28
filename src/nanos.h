@@ -5,11 +5,13 @@
 #define NANOS_H_INCLUDED
 
 #include "core.h"
-#include <llvm-19/llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <memory>
+#include "nanos_jit.h"
+
+#define SUBR extern "C" scm_obj_t
 
 class nanos_t {
-  std::unique_ptr<llvm::orc::LLJIT> m_jit;
+  std::unique_ptr<nanos_jit_t> m_jit;
 
   void init_subr();
   void init_codegen();

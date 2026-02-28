@@ -1,8 +1,10 @@
 // Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
+#include "core.h"
 #include "codegen.h"
 #include "codegen_aux.h"
+#include "codegen_common.h"
 #include "object_heap.h"
 #include "printer.h"
 
@@ -11,7 +13,6 @@
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/OptimizationLevel.h>
@@ -26,11 +27,34 @@
 #include <llvm/Transforms/Scalar/SROA.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
+#include "nanos_jit.h"
 
 thread_local codegen_t* codegen_t::s_current;
 
-codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
-    : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), builder(context), jit(jit) {
+// Define compiled_code_t methods here
+compiled_code_t::~compiled_code_t() {
+  if (tracker) {
+    if (auto err = tracker->remove()) {
+      llvm::consumeError(std::move(err));
+    }
+  }
+}
+
+compiled_code_t::compiled_code_t(compiled_code_t&& other) {
+  func_ptr = other.func_ptr;
+  tracker = std::move(other.tracker);
+  other.func_ptr = nullptr;
+}
+
+compiled_code_t& compiled_code_t::operator=(compiled_code_t&& other) {
+  func_ptr = other.func_ptr;
+  tracker = std::move(other.tracker);
+  other.func_ptr = nullptr;
+  return *this;
+}
+
+codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit)
+    : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), jit(jit), builder(context) {
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
@@ -40,16 +64,6 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, llvm::orc::LLJIT* jit)
   init_opcode_map();
   s_current = this;
 }
-
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals);
-extern "C" void c_global_set(scm_obj_t key, scm_obj_t value);
-extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
-
-extern "C" scm_obj_t c_make_cell(scm_obj_t value);
-extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]);
-extern "C" void c_write_barrier(scm_obj_t obj);
-
-#include "codegen_common.h"
 
 // Helper to finish collecting closure literals
 void codegen_t::finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals) {
@@ -387,15 +401,8 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   scm_obj_t current_closure_label = scm_nil;
   std::vector<scm_obj_t> current_literals;
 
-  // First pass: identify closure parameters to effectively switch contexts
-  // However, we process linearly. When we see a LABEL that corresponds to a closure
-  // (which we only know if we have seen MAKE-CLOSURE or if we pre-scan), it's tricky.
-  // BUT: The compiler emits code such that a closure body STARTS with a label.
-  // And that label is unique.
-  // We can collect closure params during parsing, but we need to know IF a label starts a new function.
-  // Standard scheme practice: top level code first, then closure bodies.
-  // Closures always start with a unique label. We can check `is_closure_label`.
-
+  // Detect closure parameters to switch contexts.
+  // Closures always start with a unique label which starts with 'C'.
   while (curr != scm_nil) {
     if (!is_cons(curr)) break;
     scm_obj_t inst_obj = CAR(curr);
@@ -470,17 +477,17 @@ void codegen_t::set_reg(int idx, llvm::Value* val) {
 
 // Helper to get or create an external function declaration
 llvm::Function* codegen_t::get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr) {
-  llvm::Function* func = module->getFunction(name);
+  llvm::Function* func = main_module->getFunction(name);
   if (!func) {
-    func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, module);
+    func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, main_module);
     func->setDSOLocal(true);
-  }
-  // Register the symbol with the JIT's main dylib via absoluteSymbols
-  llvm::orc::SymbolMap symbols;
-  symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
-                                         llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable};
-  if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
-    llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
+    // Register the symbol with the JIT's main dylib via absoluteSymbols
+    llvm::orc::SymbolMap symbols;
+    symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
+                                           llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable};
+    if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
+      llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
+    }
   }
   return func;
 }
@@ -686,7 +693,7 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
   }
 }
 
-codegen_t::compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
+compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   phase0_create_module();
   phase1_parse_instructions(inst_list);
   analyze_closure_labels();
@@ -706,9 +713,13 @@ codegen_t::compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 void codegen_t::phase0_create_module() {
   // ===== Phase 0: Module Creation =====
   // Create a new LLVM module for this compilation unit
-  std::string mod_name = "jit_module_" + std::to_string(std::rand());
-  this->current_module_uptr = std::make_unique<llvm::Module>(mod_name, context);
-  this->module = this->current_module_uptr.get();
+  std::string mod_name = "jit_module_main_" + std::to_string(std::rand());
+  this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, context);
+  this->main_module = this->main_module_uptr.get();
+
+  std::string clo_mod_name = "jit_module_closures_" + std::to_string(std::rand());
+  this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, context);
+  this->closure_module = this->closure_module_uptr.get();
 }
 
 void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
@@ -731,7 +742,7 @@ void codegen_t::phase2_create_functions() {
     FunctionInfo& main_info = functions[0];
     llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), false);
     std::string func_name = "scheme_func_" + std::to_string(std::rand());
-    this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, module);
+    this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, main_module);
     this->main_function->setDSOLocal(true);
     if (!this->main_function) {
       fatal("%s:%u codegen: failed to create main function", __FILE__, __LINE__);
@@ -764,7 +775,7 @@ void codegen_t::phase2_create_functions() {
     }
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
-    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::InternalLinkage, func_name, module);
+    llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, closure_module);
     closure_func->setCallingConv(CLOSURE_CALLING_CONV);
     closure_func->setDSOLocal(true);
 
@@ -779,15 +790,8 @@ void codegen_t::phase2_create_functions() {
     llvm::Function* llvm_func = info.llvm_function;
     for (const auto& inst : info.instructions) {
       if (inst.op == Opcode::LABEL) {
-        // Only create blocks for internal jump targets, but technically all labels get blocks.
-        // Note: Closure entry labels are also labels in the instruction stream.
-        // We should check if we already have a block (entry block)?
-        // Actually, existing logic:
-        // if (function_map.count(inst.opr1)) current_scan_func = function_map[inst.opr1];
-        // The label op itself might be the start of the function.
-        // If it is the start, we might skip creating a NEW block if we use the entry block?
-        // But usually entry block is separate for allocas.
-        // Let's just create blocks.
+        // Allocate a new BasicBlock for each label.
+        // Closure entry labels are also valid jump targets.
         const char* label_str = (const char*)symbol_name(inst.opr1);
         labels[inst.opr1] = llvm::BasicBlock::Create(context, label_str, llvm_func);
       }
@@ -802,6 +806,7 @@ void codegen_t::phase3_generate_code() {
   for (auto& info : functions) {
     current_function = info.llvm_function;
     current_function_info = &info;
+    this->main_module = current_function->getParent();  // set current module
 
     // Set insert point to entry block
     llvm::BasicBlock& entry = current_function->getEntryBlock();
@@ -852,9 +857,8 @@ void codegen_t::phase3_generate_code() {
 
     // Emit instructions
     for (const auto& inst : info.instructions) {
-      // Skip the label instruction if it marks the start of this function to avoid
-      // redundant branching/blocks if handled effectively, or just let standard emit_label handle it.
-      // Standard emit_label will create a branch from Entry->FirstLabel. This is fine.
+      // Emit instructions sequentially.
+      // emit_label will naturally create a branch from Entry to the first label if needed.
       emit_inst(inst);
     }
   }
@@ -863,22 +867,22 @@ void codegen_t::phase3_generate_code() {
 void codegen_t::phase4_optimize_and_verify() {
   // ===== Phase 4: Verification and Optimization =====
   // Verify correctness and optimize the generated LLVM IR
-  // Setup analysis managers
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
+  auto optimize_module = [](llvm::Module& mod) {
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
 
-  // Create pass builder and register analysis managers
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+    llvm::PassBuilder PB;
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  // Build O2 optimization pipeline
-  llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+    MPM.run(mod, MAM);
+  };
 
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
@@ -890,8 +894,11 @@ void codegen_t::phase4_optimize_and_verify() {
     fatal("%s:%u codegen: LLVM function verification failed for: %s", __FILE__, __LINE__, main_function->getName().str().c_str());
   }
 
-  // Run optimization passes on entire module
-  MPM.run(*module, MAM);
+  // Run optimization passes
+  optimize_module(*main_module_uptr);
+  if (functions.size() > 1) {
+    optimize_module(*closure_module_uptr);
+  }
 
   // Dump IR to file for debugging and inspection
   std::error_code EC;
@@ -899,16 +906,30 @@ void codegen_t::phase4_optimize_and_verify() {
   if (EC) {
     llvm::errs() << "Could not open file: " << EC.message() << "\n";
   } else {
-    module->print(dest, nullptr);
+    main_module_uptr->print(dest, nullptr);
+    if (functions.size() > 1) {
+      closure_module_uptr->print(dest, nullptr);
+    }
   }
 }
 
-codegen_t::compiled_code_t codegen_t::phase5_finalize() {
-  // Transfer module to LLJIT
+compiled_code_t codegen_t::phase5_finalize() {
+  // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
-  auto tsm = llvm::orc::ThreadSafeModule(std::move(current_module_uptr), ts_context);
-  if (auto err = jit->addIRModule(std::move(tsm))) {
-    fatal("%s:%u codegen: failed to add module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+
+  // Add closures module if exists
+  if (functions.size() > 1) {
+    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), ts_context);
+    if (auto err = jit->addIRModule(std::move(clo_tsm))) {
+      fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+    }
+  }
+
+  // Create explicit tracker for main module
+  auto rt = jit->getMainJITDylib().createResourceTracker();
+  auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);
+  if (auto err = jit->addIRModule(std::move(main_tsm), rt)) {
+    fatal("%s:%u codegen: failed to add main module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
   }
 
   // Look up the compiled function
@@ -918,8 +939,9 @@ codegen_t::compiled_code_t codegen_t::phase5_finalize() {
   }
 
   // Clear local module pointers
-  this->module = nullptr;
+  this->main_module = nullptr;
+  this->closure_module = nullptr;
   this->main_function = nullptr;
 
-  return sym->toPtr<intptr_t()>();
+  return compiled_code_t(sym->toPtr<intptr_t()>(), std::move(rt));
 }
