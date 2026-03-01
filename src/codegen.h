@@ -80,9 +80,9 @@ class codegen_t {
   thread_local static codegen_t* s_current;
 
   llvm::orc::ThreadSafeContext ts_context;
-  llvm::LLVMContext& context;
+  llvm::LLVMContext* context_ptr;
   nanos_jit_t* jit;
-  llvm::IRBuilder<> builder;
+  std::unique_ptr<llvm::IRBuilder<>> builder_ptr;
   llvm::Module* main_module = nullptr;  // Current module being compiled
   std::unique_ptr<llvm::Module> main_module_uptr;
 
@@ -187,11 +187,11 @@ class codegen_t {
                                 llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
 
   // LLVM type helpers to reduce code duplication
-  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(context); }
-  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(context); }
-  llvm::Type* getVoidPtrType() { return builder.getPtrTy(); }
-  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(context); }
-  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(context, llvm::APInt(64, (uint64_t)scm_false)); }
+  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(*context_ptr); }
+  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(*context_ptr); }
+  llvm::Type* getVoidPtrType() { return builder_ptr->getPtrTy(); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(*context_ptr); }
+  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(*context_ptr, llvm::APInt(64, (uint64_t)scm_false)); }
 
   // Helper to get code pointer from closure object
   llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);

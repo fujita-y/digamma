@@ -24,6 +24,9 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
+#define BL (*builder_ptr)
+#define CT (*context_ptr)
+
 // ============================================================================
 // Instruction Emission Switch
 // ============================================================================
@@ -101,16 +104,16 @@ void codegen_t::emit_inst(const Instruction& inst) {
 // ============================================================================
 
 void codegen_t::emit_safepoint(const Instruction& inst) {
-  llvm::FunctionType* ft = llvm::FunctionType::get(builder.getVoidTy(), false);
+  llvm::FunctionType* ft = llvm::FunctionType::get(BL.getVoidTy(), false);
   llvm::Function* safepoint_func = get_or_create_external_function("c_safepoint", ft, (void*)&c_safepoint);
-  builder.CreateCall(safepoint_func);
+  BL.CreateCall(safepoint_func);
 }
 
 // Emit a constant value to a register
 void codegen_t::emit_const(const Instruction& inst) {
   if (inst.rn1 < 0) return;
   uint64_t val = (uint64_t)inst.opr1;
-  llvm::Value* v = createInt64Constant(context, val);
+  llvm::Value* v = createInt64Constant(CT, val);
   set_reg(inst.rn1, v);
 }
 
@@ -134,8 +137,8 @@ void codegen_t::emit_if(const Instruction& inst) {
 
   llvm::Value* cond = get_reg(0);
   llvm::Value* scm_false_v = this->getScmFalseValue();
-  llvm::Value* cmp = builder.CreateICmpNE(cond, scm_false_v, "cond");
-  builder.CreateCondBr(cmp, b1, b2);
+  llvm::Value* cmp = BL.CreateICmpNE(cond, scm_false_v, "cond");
+  BL.CreateCondBr(cmp, b1, b2);
 }
 
 // Unconditional jump to label
@@ -144,7 +147,7 @@ void codegen_t::emit_jump(const Instruction& inst) {
   if (!target) {
     fatal("%s:%u codegen: jump target label not found", __FILE__, __LINE__);
   }
-  builder.CreateBr(target);
+  BL.CreateBr(target);
 }
 
 // Set insertion point to label's basic block
@@ -153,17 +156,17 @@ void codegen_t::emit_label(const Instruction& inst) {
   if (!block) {
     fatal("%s:%u codegen: label basic block not found", __FILE__, __LINE__);
   }
-  llvm::BasicBlock* current = builder.GetInsertBlock();
+  llvm::BasicBlock* current = BL.GetInsertBlock();
 
   if (current->getTerminator() == nullptr) {
-    builder.CreateBr(block);
+    BL.CreateBr(block);
   }
 
-  builder.SetInsertPoint(block);
+  BL.SetInsertPoint(block);
 }
 
 // Return r0 as function result
-void codegen_t::emit_ret(const Instruction& inst) { builder.CreateRet(get_reg(0)); }
+void codegen_t::emit_ret(const Instruction& inst) { BL.CreateRet(get_reg(0)); }
 
 // Create a closure object with captured environment
 void codegen_t::emit_make_closure(const Instruction& inst) {
@@ -186,7 +189,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   if (closure_literals.count(inst.opr1)) {
     literals = closure_literals[inst.opr1];
   }
-  llvm::Value* literals_val = createInt64Constant(context, (uint64_t)literals);
+  llvm::Value* literals_val = createInt64Constant(CT, (uint64_t)literals);
 
   // Common types
   llvm::Type* intptrTy = this->getInt64Type();
@@ -194,8 +197,8 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   llvm::Type* int32Ty = this->getInt32Type();
 
   // Prepare common arguments
-  llvm::Value* code_ptr = builder.CreateBitCast(closure_func, voidPtrTy);
-  llvm::Value* argc = createInt32Constant(context, inst.argc);
+  llvm::Value* code_ptr = BL.CreateBitCast(closure_func, voidPtrTy);
+  llvm::Value* argc = createInt32Constant(CT, inst.argc);
 
   llvm::Value* closure;
   if (!inst.has_rest && nenv == 0) {
@@ -204,41 +207,41 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
       std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
       llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
       llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s1", simpleFT, (void*)&c_make_closure_s1);
-      closure = builder.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
+      closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
     } else {
       // Simple closure optimization (with literals)
       std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty, intptrTy};
       llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
       llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s2", simpleFT, (void*)&c_make_closure_s2);
-      closure = builder.CreateCall(make_simple_closure_func, {code_ptr, argc, literals_val}, "closure");
+      closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc, literals_val}, "closure");
     }
   } else {
     // General case: Prepare environment array
     llvm::Value* env_array = nullptr;
     if (nenv > 0) {
       llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-      env_array = TmpB.CreateAlloca(intptrTy, createInt32Constant(context, nenv), "env");
+      env_array = TmpB.CreateAlloca(intptrTy, createInt32Constant(CT, nenv), "env");
       scm_obj_t curr = inst.free_indices;
       for (int i = 0; i < nenv; i++) {
         int reg_idx = parse_reg(CAR(curr));
         llvm::Value* reg_val = get_reg(reg_idx);
-        llvm::Value* ptr = builder.CreateGEP(builder.getInt64Ty(), env_array, createInt32Constant(context, i));
-        builder.CreateStore(reg_val, ptr);
+        llvm::Value* ptr = BL.CreateGEP(BL.getInt64Ty(), env_array, createInt32Constant(CT, i));
+        BL.CreateStore(reg_val, ptr);
         curr = CDR(curr);
       }
     } else {
-      env_array = llvm::ConstantPointerNull::get(builder.getPtrTy());
+      env_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
     }
 
     llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, {voidPtrTy, int32Ty, int32Ty, int32Ty, voidPtrTy, intptrTy}, false);
     llvm::Function* make_closure_func = get_or_create_external_function("c_make_closure", ft, (void*)&c_make_closure);
 
-    llvm::Value* rest = createInt32Constant(context, inst.has_rest ? 1 : 0);
-    llvm::Value* nenv_val = createInt32Constant(context, nenv);
-    llvm::Value* env_ptr = builder.CreateBitCast(env_array, voidPtrTy);
+    llvm::Value* rest = createInt32Constant(CT, inst.has_rest ? 1 : 0);
+    llvm::Value* nenv_val = createInt32Constant(CT, nenv);
+    llvm::Value* env_ptr = BL.CreateBitCast(env_array, voidPtrTy);
 
     std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nenv_val, env_ptr, literals_val};
-    closure = builder.CreateCall(make_closure_func, callArgs, "closure");
+    closure = BL.CreateCall(make_closure_func, callArgs, "closure");
   }
 
   set_reg(inst.rn1, closure);
@@ -247,14 +250,14 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 // Set global variable to value in register
 void codegen_t::emit_global_set(const Instruction& inst) {
   // Get or create c_global_set external function
-  llvm::Type* voidTy = llvm::Type::getVoidTy(context);
+  llvm::Type* voidTy = llvm::Type::getVoidTy((CT));
   llvm::Type* intptrTy = this->getInt64Type();
   std::vector<llvm::Type*> argTypes = {intptrTy, intptrTy};
   llvm::FunctionType* ft = llvm::FunctionType::get(voidTy, argTypes, false);
   llvm::Function* global_set_func = get_or_create_external_function("c_global_set", ft, (void*)&c_global_set);
 
   // Prepare arguments: symbol key and value from register
-  llvm::Value* key_v = createInt64Constant(context, (uint64_t)inst.opr1);
+  llvm::Value* key_v = createInt64Constant(CT, (uint64_t)inst.opr1);
 
   if (inst.rn1 < 0) {
     fatal("%s:%u codegen: global-set! missing register operand", __FILE__, __LINE__);
@@ -262,7 +265,7 @@ void codegen_t::emit_global_set(const Instruction& inst) {
   llvm::Value* val_v = get_reg(inst.rn1);
 
   std::vector<llvm::Value*> args = {key_v, val_v};
-  builder.CreateCall(global_set_func, args);
+  BL.CreateCall(global_set_func, args);
 }
 
 // Load global variable value into register
@@ -272,17 +275,17 @@ void codegen_t::emit_global_ref(const Instruction& inst) {
   scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
 
   // Create a constant for the value address
-  llvm::Value* value_address = createInt64Constant(context, (uint64_t)&(rec->value));
+  llvm::Value* value_address = createInt64Constant(CT, (uint64_t)&(rec->value));
 
   if (inst.rn1 < 0) {
     fatal("%s:%u codegen: global-ref missing register operand", __FILE__, __LINE__);
   }
 
   // Get pointer to cell's value
-  llvm::Value* value_ptr = builder.CreateIntToPtr(value_address, builder.getPtrTy());
+  llvm::Value* value_ptr = BL.CreateIntToPtr(value_address, BL.getPtrTy());
 
   // Load the value directly
-  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr, "gref_val");
+  llvm::Value* val = BL.CreateLoad(this->getInt64Type(), value_ptr, "gref_val");
 
   set_reg(inst.rn1, val);
 }
@@ -315,9 +318,9 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, main_module);
   f->setDSOLocal(true);
 
-  llvm::BasicBlock* saved_block = builder.GetInsertBlock();
-  llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", f);
-  builder.SetInsertPoint(entry);
+  llvm::BasicBlock* saved_block = BL.GetInsertBlock();
+  llvm::BasicBlock* entry = llvm::BasicBlock::Create(CT, "entry", f);
+  BL.SetInsertPoint(entry);
 
   auto args = f->arg_begin();
   llvm::Value* closure = args++;
@@ -328,51 +331,51 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   argv->setName("argv");
 
   llvm::Value* code_ptr = getClosureCodePtr(closure);
-  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
+  llvm::Value* closure_ptr = untagPointer(BL, CT, closure);
 
   // Load rest and cdecl flags
-  llvm::Value* rest_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
-  llvm::Value* rest_field = builder.CreateLoad(builder.getInt32Ty(), rest_ptr, "rest");
-  llvm::Value* is_rest = builder.CreateICmpNE(rest_field, builder.getInt32(0), "is_rest");
+  llvm::Value* rest_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
+  llvm::Value* rest_field = BL.CreateLoad(BL.getInt32Ty(), rest_ptr, "rest");
+  llvm::Value* is_rest = BL.CreateICmpNE(rest_field, BL.getInt32(0), "is_rest");
 
-  llvm::Value* cdecl_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
-  llvm::Value* cdecl_field = builder.CreateLoad(builder.getInt32Ty(), cdecl_ptr, "cdecl");
-  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_field, builder.getInt32(0), "is_cdecl");
+  llvm::Value* cdecl_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+  llvm::Value* cdecl_field = BL.CreateLoad(BL.getInt32Ty(), cdecl_ptr, "cdecl");
+  llvm::Value* is_cdecl = BL.CreateICmpNE(cdecl_field, BL.getInt32(0), "is_cdecl");
 
-  llvm::BasicBlock* rest_b = llvm::BasicBlock::Create(context, "rest", f);
-  llvm::BasicBlock* fixed_b = llvm::BasicBlock::Create(context, "fixed", f);
-  builder.CreateCondBr(is_rest, rest_b, fixed_b);
+  llvm::BasicBlock* rest_b = llvm::BasicBlock::Create(CT, "rest", f);
+  llvm::BasicBlock* fixed_b = llvm::BasicBlock::Create(CT, "fixed", f);
+  BL.CreateCondBr(is_rest, rest_b, fixed_b);
 
   // Rest path: (self, argc, argv[])
-  builder.SetInsertPoint(rest_b);
+  BL.SetInsertPoint(rest_b);
   {
     llvm::FunctionType* rest_ft = llvm::FunctionType::get(i64, {i64, i64, i64_ptr}, false);
     llvm::Value* fp = code_ptr;
 
-    llvm::BasicBlock* cdecl_path = llvm::BasicBlock::Create(context, "rest_cdecl", f);
-    llvm::BasicBlock* scheme_path = llvm::BasicBlock::Create(context, "rest_scheme", f);
-    builder.CreateCondBr(is_cdecl, cdecl_path, scheme_path);
+    llvm::BasicBlock* cdecl_path = llvm::BasicBlock::Create(CT, "rest_cdecl", f);
+    llvm::BasicBlock* scheme_path = llvm::BasicBlock::Create(CT, "rest_scheme", f);
+    BL.CreateCondBr(is_cdecl, cdecl_path, scheme_path);
 
-    builder.SetInsertPoint(cdecl_path);
-    auto call_c = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
+    BL.SetInsertPoint(cdecl_path);
+    auto call_c = BL.CreateCall(rest_ft, fp, {closure, argc, argv});
     call_c->setCallingConv(llvm::CallingConv::C);
-    builder.CreateRet(call_c);
+    BL.CreateRet(call_c);
 
-    builder.SetInsertPoint(scheme_path);
-    auto call_s = builder.CreateCall(rest_ft, fp, {closure, argc, argv});
+    BL.SetInsertPoint(scheme_path);
+    auto call_s = BL.CreateCall(rest_ft, fp, {closure, argc, argv});
     call_s->setCallingConv(CLOSURE_CALLING_CONV);
-    builder.CreateRet(call_s);
+    BL.CreateRet(call_s);
   }
 
   // Fixed path: (self, arg0, arg1, ...)
-  builder.SetInsertPoint(fixed_b);
+  BL.SetInsertPoint(fixed_b);
   {
-    llvm::BasicBlock* def_b = llvm::BasicBlock::Create(context, "fixed_def", f);
-    llvm::SwitchInst* sw = builder.CreateSwitch(argc, def_b, BRIDGE_MAX_ARGS + 1);
+    llvm::BasicBlock* def_b = llvm::BasicBlock::Create(CT, "fixed_def", f);
+    llvm::SwitchInst* sw = BL.CreateSwitch(argc, def_b, BRIDGE_MAX_ARGS + 1);
     for (int n = 0; n <= BRIDGE_MAX_ARGS; ++n) {
-      llvm::BasicBlock* bb = llvm::BasicBlock::Create(context, "fixed_" + std::to_string(n), f);
-      sw->addCase(llvm::cast<llvm::ConstantInt>(createInt64Constant(context, (uint64_t)n)), bb);
-      builder.SetInsertPoint(bb);
+      llvm::BasicBlock* bb = llvm::BasicBlock::Create(CT, "fixed_" + std::to_string(n), f);
+      sw->addCase(llvm::cast<llvm::ConstantInt>(createInt64Constant(CT, (uint64_t)n)), bb);
+      BL.SetInsertPoint(bb);
 
       std::vector<llvm::Type*> pts(n + 1, i64);
       llvm::FunctionType* fixed_ft = llvm::FunctionType::get(i64, pts, false);
@@ -381,29 +384,29 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
       std::vector<llvm::Value*> call_args;
       call_args.push_back(closure);
       for (int i = 0; i < n; ++i) {
-        llvm::Value* p = builder.CreateGEP(i64, argv, createInt32Constant(context, i));
-        call_args.push_back(builder.CreateLoad(i64, p));
+        llvm::Value* p = BL.CreateGEP(i64, argv, createInt32Constant(CT, i));
+        call_args.push_back(BL.CreateLoad(i64, p));
       }
 
-      llvm::BasicBlock* cdecl_p = llvm::BasicBlock::Create(context, "fixed_cdecl_" + std::to_string(n), f);
-      llvm::BasicBlock* scheme_p = llvm::BasicBlock::Create(context, "fixed_scheme_" + std::to_string(n), f);
-      builder.CreateCondBr(is_cdecl, cdecl_p, scheme_p);
+      llvm::BasicBlock* cdecl_p = llvm::BasicBlock::Create(CT, "fixed_cdecl_" + std::to_string(n), f);
+      llvm::BasicBlock* scheme_p = llvm::BasicBlock::Create(CT, "fixed_scheme_" + std::to_string(n), f);
+      BL.CreateCondBr(is_cdecl, cdecl_p, scheme_p);
 
-      builder.SetInsertPoint(cdecl_p);
-      auto c = builder.CreateCall(fixed_ft, fp, call_args);
+      BL.SetInsertPoint(cdecl_p);
+      auto c = BL.CreateCall(fixed_ft, fp, call_args);
       c->setCallingConv(llvm::CallingConv::C);
-      builder.CreateRet(c);
+      BL.CreateRet(c);
 
-      builder.SetInsertPoint(scheme_p);
-      auto s = builder.CreateCall(fixed_ft, fp, call_args);
+      BL.SetInsertPoint(scheme_p);
+      auto s = BL.CreateCall(fixed_ft, fp, call_args);
       s->setCallingConv(CLOSURE_CALLING_CONV);
-      builder.CreateRet(s);
+      BL.CreateRet(s);
     }
-    builder.SetInsertPoint(def_b);
-    builder.CreateRet(getScmFalseValue());
+    BL.SetInsertPoint(def_b);
+    BL.CreateRet(getScmFalseValue());
   }
 
-  if (saved_block) builder.SetInsertPoint(saved_block);
+  if (saved_block) BL.SetInsertPoint(saved_block);
   return f;
 }
 
@@ -422,12 +425,13 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   auto saved_module_uptr = std::move(main_module_uptr);
   auto* saved_module = main_module;
   auto* saved_main_func = main_function;
-  auto saved_builder_ip = builder.saveIP();
+  auto saved_builder_ip = BL.saveIP();
 
   // Create a temporary module for the bridge
-  main_module_uptr = std::make_unique<llvm::Module>("bridge_module", context);
+  main_module_uptr = std::make_unique<llvm::Module>("bridge_module", (CT));
   main_module = main_module_uptr.get();
   main_module->setDataLayout(jit->getDataLayout());
+  main_module->setTargetTriple(jit->getTargetTriple().getTriple());
   main_module->setPICLevel(llvm::PICLevel::BigPIC);
   main_module->setPIELevel(llvm::PIELevel::Large);
 
@@ -444,7 +448,7 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   main_module_uptr = std::move(saved_module_uptr);
   main_module = saved_module;
   main_function = saved_main_func;
-  builder.restoreIP(saved_builder_ip);
+  BL.restoreIP(saved_builder_ip);
 
   // Re-lookup the symbol
   sym = jit->lookup(name);
@@ -470,22 +474,22 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
   // Prepare arguments for c_apply_helper
   // proc in r0, arguments in r1...r(argc-1)
   llvm::Value* proc = get_reg(0);
-  llvm::Value* argc_val = createInt32Constant(context, inst.argc - 1);
+  llvm::Value* argc_val = createInt32Constant(CT, inst.argc - 1);
   llvm::Value* argv_array = nullptr;
   if (inst.argc > 1) {
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    argv_array = TmpB.CreateAlloca(i64, createInt32Constant(context, inst.argc - 1), "apply_argv");
+    argv_array = TmpB.CreateAlloca(i64, createInt32Constant(CT, inst.argc - 1), "apply_argv");
     for (int i = 1; i < inst.argc; i++) {
-      llvm::Value* p = builder.CreateGEP(i64, argv_array, createInt32Constant(context, i - 1));
-      builder.CreateStore(get_reg(i), p);
+      llvm::Value* p = BL.CreateGEP(i64, argv_array, createInt32Constant(CT, i - 1));
+      BL.CreateStore(get_reg(i), p);
     }
   } else {
     argv_array = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i64_ptr));
   }
 
-  auto call = builder.CreateCall(ft, apply_helper, {proc, argc_val, argv_array}, "apply_opt");
+  auto call = BL.CreateCall(ft, apply_helper, {proc, argc_val, argv_array}, "apply_opt");
   if (is_tail) {
-    builder.CreateRet(call);
+    BL.CreateRet(call);
   } else {
     set_reg(0, call);
   }
@@ -533,17 +537,17 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           if (inst.argc < fixed_argc) {
             throw std::runtime_error("error in codegen: wrong number of arguments");
           }
-          args.push_back(createInt64Constant(context, inst.argc));
+          args.push_back(createInt64Constant(CT, inst.argc));
           llvm::Value* argv_array = nullptr;
           if (inst.argc > 0) {
             llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-            argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+            argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
             for (int i = 0; i < inst.argc; i++) {
-              llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
-              builder.CreateStore(get_reg(i), arg_ptr);
+              llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
+              BL.CreateStore(get_reg(i), arg_ptr);
             }
           } else {
-            argv_array = llvm::ConstantPointerNull::get(builder.getPtrTy());
+            argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
           }
           args.push_back(argv_array);
         } else {
@@ -556,18 +560,18 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         }
 
         // Create function pointer
-        llvm::Value* funcPtr = createInt64Constant(context, (uint64_t)code_ptr);
-        llvm::Value* typedFuncPtr = builder.CreateIntToPtr(funcPtr, builder.getPtrTy());
+        llvm::Value* funcPtr = createInt64Constant(CT, (uint64_t)code_ptr);
+        llvm::Value* typedFuncPtr = BL.CreateIntToPtr(funcPtr, BL.getPtrTy());
 
         // Emit call
         // If cdecl == 0 (Scheme), use tailcc. If cdecl == 1 (C), use generic ccc.
-        llvm::CallInst* call = builder.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
+        llvm::CallInst* call = BL.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
 
         if (cdecl == 0) {
           call->setCallingConv(CLOSURE_CALLING_CONV);
           if (is_tail) {
             call->setTailCallKind(llvm::CallInst::TCK_MustTail);
-            builder.CreateRet(call);
+            BL.CreateRet(call);
           } else {
             set_reg(0, call);
           }
@@ -575,7 +579,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           // cdecl == 1: C calling convention (default)
           call->setCallingConv(llvm::CallingConv::C);
           if (is_tail) {
-            builder.CreateRet(call);
+            BL.CreateRet(call);
           } else {
             set_reg(0, call);
           }
@@ -612,18 +616,18 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       // Target expects: (self, argc, argv[])
       // We need to pack our register arguments into an array
 
-      args.push_back(createInt64Constant(context, inst.argc));
+      args.push_back(createInt64Constant(CT, inst.argc));
 
       llvm::Value* argv_array = nullptr;
       if (inst.argc > 0) {
         llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-        argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+        argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
         for (int i = 0; i < inst.argc; i++) {
-          llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
-          builder.CreateStore(get_reg(i), arg_ptr);
+          llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
+          BL.CreateStore(get_reg(i), arg_ptr);
         }
       } else {
-        argv_array = llvm::ConstantPointerNull::get(builder.getPtrTy());
+        argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
       }
       args.push_back(argv_array);
 
@@ -647,12 +651,12 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           llvm::Function::Create(target_func->getFunctionType(), llvm::Function::ExternalLinkage, target_func->getName(), this->main_module);
     }
 
-    llvm::CallInst* call = builder.CreateCall(local_target_func, args, is_tail ? "tail_call_opt" : "call_opt");
+    llvm::CallInst* call = BL.CreateCall(local_target_func, args, is_tail ? "tail_call_opt" : "call_opt");
     call->setCallingConv(CLOSURE_CALLING_CONV);
 
     if (is_tail) {
       call->setTailCallKind(llvm::CallInst::TCK_MustTail);
-      builder.CreateRet(call);
+      BL.CreateRet(call);
     } else {
       set_reg(0, call);
     }
@@ -669,72 +673,72 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   std::vector<llvm::Type*> paramTypes;
   paramTypes.push_back(this->getInt64Type());  // self
   paramTypes.push_back(this->getInt64Type());  // argc
-  paramTypes.push_back(builder.getPtrTy());    // argv[]
+  paramTypes.push_back(BL.getPtrTy());         // argv[]
   llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
 
   // Allocate argv array and populate it
   llvm::Value* argv_array = nullptr;
   if (inst.argc > 0) {
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(context, inst.argc), "argv");
+    argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
     for (int i = 0; i < inst.argc; i++) {
-      llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(context, i));
-      builder.CreateStore(get_reg(i), arg_ptr);
+      llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
+      BL.CreateStore(get_reg(i), arg_ptr);
     }
   } else {
-    argv_array = llvm::ConstantPointerNull::get(builder.getPtrTy());
+    argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
   }
 
   std::vector<llvm::Value*> args;
   args.push_back(closure);
-  args.push_back(createInt64Constant(context, inst.argc));
+  args.push_back(createInt64Constant(CT, inst.argc));
   args.push_back(argv_array);
 
   llvm::Value* func_ptr = code_void_ptr;
 
   // Handle CDECL vs SCHEME (Tail) calling convention
-  llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(context, "rest_cdecl", current_function);
-  llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(context, "rest_scheme", current_function);
+  llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(CT, "rest_cdecl", current_function);
+  llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(CT, "rest_scheme", current_function);
   llvm::BasicBlock* local_merge = nullptr;
 
   if (!is_tail) {
-    local_merge = llvm::BasicBlock::Create(context, "rest_local_merge", current_function);
+    local_merge = llvm::BasicBlock::Create(CT, "rest_local_merge", current_function);
   }
 
   // Check cdecl flag
-  builder.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
+  BL.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
 
   // CDECL path - no musttail
-  builder.SetInsertPoint(cdecl_block);
-  llvm::CallInst* call_c = builder.CreateCall(funcType, func_ptr, args, "rest_call_c");
+  BL.SetInsertPoint(cdecl_block);
+  llvm::CallInst* call_c = BL.CreateCall(funcType, func_ptr, args, "rest_call_c");
   call_c->setCallingConv(llvm::CallingConv::C);
   if (is_tail) {
-    builder.CreateRet(call_c);
+    BL.CreateRet(call_c);
   } else {
-    builder.CreateBr(local_merge);
+    BL.CreateBr(local_merge);
   }
 
   // Scheme path - musttail if tail
-  builder.SetInsertPoint(scheme_block);
-  llvm::CallInst* call_s = builder.CreateCall(funcType, func_ptr, args, "rest_call_s");
+  BL.SetInsertPoint(scheme_block);
+  llvm::CallInst* call_s = BL.CreateCall(funcType, func_ptr, args, "rest_call_s");
   call_s->setCallingConv(CLOSURE_CALLING_CONV);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
-    builder.CreateRet(call_s);
+    BL.CreateRet(call_s);
   } else {
-    builder.CreateBr(local_merge);
+    BL.CreateBr(local_merge);
   }
 
   if (!is_tail) {
-    builder.SetInsertPoint(local_merge);
-    llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "rest_res");
+    BL.SetInsertPoint(local_merge);
+    llvm::PHINode* phi = BL.CreatePHI(this->getInt64Type(), 2, "rest_res");
     phi->addIncoming(call_c, cdecl_block);
     phi->addIncoming(call_s, scheme_block);
 
     // Explicitly transition to merge_block
-    builder.CreateBr(merge_block);
+    BL.CreateBr(merge_block);
   }
-  rest_exit_block = builder.GetInsertBlock();
+  rest_exit_block = BL.GetInsertBlock();
 }
 
 void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst,
@@ -755,54 +759,54 @@ void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code
   llvm::Value* normal_func_ptr = code_void_ptr;
 
   // Handle CDECL vs SCHEME (Tail) calling convention
-  llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(context, "norm_cdecl", current_function);
-  llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(context, "norm_scheme", current_function);
+  llvm::BasicBlock* cdecl_block = llvm::BasicBlock::Create(CT, "norm_cdecl", current_function);
+  llvm::BasicBlock* scheme_block = llvm::BasicBlock::Create(CT, "norm_scheme", current_function);
   llvm::BasicBlock* local_merge = nullptr;
 
   if (!is_tail) {
-    local_merge = llvm::BasicBlock::Create(context, "norm_local_merge", current_function);
+    local_merge = llvm::BasicBlock::Create(CT, "norm_local_merge", current_function);
   }
 
   // Check cdecl flag
-  builder.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
+  BL.CreateCondBr(is_cdecl, cdecl_block, scheme_block);
 
   // CDECL path - no musttail
-  builder.SetInsertPoint(cdecl_block);
-  llvm::CallInst* call_c = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_c");
+  BL.SetInsertPoint(cdecl_block);
+  llvm::CallInst* call_c = BL.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_c");
   call_c->setCallingConv(llvm::CallingConv::C);
   if (is_tail) {
-    builder.CreateRet(call_c);
+    BL.CreateRet(call_c);
   } else {
-    builder.CreateBr(local_merge);
+    BL.CreateBr(local_merge);
   }
 
   // Scheme path - musttail if tail
-  builder.SetInsertPoint(scheme_block);
-  llvm::CallInst* call_s = builder.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_s");
+  BL.SetInsertPoint(scheme_block);
+  llvm::CallInst* call_s = BL.CreateCall(normalFuncType, normal_func_ptr, normalArgs, "norm_call_s");
   call_s->setCallingConv(CLOSURE_CALLING_CONV);
   if (is_tail) {
     call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
-    builder.CreateRet(call_s);
+    BL.CreateRet(call_s);
   } else {
-    builder.CreateBr(local_merge);
+    BL.CreateBr(local_merge);
   }
 
   if (!is_tail) {
-    builder.SetInsertPoint(local_merge);
-    llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "norm_res");
+    BL.SetInsertPoint(local_merge);
+    llvm::PHINode* phi = BL.CreatePHI(this->getInt64Type(), 2, "norm_res");
     phi->addIncoming(call_c, cdecl_block);
     phi->addIncoming(call_s, scheme_block);
-    builder.CreateBr(merge_block);
+    BL.CreateBr(merge_block);
   }
-  normal_exit_block = builder.GetInsertBlock();
+  normal_exit_block = BL.GetInsertBlock();
 }
 
 void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail) {
   llvm::Type* i64 = this->getInt64Type();
   llvm::Type* i32 = this->getInt32Type();
-  llvm::FunctionType* test_ft = llvm::FunctionType::get(builder.getVoidTy(), {i64, i32}, false);
+  llvm::FunctionType* test_ft = llvm::FunctionType::get(BL.getVoidTy(), {i64, i32}, false);
   llvm::Function* test_func = get_or_create_external_function("c_test_application", test_ft, (void*)&c_test_application);
-  builder.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(context, inst.argc)});
+  BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc)});
 
   if (inst.argc <= BRIDGE_MAX_ARGS) {
     // Optimized generic call via bridge
@@ -812,24 +816,24 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
 
     // Prepare arguments for bridge: i64 (i64 closure, i64 argc, i64* argv)
     llvm::Value* closure = get_reg(inst.rn1);
-    llvm::Value* argc_val = createInt64Constant(context, inst.argc);
+    llvm::Value* argc_val = createInt64Constant(CT, inst.argc);
     llvm::Value* argv_array = nullptr;
     if (inst.argc > 0) {
       llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-      argv_array = TmpB.CreateAlloca(i64, createInt32Constant(context, inst.argc), "bridge_argv");
+      argv_array = TmpB.CreateAlloca(i64, createInt32Constant(CT, inst.argc), "bridge_argv");
       for (int i = 0; i < inst.argc; i++) {
-        llvm::Value* p = builder.CreateGEP(i64, argv_array, createInt32Constant(context, i));
-        builder.CreateStore(get_reg(i), p);
+        llvm::Value* p = BL.CreateGEP(i64, argv_array, createInt32Constant(CT, i));
+        BL.CreateStore(get_reg(i), p);
       }
     } else {
       argv_array = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i64_ptr));
     }
 
-    auto call = builder.CreateCall(bridge->getFunctionType(), bridge, {closure, argc_val, argv_array}, "bridge_call");
+    auto call = BL.CreateCall(bridge->getFunctionType(), bridge, {closure, argc_val, argv_array}, "bridge_call");
     // The bridge itself handles the calling convention (Scheme/CDECL) and musttail optimization internally.
     // However, the call TO the bridge is a standard C call.
     if (is_tail) {
-      builder.CreateRet(call);
+      BL.CreateRet(call);
     } else {
       set_reg(0, call);
     }
@@ -843,46 +847,46 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
   llvm::Value* code_void_ptr = getClosureCodePtr(closure);
 
   // Read closure's rest field to determine calling convention
-  llvm::Value* closure_ptr = untagPointer(builder, context, closure);
-  llvm::Value* rest_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
+  llvm::Value* closure_ptr = untagPointer(BL, CT, closure);
+  llvm::Value* rest_field_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
   llvm::Value* rest_field_ptr_i32 = rest_field_ptr;
-  llvm::Value* rest_flag = builder.CreateLoad(builder.getInt32Ty(), rest_field_ptr_i32, "rest");
+  llvm::Value* rest_flag = BL.CreateLoad(BL.getInt32Ty(), rest_field_ptr_i32, "rest");
 
   // Load cdecl field (already defined at top of file)
-  llvm::Value* cdecl_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
+  llvm::Value* cdecl_field_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
   llvm::Value* cdecl_field_ptr_i32 = cdecl_field_ptr;
-  llvm::Value* cdecl_flag = builder.CreateLoad(builder.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
+  llvm::Value* cdecl_flag = BL.CreateLoad(BL.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
 
   // Branch based on rest flag
-  llvm::Value* is_rest = builder.CreateICmpNE(rest_flag, builder.getInt32(0), "is_rest");
-  llvm::Value* is_cdecl = builder.CreateICmpNE(cdecl_flag, builder.getInt32(0), "is_cdecl");
+  llvm::Value* is_rest = BL.CreateICmpNE(rest_flag, BL.getInt32(0), "is_rest");
+  llvm::Value* is_cdecl = BL.CreateICmpNE(cdecl_flag, BL.getInt32(0), "is_cdecl");
 
-  llvm::BasicBlock* rest_block = llvm::BasicBlock::Create(context, is_tail ? "rest_tail_call" : "rest_call", current_function);
-  llvm::BasicBlock* normal_block = llvm::BasicBlock::Create(context, is_tail ? "normal_tail_call" : "normal_call", current_function);
+  llvm::BasicBlock* rest_block = llvm::BasicBlock::Create(CT, is_tail ? "rest_tail_call" : "rest_call", current_function);
+  llvm::BasicBlock* normal_block = llvm::BasicBlock::Create(CT, is_tail ? "normal_tail_call" : "normal_call", current_function);
   llvm::BasicBlock* merge_block = nullptr;
   if (!is_tail) {
-    merge_block = llvm::BasicBlock::Create(context, "call_merge", current_function);
+    merge_block = llvm::BasicBlock::Create(CT, "call_merge", current_function);
   }
 
-  llvm::MDBuilder MDB(context);
+  llvm::MDBuilder MDB((CT));
   auto branch_weights = MDB.createBranchWeights(1, 2000);  // 1 = unlikely (rest), 2000 = likely (normal)
-  builder.CreateCondBr(is_rest, rest_block, normal_block, branch_weights);
+  BL.CreateCondBr(is_rest, rest_block, normal_block, branch_weights);
 
   llvm::BasicBlock* rest_exit_block = nullptr;
   llvm::BasicBlock* normal_exit_block = nullptr;
 
   // --- Rest Block ---
-  builder.SetInsertPoint(rest_block);
+  BL.SetInsertPoint(rest_block);
   emit_generic_rest_call(closure, code_void_ptr, is_cdecl, inst, is_tail, merge_block, rest_exit_block);
 
   // --- Normal Block ---
-  builder.SetInsertPoint(normal_block);
+  BL.SetInsertPoint(normal_block);
   emit_generic_normal_call(closure, code_void_ptr, is_cdecl, inst, is_tail, merge_block, normal_exit_block);
 
   // --- Merge Block ---
   if (!is_tail) {
-    builder.SetInsertPoint(merge_block);
-    llvm::PHINode* phi = builder.CreatePHI(this->getInt64Type(), 2, "call_result");
+    BL.SetInsertPoint(merge_block);
+    llvm::PHINode* phi = BL.CreatePHI(this->getInt64Type(), 2, "call_result");
 
     // Retrieve the result from the exit blocks by extracting the PHI node
     // from the first instruction of each local merge block.
@@ -936,7 +940,7 @@ void codegen_t::emit_tail_call(const Instruction& inst) { emit_call_common(inst,
 // Load free variable from closure environment
 void codegen_t::emit_closure_ref(const Instruction& inst) {
   if (!current_closure_self) {
-    fatal("%s:%u codegen: closure-ref used outside of closure context", __FILE__, __LINE__);
+    fatal("%s:%u codegen: closure-ref used outside of closure (CT)", __FILE__, __LINE__);
   }
 
   int env_idx = (int)fixnum(inst.opr2);
@@ -945,13 +949,13 @@ void codegen_t::emit_closure_ref(const Instruction& inst) {
   }
 
   // Get pointer to closure environment array
-  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(BL, CT, current_closure_self, this->getInt64Type());
 
   // Get pointer to specific index
-  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+  llvm::Value* val_ptr = BL.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(CT, env_idx));
 
   // Load the value
-  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), val_ptr, "free_var");
+  llvm::Value* val = BL.CreateLoad(this->getInt64Type(), val_ptr, "free_var");
 
   set_reg(inst.rn1, val);
 }
@@ -959,7 +963,7 @@ void codegen_t::emit_closure_ref(const Instruction& inst) {
 // Store value into closure environment
 void codegen_t::emit_closure_set(const Instruction& inst) {
   if (!current_closure_self) {
-    fatal("%s:%u codegen: closure-set! used outside of closure context", __FILE__, __LINE__);
+    fatal("%s:%u codegen: closure-set! used outside of closure (CT)", __FILE__, __LINE__);
   }
 
   int env_idx = (int)fixnum(inst.opr1);
@@ -968,10 +972,10 @@ void codegen_t::emit_closure_set(const Instruction& inst) {
   }
 
   // Get pointer to closure environment array
-  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(BL, CT, current_closure_self, this->getInt64Type());
 
   // Get pointer to specific index
-  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+  llvm::Value* val_ptr = BL.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(CT, env_idx));
 
   // Get value from source register
   if (inst.rn2 < 0) {
@@ -980,7 +984,7 @@ void codegen_t::emit_closure_set(const Instruction& inst) {
   llvm::Value* val = get_reg(inst.rn2);
 
   // Store the value
-  builder.CreateStore(val, val_ptr);
+  BL.CreateStore(val, val_ptr);
 
   // Write barrier
   emitWriteBarrier(val);
@@ -989,7 +993,7 @@ void codegen_t::emit_closure_set(const Instruction& inst) {
 // Load current closure object into register
 void codegen_t::emit_closure_self(const Instruction& inst) {
   if (!current_closure_self) {
-    fatal("%s:%u codegen: closure-self used outside of closure context", __FILE__, __LINE__);
+    fatal("%s:%u codegen: closure-self used outside of closure (CT)", __FILE__, __LINE__);
   }
   set_reg(inst.rn1, current_closure_self);
 }
@@ -997,7 +1001,7 @@ void codegen_t::emit_closure_self(const Instruction& inst) {
 // Load free variable (cell) from closure environment and unbox it
 void codegen_t::emit_closure_cell_ref(const Instruction& inst) {
   if (!current_closure_self) {
-    fatal("%s:%u codegen: closure-cell-ref used outside of closure context", __FILE__, __LINE__);
+    fatal("%s:%u codegen: closure-cell-ref used outside of closure (CT)", __FILE__, __LINE__);
   }
 
   int env_idx = (int)fixnum(inst.opr2);
@@ -1006,15 +1010,15 @@ void codegen_t::emit_closure_cell_ref(const Instruction& inst) {
   }
 
   // Get pointer to closure environment array
-  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
-  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(BL, CT, current_closure_self, this->getInt64Type());
+  llvm::Value* val_ptr = BL.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(CT, env_idx));
 
   // Load the cell object (which is a tagged pointer)
-  llvm::Value* cell_obj = builder.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
+  llvm::Value* cell_obj = BL.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
 
   // Get pointer to cell's value and load it
-  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
-  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
+  llvm::Value* value_ptr_typed = getCellValuePtr(BL, CT, cell_obj, this->getInt64Type());
+  llvm::Value* val = BL.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
 
   set_reg(inst.rn1, val);
 }
@@ -1022,7 +1026,7 @@ void codegen_t::emit_closure_cell_ref(const Instruction& inst) {
 // Load free variable (cell) from closure environment and update its value
 void codegen_t::emit_closure_cell_set(const Instruction& inst) {
   if (!current_closure_self) {
-    fatal("%s:%u codegen: closure-cell-set! used outside of closure context", __FILE__, __LINE__);
+    fatal("%s:%u codegen: closure-cell-set! used outside of closure (CT)", __FILE__, __LINE__);
   }
 
   int env_idx = (int)fixnum(inst.opr1);
@@ -1031,14 +1035,14 @@ void codegen_t::emit_closure_cell_set(const Instruction& inst) {
   }
 
   // Get pointer to closure environment array
-  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(builder, context, current_closure_self, this->getInt64Type());
-  llvm::Value* val_ptr = builder.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(context, env_idx));
+  llvm::Value* env_array_ptr = getClosureEnvArrayPtr(BL, CT, current_closure_self, this->getInt64Type());
+  llvm::Value* val_ptr = BL.CreateGEP(this->getInt64Type(), env_array_ptr, createInt32Constant(CT, env_idx));
 
   // Load the cell object
-  llvm::Value* cell_obj = builder.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
+  llvm::Value* cell_obj = BL.CreateLoad(this->getInt64Type(), val_ptr, "cell_obj");
 
   // Get pointer to cell's value
-  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+  llvm::Value* value_ptr_typed = getCellValuePtr(BL, CT, cell_obj, this->getInt64Type());
 
   // Get value from source register
   if (inst.rn2 < 0) {
@@ -1047,7 +1051,7 @@ void codegen_t::emit_closure_cell_set(const Instruction& inst) {
   llvm::Value* val = get_reg(inst.rn2);
 
   // Store the value
-  builder.CreateStore(val, value_ptr_typed);
+  BL.CreateStore(val, value_ptr_typed);
 
   // Write barrier on value being stored
   emitWriteBarrier(val);
@@ -1062,8 +1066,8 @@ void codegen_t::emit_reg_cell_ref(const Instruction& inst) {
   llvm::Value* cell_obj = get_reg(inst.rn2);
 
   // Get pointer to cell's value and load it
-  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
-  llvm::Value* val = builder.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
+  llvm::Value* value_ptr_typed = getCellValuePtr(BL, CT, cell_obj, this->getInt64Type());
+  llvm::Value* val = BL.CreateLoad(this->getInt64Type(), value_ptr_typed, "cell_val");
 
   set_reg(inst.rn1, val);
 }
@@ -1077,7 +1081,7 @@ void codegen_t::emit_reg_cell_set(const Instruction& inst) {
   llvm::Value* cell_obj = get_reg(inst.rn1);
 
   // Get pointer to cell's value
-  llvm::Value* value_ptr_typed = getCellValuePtr(builder, context, cell_obj, this->getInt64Type());
+  llvm::Value* value_ptr_typed = getCellValuePtr(BL, CT, cell_obj, this->getInt64Type());
 
   // Get value from source register
   if (inst.rn2 < 0) {
@@ -1086,7 +1090,7 @@ void codegen_t::emit_reg_cell_set(const Instruction& inst) {
   llvm::Value* val = get_reg(inst.rn2);
 
   // Store value
-  builder.CreateStore(val, value_ptr_typed);
+  BL.CreateStore(val, value_ptr_typed);
 
   // Write barrier on value being stored
   emitWriteBarrier(val);
@@ -1107,7 +1111,7 @@ void codegen_t::emit_make_cell(const Instruction& inst) {
   llvm::Value* val = get_reg(inst.rn1);
 
   // Call c_make_cell
-  llvm::Value* cell = builder.CreateCall(make_cell_func, {val}, "cell");
+  llvm::Value* cell = BL.CreateCall(make_cell_func, {val}, "cell");
 
   // Store result back to register
   set_reg(inst.rn1, cell);

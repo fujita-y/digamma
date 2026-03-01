@@ -29,6 +29,9 @@
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 #include "nanos_jit.h"
 
+#define BL (*builder_ptr)
+#define CT (*context_ptr)
+
 thread_local codegen_t* codegen_t::s_current;
 
 // Define compiled_code_t methods here
@@ -54,7 +57,8 @@ compiled_code_t& compiled_code_t::operator=(compiled_code_t&& other) {
 }
 
 codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit)
-    : ts_context(std::move(ts_ctx)), context(*ts_context.getContext()), jit(jit), builder(context) {
+    : ts_context(std::move(ts_ctx)), context_ptr(ts_context.getContext()), jit(jit) {
+  builder_ptr = std::make_unique<llvm::IRBuilder<>>(CT);
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
@@ -464,7 +468,7 @@ llvm::Value* codegen_t::get_reg(int idx) {
     fatal("%s:%u codegen: register index out of bounds: r%d (max: r%lu) in function %s", __FILE__, __LINE__, idx, allocas.size() - 1,
           current_function ? current_function->getName().str().c_str() : "unknown");
   }
-  return builder.CreateLoad(this->getInt64Type(), allocas[idx]);
+  return BL.CreateLoad(this->getInt64Type(), allocas[idx]);
 }
 
 void codegen_t::set_reg(int idx, llvm::Value* val) {
@@ -472,7 +476,7 @@ void codegen_t::set_reg(int idx, llvm::Value* val) {
     fatal("%s:%u codegen: register index out of bounds: r%d (max: r%lu) in function %s", __FILE__, __LINE__, idx, allocas.size() - 1,
           current_function ? current_function->getName().str().c_str() : "unknown");
   }
-  builder.CreateStore(val, allocas[idx]);
+  BL.CreateStore(val, allocas[idx]);
 }
 
 // Helper to get or create an external function declaration
@@ -494,19 +498,19 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
 
 // Helper to get code pointer from closure object
 llvm::Value* codegen_t::getClosureCodePtr(llvm::Value* closure_tagged) {
-  llvm::Value* closure_ptr = untagPointer(builder, context, closure_tagged);
-  llvm::Value* code_field_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_CODE_FIELD_OFFSET);
-  return builder.CreateLoad(this->getVoidPtrType(), code_field_ptr, "code_ptr");
+  llvm::Value* closure_ptr = untagPointer(BL, CT, closure_tagged);
+  llvm::Value* code_field_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_CODE_FIELD_OFFSET);
+  return BL.CreateLoad(this->getVoidPtrType(), code_field_ptr, "code_ptr");
 }
 
 // Helper to emit write barrier call
 void codegen_t::emitWriteBarrier(llvm::Value* value) {
   llvm::Type* intptrTy = this->getInt64Type();
-  llvm::Type* voidTy = llvm::Type::getVoidTy(context);
+  llvm::Type* voidTy = llvm::Type::getVoidTy((CT));
   std::vector<llvm::Type*> wbArgTypes = {intptrTy};
   llvm::FunctionType* wbFT = llvm::FunctionType::get(voidTy, wbArgTypes, false);
   llvm::Function* wb_func = get_or_create_external_function("c_write_barrier", wbFT, (void*)&c_write_barrier);
-  builder.CreateCall(wb_func, {value});
+  BL.CreateCall(wb_func, {value});
 }
 
 // Redefining helper to take count
@@ -522,7 +526,7 @@ void codegen_t::create_allocas(llvm::Function* f, int num_regs) {
       fatal("%s:%u codegen: failed to create alloca for register r%d", __FILE__, __LINE__, i);
     }
     // Initialize with 0
-    tmpBuilder.CreateStore(createInt64Constant(context, 0), allocas[i]);
+    tmpBuilder.CreateStore(createInt64Constant(CT, 0), allocas[i]);
   }
 }
 
@@ -530,8 +534,8 @@ void codegen_t::create_allocas(llvm::Function* f, int num_regs) {
 // This creates a Scheme list from extra arguments beyond the fixed parameters
 void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr) {
   // Calculate number of rest arguments: actual_argc - fixed_argc
-  llvm::Value* fixed_argc_val = createInt64Constant(context, fixed_argc);
-  llvm::Value* rest_count = builder.CreateSub(actual_argc, fixed_argc_val, "rest_count");
+  llvm::Value* fixed_argc_val = createInt64Constant(CT, fixed_argc);
+  llvm::Value* rest_count = BL.CreateSub(actual_argc, fixed_argc_val, "rest_count");
 
   // Get c_construct_rest_list helper function
   // This C function builds a Scheme list from an array of arguments
@@ -540,7 +544,7 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
   llvm::Type* int32Ty = this->getInt32Type();
 
   // Ensure count uses int32 for C call
-  llvm::Value* count_i32 = builder.CreateTrunc(rest_count, int32Ty);
+  llvm::Value* count_i32 = BL.CreateTrunc(rest_count, int32Ty);
 
   // Function type for helper: (i32, intptr_t*) -> intptr_t
   std::vector<llvm::Type*> helperArgTypes = {int32Ty, intptrPtrTy};
@@ -548,10 +552,10 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
   llvm::Function* helper_func = get_or_create_external_function("c_construct_rest_list", helperFT, (void*)&c_construct_rest_list);
 
   // Calculate pointer to argv[fixed_argc] (start of rest arguments)
-  llvm::Value* rest_argv_ptr = builder.CreateGEP(intptrTy, argv_ptr, fixed_argc_val, "rest_argv_ptr");
+  llvm::Value* rest_argv_ptr = BL.CreateGEP(intptrTy, argv_ptr, fixed_argc_val, "rest_argv_ptr");
 
   // Call helper to construct the rest list
-  llvm::Value* rest_list = builder.CreateCall(helper_func, {count_i32, rest_argv_ptr}, "rest_list");
+  llvm::Value* rest_list = BL.CreateCall(helper_func, {count_i32, rest_argv_ptr}, "rest_list");
 
   // Store rest list to register[fixed_argc]
   // In Scheme, if a function has signature (lambda (a b . rest) ...),
@@ -692,38 +696,62 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
     ofs << "\n";
   }
 }
-
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
-  phase0_create_module();
-  phase1_parse_instructions(inst_list);
-  analyze_closure_labels();
-  // Clear the file before dumping all functions
-  {
-    std::ofstream ofs("/tmp/nanous.ins", std::ios::trunc);
+  // Save old CT and BL, create new ones for thread-safe concurrent compilation!
+  auto old_context_ptr = this->context_ptr;
+  auto old_ts_context = this->ts_context;
+  auto old_builder = std::move(this->builder_ptr);
+
+  auto new_ctx = std::make_unique<llvm::LLVMContext>();
+  this->ts_context = llvm::orc::ThreadSafeContext(std::move(new_ctx));
+  this->context_ptr = this->ts_context.getContext();
+  this->builder_ptr = std::make_unique<llvm::IRBuilder<>>(CT);
+
+  try {
+    phase0_create_module();
+    phase1_parse_instructions(inst_list);
+    analyze_closure_labels();
+    // Clear the file before dumping all functions
+    {
+      std::ofstream ofs("/tmp/nanous.ins", std::ios::trunc);
+    }
+    for (const auto& func : functions) {
+      dump_instructions(func.instructions);
+    }
+    phase2_create_functions();
+    phase3_generate_code();
+    phase4_optimize_and_verify();
+    auto result = phase5_finalize();
+
+    this->ts_context = old_ts_context;
+    this->context_ptr = old_context_ptr;
+    this->builder_ptr = std::move(old_builder);
+
+    return result;
+  } catch (...) {
+    this->ts_context = old_ts_context;
+    this->context_ptr = old_context_ptr;
+    this->builder_ptr = std::move(old_builder);
+    throw;
   }
-  for (const auto& func : functions) {
-    dump_instructions(func.instructions);
-  }
-  phase2_create_functions();
-  phase3_generate_code();
-  phase4_optimize_and_verify();
-  return phase5_finalize();
 }
 
 void codegen_t::phase0_create_module() {
   // ===== Phase 0: Module Creation =====
   // Create a new LLVM module for this compilation unit
   std::string mod_name = "jit_module_main_" + std::to_string(std::rand());
-  this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, context);
+  this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, (CT));
   this->main_module = this->main_module_uptr.get();
   this->main_module->setDataLayout(jit->getDataLayout());
+  this->main_module->setTargetTriple(jit->getTargetTriple().getTriple());
   this->main_module->setPICLevel(llvm::PICLevel::BigPIC);
   this->main_module->setPIELevel(llvm::PIELevel::Large);
 
   std::string clo_mod_name = "jit_module_closures_" + std::to_string(std::rand());
-  this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, context);
+  this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, (CT));
   this->closure_module = this->closure_module_uptr.get();
   this->closure_module->setDataLayout(jit->getDataLayout());
+  this->closure_module->setTargetTriple(jit->getTargetTriple().getTriple());
   this->closure_module->setPICLevel(llvm::PICLevel::BigPIC);
   this->closure_module->setPIELevel(llvm::PIELevel::Large);
 }
@@ -756,7 +784,7 @@ void codegen_t::phase2_create_functions() {
     main_info.llvm_function = this->main_function;
 
     // Create generic entry block needed for allocas
-    llvm::BasicBlock::Create(context, "entry", this->main_function);
+    llvm::BasicBlock::Create(CT, "entry", this->main_function);
   }
 
   // 2. Create Closure Functions
@@ -788,7 +816,7 @@ void codegen_t::phase2_create_functions() {
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
 
-    llvm::BasicBlock::Create(context, "entry", closure_func);
+    llvm::BasicBlock::Create(CT, "entry", closure_func);
   }
 
   // 3. Create BasicBlocks for all labels within each function
@@ -799,7 +827,7 @@ void codegen_t::phase2_create_functions() {
         // Allocate a new BasicBlock for each label.
         // Closure entry labels are also valid jump targets.
         const char* label_str = (const char*)symbol_name(inst.opr1);
-        labels[inst.opr1] = llvm::BasicBlock::Create(context, label_str, llvm_func);
+        labels[inst.opr1] = llvm::BasicBlock::Create(CT, label_str, llvm_func);
       }
     }
   }
@@ -816,7 +844,7 @@ void codegen_t::phase3_generate_code() {
 
     // Set insert point to entry block
     llvm::BasicBlock& entry = current_function->getEntryBlock();
-    builder.SetInsertPoint(&entry);
+    BL.SetInsertPoint(&entry);
 
     // Create allocas for this function's register usage
     // max_reg is 0-indexed, so count is max_reg + 1. If max_reg is -1, count is 0.
@@ -838,8 +866,8 @@ void codegen_t::phase3_generate_code() {
 
         // Load fixed arguments from argv[] into registers
         for (int i = 0; i < info.argc; i++) {
-          llvm::Value* arg_ptr = builder.CreateGEP(this->getInt64Type(), argv_ptr, createInt64Constant(context, i));
-          llvm::Value* arg_val = builder.CreateLoad(this->getInt64Type(), arg_ptr);
+          llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_ptr, createInt64Constant(CT, i));
+          llvm::Value* arg_val = BL.CreateLoad(this->getInt64Type(), arg_ptr);
           set_reg(i, arg_val);
         }
 
@@ -950,6 +978,8 @@ compiled_code_t codegen_t::phase5_finalize() {
   this->main_module = nullptr;
   this->closure_module = nullptr;
   this->main_function = nullptr;
+  this->closure_module_uptr.reset();
+  this->main_module_uptr.reset();
 
   return compiled_code_t(sym->toPtr<intptr_t()>(), std::move(rt));
 }

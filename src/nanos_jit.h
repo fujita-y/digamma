@@ -40,6 +40,7 @@ class nanos_jit_t {
   static llvm::Expected<std::unique_ptr<nanos_jit_t>> Create();
 
   const llvm::DataLayout &getDataLayout() const { return DL; }
+  const llvm::Triple &getTargetTriple() const { return ES->getExecutorProcessControl().getTargetTriple(); }
   llvm::orc::JITDylib &getMainJITDylib() { return MainJD; }
   llvm::orc::ExecutionSession &getExecutionSession() { return *ES; }
   llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name) { return Mangle(Name); }
