@@ -428,6 +428,8 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   main_module_uptr = std::make_unique<llvm::Module>("bridge_module", context);
   main_module = main_module_uptr.get();
   main_module->setDataLayout(jit->getDataLayout());
+  main_module->setPICLevel(llvm::PICLevel::BigPIC);
+  main_module->setPIELevel(llvm::PIELevel::Large);
 
   (void)get_or_create_call_closure_bridge();
 

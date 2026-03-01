@@ -71,6 +71,7 @@ Expected<std::unique_ptr<nanos_jit_t>> nanos_jit_t::Create() {
   JITTargetMachineBuilder JTMB(ES->getExecutorProcessControl().getTargetTriple());
 
   JTMB.setCodeModel(llvm::CodeModel::Small);
+  JTMB.setRelocationModel(llvm::Reloc::PIC_);
   JTMB.setCodeGenOptLevel(llvm::CodeGenOptLevel::Default);
   JTMB.getOptions().GuaranteedTailCallOpt = true;
 

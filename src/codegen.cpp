@@ -716,10 +716,16 @@ void codegen_t::phase0_create_module() {
   std::string mod_name = "jit_module_main_" + std::to_string(std::rand());
   this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, context);
   this->main_module = this->main_module_uptr.get();
+  this->main_module->setDataLayout(jit->getDataLayout());
+  this->main_module->setPICLevel(llvm::PICLevel::BigPIC);
+  this->main_module->setPIELevel(llvm::PIELevel::Large);
 
   std::string clo_mod_name = "jit_module_closures_" + std::to_string(std::rand());
   this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, context);
   this->closure_module = this->closure_module_uptr.get();
+  this->closure_module->setDataLayout(jit->getDataLayout());
+  this->closure_module->setPICLevel(llvm::PICLevel::BigPIC);
+  this->closure_module->setPIELevel(llvm::PIELevel::Large);
 }
 
 void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
