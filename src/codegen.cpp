@@ -927,9 +927,6 @@ compiled_code_t codegen_t::phase5_finalize() {
   if (functions.size() > 1) {
     auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), ts_context);
 
-    // To workaround LLVM 19 issue
-    clo_tsm.withModuleDo([](llvm::Module& M) { M.setIsNewDbgInfoFormat(false); });
-
     if (auto err = jit->addIRModule(std::move(clo_tsm))) {
       fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
     }
@@ -938,9 +935,6 @@ compiled_code_t codegen_t::phase5_finalize() {
   // Create explicit tracker for main module
   auto rt = jit->getMainJITDylib().createResourceTracker();
   auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);
-
-  // To workaround LLVM 19 issue
-  main_tsm.withModuleDo([](llvm::Module& M) { M.setIsNewDbgInfoFormat(false); });
 
   if (auto err = jit->addIRModule(std::move(main_tsm), rt)) {
     fatal("%s:%u codegen: failed to add main module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());

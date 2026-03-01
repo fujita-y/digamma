@@ -23,7 +23,12 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
       Mangle(*this->ES, this->DL),
       ObjectLayer(std::make_unique<ObjectLinkingLayer>(*this->ES, this->ES->getExecutorProcessControl().getMemMgr())),
       CompileLayer(std::make_unique<IRCompileLayer>(*this->ES, *ObjectLayer, std::make_unique<ConcurrentIRCompiler>(std::move(JTMB)))),
-      CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *CompileLayer, this->EPCIU->getLazyCallThroughManager(),
+      TransformLayer(std::make_unique<IRTransformLayer>(*this->ES, *CompileLayer,
+                                                        [](ThreadSafeModule TSM, const MaterializationResponsibility &R) {
+                                                          TSM.withModuleDo([](Module &M) { M.setIsNewDbgInfoFormat(false); });
+                                                          return TSM;
+                                                        })),
+      CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *TransformLayer, this->EPCIU->getLazyCallThroughManager(),
                                                       [this]() { return this->EPCIU->createIndirectStubsManager(); })),
       MainJD(this->ES->createBareJITDylib("<main>")) {
   MainJD.addGenerator(cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(this->DL.getGlobalPrefix())));
@@ -39,6 +44,7 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
 
 nanos_jit_t::~nanos_jit_t() {
   CODLayer.reset();
+  TransformLayer.reset();
   CompileLayer.reset();
   ObjectLayer.reset();
   if (auto Err = EPCIU->cleanup()) {

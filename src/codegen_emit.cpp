@@ -436,9 +436,6 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   // Finalize the temporary module
   auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);
 
-  // To workaround LLVM 19 issue
-  tsm.withModuleDo([](llvm::Module& M) { M.setIsNewDbgInfoFormat(false); });
-
   if (auto err = jit->addIRModule(std::move(tsm))) {
     fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
   }

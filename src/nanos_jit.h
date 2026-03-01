@@ -11,6 +11,7 @@
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 #include <llvm/ExecutionEngine/Orc/ExecutorProcessControl.h>
 #include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
+#include <llvm/ExecutionEngine/Orc/IRTransformLayer.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
@@ -24,6 +25,7 @@ class nanos_jit_t {
 
   std::unique_ptr<llvm::orc::ObjectLinkingLayer> ObjectLayer;
   std::unique_ptr<llvm::orc::IRCompileLayer> CompileLayer;
+  std::unique_ptr<llvm::orc::IRTransformLayer> TransformLayer;
   std::unique_ptr<llvm::orc::CompileOnDemandLayer> CODLayer;
 
   llvm::orc::JITDylib &MainJD;
