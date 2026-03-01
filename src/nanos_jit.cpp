@@ -6,7 +6,7 @@
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/Support/Error.h>
 
-#define USE_WHOLE_MODULE_PARTITION_FUNCTION 0
+#define USE_WHOLE_MODULE_PARTITION_FUNCTION 1
 
 using namespace llvm;
 using namespace llvm::orc;

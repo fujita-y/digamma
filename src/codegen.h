@@ -243,6 +243,8 @@ class codegen_t {
   void phase4_optimize_and_verify();
   compiled_code_t phase5_finalize();
 
+  std::string generate_unique_suffix();
+
  public:
   codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit);
 

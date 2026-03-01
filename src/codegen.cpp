@@ -27,6 +27,7 @@
 #include <llvm/Transforms/Scalar/SROA.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
+#include <random>
 #include "nanos_jit.h"
 
 #define BL (*builder_ptr)
@@ -67,6 +68,17 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit)
   object_heap_t::current()->add_root(cached_symbol_safepoint);
   init_opcode_map();
   s_current = this;
+}
+
+std::string codegen_t::generate_unique_suffix() {
+  static int counter = 0;
+  static std::mt19937 gen(std::random_device{}());
+  static std::uniform_int_distribution<uint32_t> distrib(0, UINT32_MAX);
+  uint32_t val = distrib(gen);
+  counter++;
+  std::stringstream ss;
+  ss << std::hex << std::setw(8) << std::setfill('0') << val << "_" << counter << "_" << std::this_thread::get_id();
+  return ss.str();
 }
 
 // Helper to finish collecting closure literals
@@ -739,7 +751,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 void codegen_t::phase0_create_module() {
   // ===== Phase 0: Module Creation =====
   // Create a new LLVM module for this compilation unit
-  std::string mod_name = "jit_module_main_" + std::to_string(std::rand());
+  std::string mod_name = "jit_module_main_" + generate_unique_suffix();
   this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, (CT));
   this->main_module = this->main_module_uptr.get();
   this->main_module->setDataLayout(jit->getDataLayout());
@@ -747,7 +759,7 @@ void codegen_t::phase0_create_module() {
   this->main_module->setPICLevel(llvm::PICLevel::BigPIC);
   this->main_module->setPIELevel(llvm::PIELevel::Large);
 
-  std::string clo_mod_name = "jit_module_closures_" + std::to_string(std::rand());
+  std::string clo_mod_name = "jit_module_closures_" + generate_unique_suffix();
   this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, (CT));
   this->closure_module = this->closure_module_uptr.get();
   this->closure_module->setDataLayout(jit->getDataLayout());
@@ -775,7 +787,7 @@ void codegen_t::phase2_create_functions() {
   {
     FunctionInfo& main_info = functions[0];
     llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), false);
-    std::string func_name = "scheme_func_" + std::to_string(std::rand());
+    std::string func_name = "scm_fn_" + generate_unique_suffix();
     this->main_function = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, func_name, main_module);
     this->main_function->setDSOLocal(true);
     if (!this->main_function) {
@@ -792,7 +804,7 @@ void codegen_t::phase2_create_functions() {
     FunctionInfo& info = functions[i];
     if (info.label == scm_nil) continue;
 
-    std::string func_name = std::string((const char*)symbol_name(info.label)) + "_" + std::to_string(std::rand());
+    std::string func_name = std::string((const char*)symbol_name(info.label)) + "_" + generate_unique_suffix();
 
     std::vector<llvm::Type*> paramTypes;
     paramTypes.push_back(this->getInt64Type());  // self
