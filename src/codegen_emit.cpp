@@ -438,7 +438,7 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   (void)get_or_create_call_closure_bridge();
 
   // Finalize the temporary module
-  auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);
+  auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);  // [TODO] use cloneTSM
 
   if (auto err = jit->addIRModule(std::move(tsm))) {
     fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());

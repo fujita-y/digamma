@@ -10,6 +10,17 @@
 
 static thread_local bool* s_stop_the_world = nullptr;
 
+static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
+
+bool is_side_effect_free_aux_helper(const char* name) {
+  // return true if function no need to call if returned value is not used
+  if (starts_with(name, "c_make_closure")) return true;
+  if (starts_with(name, "c_make_cons")) return true;
+  if (starts_with(name, "c_construct_rest_list")) return true;
+  if (starts_with(name, "c_test_application")) return true;
+  return false;
+}
+
 extern "C" void c_safepoint(void) {
   if (s_stop_the_world != nullptr) [[likely]] {
     if (*s_stop_the_world) [[unlikely]] {

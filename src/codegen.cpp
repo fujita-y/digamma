@@ -70,6 +70,22 @@ codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit)
   s_current = this;
 }
 
+void codegen_t::add_side_effect_free_attributes(llvm::Function* func) {
+  auto& ctx = func->getContext();
+  func->addFnAttr(llvm::Attribute::getWithMemoryEffects(ctx, llvm::MemoryEffects::readOnly()));
+  func->addFnAttr(llvm::Attribute::WillReturn);
+  func->addFnAttr(llvm::Attribute::NoUnwind);
+  func->addFnAttr(llvm::Attribute::MustProgress);
+  func->addFnAttr(llvm::Attribute::NoFree);
+  func->addFnAttr(llvm::Attribute::NoSync);
+}
+
+void codegen_t::add_common_closure_attributes(llvm::Function* func) {
+  func->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  func->setCallingConv(CLOSURE_CALLING_CONV);
+  func->setDSOLocal(true);
+}
+
 std::string codegen_t::generate_unique_suffix() {
   static int counter = 0;
   static std::mt19937 gen(std::random_device{}());
@@ -497,6 +513,7 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
   if (!func) {
     func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, main_module);
     func->setDSOLocal(true);
+    if (is_side_effect_free_aux_helper(name)) add_side_effect_free_attributes(func);
     // Register the symbol with the JIT's main dylib via absoluteSymbols
     llvm::orc::SymbolMap symbols;
     symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
@@ -696,7 +713,7 @@ void codegen_t::analyze_closure_labels() {
 }
 
 void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) {
-  std::ofstream ofs("/tmp/nanous.ins", std::ios::app);
+  std::ofstream ofs("/tmp/nanos.ins", std::ios::app);
   if (!ofs.is_open()) return;
   printer_t printer(ofs);
   for (const auto& inst : instructions) {
@@ -725,7 +742,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     analyze_closure_labels();
     // Clear the file before dumping all functions
     {
-      std::ofstream ofs("/tmp/nanous.ins", std::ios::trunc);
+      std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
     }
     for (const auto& func : functions) {
       dump_instructions(func.instructions);
@@ -822,8 +839,7 @@ void codegen_t::phase2_create_functions() {
 
     llvm::FunctionType* closureFuncType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
     llvm::Function* closure_func = llvm::Function::Create(closureFuncType, llvm::Function::ExternalLinkage, func_name, closure_module);
-    closure_func->setCallingConv(CLOSURE_CALLING_CONV);
-    closure_func->setDSOLocal(true);
+    add_common_closure_attributes(closure_func);
 
     info.llvm_function = closure_func;
     function_map[info.label] = closure_func;
@@ -965,7 +981,7 @@ compiled_code_t codegen_t::phase5_finalize() {
 
   // Add closures module if exists
   if (functions.size() > 1) {
-    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), ts_context);
+    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), ts_context);  // [TODO] use cloneTSM
 
     if (auto err = jit->addIRModule(std::move(clo_tsm))) {
       fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
@@ -974,7 +990,7 @@ compiled_code_t codegen_t::phase5_finalize() {
 
   // Create explicit tracker for main module
   auto rt = jit->getMainJITDylib().createResourceTracker();
-  auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);
+  auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);  // [TODO] use cloneTSM
 
   if (auto err = jit->addIRModule(std::move(main_tsm), rt)) {
     fatal("%s:%u codegen: failed to add main module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());

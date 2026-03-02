@@ -146,6 +146,12 @@ class codegen_t {
   // Helper to finish collecting literals for a closure
   void finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
 
+  // Helper to add side effect free attributes to a function
+  void add_side_effect_free_attributes(llvm::Function* func);
+
+  // Helper to add common closure attributes to a function
+  void add_common_closure_attributes(llvm::Function* func);
+
   // Helper to get or create an external function declaration in the current module
   llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
 

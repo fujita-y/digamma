@@ -20,4 +20,6 @@ extern "C" void c_safepoint(void);
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc);
 extern "C" void c_test_application(scm_obj_t proc, int argc);
 
+bool is_side_effect_free_aux_helper(const char* name);
+
 #endif  // CODEGEN_AUX_H_INCLUDED

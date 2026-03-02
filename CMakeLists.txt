@@ -10,6 +10,13 @@ project(Nanos)
 # Configuration
 # ==============================================================================
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
+
 # --- LLVM ---
 execute_process(
   COMMAND llvm-config --cmakedir
@@ -154,13 +161,13 @@ set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context -pthread -ldl)
 # ==============================================================================
 
 # --- Core Library ---
-# Static library for core sources shared across all executables
-add_library(nanos_core STATIC ${NANOS_CORE_SOURCES})
+# Object library for core sources shared across all executables
+add_library(nanos_core OBJECT ${NANOS_CORE_SOURCES})
 target_link_libraries(nanos_core PUBLIC nanos_config)
 
 # --- I/O Library ---
-# Static library for reader/printer sources used by multiple targets
-add_library(nanos_io STATIC src/reader.cpp src/printer.cpp)
+# Object library for reader/printer sources used by multiple targets
+add_library(nanos_io OBJECT src/reader.cpp src/printer.cpp)
 target_link_libraries(nanos_io PUBLIC nanos_config)
 
 # --- Main Executable ---
@@ -213,3 +220,4 @@ add_nanos_test(test_equiv tests/test_equiv.cpp)
 add_nanos_test(test_call_ec tests/test_call_ec.cpp)
 add_nanos_test(test_call_cc tests/test_call_cc.cpp)
 add_nanos_test(test_dynamic_wind tests/test_dynamic_wind.cpp)
+add_nanos_test(test_subr tests/test_subr.cpp)

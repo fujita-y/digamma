@@ -47,10 +47,10 @@ constexpr uintptr_t tc6_hashtable = 5;
 constexpr uintptr_t tc6_closure = 6;
 constexpr uintptr_t tc6_environment = 7;
 constexpr uintptr_t tc6_cell = 8;
-constexpr uintptr_t tc6_subr = 9;
-constexpr uintptr_t tc6_escape = 10;
-constexpr uintptr_t tc6_continuation = 11;
+constexpr uintptr_t tc6_escape = 9;
+constexpr uintptr_t tc6_continuation = 10;
 /*
+constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_continuation = ;
 constexpr uintptr_t tc6_bignum = ;
 constexpr uintptr_t tc6_subr = ;
@@ -211,7 +211,6 @@ inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
 inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
 inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
 inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
-inline bool is_subr(scm_obj_t x) { return is_tc6(x, tc6_subr); }
 inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
 inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
 
@@ -224,6 +223,7 @@ scm_obj_t make_list(int len, ...);
 scm_obj_t make_list2(scm_obj_t first, scm_obj_t second);
 scm_obj_t make_flonum(double d);
 scm_obj_t make_symbol(const char* name);
+scm_obj_t make_uninterned_symbol(const char* name);
 scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_u8vector(int nsize);

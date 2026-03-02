@@ -88,6 +88,18 @@ scm_obj_t make_symbol(const char* name) {
   return obj;
 }
 
+scm_obj_t make_uninterned_symbol(const char* name) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_symbol_rec_t* rec = (scm_symbol_rec_t*)heap.alloc_symbol();
+  int n = strlen(name) + 1;
+  uint8_t* datum = (uint8_t*)heap.alloc_private(n);
+  memcpy(datum, name, n);
+  rec->tag = tc6_tag(tc6_symbol);
+  rec->name = datum;
+  scm_obj_t obj = tc6_pointer(rec, tc6_symbol);
+  return obj;
+}
+
 uint8_t* symbol_name(scm_obj_t x) {
   if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
   return ((scm_symbol_rec_t*)to_address(x))->name;

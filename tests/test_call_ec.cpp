@@ -99,23 +99,25 @@ int main(int argc, char** argv) {
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
+  {
+    auto jit_expected = nanos_jit_t::Create();
+    if (!jit_expected) {
+      fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
+      exit(1);
+    }
+    auto jit = std::move(*jit_expected);
 
-  auto jit_expected = nanos_jit_t::Create();
-  if (!jit_expected) {
-    fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
-    exit(1);
+    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+
+    codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+
+    scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
+    c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
+
+    test_return_normally();
+    test_invoke_continuation();
+    test_double_invoke_fails();
   }
-  auto jit = std::move(*jit_expected);
-
-  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
-
-  scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
-  c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
-
-  test_return_normally();
-  test_invoke_continuation();
-  test_double_invoke_fails();
 
   heap.destroy();
 

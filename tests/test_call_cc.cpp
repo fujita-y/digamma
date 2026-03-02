@@ -110,15 +110,17 @@ int main(int argc, char** argv) {
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
-  auto jit_expected = nanos_jit_t::Create();
-  if (!jit_expected) exit(1);
-  auto jit = std::move(*jit_expected);
-  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+  {
+    auto jit_expected = nanos_jit_t::Create();
+    if (!jit_expected) exit(1);
+    auto jit = std::move(*jit_expected);
+    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+    codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
 
-  test_return_normally();
-  test_invoke_continuation();
-  test_multishot();
+    test_return_normally();
+    test_invoke_continuation();
+    test_multishot();
+  }
 
   heap.destroy();
   puts("all test done");

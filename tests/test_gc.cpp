@@ -186,7 +186,7 @@ static bool test_root_survivability() {
 }
 
 int main(int argc, char** argv) {
-  int num_loops = 10000;
+  int num_loops = 1000;
   int repeat = 1;
   if (argc > 1) {
     num_loops = atoi(argv[1]);

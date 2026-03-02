@@ -1,0 +1,972 @@
+// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
+
+// Direct tests for predicate subrs in nanos_subr.cpp.
+// Each test calls the subr C function directly and checks the result
+// against the R6RS specification.
+
+#include "core.h"
+#include "object.h"
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <initializer_list>
+#include <vector>
+#include "nanos_context.h"
+#include "object_heap.h"
+
+// ---------------------------------------------------------------------------
+// Subr declarations (extern "C" via SUBR macro)
+// ---------------------------------------------------------------------------
+
+SUBR subr_boolean_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_eqv_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_equal_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_exact_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_inexact_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_infinite_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_integer_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_list_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_null_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_number_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_nan_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_real_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_not(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+
+// New subrs (vectors, strings, chars, arithmetic)
+SUBR subr_vector(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_vector_length(scm_obj_t self, scm_obj_t a1);
+SUBR subr_vector_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_length(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_string_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+SUBR subr_symbol_to_string(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_to_symbol(scm_obj_t self, scm_obj_t a1);
+SUBR subr_number_to_string(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_caar(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cadar(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cddr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_set_car_bang(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_length(scm_obj_t self, scm_obj_t a1);
+SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1);
+SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
+
+// ---------------------------------------------------------------------------
+// Required stubs
+// ---------------------------------------------------------------------------
+
+void fatal(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+void warning(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+}
+
+void trace(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+}
+
+// ---------------------------------------------------------------------------
+// Test infrastructure
+// ---------------------------------------------------------------------------
+
+static bool some_test_failed = false;
+
+#define ASSERT_TRUE(expr)                         \
+  do {                                            \
+    if (!(expr)) {                                \
+      printf("\033[31mFAIL: %s\033[0m\n", #expr); \
+      some_test_failed = true;                    \
+    } else {                                      \
+      printf("\033[32mPASS: %s\033[0m\n", #expr); \
+    }                                             \
+  } while (0)
+
+#define ASSERT_FALSE(expr)                           \
+  do {                                               \
+    if ((expr)) {                                    \
+      printf("\033[31mFAIL: !(%s)\033[0m\n", #expr); \
+      some_test_failed = true;                       \
+    } else {                                         \
+      printf("\033[32mPASS: !(%s)\033[0m\n", #expr); \
+    }                                                \
+  } while (0)
+
+// Convenience: call a 1-arg predicate and check it returns scm_true
+#define PRED_TRUE(fn, arg)    ASSERT_TRUE(fn(scm_nil, arg) == scm_true)
+#define PRED_FALSE(fn, arg)   ASSERT_TRUE(fn(scm_nil, arg) == scm_false)
+
+// Call a 2-arg predicate
+#define PRED2_TRUE(fn, a, b)  ASSERT_TRUE(fn(scm_nil, a, b) == scm_true)
+#define PRED2_FALSE(fn, a, b) ASSERT_TRUE(fn(scm_nil, a, b) == scm_false)
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Dummy closure used for procedure? tests
+static scm_obj_t dummy_closure() { return make_closure(nullptr, 0, 0, 0, nullptr, scm_nil, 0); }
+
+// Build a proper list (1 2 3)
+static scm_obj_t make_proper_list_123() {
+  scm_obj_t lst = scm_nil;
+  lst = make_cons(make_fixnum(3), lst);
+  lst = make_cons(make_fixnum(2), lst);
+  lst = make_cons(make_fixnum(1), lst);
+  return lst;
+}
+
+// Build an improper list (1 2 . 3)
+static scm_obj_t make_improper_list() {
+  scm_obj_t tail = make_cons(make_fixnum(2), make_fixnum(3));  // (2 . 3)
+  return make_cons(make_fixnum(1), tail);                      // (1 2 . 3)
+}
+
+static scm_obj_t make_alist() {
+  return make_cons(make_cons(make_symbol("a"), make_fixnum(1)),
+                   make_cons(make_cons(make_symbol("b"), make_fixnum(2)), make_cons(make_cons(make_string("c"), make_fixnum(3)), scm_nil)));
+}
+
+// Build a circular list: (1 2 3 1 2 3 ...)
+static scm_obj_t make_circular_list() {
+  scm_obj_t p1 = make_cons(make_fixnum(1), scm_nil);
+  scm_obj_t p2 = make_cons(make_fixnum(2), scm_nil);
+  scm_obj_t p3 = make_cons(make_fixnum(3), scm_nil);
+  CDR(p1) = p2;
+  CDR(p2) = p3;
+  CDR(p3) = p1;  // cycle
+  return p1;
+}
+
+// ---------------------------------------------------------------------------
+// boolean?  — R6RS §9.10
+// ---------------------------------------------------------------------------
+
+void test_boolean_p() {
+  printf("--- boolean? ---\n");
+  // #t and #f are the only booleans
+  PRED_TRUE(subr_boolean_p, scm_true);
+  PRED_TRUE(subr_boolean_p, scm_false);
+  // Everything else is not a boolean
+  PRED_FALSE(subr_boolean_p, make_fixnum(0));
+  PRED_FALSE(subr_boolean_p, scm_nil);
+  PRED_FALSE(subr_boolean_p, scm_undef);
+  PRED_FALSE(subr_boolean_p, make_char('a'));
+  PRED_FALSE(subr_boolean_p, make_symbol("foo"));
+  PRED_FALSE(subr_boolean_p, make_string("foo"));
+}
+
+// ---------------------------------------------------------------------------
+// char?  — R6RS §9.13
+// ---------------------------------------------------------------------------
+
+void test_char_p() {
+  printf("--- char? ---\n");
+  PRED_TRUE(subr_char_p, make_char('a'));
+  PRED_TRUE(subr_char_p, make_char('Z'));
+  PRED_TRUE(subr_char_p, make_char(0));        // NUL
+  PRED_TRUE(subr_char_p, make_char(0x1F600));  // emoji (U+1F600)
+  PRED_FALSE(subr_char_p, scm_true);
+  PRED_FALSE(subr_char_p, make_fixnum(65));  // integer 65, not #\A
+  PRED_FALSE(subr_char_p, scm_nil);
+  PRED_FALSE(subr_char_p, make_string("a"));
+}
+
+// ---------------------------------------------------------------------------
+// eq?  — R6RS §9.6
+// ---------------------------------------------------------------------------
+
+void test_eq_p() {
+  printf("--- eq? ---\n");
+  // Booleans: same singleton
+  PRED2_TRUE(subr_eq_p, scm_true, scm_true);
+  PRED2_TRUE(subr_eq_p, scm_false, scm_false);
+  PRED2_FALSE(subr_eq_p, scm_true, scm_false);
+  // Fixnums with same value are eq?
+  PRED2_TRUE(subr_eq_p, make_fixnum(42), make_fixnum(42));
+  PRED2_FALSE(subr_eq_p, make_fixnum(42), make_fixnum(43));
+  // Symbols with the same name are eq? (interned)
+  scm_obj_t sym1 = make_symbol("foo");
+  scm_obj_t sym2 = make_symbol("foo");
+  PRED2_TRUE(subr_eq_p, sym1, sym2);
+  // nil is eq? to itself
+  PRED2_TRUE(subr_eq_p, scm_nil, scm_nil);
+  // Different singletons
+  PRED2_FALSE(subr_eq_p, scm_nil, scm_undef);
+  // Chars with same codepoint are eq? (immediate value)
+  PRED2_TRUE(subr_eq_p, make_char('x'), make_char('x'));
+  PRED2_FALSE(subr_eq_p, make_char('x'), make_char('y'));
+  // Two separately allocated strings are not eq? even if equal content
+  scm_obj_t s1 = make_string("hello");
+  scm_obj_t s2 = make_string("hello");
+  PRED2_FALSE(subr_eq_p, s1, s2);
+  // But the same object is eq? to itself
+  PRED2_TRUE(subr_eq_p, s1, s1);
+}
+
+// ---------------------------------------------------------------------------
+// eqv?  — R6RS §9.6
+// ---------------------------------------------------------------------------
+
+void test_eqv_p() {
+  printf("--- eqv? ---\n");
+  // Same fixnums
+  PRED2_TRUE(subr_eqv_p, make_fixnum(0), make_fixnum(0));
+  PRED2_FALSE(subr_eqv_p, make_fixnum(1), make_fixnum(2));
+  // Booleans
+  PRED2_TRUE(subr_eqv_p, scm_true, scm_true);
+  PRED2_FALSE(subr_eqv_p, scm_true, scm_false);
+  // nil
+  PRED2_TRUE(subr_eqv_p, scm_nil, scm_nil);
+  // Flonums: eqv? compares by value
+  PRED2_TRUE(subr_eqv_p, make_flonum(1.5), make_flonum(1.5));
+  PRED2_FALSE(subr_eqv_p, make_flonum(1.5), make_flonum(2.0));
+  // exact/inexact distinction: fixnum vs flonum
+  PRED2_FALSE(subr_eqv_p, make_fixnum(1), make_flonum(1.0));
+  // Symbols (interned)
+  PRED2_TRUE(subr_eqv_p, make_symbol("bar"), make_symbol("bar"));
+}
+
+// ---------------------------------------------------------------------------
+// equal?  — R6RS §9.6
+// ---------------------------------------------------------------------------
+
+void test_equal_p() {
+  printf("--- equal? ---\n");
+  // Fixnums
+  PRED2_TRUE(subr_equal_p, make_fixnum(99), make_fixnum(99));
+  PRED2_FALSE(subr_equal_p, make_fixnum(99), make_fixnum(100));
+  // Strings: equal? compares by content
+  PRED2_TRUE(subr_equal_p, make_string("abc"), make_string("abc"));
+  PRED2_FALSE(subr_equal_p, make_string("abc"), make_string("xyz"));
+  // Lists (structural equality)
+  scm_obj_t l1 = make_proper_list_123();
+  scm_obj_t l2 = make_proper_list_123();
+  PRED2_TRUE(subr_equal_p, l1, l2);
+  scm_obj_t l3 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), make_cons(make_fixnum(9), scm_nil)));
+  PRED2_FALSE(subr_equal_p, l1, l3);
+  // Vectors
+  scm_obj_t v1 = make_vector(3, make_fixnum(0));
+  scm_obj_t v2 = make_vector(3, make_fixnum(0));
+  PRED2_TRUE(subr_equal_p, v1, v2);
+  scm_obj_t* elts = vector_elts(v2);
+  elts[1] = make_fixnum(7);
+  PRED2_FALSE(subr_equal_p, v1, v2);
+  // Booleans
+  PRED2_TRUE(subr_equal_p, scm_false, scm_false);
+  PRED2_FALSE(subr_equal_p, scm_true, scm_false);
+}
+
+// ---------------------------------------------------------------------------
+// exact?  — R6RS §9.9.4.1
+// ---------------------------------------------------------------------------
+
+void test_exact_p() {
+  printf("--- exact? ---\n");
+  // Fixnums are exact
+  PRED_TRUE(subr_exact_p, make_fixnum(0));
+  PRED_TRUE(subr_exact_p, make_fixnum(-1));
+  PRED_TRUE(subr_exact_p, make_fixnum(1000000));
+  // Flonums are inexact
+  PRED_FALSE(subr_exact_p, make_flonum(1.0));
+  PRED_FALSE(subr_exact_p, make_flonum(0.5));
+  PRED_FALSE(subr_exact_p, make_flonum(-3.14));
+}
+
+// ---------------------------------------------------------------------------
+// inexact?  — R6RS §9.9.4.1
+// ---------------------------------------------------------------------------
+
+void test_inexact_p() {
+  printf("--- inexact? ---\n");
+  // Flonums are inexact
+  PRED_TRUE(subr_inexact_p, make_flonum(0.0));
+  PRED_TRUE(subr_inexact_p, make_flonum(1.5));
+  PRED_TRUE(subr_inexact_p, make_flonum(-999.9));
+  // Fixnums are exact (not inexact)
+  PRED_FALSE(subr_inexact_p, make_fixnum(0));
+  PRED_FALSE(subr_inexact_p, make_fixnum(42));
+}
+
+// ---------------------------------------------------------------------------
+// infinite?  — R6RS §9.9.4.5
+// ---------------------------------------------------------------------------
+
+void test_infinite_p() {
+  printf("--- infinite? ---\n");
+  // +inf.0 and -inf.0
+  PRED_TRUE(subr_infinite_p, make_flonum(1.0 / 0.0));   // +inf
+  PRED_TRUE(subr_infinite_p, make_flonum(-1.0 / 0.0));  // -inf
+  // Finite flonum
+  PRED_FALSE(subr_infinite_p, make_flonum(1.5));
+  PRED_FALSE(subr_infinite_p, make_flonum(0.0));
+  // NaN is not infinite
+  PRED_FALSE(subr_infinite_p, make_flonum(0.0 / 0.0));
+  // Exact integers are not infinite
+  PRED_FALSE(subr_infinite_p, make_fixnum(0));
+  PRED_FALSE(subr_infinite_p, make_fixnum(99999));
+}
+
+// ---------------------------------------------------------------------------
+// integer?  — R6RS §9.9.4.1
+// ---------------------------------------------------------------------------
+
+void test_integer_p() {
+  printf("--- integer? ---\n");
+  // Fixnums are integers
+  PRED_TRUE(subr_integer_p, make_fixnum(0));
+  PRED_TRUE(subr_integer_p, make_fixnum(-42));
+  PRED_TRUE(subr_integer_p, make_fixnum(1000));
+  // Flonums that are whole numbers
+  PRED_TRUE(subr_integer_p, make_flonum(1.0));
+  PRED_TRUE(subr_integer_p, make_flonum(-3.0));
+  PRED_TRUE(subr_integer_p, make_flonum(0.0));
+  // Fractional flonum
+  PRED_FALSE(subr_integer_p, make_flonum(1.5));
+  PRED_FALSE(subr_integer_p, make_flonum(-0.1));
+  // +inf.0 and nan are not integers
+  PRED_FALSE(subr_integer_p, make_flonum(1.0 / 0.0));
+  PRED_FALSE(subr_integer_p, make_flonum(0.0 / 0.0));
+  // Non-numbers
+  PRED_FALSE(subr_integer_p, scm_true);
+  PRED_FALSE(subr_integer_p, make_string("1"));
+}
+
+// ---------------------------------------------------------------------------
+// list?  — R6RS §9.12
+// ---------------------------------------------------------------------------
+
+void test_list_p() {
+  printf("--- list? ---\n");
+  // The empty list is a list
+  PRED_TRUE(subr_list_p, scm_nil);
+  // A proper list
+  PRED_TRUE(subr_list_p, make_proper_list_123());
+  // A one-element proper list
+  PRED_TRUE(subr_list_p, make_cons(make_fixnum(1), scm_nil));
+  // Improper list (1 2 . 3) is not a list
+  PRED_FALSE(subr_list_p, make_improper_list());
+  // A bare pair (dotted pair) is not a list
+  PRED_FALSE(subr_list_p, make_cons(make_fixnum(1), make_fixnum(2)));
+  // Circular list is not a list
+  scm_obj_t circ = make_circular_list();
+  PRED_FALSE(subr_list_p, circ);
+  // Non-pairs are not lists (except '())
+  PRED_FALSE(subr_list_p, make_fixnum(0));
+  PRED_FALSE(subr_list_p, scm_true);
+  PRED_FALSE(subr_list_p, make_string("x"));
+}
+
+// ---------------------------------------------------------------------------
+// null?  — R6RS §9.12
+// ---------------------------------------------------------------------------
+
+void test_null_p() {
+  printf("--- null? ---\n");
+  PRED_TRUE(subr_null_p, scm_nil);
+  PRED_FALSE(subr_null_p, scm_false);
+  PRED_FALSE(subr_null_p, scm_true);
+  PRED_FALSE(subr_null_p, make_fixnum(0));
+  PRED_FALSE(subr_null_p, make_cons(scm_nil, scm_nil));
+  PRED_FALSE(subr_null_p, scm_undef);
+}
+
+// ---------------------------------------------------------------------------
+// number?  — R6RS §9.9.4.1
+// ---------------------------------------------------------------------------
+
+void test_number_p() {
+  printf("--- number? ---\n");
+  PRED_TRUE(subr_number_p, make_fixnum(0));
+  PRED_TRUE(subr_number_p, make_fixnum(-1));
+  PRED_TRUE(subr_number_p, make_flonum(3.14));
+  PRED_TRUE(subr_number_p, make_flonum(0.0));
+  PRED_TRUE(subr_number_p, make_flonum(1.0 / 0.0));  // +inf is a number
+  PRED_TRUE(subr_number_p, make_flonum(0.0 / 0.0));  // nan is a number
+  PRED_FALSE(subr_number_p, scm_true);
+  PRED_FALSE(subr_number_p, scm_false);
+  PRED_FALSE(subr_number_p, make_char('0'));
+  PRED_FALSE(subr_number_p, make_string("42"));
+  PRED_FALSE(subr_number_p, scm_nil);
+}
+
+// ---------------------------------------------------------------------------
+// nan?  — R6RS §9.9.4.5
+// ---------------------------------------------------------------------------
+
+void test_nan_p() {
+  printf("--- nan? ---\n");
+  PRED_TRUE(subr_nan_p, make_flonum(0.0 / 0.0));  // +nan.0
+  PRED_FALSE(subr_nan_p, make_flonum(1.5));
+  PRED_FALSE(subr_nan_p, make_flonum(1.0 / 0.0));  // +inf is not nan
+  PRED_FALSE(subr_nan_p, make_flonum(0.0));
+  // Exact integers are not nan
+  PRED_FALSE(subr_nan_p, make_fixnum(0));
+  PRED_FALSE(subr_nan_p, make_fixnum(42));
+}
+
+// ---------------------------------------------------------------------------
+// pair?  — R6RS §9.12
+// ---------------------------------------------------------------------------
+
+void test_pair_p() {
+  printf("--- pair? ---\n");
+  PRED_TRUE(subr_pair_p, make_cons(make_fixnum(1), make_fixnum(2)));
+  PRED_TRUE(subr_pair_p, make_cons(scm_nil, scm_nil));
+  PRED_TRUE(subr_pair_p, make_proper_list_123());  // a list head is a pair
+  // '() is not a pair
+  PRED_FALSE(subr_pair_p, scm_nil);
+  PRED_FALSE(subr_pair_p, scm_true);
+  PRED_FALSE(subr_pair_p, make_fixnum(0));
+  PRED_FALSE(subr_pair_p, make_string("foo"));
+  PRED_FALSE(subr_pair_p, make_vector(3, scm_nil));
+}
+
+// ---------------------------------------------------------------------------
+// procedure?  — R6RS §9.7
+// ---------------------------------------------------------------------------
+
+void test_procedure_p() {
+  printf("--- procedure? ---\n");
+  // A closure is a procedure
+  scm_obj_t cl = dummy_closure();
+  PRED_TRUE(subr_procedure_p, cl);
+  // Non-procedures
+  PRED_FALSE(subr_procedure_p, make_fixnum(0));
+  PRED_FALSE(subr_procedure_p, scm_true);
+  PRED_FALSE(subr_procedure_p, scm_nil);
+  PRED_FALSE(subr_procedure_p, make_string("lambda"));
+  PRED_FALSE(subr_procedure_p, make_vector(1, scm_nil));
+  PRED_FALSE(subr_procedure_p, make_symbol("+"));
+}
+
+// ---------------------------------------------------------------------------
+// real?  — R6RS §9.9.4.1
+// ---------------------------------------------------------------------------
+
+void test_real_p() {
+  printf("--- real? ---\n");
+  PRED_TRUE(subr_real_p, make_fixnum(0));
+  PRED_TRUE(subr_real_p, make_fixnum(-100));
+  PRED_TRUE(subr_real_p, make_flonum(3.14));
+  PRED_TRUE(subr_real_p, make_flonum(0.0));
+  PRED_TRUE(subr_real_p, make_flonum(1.0 / 0.0));
+  PRED_TRUE(subr_real_p, make_flonum(0.0 / 0.0));
+  PRED_FALSE(subr_real_p, scm_true);
+  PRED_FALSE(subr_real_p, make_char('1'));
+  PRED_FALSE(subr_real_p, make_string("3.14"));
+}
+
+// ---------------------------------------------------------------------------
+// string?  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_string_p() {
+  printf("--- string? ---\n");
+  PRED_TRUE(subr_string_p, make_string(""));
+  PRED_TRUE(subr_string_p, make_string("hello"));
+  PRED_TRUE(subr_string_p, make_string("123"));
+  PRED_FALSE(subr_string_p, make_symbol("hello"));
+  PRED_FALSE(subr_string_p, make_char('h'));
+  PRED_FALSE(subr_string_p, scm_nil);
+  PRED_FALSE(subr_string_p, make_fixnum(0));
+  PRED_FALSE(subr_string_p, scm_true);
+}
+
+// ---------------------------------------------------------------------------
+// symbol?  — R6RS §9.13 (symbols)
+// ---------------------------------------------------------------------------
+
+void test_symbol_p() {
+  printf("--- symbol? ---\n");
+  PRED_TRUE(subr_symbol_p, make_symbol("foo"));
+  PRED_TRUE(subr_symbol_p, make_symbol("+"));
+  PRED_TRUE(subr_symbol_p, make_symbol("hello-world!"));
+  PRED_FALSE(subr_symbol_p, make_string("foo"));
+  PRED_FALSE(subr_symbol_p, scm_true);
+  PRED_FALSE(subr_symbol_p, scm_nil);
+  PRED_FALSE(subr_symbol_p, make_fixnum(0));
+  PRED_FALSE(subr_symbol_p, make_char('a'));
+}
+
+// ---------------------------------------------------------------------------
+// vector?  — R6RS §9.15
+// ---------------------------------------------------------------------------
+
+void test_vector_p() {
+  printf("--- vector? ---\n");
+  PRED_TRUE(subr_vector_p, make_vector(0, scm_nil));
+  PRED_TRUE(subr_vector_p, make_vector(3, make_fixnum(0)));
+  PRED_FALSE(subr_vector_p, make_cons(make_fixnum(1), scm_nil));
+  PRED_FALSE(subr_vector_p, scm_nil);
+  PRED_FALSE(subr_vector_p, make_fixnum(3));
+  PRED_FALSE(subr_vector_p, scm_true);
+  PRED_FALSE(subr_vector_p, make_string("vector"));
+}
+
+// ---------------------------------------------------------------------------
+// not  — R6RS §9.10
+// ---------------------------------------------------------------------------
+
+void test_not() {
+  printf("--- not ---\n");
+  // Only #f is falsy; everything else is truthy
+  ASSERT_TRUE(subr_not(scm_nil, scm_false) == scm_true);
+  ASSERT_TRUE(subr_not(scm_nil, scm_true) == scm_false);
+  ASSERT_TRUE(subr_not(scm_nil, make_fixnum(0)) == scm_false);
+  ASSERT_TRUE(subr_not(scm_nil, scm_nil) == scm_false);
+  ASSERT_TRUE(subr_not(scm_nil, make_string("")) == scm_false);
+}
+
+// ---------------------------------------------------------------------------
+// vector  — R6RS §9.15
+// ---------------------------------------------------------------------------
+
+static scm_obj_t call_vector(std::initializer_list<scm_obj_t> args) {
+  std::vector<scm_obj_t> v(args);
+  return subr_vector(scm_nil, (int)v.size(), v.data());
+}
+
+void test_vector() {
+  printf("--- vector / vector-length / vector-ref / vector-set! / vector->list ---\n");
+
+  // (vector) → #()
+  scm_obj_t v0 = call_vector({});
+  ASSERT_TRUE(is_vector(v0));
+  ASSERT_TRUE(subr_vector_length(scm_nil, v0) == make_fixnum(0));
+
+  // (vector 10 20 30) → #(10 20 30)
+  scm_obj_t v3 = call_vector({make_fixnum(10), make_fixnum(20), make_fixnum(30)});
+  ASSERT_TRUE(is_vector(v3));
+  ASSERT_TRUE(subr_vector_length(scm_nil, v3) == make_fixnum(3));
+
+  // vector-ref
+  ASSERT_TRUE(subr_vector_ref(scm_nil, v3, make_fixnum(0)) == make_fixnum(10));
+  ASSERT_TRUE(subr_vector_ref(scm_nil, v3, make_fixnum(1)) == make_fixnum(20));
+  ASSERT_TRUE(subr_vector_ref(scm_nil, v3, make_fixnum(2)) == make_fixnum(30));
+
+  // vector-set!
+  subr_vector_set(scm_nil, v3, make_fixnum(1), make_fixnum(99));
+  ASSERT_TRUE(subr_vector_ref(scm_nil, v3, make_fixnum(1)) == make_fixnum(99));
+
+  // vector->list:  #(10 99 30) → (10 99 30)
+  scm_obj_t lst = subr_vector_to_list(scm_nil, v3);
+  ASSERT_TRUE(is_cons(lst));
+  ASSERT_TRUE(CAR(lst) == make_fixnum(10));
+  ASSERT_TRUE(CAR(CDR(lst)) == make_fixnum(99));
+  ASSERT_TRUE(CAR(CDR(CDR(lst))) == make_fixnum(30));
+  ASSERT_TRUE(CDR(CDR(CDR(lst))) == scm_nil);
+
+  // vector->list of empty vector → '()
+  ASSERT_TRUE(subr_vector_to_list(scm_nil, v0) == scm_nil);
+}
+
+// ---------------------------------------------------------------------------
+// string-length  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_string_length() {
+  printf("--- string-length ---\n");
+  ASSERT_TRUE(subr_string_length(scm_nil, make_string("")) == make_fixnum(0));
+  ASSERT_TRUE(subr_string_length(scm_nil, make_string("hello")) == make_fixnum(5));
+  ASSERT_TRUE(subr_string_length(scm_nil, make_string("abc")) == make_fixnum(3));
+}
+
+// ---------------------------------------------------------------------------
+// string-ref  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_string_ref() {
+  printf("--- string-ref ---\n");
+  scm_obj_t s = make_string("hello");
+  ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(0)) == make_char('h'));
+  ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(4)) == make_char('o'));
+  // Each ASCII char is its own byte, so index == byte offset
+  ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(1)) == make_char('e'));
+}
+
+// ---------------------------------------------------------------------------
+// string=?  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_string_eq() {
+  printf("--- string=? ---\n");
+  PRED2_TRUE(subr_string_eq, make_string(""), make_string(""));
+  PRED2_TRUE(subr_string_eq, make_string("abc"), make_string("abc"));
+  PRED2_FALSE(subr_string_eq, make_string("abc"), make_string("ABC"));
+  PRED2_FALSE(subr_string_eq, make_string("hello"), make_string("world"));
+  PRED2_FALSE(subr_string_eq, make_string("a"), make_string("ab"));
+}
+
+// ---------------------------------------------------------------------------
+// string-append  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_string_append() {
+  printf("--- string-append ---\n");
+  // (string-append) → ""
+  {
+    scm_obj_t result = subr_string_append(scm_nil, 0, nullptr);
+    ASSERT_TRUE(is_string(result));
+    ASSERT_TRUE(strcmp((const char*)string_name(result), "") == 0);
+  }
+  // (string-append "foo" "bar") → "foobar"
+  {
+    scm_obj_t args[] = {make_string("foo"), make_string("bar")};
+    scm_obj_t result = subr_string_append(scm_nil, 2, args);
+    ASSERT_TRUE(strcmp((const char*)string_name(result), "foobar") == 0);
+  }
+  // (string-append "a" "b" "c") → "abc"
+  {
+    scm_obj_t args[] = {make_string("a"), make_string("b"), make_string("c")};
+    scm_obj_t result = subr_string_append(scm_nil, 3, args);
+    ASSERT_TRUE(strcmp((const char*)string_name(result), "abc") == 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// substring  — R6RS §9.14
+// ---------------------------------------------------------------------------
+
+void test_substring() {
+  printf("--- substring ---\n");
+  scm_obj_t s = make_string("hello world");
+  // (substring "hello world" 0 5) → "hello"
+  scm_obj_t r1 = subr_substring(scm_nil, s, make_fixnum(0), make_fixnum(5));
+  ASSERT_TRUE(strcmp((const char*)string_name(r1), "hello") == 0);
+  // (substring "hello world" 6 11) → "world"
+  scm_obj_t r2 = subr_substring(scm_nil, s, make_fixnum(6), make_fixnum(11));
+  ASSERT_TRUE(strcmp((const char*)string_name(r2), "world") == 0);
+  // (substring s 0 0) → ""
+  scm_obj_t r3 = subr_substring(scm_nil, s, make_fixnum(0), make_fixnum(0));
+  ASSERT_TRUE(strcmp((const char*)string_name(r3), "") == 0);
+  // (substring s 0 11) → whole string
+  scm_obj_t r4 = subr_substring(scm_nil, s, make_fixnum(0), make_fixnum(11));
+  ASSERT_TRUE(strcmp((const char*)string_name(r4), "hello world") == 0);
+}
+
+// ---------------------------------------------------------------------------
+// symbol->string / string->symbol  — R6RS §9.13
+// ---------------------------------------------------------------------------
+
+void test_symbol_string_conv() {
+  printf("--- symbol->string / string->symbol ---\n");
+  // symbol->string
+  scm_obj_t sym = make_symbol("hello");
+  scm_obj_t str = subr_symbol_to_string(scm_nil, sym);
+  ASSERT_TRUE(is_string(str));
+  ASSERT_TRUE(strcmp((const char*)string_name(str), "hello") == 0);
+  // The result is a fresh string object, not eq? to the symbol
+  ASSERT_FALSE(str == sym);
+
+  // string->symbol (interned)
+  scm_obj_t s2 = make_string("world");
+  scm_obj_t sym2a = subr_string_to_symbol(scm_nil, s2);
+  scm_obj_t sym2b = subr_string_to_symbol(scm_nil, make_string("world"));
+  ASSERT_TRUE(is_symbol(sym2a));
+  ASSERT_TRUE(sym2a == sym2b);  // interned: same object
+  ASSERT_TRUE(strcmp((const char*)symbol_name(sym2a), "world") == 0);
+}
+
+// ---------------------------------------------------------------------------
+// number->string  — R6RS §9.9.4.4
+// ---------------------------------------------------------------------------
+
+void test_number_to_string() {
+  printf("--- number->string ---\n");
+  auto n2s = [](scm_obj_t n) -> const char* {
+    scm_obj_t args[] = {n};
+    return (const char*)string_name(subr_number_to_string(scm_nil, 1, args));
+  };
+  auto n2s_radix = [](scm_obj_t n, int r) -> const char* {
+    scm_obj_t args[] = {n, make_fixnum(r)};
+    return (const char*)string_name(subr_number_to_string(scm_nil, 2, args));
+  };
+
+  // Fixnum base 10
+  ASSERT_TRUE(strcmp(n2s(make_fixnum(0)), "0") == 0);
+  ASSERT_TRUE(strcmp(n2s(make_fixnum(42)), "42") == 0);
+  ASSERT_TRUE(strcmp(n2s(make_fixnum(-7)), "-7") == 0);
+  ASSERT_TRUE(strcmp(n2s(make_fixnum(255)), "255") == 0);
+
+  // Fixnum other bases
+  ASSERT_TRUE(strcmp(n2s_radix(make_fixnum(255), 16), "ff") == 0);
+  ASSERT_TRUE(strcmp(n2s_radix(make_fixnum(8), 8), "10") == 0);
+  ASSERT_TRUE(strcmp(n2s_radix(make_fixnum(10), 2), "1010") == 0);
+  ASSERT_TRUE(strcmp(n2s_radix(make_fixnum(0), 2), "0") == 0);
+
+  // Flonum base 10
+  ASSERT_TRUE(strcmp(n2s(make_flonum(1.0 / 0.0)), "+inf.0") == 0);
+  ASSERT_TRUE(strcmp(n2s(make_flonum(-1.0 / 0.0)), "-inf.0") == 0);
+  ASSERT_TRUE(strcmp(n2s(make_flonum(0.0 / 0.0)), "+nan.0") == 0);
+  // 1.5 must round-trip
+  const char* s15 = n2s(make_flonum(1.5));
+  ASSERT_TRUE(s15[0] != '\0');  // non-empty
+  ASSERT_TRUE(strchr(s15, '.') != nullptr || strchr(s15, 'e') != nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// string->number  — R6RS §9.9.4.4
+// ---------------------------------------------------------------------------
+
+void test_string_to_number() {
+  printf("--- string->number ---\n");
+  auto s2n = [](const char* s) -> scm_obj_t {
+    scm_obj_t args[] = {make_string(s)};
+    return subr_string_to_number(scm_nil, 1, args);
+  };
+  auto s2n_radix = [](const char* s, int r) -> scm_obj_t {
+    scm_obj_t args[] = {make_string(s), make_fixnum(r)};
+    return subr_string_to_number(scm_nil, 2, args);
+  };
+
+  // Valid integers
+  ASSERT_TRUE(s2n("0") == make_fixnum(0));
+  ASSERT_TRUE(s2n("42") == make_fixnum(42));
+  ASSERT_TRUE(s2n("-7") == make_fixnum(-7));
+  ASSERT_TRUE(s2n("255") == make_fixnum(255));
+
+  // Valid flonum
+  scm_obj_t f15 = s2n("1.5");
+  ASSERT_TRUE(is_short_flonum(f15) || is_long_flonum(f15));
+  ASSERT_TRUE(flonum(f15) == 1.5);
+
+  // Radixes
+  ASSERT_TRUE(s2n_radix("ff", 16) == make_fixnum(255));
+  ASSERT_TRUE(s2n_radix("10", 8) == make_fixnum(8));
+  ASSERT_TRUE(s2n_radix("1010", 2) == make_fixnum(10));
+
+  // Invalid → #f
+  ASSERT_TRUE(s2n("") == scm_false);
+  ASSERT_TRUE(s2n("abc") == scm_false);
+  ASSERT_TRUE(s2n("1.2.3") == scm_false);
+}
+
+// ---------------------------------------------------------------------------
+// char=?  — R6RS §9.13
+// ---------------------------------------------------------------------------
+
+void test_char_eq() {
+  printf("--- char=? ---\n");
+  PRED2_TRUE(subr_char_eq, make_char('a'), make_char('a'));
+  PRED2_TRUE(subr_char_eq, make_char(0), make_char(0));
+  PRED2_TRUE(subr_char_eq, make_char(0x1F600), make_char(0x1F600));
+  PRED2_FALSE(subr_char_eq, make_char('a'), make_char('b'));
+  PRED2_FALSE(subr_char_eq, make_char('A'), make_char('a'));
+}
+
+// ---------------------------------------------------------------------------
+// char-numeric?  — R6RS §9.13
+// ---------------------------------------------------------------------------
+
+void test_char_numeric_p() {
+  printf("--- char-numeric? ---\n");
+  for (char c = '0'; c <= '9'; c++) PRED_TRUE(subr_char_numeric_p, make_char(c));
+  PRED_FALSE(subr_char_numeric_p, make_char('a'));
+  PRED_FALSE(subr_char_numeric_p, make_char('Z'));
+  PRED_FALSE(subr_char_numeric_p, make_char(' '));
+  PRED_FALSE(subr_char_numeric_p, make_char('/'));  // '/' is one before '0'
+  PRED_FALSE(subr_char_numeric_p, make_char(':'));  // ':' is one after '9'
+}
+
+// ---------------------------------------------------------------------------
+// max  — R6RS §9.9.3.2
+// ---------------------------------------------------------------------------
+
+void test_max() {
+  printf("--- max ---\n");
+  auto max1 = [](scm_obj_t a) {
+    scm_obj_t args[] = {a};
+    return subr_max(scm_nil, 1, args);
+  };
+  auto max2 = [](scm_obj_t a, scm_obj_t b) {
+    scm_obj_t args[] = {a, b};
+    return subr_max(scm_nil, 2, args);
+  };
+  auto max3 = [](scm_obj_t a, scm_obj_t b, scm_obj_t c) {
+    scm_obj_t args[] = {a, b, c};
+    return subr_max(scm_nil, 3, args);
+  };
+
+  // Single arg: identity
+  ASSERT_TRUE(max1(make_fixnum(5)) == make_fixnum(5));
+
+  // All exact
+  ASSERT_TRUE(max2(make_fixnum(3), make_fixnum(7)) == make_fixnum(7));
+  ASSERT_TRUE(max2(make_fixnum(7), make_fixnum(3)) == make_fixnum(7));
+  ASSERT_TRUE(max2(make_fixnum(-1), make_fixnum(0)) == make_fixnum(0));
+  ASSERT_TRUE(max3(make_fixnum(1), make_fixnum(3), make_fixnum(2)) == make_fixnum(3));
+
+  // All inexact
+  scm_obj_t r_ff = max2(make_flonum(1.5), make_flonum(2.5));
+  ASSERT_TRUE(is_short_flonum(r_ff) || is_long_flonum(r_ff));
+  ASSERT_TRUE(flonum(r_ff) == 2.5);
+
+  // Mixed: result promoted to inexact (R6RS §9.9.3.2)
+  scm_obj_t r_mix = max2(make_fixnum(5), make_flonum(3.0));
+  ASSERT_TRUE(is_short_flonum(r_mix) || is_long_flonum(r_mix));
+  ASSERT_TRUE(flonum(r_mix) == 5.0);  // 5 wins but becomes 5.0
+
+  // Negative values
+  ASSERT_TRUE(max2(make_fixnum(-3), make_fixnum(-1)) == make_fixnum(-1));
+}
+
+// ---------------------------------------------------------------------------
+// pairs & lists (extra)
+// ---------------------------------------------------------------------------
+
+void test_pairs_lists_extra() {
+  printf("--- pairs & lists extra ---\n");
+
+  scm_obj_t lst = make_proper_list_123();  // (1 2 3)
+
+  // cddr
+  scm_obj_t cd2ar = subr_cddr(scm_nil, lst);
+  ASSERT_TRUE(is_cons(cd2ar) && CAR(cd2ar) == make_fixnum(3) && CDR(cd2ar) == scm_nil);
+
+  // length
+  ASSERT_TRUE(subr_length(scm_nil, lst) == make_fixnum(3));
+  ASSERT_TRUE(subr_length(scm_nil, scm_nil) == make_fixnum(0));
+
+  // list-ref
+  ASSERT_TRUE(subr_list_ref(scm_nil, lst, make_fixnum(0)) == make_fixnum(1));
+  ASSERT_TRUE(subr_list_ref(scm_nil, lst, make_fixnum(2)) == make_fixnum(3));
+
+  // memq / memv / member
+  scm_obj_t mem_lst = make_cons(make_symbol("a"), make_cons(make_fixnum(2), make_cons(make_string("c"), scm_nil)));
+
+  scm_obj_t mq = subr_memq(scm_nil, make_symbol("a"), mem_lst);
+  ASSERT_TRUE(mq == mem_lst);  // found at head
+
+  scm_obj_t mv = subr_memv(scm_nil, make_fixnum(2), mem_lst);
+  ASSERT_TRUE(CAR(mv) == make_fixnum(2));
+
+  // string is not eq/eqv
+  scm_obj_t ms_q = subr_memv(scm_nil, make_string("c"), mem_lst);  // false since eqv on strings is false unless same ptr
+  ASSERT_TRUE(ms_q == scm_false);
+
+  scm_obj_t ms_m = subr_member(scm_nil, make_string("c"), mem_lst);  // true via equal?
+  ASSERT_TRUE(ms_m != scm_false);
+  ASSERT_TRUE(CAR(ms_m) != scm_false);
+
+  // assq / assoc
+  scm_obj_t alist = make_alist();
+  scm_obj_t aq = subr_assq(scm_nil, make_symbol("b"), alist);
+  ASSERT_TRUE(is_cons(aq));
+  ASSERT_TRUE(CDR(aq) == make_fixnum(2));
+
+  scm_obj_t ac = subr_assoc(scm_nil, make_string("c"), alist);
+  ASSERT_TRUE(is_cons(ac));
+  ASSERT_TRUE(CDR(ac) == make_fixnum(3));
+
+  // reverse
+  scm_obj_t rev = subr_reverse(scm_nil, lst);
+  ASSERT_TRUE(CAR(rev) == make_fixnum(3));
+  ASSERT_TRUE(CAR(CDR(rev)) == make_fixnum(2));
+  ASSERT_TRUE(CAR(CDR(CDR(rev))) == make_fixnum(1));
+
+  // list->vector
+  scm_obj_t l2v = subr_list_to_vector(scm_nil, lst);
+  ASSERT_TRUE(is_vector(l2v));
+  ASSERT_TRUE(vector_nsize(l2v) == 3);
+  ASSERT_TRUE(vector_elts(l2v)[0] == make_fixnum(1));
+  ASSERT_TRUE(vector_elts(l2v)[2] == make_fixnum(3));
+
+  // set-car!
+  scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
+  subr_set_car_bang(scm_nil, p, make_fixnum(99));
+  ASSERT_TRUE(CAR(p) == make_fixnum(99));
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
+
+int main(int argc, char** argv) {
+  printf("Starting test_subr\n");
+  fflush(stdout);
+
+  object_heap_t heap;
+  heap.init(1024 * 1024 * 2, 1024 * 1024);
+
+  test_boolean_p();
+  test_char_p();
+  test_eq_p();
+  test_eqv_p();
+  test_equal_p();
+  test_exact_p();
+  test_inexact_p();
+  test_infinite_p();
+  test_integer_p();
+  test_list_p();
+  test_null_p();
+  test_number_p();
+  test_nan_p();
+  test_pair_p();
+  test_procedure_p();
+  test_real_p();
+  test_string_p();
+  test_symbol_p();
+  test_vector_p();
+  test_not();
+  test_vector();
+  test_string_length();
+  test_string_ref();
+  test_string_eq();
+  test_string_append();
+  test_substring();
+  test_symbol_string_conv();
+  test_number_to_string();
+  test_string_to_number();
+  test_char_eq();
+  test_char_numeric_p();
+  test_max();
+  test_pairs_lists_extra();
+
+  heap.destroy();
+
+  if (some_test_failed) {
+    printf("\033[31mSome tests FAILED\033[0m\n");
+    return 1;
+  }
+  printf("\033[32mAll tests passed\033[0m\n");
+  return 0;
+}

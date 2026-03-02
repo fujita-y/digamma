@@ -3,8 +3,11 @@
 
 #include "core.h"
 #include "nanos_jit.h"
+#include <llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
+#include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
 #include <llvm/Support/Error.h>
+#include <llvm/Support/Process.h>
 
 #define USE_WHOLE_MODULE_PARTITION_FUNCTION 0
 
@@ -21,7 +24,7 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
       EPCIU(std::move(EPCIU)),
       DL(std::move(DL)),
       Mangle(*this->ES, this->DL),
-      ObjectLayer(std::make_unique<ObjectLinkingLayer>(*this->ES, this->ES->getExecutorProcessControl().getMemMgr())),
+      ObjectLayer(std::make_unique<ObjectLinkingLayer>(*this->ES, cantFail(llvm::jitlink::InProcessMemoryManager::Create()))),
       CompileLayer(std::make_unique<IRCompileLayer>(*this->ES, *ObjectLayer, std::make_unique<ConcurrentIRCompiler>(std::move(JTMB)))),
       TransformLayer(std::make_unique<IRTransformLayer>(*this->ES, *CompileLayer,
                                                         [](ThreadSafeModule TSM, const MaterializationResponsibility &R) {
@@ -43,17 +46,17 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
 }
 
 nanos_jit_t::~nanos_jit_t() {
+  if (auto Err = ES->endSession()) {
+    ES->reportError(std::move(Err));
+  }
+  if (auto Err = EPCIU->cleanup()) {
+    ES->reportError(std::move(Err));
+  }
   CODLayer.reset();
   TransformLayer.reset();
   CompileLayer.reset();
   ObjectLayer.reset();
-  if (auto Err = EPCIU->cleanup()) {
-    ES->reportError(std::move(Err));
-  }
   EPCIU.reset();
-  if (auto Err = ES->endSession()) {
-    ES->reportError(std::move(Err));
-  }
 }
 
 // ============================================================================
