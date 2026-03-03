@@ -1,1 +1,3 @@
-Digamma is an experimental implementation of Scheme. All findings and results will be merged into [Ypsilon](https://github.com/fujita-y/ypsilon), the ancestor and successor of Digamma.
+Digamma is an experimental implementation. [Ypsilon](https://github.com/fujita-y/ypsilon) is the ancestor and successor of Digamma.
+workaround.
+

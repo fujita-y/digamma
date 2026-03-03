@@ -45,7 +45,7 @@ void nanos_t::destroy() {
 // ============================================================================
 
 void nanos_t::run() {
-  puts(";; nanos - a small scheme interpreter for bootstrapping");
+  puts(";; nanos - a small virtual machine for bootstrapping, compile nanos-ir to native code.");
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
