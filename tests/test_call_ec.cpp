@@ -93,9 +93,9 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 #endif
 
 int main(int argc, char** argv) {
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
-  heap.m_collect_trip_bytes = 1024 * 512;
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  heap->m_collect_trip_bytes = 1024 * 512;
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
 
-    codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen_t cg(std::move(ts_ctx), jit.get());
 
     scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
     c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
@@ -119,7 +119,8 @@ int main(int argc, char** argv) {
     test_double_invoke_fails();
   }
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 
   return some_test_failed ? 1 : 0;
 }

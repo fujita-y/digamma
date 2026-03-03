@@ -65,7 +65,7 @@ class CodegenTest {
     jit = std::move(*jit_expected);
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
   }
 
   ~CodegenTest() { delete codegen; }
@@ -105,8 +105,8 @@ void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
 int main(int argc, char** argv) {
   printf("Starting test_apply_patterns\n");
   fflush(stdout);
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   // Define primitives
   scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
@@ -266,6 +266,7 @@ int main(int argc, char** argv) {
     return result == make_fixnum(11);
   });
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   return some_test_failed ? 1 : 0;
 }

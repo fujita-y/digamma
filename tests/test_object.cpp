@@ -208,9 +208,9 @@ static bool test_cell(int64_t val) {
 }
 
 int main(int argc, char** argv) {
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
-  heap.m_collect_trip_bytes = 1024 * 512;
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  heap->m_collect_trip_bytes = 1024 * 512;
 
   test_fixnum_in_range(-1);
   test_fixnum_in_range(0);
@@ -248,7 +248,8 @@ int main(int argc, char** argv) {
   test_cell(-50);
   test_cell_heap("hello world");
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 
   return some_test_failed ? 1 : 0;
 }

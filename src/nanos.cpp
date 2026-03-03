@@ -22,8 +22,8 @@ void nanos_t::init_codegen() {
   }
   m_jit = std::move(*jit_expected);
 
-  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), m_jit.get());
+  auto ctx = std::make_unique<llvm::LLVMContext>();
+  new codegen_t(std::move(ctx), m_jit.get());
 }
 
 void nanos_t::init() {
@@ -34,7 +34,9 @@ void nanos_t::init() {
 }
 
 void nanos_t::destroy() {
-  object_heap_t::current()->destroy();
+  object_heap_t* heap = object_heap_t::current();
+  heap->destroy();
+  delete heap;
   m_jit.reset();
 }
 

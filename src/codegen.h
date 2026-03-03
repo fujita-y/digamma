@@ -79,10 +79,9 @@ struct compiled_code_t {
 class codegen_t {
   thread_local static codegen_t* s_current;
 
-  llvm::orc::ThreadSafeContext ts_context;
-  llvm::LLVMContext* context_ptr;
+  std::unique_ptr<llvm::LLVMContext> context_uptr;  // owns the current compilation context
+  std::unique_ptr<llvm::IRBuilder<>> builder;       // in-place builder, recreated per compile()
   nanos_jit_t* jit;
-  std::unique_ptr<llvm::IRBuilder<>> builder_ptr;
   llvm::Module* main_module = nullptr;  // Current module being compiled
   std::unique_ptr<llvm::Module> main_module_uptr;
 
@@ -193,11 +192,11 @@ class codegen_t {
                                 llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
 
   // LLVM type helpers to reduce code duplication
-  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(*context_ptr); }
-  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(*context_ptr); }
-  llvm::Type* getVoidPtrType() { return builder_ptr->getPtrTy(); }
-  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(*context_ptr); }
-  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(*context_ptr, llvm::APInt(64, (uint64_t)scm_false)); }
+  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(*context_uptr); }
+  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(*context_uptr); }
+  llvm::Type* getVoidPtrType() { return builder->getPtrTy(); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(*context_uptr); }
+  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(*context_uptr, llvm::APInt(64, (uint64_t)scm_false)); }
 
   // Helper to get code pointer from closure object
   llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);
@@ -242,6 +241,18 @@ class codegen_t {
   void dump_instructions(const std::vector<Instruction>& instructions);
 
   // Compilation phases
+  // Configure a new Module with JIT data layout, target triple, PIC/PIE level
+  void configure_module(llvm::Module& M);
+
+  // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
+  // compile() call, then restores the previous state on destruction.
+  struct CompileScope {
+    codegen_t& self;
+    std::unique_ptr<llvm::LLVMContext> saved_ctx;
+    CompileScope(codegen_t& self);
+    ~CompileScope();
+  };
+
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);
   void phase2_create_functions();
@@ -252,7 +263,7 @@ class codegen_t {
   std::string generate_unique_suffix();
 
  public:
-  codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit);
+  codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit);
 
   // Compile a list of instructions
   compiled_code_t compile(scm_obj_t inst_list);

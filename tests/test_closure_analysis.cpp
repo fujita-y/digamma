@@ -50,7 +50,7 @@ class ClosureAnalysisTest {
     jit = std::move(*jit_expected);
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
   }
 
   ~ClosureAnalysisTest() { delete codegen; }
@@ -133,8 +133,8 @@ void run_test(const char* name, std::function<bool(ClosureAnalysisTest&)> test) 
 
 int main() {
   printf("Starting test_closure_analysis\n");
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   run_test("SimpleLocalClosure", [](ClosureAnalysisTest& env) -> bool {
     // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (ret))
@@ -406,6 +406,7 @@ int main() {
     return true;
   });
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   return some_test_failed ? 1 : 0;
 }

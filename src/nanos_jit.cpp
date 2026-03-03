@@ -5,11 +5,8 @@
 #include "nanos_jit.h"
 #include <llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
-#include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Process.h>
-
-#define USE_WHOLE_MODULE_PARTITION_FUNCTION 0
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -26,20 +23,10 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
       Mangle(*this->ES, this->DL),
       ObjectLayer(std::make_unique<ObjectLinkingLayer>(*this->ES, cantFail(llvm::jitlink::InProcessMemoryManager::Create()))),
       CompileLayer(std::make_unique<IRCompileLayer>(*this->ES, *ObjectLayer, std::make_unique<ConcurrentIRCompiler>(std::move(JTMB)))),
-      TransformLayer(std::make_unique<IRTransformLayer>(*this->ES, *CompileLayer,
-                                                        [](ThreadSafeModule TSM, const MaterializationResponsibility &R) {
-                                                          TSM.withModuleDo([](Module &M) { M.setIsNewDbgInfoFormat(false); });
-                                                          return TSM;
-                                                        })),
-      CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *TransformLayer, this->EPCIU->getLazyCallThroughManager(),
+      CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *CompileLayer, this->EPCIU->getLazyCallThroughManager(),
                                                       [this]() { return this->EPCIU->createIndirectStubsManager(); })),
       MainJD(this->ES->createBareJITDylib("<main>")) {
   MainJD.addGenerator(cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(this->DL.getGlobalPrefix())));
-#if USE_WHOLE_MODULE_PARTITION_FUNCTION
-  CODLayer->setPartitionFunction(CompileOnDemandLayer::compileWholeModule);
-#else
-  CODLayer->setPartitionFunction(CompileOnDemandLayer::compileRequested);
-#endif
 #ifndef NDEBUG
   CompileLayer->setNotifyCompiled([](MaterializationResponsibility &R, ThreadSafeModule TSM) { errs() << "Generating native code...\n"; });
 #endif
@@ -53,7 +40,6 @@ nanos_jit_t::~nanos_jit_t() {
     ES->reportError(std::move(Err));
   }
   CODLayer.reset();
-  TransformLayer.reset();
   CompileLayer.reset();
   ObjectLayer.reset();
   EPCIU.reset();

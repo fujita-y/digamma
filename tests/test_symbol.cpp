@@ -41,9 +41,9 @@ static bool test_symbol_intern(const char* name) {
 }
 
 int main(int argc, char** argv) {
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
-  heap.m_collect_trip_bytes = 1024 * 512;
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  heap->m_collect_trip_bytes = 1024 * 512;
 
   test_symbol_intern("foobar");
   test_symbol_intern("hogehoge");
@@ -53,7 +53,8 @@ int main(int argc, char** argv) {
   test_symbol_intern("special-chars!@#$%^&*()");
   test_symbol_intern("12345");
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 
   return some_test_failed ? 1 : 0;
 }

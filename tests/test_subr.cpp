@@ -924,8 +924,8 @@ int main(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
 
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   test_boolean_p();
   test_char_p();
@@ -961,7 +961,8 @@ int main(int argc, char** argv) {
   test_max();
   test_pairs_lists_extra();
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 
   if (some_test_failed) {
     printf("\033[31mSome tests FAILED\033[0m\n");

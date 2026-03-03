@@ -65,7 +65,7 @@ class CodegenTest {
     jit = std::move(*jit_expected);
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
   }
 
   ~CodegenTest() { delete codegen; }
@@ -111,8 +111,8 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 int main(int argc, char** argv) {
   printf("Starting test_codegen\n");
   fflush(stdout);
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   run_test("ConstantReturn", [](CodegenTest& env) -> bool {
     // ((const r0 3) (ret)) ;=> 3
@@ -763,6 +763,7 @@ int main(int argc, char** argv) {
     return true;
   });
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   return some_test_failed ? 1 : 0;
 }

@@ -105,8 +105,8 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 #endif
 
 int main(int argc, char** argv) {
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 64, 1024 * 1024 * 16);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -115,14 +115,15 @@ int main(int argc, char** argv) {
     if (!jit_expected) exit(1);
     auto jit = std::move(*jit_expected);
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen_t cg(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen_t cg(std::move(ts_ctx), jit.get());
 
     test_return_normally();
     test_invoke_continuation();
     test_multishot();
   }
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   puts("all test done");
   return some_test_failed ? 1 : 0;
 }

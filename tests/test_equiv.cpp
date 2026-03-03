@@ -151,17 +151,18 @@ void test_equal_circular(object_heap_t* heap) {
 }
 
 int main(int argc, char** argv) {
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   test_eqv_simple();
   test_eqv_flonum();
 
-  test_equal_list(&heap);
-  test_equal_vector(&heap);
-  test_equal_string(&heap);
-  test_equal_circular(&heap);
+  test_equal_list(heap);
+  test_equal_vector(heap);
+  test_equal_string(heap);
+  test_equal_circular(heap);
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   return some_test_failed ? 1 : 0;
 }

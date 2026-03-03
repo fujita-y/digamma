@@ -35,8 +35,8 @@ void trace(const char* fmt, ...) {
 
 void test_reader() {
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("123");
     reader_t reader(ss);
     bool err = false;
@@ -45,12 +45,13 @@ void test_reader() {
     assert(is_fixnum(obj));
     assert(fixnum(obj) == 123);
     std::cout << "Fixnum 123 passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("-123");
     reader_t reader(ss);
     bool err = false;
@@ -59,12 +60,13 @@ void test_reader() {
     assert(is_fixnum(obj));
     assert(fixnum(obj) == -123);
     std::cout << "Fixnum -123 passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("foo");
     reader_t reader(ss);
     bool err = false;
@@ -73,12 +75,13 @@ void test_reader() {
     assert(is_symbol(obj));
     assert(std::string((char*)symbol_name(obj)) == "foo");
     std::cout << "Symbol foo passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("|foo bar|");
     reader_t reader(ss);
     bool err = false;
@@ -87,12 +90,13 @@ void test_reader() {
     assert(is_symbol(obj));
     assert(std::string((char*)symbol_name(obj)) == "foo bar");
     std::cout << "Symbol |foo bar| passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("\"hello\"");
     reader_t reader(ss);
     bool err = false;
@@ -101,12 +105,13 @@ void test_reader() {
     assert(is_string(obj));
     assert(std::string((char*)string_name(obj)) == "hello");
     std::cout << "String \"hello\" passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("(1 2 3)");
     reader_t reader(ss);
     bool err = false;
@@ -126,12 +131,13 @@ void test_reader() {
     obj = ((scm_cons_rec_t*)obj)->cdr;
     assert(obj == scm_nil);
     std::cout << "List (1 2 3) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("(1 . 2)");
     reader_t reader(ss);
     bool err = false;
@@ -141,12 +147,13 @@ void test_reader() {
     assert(fixnum(((scm_cons_rec_t*)obj)->car) == 1);
     assert(fixnum(((scm_cons_rec_t*)obj)->cdr) == 2);
     std::cout << "List (1 . 2) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("#(1 2)");
     reader_t reader(ss);
     bool err = false;
@@ -157,12 +164,13 @@ void test_reader() {
     assert(fixnum(vector_elts(obj)[0]) == 1);
     assert(fixnum(vector_elts(obj)[1]) == 2);
     std::cout << "Vector #(1 2) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("#u8(1 255)");
     reader_t reader(ss);
     bool err = false;
@@ -173,12 +181,13 @@ void test_reader() {
     assert(u8vector_elts(obj)[0] == 1);
     assert(u8vector_elts(obj)[1] == 255);
     std::cout << "Bytevector #u8(1 255) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("'foo");
     reader_t reader(ss);
     bool err = false;
@@ -190,12 +199,13 @@ void test_reader() {
     assert(is_symbol(car));
     assert(std::string((char*)symbol_name(car)) == "quote");
     std::cout << "Quote 'foo passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("\"\\x3b1;\"");
     reader_t reader(ss);
     bool err = false;
@@ -208,12 +218,13 @@ void test_reader() {
     assert(str[1] == 0xB1);
     assert(str[2] == 0);
     std::cout << "String \"\\x3b1;\" (alpha) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("\"\\x1f600;\"");
     reader_t reader(ss);
     bool err = false;
@@ -228,13 +239,14 @@ void test_reader() {
     assert(str[3] == 0x80);
     assert(str[4] == 0);
     std::cout << "String \"\\x1f600;\" (grinning face) passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   // Test #i prefix (inexact)
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("#i42");
     reader_t reader(ss);
     bool err = false;
@@ -243,12 +255,13 @@ void test_reader() {
     assert(is_short_flonum(obj) || is_long_flonum(obj));
     assert(flonum(obj) == 42.0);
     std::cout << "Inexact #i42 passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("#i#x1A");
     reader_t reader(ss);
     bool err = false;
@@ -257,12 +270,13 @@ void test_reader() {
     assert(is_short_flonum(obj) || is_long_flonum(obj));
     assert(flonum(obj) == 26.0);
     std::cout << "Inexact #i#x1A passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 
   {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss("#x#i10");
     reader_t reader(ss);
     bool err = false;
@@ -271,14 +285,15 @@ void test_reader() {
     assert(is_short_flonum(obj) || is_long_flonum(obj));
     assert(flonum(obj) == 16.0);
     std::cout << "Inexact #x#i10 passed" << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   }
 }
 
 void test_reader_errors() {
   auto check_error = [](const char* input, const char* expected_msg) {
-    object_heap_t heap;
-    heap.init(4 * 1024 * 1024, 128 * 1024);
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
     std::stringstream ss(input);
     reader_t reader(ss);
     bool err = false;
@@ -291,7 +306,8 @@ void test_reader_errors() {
       fatal("expected error message '%s', got '%s' for input: %s", expected_msg, msg.c_str(), input);
     }
     std::cout << "Error case passed: " << input << " -> " << msg << std::endl;
-    heap.destroy();
+    heap->destroy();
+    delete heap;
   };
 
   check_error("(1 2", "unexpected end-of-file while reading list");

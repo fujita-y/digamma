@@ -40,8 +40,8 @@ void trace(const char* fmt, ...) {
   } while (0)
 
 void test_r7rs_comments() {
-  object_heap_t heap;
-  heap.init(1024 * 1024, 64 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024, 64 * 1024);
 
   {
     // Block comment
@@ -117,12 +117,13 @@ void test_r7rs_comments() {
     std::cout << "Nested datum comment passed" << std::endl;
   }
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 }
 
 void test_r7rs_strings() {
-  object_heap_t heap;
-  heap.init(1024 * 1024, 64 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024, 64 * 1024);
 
   {
     // String escape input
@@ -146,12 +147,13 @@ void test_r7rs_strings() {
     std::cout << "String escape output passed" << std::endl;
   }
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 }
 
 void test_r7rs_symbols() {
-  object_heap_t heap;
-  heap.init(1024 * 1024, 64 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024, 64 * 1024);
 
   {
     // Symbol escape output
@@ -173,7 +175,8 @@ void test_r7rs_symbols() {
     std::cout << "Symbol pipe escape output passed" << std::endl;
   }
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 }
 
 int main() {

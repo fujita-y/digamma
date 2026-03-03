@@ -13,6 +13,7 @@
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/OptimizationLevel.h>
@@ -30,8 +31,8 @@
 #include <random>
 #include "nanos_jit.h"
 
-#define BL (*builder_ptr)
-#define CT (*context_ptr)
+#define BL (*builder)
+#define CT (*context_uptr)
 
 thread_local codegen_t* codegen_t::s_current;
 
@@ -57,9 +58,8 @@ compiled_code_t& compiled_code_t::operator=(compiled_code_t&& other) {
   return *this;
 }
 
-codegen_t::codegen_t(llvm::orc::ThreadSafeContext ts_ctx, nanos_jit_t* jit)
-    : ts_context(std::move(ts_ctx)), context_ptr(ts_context.getContext()), jit(jit) {
-  builder_ptr = std::make_unique<llvm::IRBuilder<>>(CT);
+codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) : context_uptr(std::move(ctx)), jit(jit) {
+  builder = std::make_unique<llvm::IRBuilder<>>(CT);
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
@@ -535,7 +535,7 @@ llvm::Value* codegen_t::getClosureCodePtr(llvm::Value* closure_tagged) {
 // Helper to emit write barrier call
 void codegen_t::emitWriteBarrier(llvm::Value* value) {
   llvm::Type* intptrTy = this->getInt64Type();
-  llvm::Type* voidTy = llvm::Type::getVoidTy((CT));
+  llvm::Type* voidTy = llvm::Type::getVoidTy(CT);
   std::vector<llvm::Type*> wbArgTypes = {intptrTy};
   llvm::FunctionType* wbFT = llvm::FunctionType::get(voidTy, wbArgTypes, false);
   llvm::Function* wb_func = get_or_create_external_function("c_write_barrier", wbFT, (void*)&c_write_barrier);
@@ -725,22 +725,39 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
     ofs << "\n";
   }
 }
+
+// ============================================================================
+// CompileScope RAII
+// ============================================================================
+
+codegen_t::CompileScope::CompileScope(codegen_t& self) : self(self), saved_ctx(std::move(self.context_uptr)) {
+  self.context_uptr = std::make_unique<llvm::LLVMContext>();
+  self.builder = std::make_unique<llvm::IRBuilder<>>(*self.context_uptr);
+}
+
+codegen_t::CompileScope::~CompileScope() {
+  self.builder.reset();
+  self.context_uptr = std::move(saved_ctx);
+  if (self.context_uptr) self.builder = std::make_unique<llvm::IRBuilder<>>(*self.context_uptr);
+}
+
+// ============================================================================
+// configure_module helper
+// ============================================================================
+
+void codegen_t::configure_module(llvm::Module& M) {
+  M.setDataLayout(jit->getDataLayout());
+  M.setTargetTriple(jit->getTargetTriple());
+  M.setPICLevel(llvm::PICLevel::BigPIC);
+  M.setPIELevel(llvm::PIELevel::Large);
+}
+
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
-  // Save old CT and BL, create new ones for thread-safe concurrent compilation!
-  auto old_context_ptr = this->context_ptr;
-  auto old_ts_context = this->ts_context;
-  auto old_builder = std::move(this->builder_ptr);
-
-  auto new_ctx = std::make_unique<llvm::LLVMContext>();
-  this->ts_context = llvm::orc::ThreadSafeContext(std::move(new_ctx));
-  this->context_ptr = this->ts_context.getContext();
-  this->builder_ptr = std::make_unique<llvm::IRBuilder<>>(CT);
-
+  CompileScope scope(*this);
   try {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
     analyze_closure_labels();
-    // Clear the file before dumping all functions
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
     }
@@ -750,39 +767,23 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase2_create_functions();
     phase3_generate_code();
     phase4_optimize_and_verify();
-    auto result = phase5_finalize();
-
-    this->ts_context = old_ts_context;
-    this->context_ptr = old_context_ptr;
-    this->builder_ptr = std::move(old_builder);
-
-    return result;
+    return phase5_finalize();
   } catch (...) {
-    this->ts_context = old_ts_context;
-    this->context_ptr = old_context_ptr;
-    this->builder_ptr = std::move(old_builder);
     throw;
   }
 }
 
 void codegen_t::phase0_create_module() {
   // ===== Phase 0: Module Creation =====
-  // Create a new LLVM module for this compilation unit
   std::string mod_name = "jit_module_main_" + generate_unique_suffix();
-  this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, (CT));
+  this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, CT);
   this->main_module = this->main_module_uptr.get();
-  this->main_module->setDataLayout(jit->getDataLayout());
-  this->main_module->setTargetTriple(jit->getTargetTriple().getTriple());
-  this->main_module->setPICLevel(llvm::PICLevel::BigPIC);
-  this->main_module->setPIELevel(llvm::PIELevel::Large);
+  configure_module(*this->main_module);
 
   std::string clo_mod_name = "jit_module_closures_" + generate_unique_suffix();
-  this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, (CT));
+  this->closure_module_uptr = std::make_unique<llvm::Module>(clo_mod_name, CT);
   this->closure_module = this->closure_module_uptr.get();
-  this->closure_module->setDataLayout(jit->getDataLayout());
-  this->closure_module->setTargetTriple(jit->getTargetTriple().getTriple());
-  this->closure_module->setPICLevel(llvm::PICLevel::BigPIC);
-  this->closure_module->setPIELevel(llvm::PIELevel::Large);
+  configure_module(*this->closure_module);
 }
 
 void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
@@ -979,9 +980,13 @@ compiled_code_t codegen_t::phase5_finalize() {
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
-  // Add closures module if exists
+  // Build a ThreadSafeContext from our owned LLVMContext and hand it off to
+  // the JIT along with the modules. After this point context_uptr is empty;
+  // CompileScope::~CompileScope will restore the previous context.
+  llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
+
   if (functions.size() > 1) {
-    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), ts_context);  // [TODO] use cloneTSM
+    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), tsc);
 
     if (auto err = jit->addIRModule(std::move(clo_tsm))) {
       fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
@@ -990,7 +995,7 @@ compiled_code_t codegen_t::phase5_finalize() {
 
   // Create explicit tracker for main module
   auto rt = jit->getMainJITDylib().createResourceTracker();
-  auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);  // [TODO] use cloneTSM
+  auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), tsc);
 
   if (auto err = jit->addIRModule(std::move(main_tsm), rt)) {
     fatal("%s:%u codegen: failed to add main module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());

@@ -37,8 +37,8 @@ void test_printer() {
   printer_t printer(ss);
 
   // Initializing heap for object creation
-  object_heap_t heap;
-  heap.init(4 * 1024 * 1024, 128 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(4 * 1024 * 1024, 128 * 1024);
 
   // Test fixnum
   ss.str("");
@@ -98,7 +98,8 @@ void test_printer() {
   assert(ss.str() == "#(1 2)");
   std::cout << "Vector test passed" << std::endl;
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 }
 
 int main() {

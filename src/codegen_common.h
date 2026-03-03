@@ -98,14 +98,14 @@ static inline llvm::Value* getClosureEnvArrayPtr(llvm::IRBuilder<>& builder, llv
                                                  llvm::Type* int64Type) {
   llvm::Value* closure_ptr = untagPointer(builder, ctx, closure_tagged);
   llvm::Value* env_start_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_ENV_FIELD_OFFSET);
-  return builder.CreateBitCast(env_start_ptr, llvm::PointerType::get(int64Type, 0));
+  return builder.CreateBitCast(env_start_ptr, llvm::PointerType::get(ctx, 0));
 }
 
 // Helper to get pointer to cell's value field
 static inline llvm::Value* getCellValuePtr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx, llvm::Value* cell_tagged, llvm::Type* int64Type) {
   llvm::Value* cell_ptr = untagPointer(builder, ctx, cell_tagged);
   llvm::Value* value_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), cell_ptr, CELL_VALUE_FIELD_OFFSET);
-  return builder.CreateBitCast(value_ptr, llvm::PointerType::get(int64Type, 0));
+  return builder.CreateBitCast(value_ptr, llvm::PointerType::get(ctx, 0));
 }
 
 #endif  // CODEGEN_COMMON_H_INCLUDED

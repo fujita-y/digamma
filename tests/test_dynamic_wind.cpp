@@ -132,7 +132,7 @@ int main() {
   if (!jit_expected) exit(1);
   auto jit = std::move(*jit_expected);
   auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-  codegen_t* cg = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+  codegen_t* cg = new codegen_t(std::move(ts_ctx), jit.get());
 
   test_basic_dynamic_wind();
   test_dynamic_wind_with_call_cc();

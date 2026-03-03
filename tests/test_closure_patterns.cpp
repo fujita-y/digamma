@@ -65,7 +65,7 @@ class CodegenTest {
     jit = std::move(*jit_expected);
 
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen = new codegen_t(llvm::orc::ThreadSafeContext(std::move(ts_ctx)), jit.get());
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
   }
 
   ~CodegenTest() { delete codegen; }
@@ -105,8 +105,8 @@ void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
 int main(int argc, char** argv) {
   printf("Starting test_closure_patterns\n");
   fflush(stdout);
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 2, 1024 * 1024);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   // 1. Direct Call (Optimization)
   run_test("DirectCallLocal", [](CodegenTest& env) -> bool {
@@ -295,6 +295,7 @@ int main(int argc, char** argv) {
     return true;
   });
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
   return some_test_failed ? 1 : 0;
 }

@@ -24,8 +24,8 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
-#define BL (*builder_ptr)
-#define CT (*context_ptr)
+#define BL (*builder)
+#define CT (*context_uptr)
 
 // ============================================================================
 // Instruction Emission Switch
@@ -420,37 +420,34 @@ void* codegen_t::get_call_closure_bridge_ptr() {
     return cached_call_closure_bridge;
   }
 
-  // If the bridge is not in the JIT, we need to compile it.
-  // We must save the current module state because this might be called during another compilation or at runtime.
-  auto saved_module_uptr = std::move(main_module_uptr);
-  auto* saved_module = main_module;
-  auto* saved_main_func = main_function;
-  auto saved_builder_ip = BL.saveIP();
+  // Compile the bridge in its own fresh context, cleanly isolated from any
+  // surrounding compilation. CompileScope saves & restores context_uptr.
+  {
+    CompileScope scope(*this);
 
-  // Create a temporary module for the bridge
-  main_module_uptr = std::make_unique<llvm::Module>("bridge_module", (CT));
-  main_module = main_module_uptr.get();
-  main_module->setDataLayout(jit->getDataLayout());
-  main_module->setTargetTriple(jit->getTargetTriple().getTriple());
-  main_module->setPICLevel(llvm::PICLevel::BigPIC);
-  main_module->setPIELevel(llvm::PIELevel::Large);
+    auto* saved_main_func = main_function;
+    auto saved_builder_ip = BL.saveIP();
 
-  (void)get_or_create_call_closure_bridge();
+    main_module_uptr = std::make_unique<llvm::Module>("bridge_module", CT);
+    main_module = main_module_uptr.get();
+    configure_module(*main_module);
 
-  // Finalize the temporary module
-  auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), ts_context);  // [TODO] use cloneTSM
+    (void)get_or_create_call_closure_bridge();
 
-  if (auto err = jit->addIRModule(std::move(tsm))) {
-    fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
-  }
+    // Move context into ThreadSafeContext owned by the JIT.
+    // CompileScope::~CompileScope will restore the previous context.
+    llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
+    auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), std::move(tsc));
 
-  // Restore previous state
-  main_module_uptr = std::move(saved_module_uptr);
-  main_module = saved_module;
-  main_function = saved_main_func;
-  BL.restoreIP(saved_builder_ip);
+    if (auto err = jit->addIRModule(std::move(tsm))) {
+      fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+    }
 
-  // Re-lookup the symbol
+    main_module = nullptr;
+    main_function = saved_main_func;
+    BL.restoreIP(saved_builder_ip);
+  }  // ~CompileScope restores context_uptr and builder
+
   sym = jit->lookup(name);
   if (!sym) {
     fatal("%s:%u codegen: failed to look up closure bridge after compilation", __FILE__, __LINE__);

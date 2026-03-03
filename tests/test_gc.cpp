@@ -35,9 +35,9 @@ static bool some_test_failed = false;
 static void* subr_stub_ptr = (void*)0xdeadbeef;
 
 static bool test_gc_allocation(int num_loops) {
-  object_heap_t heap;
+  object_heap_t* heap = new object_heap_t();
 
-  heap.init(1024 * 1024, 1024 * 256);
+  heap->init(1024 * 1024, 1024 * 256);
 
   // Root structure:
   // (pair
@@ -80,11 +80,11 @@ static bool test_gc_allocation(int num_loops) {
 
   scm_obj_t root = make_cons(make_symbol("foo"), root_list);
 
-  heap.add_root(root);
+  heap->add_root(root);
 
   // Allocate enough objects to potentially trigger GC or just verify allocation works
   for (int i = 0; i < num_loops; i++) {
-    heap.safepoint();
+    heap->safepoint();
     usleep(1);
 
     // Original garbage
@@ -118,9 +118,10 @@ static bool test_gc_allocation(int num_loops) {
     }
   }
 
-  heap.remove_root(root);
+  heap->remove_root(root);
 
-  heap.destroy();
+  heap->destroy();
+  delete heap;
 
   printf("\033[32mtest_gc_allocation passed\033[0m\n");
   return true;
@@ -128,8 +129,8 @@ static bool test_gc_allocation(int num_loops) {
 
 static bool test_root_survivability() {
   printf("running test_root_survivability...\n");
-  object_heap_t heap;
-  heap.init(1024 * 1024 * 4, 1024 * 256);
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 4, 1024 * 256);
 
   // 1. Root a list of various objects
   scm_obj_t s = make_string("survivor-string");
@@ -138,12 +139,12 @@ static bool test_root_survivability() {
   scm_obj_t c = make_cell(v);
   scm_obj_t list = make_list(2, c, make_symbol("survivor-symbol"));
 
-  heap.add_root(list);
+  heap->add_root(list);
 
   // 2. Allocate lots of garbage to trigger multiple GCs
   for (int i = 0; i < 50000; i++) {
     make_cons(make_fixnum(i), make_string("garbage-garbage-garbage"));
-    if (i % 100 == 0) heap.safepoint();
+    if (i % 100 == 0) heap->safepoint();
   }
 
   // 3. Verify survivors
@@ -178,8 +179,9 @@ static bool test_root_survivability() {
     return false;
   }
 
-  heap.remove_root(list);
-  heap.destroy();
+  heap->remove_root(list);
+  heap->destroy();
+  delete heap;
 
   printf("\033[32mtest_root_survivability passed\033[0m\n");
   return true;
