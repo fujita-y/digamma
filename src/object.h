@@ -8,7 +8,6 @@
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include "arch_arm64.h"
-#include "mutex.h"
 
 /*
 
@@ -42,20 +41,20 @@ constexpr uintptr_t tc6_symbol = 0;
 constexpr uintptr_t tc6_string = 1;
 constexpr uintptr_t tc6_long_flonum = 2;
 constexpr uintptr_t tc6_vector = 3;
-constexpr uintptr_t tc6_u8vector = 4;
-constexpr uintptr_t tc6_hashtable = 5;
-constexpr uintptr_t tc6_closure = 6;
-constexpr uintptr_t tc6_environment = 7;
-constexpr uintptr_t tc6_cell = 8;
-constexpr uintptr_t tc6_escape = 9;
-constexpr uintptr_t tc6_continuation = 10;
+constexpr uintptr_t tc6_values = 4;
+constexpr uintptr_t tc6_u8vector = 5;
+constexpr uintptr_t tc6_hashtable = 6;
+constexpr uintptr_t tc6_closure = 7;
+constexpr uintptr_t tc6_environment = 8;
+constexpr uintptr_t tc6_cell = 9;
+constexpr uintptr_t tc6_escape = 10;
+constexpr uintptr_t tc6_continuation = 11;
 /*
 constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_continuation = ;
 constexpr uintptr_t tc6_bignum = ;
 constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_port = ;
-constexpr uintptr_t tc6_values = ;
 constexpr uintptr_t tc6_gloc = ;
 constexpr uintptr_t tc6_tuple = ;
 constexpr uintptr_t tc6_complex = ;
@@ -122,6 +121,12 @@ struct scm_vector_rec_t {
   int nsize;
 };
 
+struct scm_values_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t* elts;
+  int nsize;
+};
+
 struct scm_u8vector_rec_t {
   scm_tc6_t tag;
   uint8_t* elts;
@@ -137,7 +142,6 @@ struct hashtable_aux_t {
 
 struct scm_hashtable_rec_t {
   scm_tc6_t tag;
-  mutex_t lock;
   hash_proc_t hash;
   equiv_proc_t equiv;
   hashtable_aux_t* aux;
@@ -206,6 +210,7 @@ inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
 inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
 inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
+inline bool is_values(scm_obj_t x) { return is_tc6(x, tc6_values); }
 inline bool is_u8vector(scm_obj_t x) { return is_tc6(x, tc6_u8vector); }
 inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
 inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
@@ -226,6 +231,7 @@ scm_obj_t make_symbol(const char* name);
 scm_obj_t make_uninterned_symbol(const char* name);
 scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
+scm_obj_t make_values(int nsize);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
@@ -241,6 +247,8 @@ uint8_t* string_name(scm_obj_t x);
 
 inline int vector_nsize(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->nsize; }
 inline scm_obj_t* vector_elts(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->elts; }
+inline int values_nsize(scm_obj_t x) { return ((scm_values_rec_t*)to_address(x))->nsize; }
+inline scm_obj_t* values_elts(scm_obj_t x) { return ((scm_values_rec_t*)to_address(x))->elts; }
 inline int u8vector_nsize(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->nsize; }
 inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->elts; }
 inline scm_obj_t cell_value(scm_obj_t x) { return ((scm_cell_rec_t*)to_address(x))->value; }

@@ -16,6 +16,10 @@
 #include <map>
 #include <vector>
 
+// ============================================================================
+//  Opcode enum
+// ============================================================================
+
 enum class Opcode {
   CONST,
   MOV,
@@ -40,6 +44,10 @@ enum class Opcode {
   UNKNOWN
 };
 
+// ============================================================================
+//  Instruction
+// ============================================================================
+
 struct Instruction {
   Opcode op;
   scm_obj_t original;
@@ -53,6 +61,10 @@ struct Instruction {
   scm_obj_t free_indices = scm_nil;
   scm_obj_t closure_label = scm_nil;
 };
+
+// ============================================================================
+//  compiled_code_t — RAII wrapper for JIT-compiled code
+// ============================================================================
 
 struct compiled_code_t {
   intptr_t (*func_ptr)(void) = nullptr;
@@ -76,46 +88,16 @@ struct compiled_code_t {
   operator bool() const { return func_ptr != nullptr; }
 };
 
+// ============================================================================
+//  codegen_t — bytecode-to-LLVM-IR compiler
+// ============================================================================
+
 class codegen_t {
-  thread_local static codegen_t* s_current;
-
-  std::unique_ptr<llvm::LLVMContext> context_uptr;  // owns the current compilation context
-  std::unique_ptr<llvm::IRBuilder<>> builder;       // in-place builder, recreated per compile()
-  nanos_jit_t* jit;
-  llvm::Module* main_module = nullptr;  // Current module being compiled
-  std::unique_ptr<llvm::Module> main_module_uptr;
-
-  llvm::Module* closure_module = nullptr;
-  std::unique_ptr<llvm::Module> closure_module_uptr;
-  llvm::Function* main_function = nullptr;
-
-  // Register allocas: index -> alloca
-  std::vector<llvm::AllocaInst*> allocas;
-
-  // Labels: name -> basic block
-  std::map<scm_obj_t, llvm::BasicBlock*> labels;
-
-  // Cached symbols
-  scm_obj_t cached_symbol_label;
-  scm_obj_t cached_symbol_apply;
-  scm_obj_t cached_symbol_safepoint;
-
-  // Cached call closure bridge
-  void* cached_call_closure_bridge = nullptr;
-
-  // Closure literals: label symbol -> literals vector
-  std::map<scm_obj_t, scm_obj_t> closure_literals;
-
-  // Tracks closure entry points: label symbol -> llvm function
-  std::map<scm_obj_t, llvm::Function*> function_map;
-
-  // The function currently being generated
-  llvm::Function* current_function = nullptr;
-
-  // The 'self' argument of the current closure function
-  llvm::Value* current_closure_self = nullptr;
-
   friend class ClosureAnalysisTest;
+
+  // --------------------------------------------------------------------------
+  //  Per-function metadata
+  // --------------------------------------------------------------------------
 
   struct FunctionInfo {
     llvm::Function* llvm_function = nullptr;
@@ -126,41 +108,91 @@ class codegen_t {
     scm_obj_t label = scm_nil;  // Closure label or nil for main
   };
 
+  // --------------------------------------------------------------------------
+  //  Static / thread-local state
+  // --------------------------------------------------------------------------
+
+  thread_local static codegen_t* s_current;
+
+  // --------------------------------------------------------------------------
+  //  LLVM infrastructure
+  // --------------------------------------------------------------------------
+
+  std::unique_ptr<llvm::LLVMContext> context_uptr;  // owns the current compilation context
+  std::unique_ptr<llvm::IRBuilder<>> builder;       // in-place builder, recreated per compile()
+  nanos_jit_t* jit;
+
+  llvm::Module* main_module = nullptr;  // current module being compiled
+  std::unique_ptr<llvm::Module> main_module_uptr;
+  llvm::Module* closure_module = nullptr;
+  std::unique_ptr<llvm::Module> closure_module_uptr;
+
+  // --------------------------------------------------------------------------
+  //  Code generation state
+  // --------------------------------------------------------------------------
+
+  llvm::Function* main_function = nullptr;
+  llvm::Function* current_function = nullptr;
+  llvm::Value* current_closure_self = nullptr;  // 'self' argument of the current closure
+
   std::vector<FunctionInfo> functions;
   FunctionInfo* current_function_info = nullptr;
 
-  // Helper to get register value
-  llvm::Value* get_reg(int idx);
+  std::vector<llvm::AllocaInst*> allocas;         // register index -> alloca
+  std::map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
 
-  // Helper to set register value
-  void set_reg(int idx, llvm::Value* val);
+  // --------------------------------------------------------------------------
+  //  Closure metadata
+  // --------------------------------------------------------------------------
 
-  // Parse list into instructions vector
+  std::map<scm_obj_t, scm_obj_t> closure_literals;    // label symbol -> literals vector
+  std::map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
+
+  // --------------------------------------------------------------------------
+  //  Cached values
+  // --------------------------------------------------------------------------
+
+  scm_obj_t cached_symbol_label;
+  scm_obj_t cached_symbol_apply;
+  scm_obj_t cached_symbol_safepoint;
+  void* cached_call_closure_bridge = nullptr;
+
+  std::map<scm_obj_t, Opcode> opcode_map;
+
+  // --------------------------------------------------------------------------
+  //  Compilation pipeline (phases)
+  // --------------------------------------------------------------------------
+
+  // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
+  // compile() call, then restores the previous state on destruction.
+  struct CompileScope {
+    codegen_t& self;
+    std::unique_ptr<llvm::LLVMContext> saved_ctx;
+    CompileScope(codegen_t& self);
+    ~CompileScope();
+  };
+
+  void phase0_create_module();
+  void phase1_parse_instructions(scm_obj_t inst_list);
+  void phase2_create_functions();
+  void phase3_generate_code();
+  void phase4_optimize_and_verify();
+  compiled_code_t phase5_finalize();
+
+  // Configure a new Module with JIT data layout, target triple, PIC/PIE level
+  void configure_module(llvm::Module& M);
+  std::string generate_unique_suffix();
+
+  // --------------------------------------------------------------------------
+  //  Instruction parsing
+  // --------------------------------------------------------------------------
+
+  void init_opcode_map();
   void parse_instructions(scm_obj_t inst_list);
-
-  // Helper to parse a single instruction and update max_reg
   void parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label,
                                 std::vector<scm_obj_t>& current_literals);
-
-  // Helper to finish collecting literals for a closure
   void finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
 
-  // Helper to add side effect free attributes to a function
-  void add_side_effect_free_attributes(llvm::Function* func);
-
-  // Helper to add common closure attributes to a function
-  void add_common_closure_attributes(llvm::Function* func);
-
-  // Helper to get or create an external function declaration in the current module
-  llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
-
-  // Helper to create allocas at function entry
-  void create_allocas(llvm::Function* f, int num_regs);
-
-  // Helper to setup rest arguments for a closure function
-  void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
-
-  // Helper to parse individual instructions
   void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
                    std::vector<scm_obj_t>& current_literals);
   void parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
@@ -182,30 +214,11 @@ class codegen_t {
   void parse_reg_cell_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_make_cell(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
 
-  // Helper methods for emit_call_common decomposition
-  void emit_apply_call(const Instruction& inst, bool is_tail);
-  void emit_known_closure_call(const Instruction& inst, bool is_tail);
-  void emit_generic_closure_call(const Instruction& inst, bool is_tail);
-  void emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
-                              llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block);
-  void emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
-                                llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
-
-  // LLVM type helpers to reduce code duplication
-  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(*context_uptr); }
-  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(*context_uptr); }
-  llvm::Type* getVoidPtrType() { return builder->getPtrTy(); }
-  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(*context_uptr); }
-  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(*context_uptr, llvm::APInt(64, (uint64_t)scm_false)); }
-
-  // Helper to get code pointer from closure object
-  llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);
-
-  // Helper to emit write barrier call
-  void emitWriteBarrier(llvm::Value* value);
+  // --------------------------------------------------------------------------
+  //  IR emission — per-instruction emitters
+  // --------------------------------------------------------------------------
 
   void emit_inst(const Instruction& inst);
-  void emit_safepoint(const Instruction& inst);
   void emit_const(const Instruction& inst);
   void emit_mov(const Instruction& inst);
   void emit_if(const Instruction& inst);
@@ -219,65 +232,72 @@ class codegen_t {
   void emit_tail_call(const Instruction& inst);
   void emit_closure_ref(const Instruction& inst);
   void emit_closure_set(const Instruction& inst);
-
   void emit_closure_self(const Instruction& inst);
   void emit_closure_cell_ref(const Instruction& inst);
   void emit_closure_cell_set(const Instruction& inst);
   void emit_reg_cell_ref(const Instruction& inst);
   void emit_reg_cell_set(const Instruction& inst);
   void emit_make_cell(const Instruction& inst);
+  void emit_safepoint(const Instruction& inst);
+
+  // --------------------------------------------------------------------------
+  //  IR emission — call helpers
+  // --------------------------------------------------------------------------
 
   void emit_call_common(const Instruction& inst, bool is_tail);
+  void emit_apply_call(const Instruction& inst, bool is_tail);
+  void emit_known_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_closure_call(const Instruction& inst, bool is_tail);
+  void emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                              llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block);
+  void emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
+                                llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
 
-  // Helper to initialize opcode map
-  void init_opcode_map();
+  // --------------------------------------------------------------------------
+  //  IR helpers — types, values, utilities
+  // --------------------------------------------------------------------------
 
-  // Opcode map for faster lookup
-  std::map<scm_obj_t, Opcode> opcode_map;
+  llvm::Type* getInt64Type() { return llvm::Type::getInt64Ty(*context_uptr); }
+  llvm::Type* getInt32Type() { return llvm::Type::getInt32Ty(*context_uptr); }
+  llvm::Type* getVoidPtrType() { return builder->getPtrTy(); }
+  llvm::Type* getInt64PtrType() { return llvm::PointerType::getUnqual(*context_uptr); }
+  llvm::Value* getScmFalseValue() { return llvm::ConstantInt::get(*context_uptr, llvm::APInt(64, (uint64_t)scm_false)); }
+
+  llvm::Value* get_reg(int idx);
+  void set_reg(int idx, llvm::Value* val);
+  void create_allocas(llvm::Function* f, int num_regs);
+  void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
+
+  llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);
+  void emitWriteBarrier(llvm::Value* value);
+
+  llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
+  void add_side_effect_free_attributes(llvm::Function* func);
+  void add_common_closure_attributes(llvm::Function* func);
+
+  // --------------------------------------------------------------------------
+  //  Analysis and debugging
+  // --------------------------------------------------------------------------
 
   void analyze_closure_labels();
-
-  // Dump instructions for debugging
   void dump_instructions(const std::vector<Instruction>& instructions);
 
-  // Compilation phases
-  // Configure a new Module with JIT data layout, target triple, PIC/PIE level
-  void configure_module(llvm::Module& M);
-
-  // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
-  // compile() call, then restores the previous state on destruction.
-  struct CompileScope {
-    codegen_t& self;
-    std::unique_ptr<llvm::LLVMContext> saved_ctx;
-    CompileScope(codegen_t& self);
-    ~CompileScope();
-  };
-
-  void phase0_create_module();
-  void phase1_parse_instructions(scm_obj_t inst_list);
-  void phase2_create_functions();
-  void phase3_generate_code();
-  void phase4_optimize_and_verify();
-  compiled_code_t phase5_finalize();
-
-  std::string generate_unique_suffix();
+  // --------------------------------------------------------------------------
+  //  Public interface
+  // --------------------------------------------------------------------------
 
  public:
   codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit);
 
-  // Compile a list of instructions
   compiled_code_t compile(scm_obj_t inst_list);
 
-  // Helper to get or create the general call closure bridge
   llvm::Function* get_or_create_call_closure_bridge();
-
-  // Helper to get the compiled address of the call closure bridge
   void* get_call_closure_bridge_ptr();
 
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::map<scm_obj_t, std::pair<int, bool>> closure_params;
 
-  friend class ClosureAnalysisTest;
+  void destroy() { s_current = nullptr; }
 
   static codegen_t* current() {
     assert(s_current);

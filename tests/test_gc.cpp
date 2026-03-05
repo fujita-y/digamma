@@ -111,6 +111,14 @@ static bool test_gc_allocation(int num_loops) {
     make_closure(NULL, 0, 0, 0, NULL, scm_false, 0);
     make_environment(make_string("garbage-env"));
 
+    // values garbage: allocate a 3-element values object with mixed contents
+    {
+      scm_obj_t vals = make_values(3);
+      values_elts(vals)[0] = make_fixnum(i);
+      values_elts(vals)[1] = make_string("vals-elem");
+      values_elts(vals)[2] = make_symbol("vals-sym");
+    }
+
     if (!is_cons(obj)) {
       printf("\033[31m###### allocation failed at %d\033[0m\n", i);
       some_test_failed = true;
@@ -137,13 +145,37 @@ static bool test_root_survivability() {
   scm_obj_t v = make_vector(1, make_fixnum(0));
   vector_elts(v)[0] = s;
   scm_obj_t c = make_cell(v);
-  scm_obj_t list = make_list(2, c, make_symbol("survivor-symbol"));
+
+  // values object holding a string — tests that GC shades both the values
+  // header and its element array
+  scm_obj_t vals = make_values(2);
+  scm_obj_t vals_str = make_string("survivor-vals-str");
+  values_elts(vals)[0] = vals_str;
+  values_elts(vals)[1] = make_fixnum(42);
+
+  // hashtable object — tests that GC shades the aux buffer and its key/value slots
+  scm_obj_t ht = make_hashtable(string_hash, string_equiv, 16);
+  hashtable_set(ht, make_string("survivor-key-a"), make_string("survivor-val-a"));
+  hashtable_set(ht, make_string("survivor-key-b"), make_fixnum(777));
+
+  scm_obj_t list = make_list(4, c, make_symbol("survivor-symbol"), vals, ht);
 
   heap->add_root(list);
 
   // 2. Allocate lots of garbage to trigger multiple GCs
   for (int i = 0; i < 50000; i++) {
     make_cons(make_fixnum(i), make_string("garbage-garbage-garbage"));
+    // Mix in values garbage to stress the shade/sweep path
+    if (i % 7 == 0) {
+      scm_obj_t gv = make_values(2);
+      values_elts(gv)[0] = make_fixnum(i);
+      values_elts(gv)[1] = make_string("gc-vals-trash");
+    }
+    // Mix in hashtable garbage to stress the hashtable shade/sweep path
+    if (i % 11 == 0) {
+      scm_obj_t gh = make_hashtable(string_hash, string_equiv, 4);
+      hashtable_set(gh, make_string("trash-key"), make_fixnum(i));
+    }
     if (i % 100 == 0) heap->safepoint();
   }
 
@@ -175,6 +207,50 @@ static bool test_root_survivability() {
   scm_obj_t sym_back = car(cdr(list));
   if (!is_symbol(sym_back) || strcmp((const char*)symbol_name(sym_back), "survivor-symbol") != 0) {
     printf("\033[31m###### root survivability failed: cdr(list) is incorrect symbol\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+
+  // Verify the values object and its string element survived GC
+  scm_obj_t vals_back = car(cdr(cdr(list)));
+  if (!is_values(vals_back)) {
+    printf("\033[31m###### root survivability failed: values object not found\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (values_nsize(vals_back) != 2) {
+    printf("\033[31m###### root survivability failed: values nsize mismatch (%d)\033[0m\n", values_nsize(vals_back));
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t vs_back = values_elts(vals_back)[0];
+  if (!is_string(vs_back) || strcmp((const char*)string_name(vs_back), "survivor-vals-str") != 0) {
+    printf("\033[31m###### root survivability failed: values element string incorrect\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  if (values_elts(vals_back)[1] != make_fixnum(42)) {
+    printf("\033[31m###### root survivability failed: values element fixnum incorrect\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+
+  // Verify the hashtable and its entries survived GC
+  scm_obj_t ht_back = car(cdr(cdr(cdr(list))));
+  if (!is_hashtable(ht_back)) {
+    printf("\033[31m###### root survivability failed: hashtable not found\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t va_back = hashtable_ref(ht_back, make_string("survivor-key-a"), scm_undef);
+  if (!is_string(va_back) || strcmp((const char*)string_name(va_back), "survivor-val-a") != 0) {
+    printf("\033[31m###### root survivability failed: hashtable entry 'a' incorrect\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  scm_obj_t vb_back = hashtable_ref(ht_back, make_string("survivor-key-b"), scm_undef);
+  if (vb_back != make_fixnum(777)) {
+    printf("\033[31m###### root survivability failed: hashtable entry 'b' incorrect\033[0m\n");
     some_test_failed = true;
     return false;
   }

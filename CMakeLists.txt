@@ -48,7 +48,6 @@ execute_process(
 # Dependencies
 # ==============================================================================
 
-
 # --- Boost (via vcpkg) ---
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   # Automatically detect vcpkg installation for the current architecture
@@ -66,6 +65,8 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 
 find_package(Boost CONFIG REQUIRED COMPONENTS context)
+find_package(replxx CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 # ==============================================================================
 # Compiler Configuration
@@ -154,7 +155,7 @@ set(NANOS_CORE_SOURCES
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context replxx::replxx Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets

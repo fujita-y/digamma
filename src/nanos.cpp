@@ -1,11 +1,14 @@
 #include "object.h"
 #include "nanos.h"
-#include <llvm/Support/TargetSelect.h>
 #include "codegen.h"
 #include "nanos_jit.h"
 #include "object_heap.h"
 #include "printer.h"
 #include "reader.h"
+
+#include <llvm/Support/TargetSelect.h>
+#include <replxx.hxx>
+#include <sstream>
 
 // ============================================================================
 // Initialization
@@ -34,6 +37,9 @@ void nanos_t::init() {
 }
 
 void nanos_t::destroy() {
+  codegen_t* codegen = codegen_t::current();
+  codegen->destroy();
+  delete codegen;
   object_heap_t* heap = object_heap_t::current();
   heap->destroy();
   delete heap;
@@ -53,40 +59,81 @@ void nanos_t::run() {
 #endif
 
   printer_t printer(std::cout);
-  reader_t reader(std::cin);
+  auto rx = std::make_unique<replxx::Replxx>();
+  rx->install_window_change_handler();
+
+  std::string input_buffer;
 
   while (true) {
-    if (std::cin.eof()) break;
+    char const* cinput = rx->input(input_buffer.empty() ? "> " : "  ");
+    if (cinput == nullptr) {
+      break;  // EOF
+    }
 
-    printf("> ");
-    fflush(stdout);
+    std::string line(cinput);
+    if (input_buffer.empty() && line.empty()) continue;
+
+    input_buffer += line + "\n";
+
+    std::istringstream iss(input_buffer);
+    reader_t reader(iss);
 
     bool err = false;
-    scm_obj_t obj = reader.read(err);
+    std::vector<scm_obj_t> objs;
+    bool incomplete = false;
 
-    if (err) {
-      if (obj == scm_eof) break;  // Should have been caught by checking eof before read, but just in case
-      puts("Error: read failed");
-      // Simple recovery: consume rest of line
-      std::string line;
-      std::getline(std::cin, line);
+    while (true) {
+      err = false;
+      scm_obj_t obj = reader.read(err);
+
+      if (err) {
+        std::string msg = reader.get_error_message();
+        if (msg.find("unexpected end-of-file") != std::string::npos) {
+          incomplete = true;
+        } else {
+          puts("Error: read failed");
+          input_buffer.clear();
+        }
+        break;
+      }
+
+      if (obj == scm_eof) {
+        break;
+      }
+
+      objs.push_back(obj);
+    }
+
+    if (incomplete) {
       continue;
     }
-    if (obj == scm_eof) break;
 
-    if (is_cons(obj)) {
-      try {
-        auto func = codegen_t::current()->compile(obj);
-        intptr_t result = func();
-        printf("(0x%016lx)\n", result);
-        printer.write((scm_obj_t)result);
-        puts("");
-      } catch (std::exception& e) {
-        printf("%s\n", e.what());
+    if (!input_buffer.empty()) {
+      std::string hist = input_buffer;
+      while (!hist.empty() && (hist.back() == '\n' || hist.back() == '\r')) {
+        hist.pop_back();
       }
-    } else {
-      printer.write(obj);
-      puts("");
+      if (!hist.empty()) {
+        rx->history_add(hist);
+      }
+      input_buffer.clear();
+    }
+
+    for (scm_obj_t obj : objs) {
+      if (is_cons(obj)) {
+        try {
+          auto func = codegen_t::current()->compile(obj);
+          intptr_t result = func();
+          printf("(0x%016lx)\n", result);
+          printer.write((scm_obj_t)result);
+          puts("");
+        } catch (std::exception& e) {
+          printf("%s\n", e.what());
+        }
+      } else {
+        printer.write(obj);
+        puts("");
+      }
     }
   }
 }

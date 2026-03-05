@@ -85,6 +85,17 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
       out << ")";
       return;
     }
+    if (is_values(obj)) {
+      out << "#<values";
+      int n = values_nsize(obj);
+      scm_obj_t* elts = values_elts(obj);
+      for (int i = 0; i < n; i++) {
+        out << " ";
+        print(elts[i], display_mode);
+      }
+      out << ">";
+      return;
+    }
     if (is_u8vector(obj)) {
       out << "#u8(";
       int n = u8vector_nsize(obj);
@@ -172,11 +183,7 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
     return;
   }
   if (is_closure(obj)) {
-    out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", 
-                            (uintptr_t)obj, 
-                            closure_argc(obj), 
-                            closure_rest(obj), 
-                            closure_nenv(obj));
+    out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
     return;
   }
 

@@ -133,6 +133,18 @@ scm_obj_t make_vector(int nsize, scm_obj_t init) {
   return tc6_pointer(rec, tc6_vector);
 }
 
+scm_obj_t make_values(int nsize) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_values_rec_t* rec = (scm_values_rec_t*)heap.alloc_values();
+  rec->elts = (scm_obj_t*)heap.alloc_private(nsize * sizeof(scm_obj_t));
+  rec->nsize = nsize;
+  for (int i = 0; i < nsize; i++) {
+    rec->elts[i] = scm_unspecified;
+  }
+  rec->tag = tc6_tag(tc6_values);
+  return tc6_pointer(rec, tc6_values);
+}
+
 scm_obj_t make_u8vector(int nsize) {
   object_heap_t& heap = *object_heap_t::current();
   scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)heap.alloc_u8vector(nsize);
@@ -148,7 +160,6 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   object_heap_t& heap = *object_heap_t::current();
   scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)heap.alloc_hashtable();
   int nsize = calc_hashtable_size(capacity);
-  rec->lock.init();
   rec->hash = hash;
   rec->equiv = equiv;
   size_t aux_size = sizeof(hashtable_aux_t) + sizeof(scm_obj_t) * ((nsize + nsize) - 1);

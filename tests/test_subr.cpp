@@ -65,7 +65,7 @@ SUBR subr_cadar(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cddr(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_set_car_bang(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_length(scm_obj_t self, scm_obj_t a1);
 SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1);
@@ -75,6 +75,22 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
+
+// Hashtables
+SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_equal_hash(scm_obj_t self, scm_obj_t a1);
+SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_make_eqv_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_make_equal_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_hashtable_ref(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+SUBR subr_hashtable_delete(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_hashtable_contains(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_hashtable_clear(scm_obj_t self, scm_obj_t a1);
+SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
+SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1);
+SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]);
+// (call-with-values requires JIT bridge; tested in test_codegen)
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -912,13 +928,563 @@ void test_pairs_lists_extra() {
 
   // set-car!
   scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
-  subr_set_car_bang(scm_nil, p, make_fixnum(99));
+  subr_set_car(scm_nil, p, make_fixnum(99));
   ASSERT_TRUE(CAR(p) == make_fixnum(99));
 }
 
 // ---------------------------------------------------------------------------
-// main
+// hashtable? / equal-hash / make-eq-hashtable / make-eqv-hashtable  — R6RS §12
 // ---------------------------------------------------------------------------
+
+void test_hashtable_subrs() {
+  printf("--- hashtable? / equal-hash / make-eq-hashtable / make-eqv-hashtable ---\n");
+
+  // hashtable?
+  scm_obj_t args0[] = {};
+  scm_obj_t ht_eq = subr_make_eq_hashtable(scm_nil, 0, args0);
+  ASSERT_TRUE(is_hashtable(ht_eq));
+  PRED_TRUE(subr_hashtable_p, ht_eq);
+  PRED_FALSE(subr_hashtable_p, make_fixnum(0));
+  PRED_FALSE(subr_hashtable_p, scm_nil);
+  PRED_FALSE(subr_hashtable_p, make_vector(2, scm_nil));
+
+  // make-eq-hashtable without capacity
+  ASSERT_TRUE(is_hashtable(ht_eq));
+
+  // make-eq-hashtable with explicit capacity
+  scm_obj_t args_cap[] = {make_fixnum(64)};
+  scm_obj_t ht_eq2 = subr_make_eq_hashtable(scm_nil, 1, args_cap);
+  ASSERT_TRUE(is_hashtable(ht_eq2));
+
+  // make-eqv-hashtable without capacity
+  scm_obj_t ht_eqv = subr_make_eqv_hashtable(scm_nil, 0, args0);
+  ASSERT_TRUE(is_hashtable(ht_eqv));
+
+  // make-eqv-hashtable with explicit capacity
+  scm_obj_t ht_eqv2 = subr_make_eqv_hashtable(scm_nil, 1, args_cap);
+  ASSERT_TRUE(is_hashtable(ht_eqv2));
+
+  // make-equal-hashtable without capacity
+  scm_obj_t ht_equal = subr_make_equal_hashtable(scm_nil, 0, args0);
+  ASSERT_TRUE(is_hashtable(ht_equal));
+
+  // make-equal-hashtable with explicit capacity
+  scm_obj_t ht_equal2 = subr_make_equal_hashtable(scm_nil, 1, args_cap);
+  ASSERT_TRUE(is_hashtable(ht_equal2));
+
+  // equal-hash: same structural value → same hash
+  scm_obj_t h1 = subr_equal_hash(scm_nil, make_fixnum(42));
+  scm_obj_t h2 = subr_equal_hash(scm_nil, make_fixnum(42));
+  ASSERT_TRUE(is_fixnum(h1));
+  ASSERT_TRUE(h1 == h2);
+
+  // equal-hash on strings: equal content → same hash
+  scm_obj_t hs1 = subr_equal_hash(scm_nil, make_string("hello"));
+  scm_obj_t hs2 = subr_equal_hash(scm_nil, make_string("hello"));
+  ASSERT_TRUE(is_fixnum(hs1));
+  ASSERT_TRUE(hs1 == hs2);
+
+  // equal-hash on lists: equal structure → same hash
+  scm_obj_t hl1 = subr_equal_hash(scm_nil, make_proper_list_123());
+  scm_obj_t hl2 = subr_equal_hash(scm_nil, make_proper_list_123());
+  ASSERT_TRUE(hl1 == hl2);
+
+  // equal-hash result is a non-negative fixnum
+  ASSERT_TRUE(fixnum(h1) >= 0);
+  ASSERT_TRUE(fixnum(hs1) >= 0);
+  ASSERT_TRUE(fixnum(hl1) >= 0);
+}
+
+// ---------------------------------------------------------------------------
+// hashtable-ref / hashtable-set! / hashtable-delete! /
+// hashtable-contains? / hashtable-clear!  — R6RS §12.3
+// ---------------------------------------------------------------------------
+
+// Helper: make an eq-hashtable with no capacity hint
+static scm_obj_t make_eq_ht() {
+  scm_obj_t args0[] = {};
+  return subr_make_eq_hashtable(scm_nil, 0, args0);
+}
+
+// Helper: call hashtable-ref with 2 args (no default; raises on miss)
+static scm_obj_t ht_ref2(scm_obj_t ht, scm_obj_t key) {
+  scm_obj_t args[] = {ht, key};
+  return subr_hashtable_ref(scm_nil, 2, args);
+}
+
+// Helper: call hashtable-ref with 3 args (explicit default)
+static scm_obj_t ht_ref3(scm_obj_t ht, scm_obj_t key, scm_obj_t def) {
+  scm_obj_t args[] = {ht, key, def};
+  return subr_hashtable_ref(scm_nil, 3, args);
+}
+
+void test_hashtable_ops() {
+  printf("--- hashtable-set! / hashtable-ref / hashtable-contains? / hashtable-delete! / hashtable-clear! ---\n");
+
+  // ----------------------------------------------------------------
+  // hashtable-set! + hashtable-ref (3-arg, with default)
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t ht = make_eq_ht();
+    scm_obj_t k = make_symbol("x");
+    scm_obj_t v = make_fixnum(42);
+
+    // Key absent: returns default
+    ASSERT_TRUE(ht_ref3(ht, k, scm_false) == scm_false);
+
+    // After set!, ref returns the stored value
+    ASSERT_TRUE(subr_hashtable_set(scm_nil, ht, k, v) == scm_unspecified);
+    ASSERT_TRUE(ht_ref3(ht, k, scm_false) == v);
+
+    // Overwrite: new value replaces old
+    scm_obj_t v2 = make_fixnum(99);
+    subr_hashtable_set(scm_nil, ht, k, v2);
+    ASSERT_TRUE(ht_ref3(ht, k, scm_false) == v2);
+
+    // Different key still absent
+    scm_obj_t k2 = make_symbol("y");
+    ASSERT_TRUE(ht_ref3(ht, k2, make_fixnum(0)) == make_fixnum(0));
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-ref (2-arg): raises on missing key
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t ht = make_eq_ht();
+    scm_obj_t k = make_symbol("missing");
+    bool threw = false;
+    try {
+      ht_ref2(ht, k);
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    // After insertion, 2-arg ref succeeds
+    scm_obj_t v = make_fixnum(7);
+    subr_hashtable_set(scm_nil, ht, k, v);
+    ASSERT_TRUE(ht_ref2(ht, k) == v);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-contains?
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t ht = make_eq_ht();
+    scm_obj_t k = make_symbol("present");
+
+    // Not present initially
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, k) == scm_false);
+
+    // Present after set!
+    subr_hashtable_set(scm_nil, ht, k, make_fixnum(1));
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, k) == scm_true);
+
+    // Different key remains absent
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, make_symbol("absent")) == scm_false);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-delete!
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t ht = make_eq_ht();
+    scm_obj_t k = make_symbol("del");
+    scm_obj_t v = make_fixnum(55);
+
+    // Delete absent key: no-op, returns unspecified
+    ASSERT_TRUE(subr_hashtable_delete(scm_nil, ht, k) == scm_unspecified);
+
+    // Insert then delete
+    subr_hashtable_set(scm_nil, ht, k, v);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, k) == scm_true);
+    ASSERT_TRUE(subr_hashtable_delete(scm_nil, ht, k) == scm_unspecified);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, k) == scm_false);
+    ASSERT_TRUE(ht_ref3(ht, k, scm_false) == scm_false);
+
+    // Re-inserting after delete works correctly
+    subr_hashtable_set(scm_nil, ht, k, make_fixnum(77));
+    ASSERT_TRUE(ht_ref3(ht, k, scm_false) == make_fixnum(77));
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-clear!
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t ht = make_eq_ht();
+    scm_obj_t ka = make_symbol("a");
+    scm_obj_t kb = make_symbol("b");
+    scm_obj_t kc = make_symbol("c");
+
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(1));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(2));
+    subr_hashtable_set(scm_nil, ht, kc, make_fixnum(3));
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, ka) == scm_true);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, kb) == scm_true);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, kc) == scm_true);
+
+    // Clear returns unspecified
+    ASSERT_TRUE(subr_hashtable_clear(scm_nil, ht) == scm_unspecified);
+
+    // All keys are gone
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, ka) == scm_false);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, kb) == scm_false);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, kc) == scm_false);
+    ASSERT_TRUE(ht_ref3(ht, ka, scm_false) == scm_false);
+
+    // Hashtable is still usable after clear
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(10));
+    ASSERT_TRUE(ht_ref3(ht, ka, scm_false) == make_fixnum(10));
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht, kb) == scm_false);
+  }
+
+  // ----------------------------------------------------------------
+  // Multiple hashtable types: eqv-hashtable (fixnum keys), equal-hashtable (string keys)
+  // ----------------------------------------------------------------
+  {
+    // eqv-hashtable with fixnum keys
+    scm_obj_t args0[] = {};
+    scm_obj_t ht_eqv = subr_make_eqv_hashtable(scm_nil, 0, args0);
+    scm_obj_t ki = make_fixnum(123);
+    subr_hashtable_set(scm_nil, ht_eqv, ki, make_fixnum(456));
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht_eqv, make_fixnum(123)) == scm_true);
+    ASSERT_TRUE(ht_ref3(ht_eqv, make_fixnum(123), scm_false) == make_fixnum(456));
+    ASSERT_TRUE(ht_ref3(ht_eqv, make_fixnum(124), scm_false) == scm_false);
+    subr_hashtable_delete(scm_nil, ht_eqv, ki);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht_eqv, ki) == scm_false);
+
+    // equal-hashtable with string keys (content-based lookup)
+    scm_obj_t ht_eq = subr_make_equal_hashtable(scm_nil, 0, args0);
+    scm_obj_t ks1 = make_string("hello");
+    scm_obj_t ks2 = make_string("hello");  // same content, different object
+    subr_hashtable_set(scm_nil, ht_eq, ks1, make_fixnum(99));
+    // equal-hashtable uses equal? so ks2 (same content) should find the entry
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht_eq, ks2) == scm_true);
+    ASSERT_TRUE(ht_ref3(ht_eq, ks2, scm_false) == make_fixnum(99));
+    subr_hashtable_clear(scm_nil, ht_eq);
+    ASSERT_TRUE(subr_hashtable_contains(scm_nil, ht_eq, ks1) == scm_false);
+  }
+
+  // ----------------------------------------------------------------
+  // Error handling: type checks
+  // ----------------------------------------------------------------
+  {
+    auto throws = [](auto fn) {
+      bool threw = false;
+      try {
+        fn();
+      } catch (const std::runtime_error&) {
+        threw = true;
+      }
+      return threw;
+    };
+    scm_obj_t not_ht = make_fixnum(0);
+    scm_obj_t dummy_k = make_fixnum(1);
+    scm_obj_t dummy_v = make_fixnum(2);
+    scm_obj_t ht = make_eq_ht();
+
+    // non-hashtable first arg
+    ASSERT_TRUE(throws([&] { subr_hashtable_set(scm_nil, not_ht, dummy_k, dummy_v); }));
+    ASSERT_TRUE(throws([&] {
+      scm_obj_t a[] = {not_ht, dummy_k};
+      subr_hashtable_ref(scm_nil, 2, a);
+    }));
+    ASSERT_TRUE(throws([&] { subr_hashtable_delete(scm_nil, not_ht, dummy_k); }));
+    ASSERT_TRUE(throws([&] { subr_hashtable_contains(scm_nil, not_ht, dummy_k); }));
+    ASSERT_TRUE(throws([&] { subr_hashtable_clear(scm_nil, not_ht); }));
+    (void)ht;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// values / hashtable-entries  — R6RS §11.14, §12.3
+// ---------------------------------------------------------------------------
+
+void test_values_and_entries() {
+  printf("--- values / hashtable-entries ---\n");
+
+  // ----------------------------------------------------------------
+  // values: single value is returned unwrapped (identity)
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args1[] = {make_fixnum(42)};
+    scm_obj_t v1 = subr_values(scm_nil, 1, args1);
+    ASSERT_TRUE(v1 == make_fixnum(42));  // single value: passthrough
+    ASSERT_TRUE(!is_values(v1));         // not wrapped in a values object
+  }
+
+  // ----------------------------------------------------------------
+  // values: zero args → wrapped empty values object
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t v0 = subr_values(scm_nil, 0, nullptr);
+    ASSERT_TRUE(is_values(v0));
+    ASSERT_TRUE(values_nsize(v0) == 0);
+  }
+
+  // ----------------------------------------------------------------
+  // values: two args → wrapped values object with correct elements
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args2[] = {make_fixnum(10), make_fixnum(20)};
+    scm_obj_t v2 = subr_values(scm_nil, 2, args2);
+    ASSERT_TRUE(is_values(v2));
+    ASSERT_TRUE(values_nsize(v2) == 2);
+    ASSERT_TRUE(values_elts(v2)[0] == make_fixnum(10));
+    ASSERT_TRUE(values_elts(v2)[1] == make_fixnum(20));
+  }
+
+  // ----------------------------------------------------------------
+  // values: three args
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args3[] = {make_symbol("a"), make_fixnum(99), scm_true};
+    scm_obj_t v3 = subr_values(scm_nil, 3, args3);
+    ASSERT_TRUE(is_values(v3));
+    ASSERT_TRUE(values_nsize(v3) == 3);
+    ASSERT_TRUE(values_elts(v3)[0] == make_symbol("a"));
+    ASSERT_TRUE(values_elts(v3)[1] == make_fixnum(99));
+    ASSERT_TRUE(values_elts(v3)[2] == scm_true);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-entries: empty hashtable
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t entries = subr_hashtable_entries(scm_nil, ht);
+    ASSERT_TRUE(is_values(entries));
+    ASSERT_TRUE(values_nsize(entries) == 2);
+    scm_obj_t keys_v = values_elts(entries)[0];
+    scm_obj_t vals_v = values_elts(entries)[1];
+    ASSERT_TRUE(is_vector(keys_v));
+    ASSERT_TRUE(is_vector(vals_v));
+    ASSERT_TRUE(vector_nsize(keys_v) == 0);
+    ASSERT_TRUE(vector_nsize(vals_v) == 0);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-entries: three entries — verify keys and values appear
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t ka = make_symbol("alpha");
+    scm_obj_t kb = make_symbol("beta");
+    scm_obj_t kc = make_symbol("gamma");
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(1));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(2));
+    subr_hashtable_set(scm_nil, ht, kc, make_fixnum(3));
+
+    scm_obj_t entries = subr_hashtable_entries(scm_nil, ht);
+    ASSERT_TRUE(is_values(entries));
+    scm_obj_t keys_v = values_elts(entries)[0];
+    scm_obj_t vals_v = values_elts(entries)[1];
+    ASSERT_TRUE(is_vector(keys_v));
+    ASSERT_TRUE(is_vector(vals_v));
+    ASSERT_TRUE(vector_nsize(keys_v) == 3);
+    ASSERT_TRUE(vector_nsize(vals_v) == 3);
+
+    // Verify each key has its value in the parallel position
+    bool found_a = false, found_b = false, found_c = false;
+    for (int i = 0; i < 3; i++) {
+      scm_obj_t k = vector_elts(keys_v)[i];
+      scm_obj_t v = vector_elts(vals_v)[i];
+      if (k == ka) {
+        ASSERT_TRUE(v == make_fixnum(1));
+        found_a = true;
+      }
+      if (k == kb) {
+        ASSERT_TRUE(v == make_fixnum(2));
+        found_b = true;
+      }
+      if (k == kc) {
+        ASSERT_TRUE(v == make_fixnum(3));
+        found_c = true;
+      }
+    }
+    ASSERT_TRUE(found_a);
+    ASSERT_TRUE(found_b);
+    ASSERT_TRUE(found_c);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-entries: after delete, deleted key absent from vectors
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t ka = make_symbol("x");
+    scm_obj_t kb = make_symbol("y");
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(10));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(20));
+    subr_hashtable_delete(scm_nil, ht, ka);
+
+    scm_obj_t entries = subr_hashtable_entries(scm_nil, ht);
+    scm_obj_t keys_v = values_elts(entries)[0];
+    scm_obj_t vals_v = values_elts(entries)[1];
+    ASSERT_TRUE(vector_nsize(keys_v) == 1);
+    ASSERT_TRUE(vector_nsize(vals_v) == 1);
+    ASSERT_TRUE(vector_elts(keys_v)[0] == kb);
+    ASSERT_TRUE(vector_elts(vals_v)[0] == make_fixnum(20));
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-entries: after clear, both vectors are empty
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    subr_hashtable_set(scm_nil, ht, make_symbol("p"), make_fixnum(1));
+    subr_hashtable_set(scm_nil, ht, make_symbol("q"), make_fixnum(2));
+    subr_hashtable_clear(scm_nil, ht);
+
+    scm_obj_t entries = subr_hashtable_entries(scm_nil, ht);
+    ASSERT_TRUE(vector_nsize(values_elts(entries)[0]) == 0);
+    ASSERT_TRUE(vector_nsize(values_elts(entries)[1]) == 0);
+  }
+
+  // ----------------------------------------------------------------
+  // hashtable-entries: type check
+  // ----------------------------------------------------------------
+  {
+    bool threw = false;
+    try {
+      subr_hashtable_entries(scm_nil, make_fixnum(0));
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    ASSERT_TRUE(threw);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// hashtable-alist  - digamma extension
+// ---------------------------------------------------------------------------
+
+void test_hashtable_alist() {
+  printf("--- hashtable-alist ---\n");
+
+  // ----------------------------------------------------------------
+  // empty hashtable -> '()
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
+    ASSERT_TRUE(alist == scm_nil);
+  }
+
+  // ----------------------------------------------------------------
+  // three entries -> proper alist with correct pairs
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t ka = make_symbol("alpha");
+    scm_obj_t kb = make_symbol("beta");
+    scm_obj_t kc = make_symbol("gamma");
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(1));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(2));
+    subr_hashtable_set(scm_nil, ht, kc, make_fixnum(3));
+
+    scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
+
+    // Must be a proper list of length 3
+    int count = 0;
+    bool found_a = false, found_b = false, found_c = false;
+    scm_obj_t cur = alist;
+    while (is_cons(cur)) {
+      scm_obj_t p = CAR(cur);
+      ASSERT_TRUE(is_cons(p));
+      scm_obj_t k = CAR(p);
+      scm_obj_t v = CDR(p);
+      if (k == ka) {
+        ASSERT_TRUE(v == make_fixnum(1));
+        found_a = true;
+      }
+      if (k == kb) {
+        ASSERT_TRUE(v == make_fixnum(2));
+        found_b = true;
+      }
+      if (k == kc) {
+        ASSERT_TRUE(v == make_fixnum(3));
+        found_c = true;
+      }
+      count++;
+      cur = CDR(cur);
+    }
+    ASSERT_TRUE(cur == scm_nil);  // proper list
+    ASSERT_TRUE(count == 3);
+    ASSERT_TRUE(found_a);
+    ASSERT_TRUE(found_b);
+    ASSERT_TRUE(found_c);
+  }
+
+  // ----------------------------------------------------------------
+  // after delete, deleted key absent from alist
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t ka = make_symbol("x");
+    scm_obj_t kb = make_symbol("y");
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(10));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(20));
+    subr_hashtable_delete(scm_nil, ht, ka);
+
+    scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
+    ASSERT_TRUE(is_cons(alist));
+    ASSERT_TRUE(CDR(alist) == scm_nil);  // exactly one entry
+    scm_obj_t p = CAR(alist);
+    ASSERT_TRUE(CAR(p) == kb);
+    ASSERT_TRUE(CDR(p) == make_fixnum(20));
+  }
+
+  // ----------------------------------------------------------------
+  // after clear, alist is empty
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    subr_hashtable_set(scm_nil, ht, make_symbol("p"), make_fixnum(1));
+    subr_hashtable_clear(scm_nil, ht);
+    ASSERT_TRUE(subr_hashtable_alist(scm_nil, ht) == scm_nil);
+  }
+
+  // ----------------------------------------------------------------
+  // assq on the alist works correctly
+  // ----------------------------------------------------------------
+  {
+    scm_obj_t args0[] = {};
+    scm_obj_t ht = subr_make_eq_hashtable(scm_nil, 0, args0);
+    scm_obj_t ka = make_symbol("foo");
+    scm_obj_t kb = make_symbol("bar");
+    subr_hashtable_set(scm_nil, ht, ka, make_fixnum(42));
+    subr_hashtable_set(scm_nil, ht, kb, make_fixnum(99));
+
+    scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
+    scm_obj_t found_a = subr_assq(scm_nil, ka, alist);
+    scm_obj_t found_b = subr_assq(scm_nil, kb, alist);
+    ASSERT_TRUE(is_cons(found_a) && CDR(found_a) == make_fixnum(42));
+    ASSERT_TRUE(is_cons(found_b) && CDR(found_b) == make_fixnum(99));
+    ASSERT_TRUE(subr_assq(scm_nil, make_symbol("absent"), alist) == scm_false);
+  }
+
+  // ----------------------------------------------------------------
+  // type check
+  // ----------------------------------------------------------------
+  {
+    bool threw = false;
+    try {
+      subr_hashtable_alist(scm_nil, make_fixnum(0));
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    ASSERT_TRUE(threw);
+  }
+}
 
 int main(int argc, char** argv) {
   printf("Starting test_subr\n");
@@ -960,6 +1526,10 @@ int main(int argc, char** argv) {
   test_char_numeric_p();
   test_max();
   test_pairs_lists_extra();
+  test_hashtable_subrs();
+  test_hashtable_ops();
+  test_values_and_entries();
+  test_hashtable_alist();
 
   heap->destroy();
   delete heap;

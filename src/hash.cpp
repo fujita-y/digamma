@@ -212,7 +212,6 @@ scm_obj_t hashtable_ref(scm_obj_t obj, scm_obj_t key, scm_obj_t default_value) {
 void hashtable_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
   assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
-  scoped_lock lock(ht->lock);
   object_heap_t::current()->write_barrier(key);
   object_heap_t::current()->write_barrier(value);
   int n = put(ht, key, value);
@@ -222,6 +221,19 @@ void hashtable_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
 void hashtable_delete(scm_obj_t obj, scm_obj_t key) {
   assert(is_hashtable(obj));
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
-  scoped_lock lock(ht->lock);
   remove(ht, key);
+}
+
+void hashtable_clear(scm_obj_t obj) {
+  assert(is_hashtable(obj));
+  scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(obj);
+  hashtable_aux_t* aux = ht->aux;
+  int nsize = aux->capacity;
+  // Reset all key slots to scm_hash_free and value slots to scm_undef
+  for (int i = 0; i < nsize; i++) {
+    aux->elts[i] = scm_hash_free;
+    aux->elts[i + nsize] = scm_undef;
+  }
+  aux->used = 0;
+  aux->live = 0;
 }

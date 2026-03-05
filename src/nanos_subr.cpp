@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "object.h"
+#include "codegen.h"
 #include "codegen_aux.h"
 #include "equiv.h"
 #include "hash.h"
@@ -15,9 +16,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <sstream>
 
 // ============================================================================
-// Arithmetic
+// Arithmetic  - R6RS 11.7
 // ============================================================================
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -92,7 +94,7 @@ SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
-// Numeric Comparisons
+// Numeric Comparisons  - R6RS 11.7.3
 // ============================================================================
 
 SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -192,11 +194,13 @@ SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
-// Pairs & Lists
+// Pairs & Lists  - R6RS 11.9
 // ============================================================================
 
+// cons  - R6RS 11.9
 SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1, a2); }
 
+// car  - R6RS 11.9
 SUBR subr_car(scm_obj_t self, scm_obj_t a1) {
   if (is_cons(a1)) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
@@ -205,6 +209,7 @@ SUBR subr_car(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("car: argument must be a cons cell");
 }
 
+// cdr  - R6RS 11.9
 SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   if (is_cons(a1)) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
@@ -213,10 +218,16 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("cdr: argument must be a cons cell");
 }
 
+// cadr, caddr, caar, cadar, cadddr, cddr, cdddr  - R6RS 11.9
 SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
-
 SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
+SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
+SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
 
+// list  - R6RS 11.9
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t list = scm_nil;
   for (int i = argc - 1; i >= 0; i--) {
@@ -239,6 +250,7 @@ static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
   return head;
 }
 
+// append  - R6RS 11.9
 SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return scm_nil;
   if (argc == 1) return argv[0];
@@ -252,13 +264,8 @@ SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return obj;
 }
 
-SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
-SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
-SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
-SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
-
-SUBR subr_set_car_bang(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+// set-car!  - R6RS 11.9
+SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (is_cons(a1)) {
     object_heap_t::current()->write_barrier(a2);
     CAR(a1) = a2;
@@ -267,6 +274,7 @@ SUBR subr_set_car_bang(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   throw std::runtime_error("set-car!: argument must be a cons cell");
 }
 
+// length  - R6RS 11.9
 SUBR subr_length(scm_obj_t self, scm_obj_t a1) {
   int len = 0;
   scm_obj_t slow = a1;
@@ -285,6 +293,7 @@ SUBR subr_length(scm_obj_t self, scm_obj_t a1) {
   }
 }
 
+// list-ref  - R6RS 11.9
 SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_fixnum(a2)) throw std::runtime_error("list-ref: second argument must be an exact integer");
   intptr_t k = fixnum(a2);
@@ -299,6 +308,7 @@ SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return CAR(cur);
 }
 
+// list->vector  - R6RS 11.13
 SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1) {
   int len = 0;
   scm_obj_t cur = a1;
@@ -317,6 +327,7 @@ SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1) {
   return v;
 }
 
+// memq  - R6RS 11.9
 SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
@@ -327,6 +338,7 @@ SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return scm_false;
 }
 
+// memv  - R6RS 11.9
 SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
@@ -337,6 +349,7 @@ SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return scm_false;
 }
 
+// member  - R6RS 11.9
 SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
@@ -348,6 +361,7 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return scm_false;
 }
 
+// assq  - R6RS 11.9
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
@@ -360,6 +374,7 @@ SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return scm_false;
 }
 
+// assoc  - R6RS 11.9
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
@@ -373,6 +388,7 @@ SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return scm_false;
 }
 
+// reverse  - R6RS 11.9
 SUBR subr_reverse(scm_obj_t self, scm_obj_t a1) {
   scm_obj_t cur = a1;
   scm_obj_t result = scm_nil;
@@ -388,41 +404,42 @@ SUBR subr_reverse(scm_obj_t self, scm_obj_t a1) {
 // Predicates & Logic
 // ============================================================================
 
+// not  - R6RS 11.8
 SUBR subr_not(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_false) ? scm_true : scm_false; }
 
-// boolean?
+// boolean?  - R6RS 11.8
 SUBR subr_boolean_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_true || a1 == scm_false) ? scm_true : scm_false; }
 
-// char?
+// char?  - R6RS 11.11
 SUBR subr_char_p(scm_obj_t self, scm_obj_t a1) { return is_char(a1) ? scm_true : scm_false; }
 
-// eq?
+// eq?  - R6RS 11.5
 SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return (a1 == a2) ? scm_true : scm_false; }
 
-// eqv?
+// eqv?  - R6RS 11.5
 SUBR subr_eqv_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return eqv_p(a1, a2) ? scm_true : scm_false; }
 
-// equal?
+// equal?  - R6RS 11.5
 SUBR subr_equal_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
   return equal_p(visited, a1, a2) ? scm_true : scm_false;
 }
 
-// exact?
+// exact?  - R6RS 11.7.2
 SUBR subr_exact_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return scm_true;
   if (is_short_flonum(a1) || is_long_flonum(a1)) return scm_false;
   throw std::runtime_error("exact?: argument must be a number");
 }
 
-// inexact?
+// inexact?  - R6RS 11.7.2
 SUBR subr_inexact_p(scm_obj_t self, scm_obj_t a1) {
   if (is_short_flonum(a1) || is_long_flonum(a1)) return scm_true;
   if (is_fixnum(a1)) return scm_false;
   throw std::runtime_error("inexact?: argument must be a number");
 }
 
-// infinite?
+// infinite?  - R6RS 11.7.3
 SUBR subr_infinite_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return scm_false;
   if (is_short_flonum(a1)) return std::isinf(flonum(a1)) ? scm_true : scm_false;
@@ -430,7 +447,7 @@ SUBR subr_infinite_p(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("infinite?: argument must be a real number");
 }
 
-// integer?
+// integer?  - R6RS 11.7.2
 SUBR subr_integer_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return scm_true;
   if (is_short_flonum(a1) || is_long_flonum(a1)) {
@@ -440,7 +457,7 @@ SUBR subr_integer_p(scm_obj_t self, scm_obj_t a1) {
   return scm_false;
 }
 
-// list? (tortoise-and-hare cycle detection)
+// list?  - R6RS 11.9 (tortoise-and-hare cycle detection)
 SUBR subr_list_p(scm_obj_t self, scm_obj_t a1) {
   scm_obj_t slow = a1;
   scm_obj_t fast = a1;
@@ -456,42 +473,42 @@ SUBR subr_list_p(scm_obj_t self, scm_obj_t a1) {
   }
 }
 
-// null?
+// null?  - R6RS 11.9
 SUBR subr_null_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_nil) ? scm_true : scm_false; }
 
-// number?
+// number?  - R6RS 11.7.2
 SUBR subr_number_p(scm_obj_t self, scm_obj_t a1) { return (is_fixnum(a1) || is_short_flonum(a1) || is_long_flonum(a1)) ? scm_true : scm_false; }
 
-// nan?
+// nan?  - R6RS 11.7.3
 SUBR subr_nan_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return scm_false;
   if (is_short_flonum(a1) || is_long_flonum(a1)) return std::isnan(flonum(a1)) ? scm_true : scm_false;
   throw std::runtime_error("nan?: argument must be a real number");
 }
 
-// pair?
+// pair?  - R6RS 11.9
 SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1) { return is_cons(a1) ? scm_true : scm_false; }
 
-// procedure?
+// procedure?  - R6RS 11.6
 SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1) { return (is_closure(a1) || is_continuation(a1) || is_escape(a1)) ? scm_true : scm_false; }
 
-// real?
+// real?  - R6RS 11.7.2
 SUBR subr_real_p(scm_obj_t self, scm_obj_t a1) { return (is_fixnum(a1) || is_short_flonum(a1) || is_long_flonum(a1)) ? scm_true : scm_false; }
 
-// string?
+// string?  - R6RS 11.12
 SUBR subr_string_p(scm_obj_t self, scm_obj_t a1) { return is_string(a1) ? scm_true : scm_false; }
 
-// symbol?
+// symbol?  - R6RS 11.10
 SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1) { return is_symbol(a1) ? scm_true : scm_false; }
 
-// vector?
+// vector?  - R6RS 11.13
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1) { return is_vector(a1) ? scm_true : scm_false; }
 
 // ============================================================================
-// Vectors
+// Vectors  - R6RS 11.13
 // ============================================================================
 
-// vector
+// vector  - R6RS 11.13
 SUBR subr_vector(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t v = make_vector(argc, scm_undef);
   scm_obj_t* elts = vector_elts(v);
@@ -499,13 +516,13 @@ SUBR subr_vector(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return v;
 }
 
-// vector-length
+// vector-length  - R6RS 11.13
 SUBR subr_vector_length(scm_obj_t self, scm_obj_t a1) {
   if (is_vector(a1)) return make_fixnum(vector_nsize(a1));
   throw std::runtime_error("vector-length: argument must be a vector");
 }
 
-// vector-ref
+// vector-ref  - R6RS 11.13
 SUBR subr_vector_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_vector(a1)) throw std::runtime_error("vector-ref: first argument must be a vector");
   if (!is_fixnum(a2)) throw std::runtime_error("vector-ref: second argument must be an exact integer");
@@ -515,7 +532,7 @@ SUBR subr_vector_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return vector_elts(a1)[n];
 }
 
-// vector-set!
+// vector-set!  - R6RS 11.13
 SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (!is_vector(a1)) throw std::runtime_error("vector-set!: first argument must be a vector");
   if (!is_fixnum(a2)) throw std::runtime_error("vector-set!: second argument must be an exact integer");
@@ -527,7 +544,7 @@ SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   return scm_undef;
 }
 
-// vector->list
+// vector->list  - R6RS 11.13
 SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1) {
   if (!is_vector(a1)) throw std::runtime_error("vector->list: argument must be a vector");
   int n = vector_nsize(a1);
@@ -538,16 +555,16 @@ SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1) {
 }
 
 // ============================================================================
-// Strings
+// Strings  - R6RS 11.12
 // ============================================================================
 
-// string-length  (byte length — ASCII/UTF-8 byte count)
+// string-length  - R6RS 11.12 (byte length - ASCII/UTF-8 byte count)
 SUBR subr_string_length(scm_obj_t self, scm_obj_t a1) {
   if (!is_string(a1)) throw std::runtime_error("string-length: argument must be a string");
   return make_fixnum((intptr_t)strlen((const char*)string_name(a1)));
 }
 
-// string-ref  (byte index → char)
+// string-ref  - R6RS 11.12 (byte index → char)
 SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_string(a1)) throw std::runtime_error("string-ref: first argument must be a string");
   if (!is_fixnum(a2)) throw std::runtime_error("string-ref: second argument must be an exact integer");
@@ -570,14 +587,14 @@ SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return make_char(ucs4);
 }
 
-// string=?
+// string=?  - R6RS 11.12
 SUBR subr_string_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_string(a1)) throw std::runtime_error("string=?: arguments must be strings");
   if (!is_string(a2)) throw std::runtime_error("string=?: arguments must be strings");
   return strcmp((const char*)string_name(a1), (const char*)string_name(a2)) == 0 ? scm_true : scm_false;
 }
 
-// string-append
+// string-append  - R6RS 11.12
 SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   size_t total = 0;
   for (int i = 0; i < argc; i++) {
@@ -590,7 +607,7 @@ SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_string(buf.c_str());
 }
 
-// substring  (byte offsets)
+// substring  - R6RS 11.12 (byte offsets)
 SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (!is_string(a1)) throw std::runtime_error("substring: first argument must be a string");
   if (!is_fixnum(a2)) throw std::runtime_error("substring: second argument must be an exact integer");
@@ -606,19 +623,19 @@ SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   return make_string(buf.c_str());
 }
 
-// symbol->string
+// symbol->string  - R6RS 11.10
 SUBR subr_symbol_to_string(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("symbol->string: argument must be a symbol");
   return make_string((const char*)symbol_name(a1));
 }
 
-// string->symbol
+// string->symbol  - R6RS 11.10
 SUBR subr_string_to_symbol(scm_obj_t self, scm_obj_t a1) {
   if (!is_string(a1)) throw std::runtime_error("string->symbol: argument must be a string");
   return make_symbol((const char*)string_name(a1));
 }
 
-// number->string  (radix 2/8/10/16; fixnum or flonum)
+// number->string  - R6RS 11.7.3 (radix 2/8/10/16; fixnum or flonum)
 SUBR subr_number_to_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 2) throw std::runtime_error("number->string: wrong number of arguments");
   int radix = 10;
@@ -678,7 +695,7 @@ SUBR subr_number_to_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
   throw std::runtime_error("number->string: argument must be a number");
 }
 
-// string->number  (radix 2/8/10/16; returns #f on failure)
+// string->number  - R6RS 11.7.3 (radix 2/8/10/16; returns #f on failure)
 SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 2) throw std::runtime_error("string->number: wrong number of arguments");
   if (!is_string(argv[0])) throw std::runtime_error("string->number: first argument must be a string");
@@ -705,18 +722,18 @@ SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
-// Characters
+// Characters  - R6RS 11.11
 // ============================================================================
 
 static inline uint32_t char_ucs4(scm_obj_t x) { return (uint32_t)((uintptr_t)x >> 32); }
 
-// char=?
+// char=?  - R6RS 11.11
 SUBR subr_char_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_char(a1) || !is_char(a2)) throw std::runtime_error("char=?: arguments must be characters");
   return char_ucs4(a1) == char_ucs4(a2) ? scm_true : scm_false;
 }
 
-// char-numeric?
+// char-numeric?  - R6RS 11.11
 SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1) {
   if (!is_char(a1)) throw std::runtime_error("char-numeric?: argument must be a character");
   uint32_t c = char_ucs4(a1);
@@ -727,7 +744,7 @@ SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1) {
 // Arithmetic extras
 // ============================================================================
 
-// max
+// max  - R6RS 11.7.3
 SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) throw std::runtime_error("max: too few arguments");
   scm_obj_t result = argv[0];
@@ -748,19 +765,22 @@ SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
-// I/O
+// I/O  - R6RS 8
 // ============================================================================
 
+// write  - R6RS 8.3
 SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).write(a1);
   return scm_undef;
 }
 
+// display  - R6RS 8.3
 SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).display(a1);
   return scm_undef;
 }
 
+// newline  - R6RS 8.3
 SUBR subr_newline(scm_obj_t self) {
   std::cout << std::endl;
   return scm_undef;
@@ -793,10 +813,222 @@ SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
+// Error  - R6RS 11.14 (simplified: throws runtime_error instead of raising a condition)
+// ============================================================================
+
+// error  - R6RS 11.14 signature, simplified: throws std::runtime_error
+// (error message irritant ...)
+SUBR subr_error(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  std::ostringstream oss;
+  oss << "error: ";
+  if (argc >= 1) {
+    printer_t(oss).display(argv[0]);  // message: display mode (no quotes on strings)
+  }
+  for (int i = 1; i < argc; i++) {
+    oss << " ";
+    printer_t(oss).write(argv[i]);  // irritants: write mode (quoted)
+  }
+  throw std::runtime_error(oss.str());
+}
+
+// ============================================================================
 // Application & Control
 // ============================================================================
 
 SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]) { return c_apply_helper(argv[0], argc - 1, &argv[1]); }
+
+// ============================================================================
+// Hashtables
+// ============================================================================
+
+// hashtable?  - R6RS 12.1
+SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1) { return is_hashtable(a1) ? scm_true : scm_false; }
+
+// equal-hash  - R6RS 12.4
+SUBR subr_equal_hash(scm_obj_t self, scm_obj_t a1) { return make_fixnum((intptr_t)equal_hash(a1, INT32_MAX)); }
+
+// make-eq-hashtable  - R6RS 12.2
+SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("make-eq-hashtable: too many arguments");
+  int capacity = 32;
+  if (argc == 1) {
+    if (!is_fixnum(argv[0])) throw std::runtime_error("make-eq-hashtable: capacity must be an exact integer");
+    intptr_t cap = fixnum(argv[0]);
+    if (cap < 0) throw std::runtime_error("make-eq-hashtable: capacity must be non-negative");
+    capacity = (int)cap;
+  }
+  return make_hashtable(address_hash, address_equiv, capacity);
+}
+
+// make-eqv-hashtable  - R6RS 12.2
+SUBR subr_make_eqv_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("make-eqv-hashtable: too many arguments");
+  int capacity = 32;
+  if (argc == 1) {
+    if (!is_fixnum(argv[0])) throw std::runtime_error("make-eqv-hashtable: capacity must be an exact integer");
+    intptr_t cap = fixnum(argv[0]);
+    if (cap < 0) throw std::runtime_error("make-eqv-hashtable: capacity must be non-negative");
+    capacity = (int)cap;
+  }
+  return make_hashtable(eqv_hash, eqv_equiv, capacity);
+}
+
+// make-equal-hashtable  - digamma extension
+SUBR subr_make_equal_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("make-equal-hashtable: too many arguments");
+  int capacity = 32;
+  if (argc == 1) {
+    if (!is_fixnum(argv[0])) throw std::runtime_error("make-equal-hashtable: capacity must be an exact integer");
+    intptr_t cap = fixnum(argv[0]);
+    if (cap < 0) throw std::runtime_error("make-equal-hashtable: capacity must be non-negative");
+    capacity = (int)cap;
+  }
+  return make_hashtable(equal_hash, equal_equiv, capacity);
+}
+
+// hashtable-ref  - R6RS 12.3
+// (hashtable-ref ht key default)
+SUBR subr_hashtable_ref(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2 || argc > 3) throw std::runtime_error("hashtable-ref: wrong number of arguments");
+  if (!is_hashtable(argv[0])) throw std::runtime_error("hashtable-ref: first argument must be a hashtable");
+  scm_obj_t default_val = (argc == 3) ? argv[2] : scm_undef;
+  scm_obj_t result = hashtable_ref(argv[0], argv[1], default_val);
+  if (argc == 2 && result == scm_undef) throw std::runtime_error("hashtable-ref: key not found");
+  return result;
+}
+
+// hashtable-set!  - R6RS 12.3
+// (hashtable-set! ht key value)
+SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-set!: first argument must be a hashtable");
+  hashtable_set(a1, a2, a3);
+  return scm_unspecified;
+}
+
+// hashtable-delete!  - R6RS 12.3
+// (hashtable-delete! ht key)
+SUBR subr_hashtable_delete(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-delete!: first argument must be a hashtable");
+  hashtable_delete(a1, a2);
+  return scm_unspecified;
+}
+
+// hashtable-contains?  - R6RS 12.3
+// (hashtable-contains? ht key)
+SUBR subr_hashtable_contains(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-contains?: first argument must be a hashtable");
+  scm_obj_t result = hashtable_ref(a1, a2, scm_undef);
+  return (result != scm_undef) ? scm_true : scm_false;
+}
+
+// hashtable-clear!  - R6RS 12.3
+// (hashtable-clear! ht)
+SUBR subr_hashtable_clear(scm_obj_t self, scm_obj_t a1) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-clear!: first argument must be a hashtable");
+  hashtable_clear(a1);
+  return scm_unspecified;
+}
+
+// hashtable-entries  - R6RS 12.3
+// (hashtable-entries ht) => (values keys-vector values-vector)
+SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-entries: argument must be a hashtable");
+  scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(a1);
+  hashtable_aux_t* aux = ht->aux;
+  int nsize = aux->capacity;
+
+  // Count live entries
+  int live = aux->live;
+
+  // Allocate result vectors
+  scm_obj_t keys_vec = make_vector(live, scm_unspecified);
+  scm_obj_t vals_vec = make_vector(live, scm_unspecified);
+  scm_obj_t* keys_elts = vector_elts(keys_vec);
+  scm_obj_t* vals_elts = vector_elts(vals_vec);
+
+  int out = 0;
+  for (int i = 0; i < nsize; i++) {
+    scm_obj_t k = aux->elts[i];
+    if (k == scm_hash_free || k == scm_hash_deleted) continue;
+    keys_elts[out] = k;
+    vals_elts[out] = aux->elts[i + nsize];
+    out++;
+  }
+
+  // Pack into a 2-element values object
+  scm_obj_t result = make_values(2);
+  values_elts(result)[0] = keys_vec;
+  values_elts(result)[1] = vals_vec;
+  return result;
+}
+
+// hashtable-alist  - digamma extension
+// (hashtable-alist ht) => ((key . value) ...)
+// Like hashtable-entries but returns an association list instead of two vectors.
+SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-alist: argument must be a hashtable");
+  scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(a1);
+  hashtable_aux_t* aux = ht->aux;
+  int nsize = aux->capacity;
+
+  scm_obj_t head = scm_nil;
+  scm_obj_t tail = scm_nil;
+  for (int i = 0; i < nsize; i++) {
+    scm_obj_t k = aux->elts[i];
+    if (k == scm_hash_free || k == scm_hash_deleted) continue;
+    scm_obj_t pair = make_cons(k, aux->elts[i + nsize]);
+    scm_obj_t cell = make_cons(pair, scm_nil);
+    if (head == scm_nil) {
+      head = cell;
+      tail = cell;
+    } else {
+      CDR(tail) = cell;
+      tail = cell;
+    }
+  }
+  return head;
+}
+
+// ============================================================================
+// Multiple Return Values
+// ============================================================================
+
+// values  - R6RS 11.14
+// (values obj ...)  - pack zero or more objects into a values object
+SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  // Single value: return it directly (avoids wrapping for common case)
+  if (argc == 1) return argv[0];
+  scm_obj_t v = make_values(argc);
+  scm_obj_t* elts = values_elts(v);
+  for (int i = 0; i < argc; i++) elts[i] = argv[i];
+  return v;
+}
+
+// call-with-values  - R6RS 11.14
+// (call-with-values producer consumer)
+// Calls (producer), then applies consumer to the resulting values.
+SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consumer) {
+  if (!is_closure(producer)) throw std::runtime_error("call-with-values: first argument must be a procedure");
+  if (!is_closure(consumer)) throw std::runtime_error("call-with-values: second argument must be a procedure");
+
+  codegen_t* cg = codegen_t::current();
+  if (!cg) throw std::runtime_error("call-with-values: JIT not initialized");
+  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
+  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
+  auto bridge = (bridge_func_t)bridge_ptr;
+
+  // Step 1: call producer thunk
+  scm_obj_t result = (scm_obj_t)bridge(producer, 0, nullptr);
+
+  // Step 2: spread values (or single value) to consumer
+  if (is_values(result)) {
+    int n = values_nsize(result);
+    scm_obj_t* elts = values_elts(result);
+    return (scm_obj_t)bridge(consumer, n, elts);
+  } else {
+    return (scm_obj_t)bridge(consumer, 1, &result);
+  }
+}
 
 // ============================================================================
 // Initialization & Registration
@@ -832,7 +1064,7 @@ void nanos_t::init_subr() {
   reg("caddr", (void*)subr_caddr, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
-  reg("set-car!", (void*)subr_set_car_bang, 2, 0);
+  reg("set-car!", (void*)subr_set_car, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
   reg("list-ref", (void*)subr_list_ref, 2, 0);
   reg("list->vector", (void*)subr_list_to_vector, 1, 0);
@@ -897,12 +1129,31 @@ void nanos_t::init_subr() {
   reg("display", (void*)subr_display, 1, 0);
   reg("newline", (void*)subr_newline, 0, 0);
 
+  // hashtables
+  reg("hashtable?", (void*)subr_hashtable_p, 1, 0);
+  reg("equal-hash", (void*)subr_equal_hash, 1, 0);
+  reg("make-eq-hashtable", (void*)subr_make_eq_hashtable, 0, 1);
+  reg("make-eqv-hashtable", (void*)subr_make_eqv_hashtable, 0, 1);
+  reg("make-equal-hashtable", (void*)subr_make_equal_hashtable, 0, 1);
+  reg("hashtable-ref", (void*)subr_hashtable_ref, 2, 1);
+  reg("hashtable-set!", (void*)subr_hashtable_set, 3, 0);
+  reg("hashtable-delete!", (void*)subr_hashtable_delete, 2, 0);
+  reg("hashtable-contains?", (void*)subr_hashtable_contains, 2, 0);
+  reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, 0);
+  reg("hashtable-entries", (void*)subr_hashtable_entries, 1, 0);
+  reg("hashtable-alist", (void*)subr_hashtable_alist, 1, 0);
+
+  // multiple return values
+  reg("values", (void*)subr_values, 0, 1);
+  reg("call-with-values", (void*)subr_call_with_values, 2, 0);
+
   // GC & system
   reg("collect", (void*)subr_collect, 0, 0);
   reg("safepoint", (void*)subr_safepoint, 0, 0);
   reg("gensym", (void*)subr_gensym, 0, 1);
 
   // application & control
+  reg("error", (void*)subr_error, 1, 1);
   reg("apply", (void*)subr_apply, 0, 1);
   reg("call/ec", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);

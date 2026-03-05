@@ -54,6 +54,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_symbols.init(&m_concurrent_heap, clp2(sizeof(scm_symbol_rec_t)), true, true);
   m_strings.init(&m_concurrent_heap, clp2(sizeof(scm_string_rec_t)), true, true);
   m_vectors.init(&m_concurrent_heap, clp2(sizeof(scm_vector_rec_t)), true, true);
+  m_values.init(&m_concurrent_heap, clp2(sizeof(scm_values_rec_t)), true, true);
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
   m_environments.init(&m_concurrent_heap, clp2(sizeof(scm_environment_rec_t)), true, false);
@@ -75,6 +76,7 @@ void object_heap_t::destroy() {
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
   m_concurrent_pool.destroy();
+  s_current = nullptr;
 }
 
 void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
@@ -229,6 +231,13 @@ void object_heap_t::trace(void* obj) {
     }
     return;
   }
+  if (traits->owner == &m_values) {
+    scm_values_rec_t* rec = (scm_values_rec_t*)obj;
+    for (int i = 0; i < rec->nsize; i++) {
+      shade(rec->elts[i]);
+    }
+    return;
+  }
   if (traits->owner == &m_hashtables) {
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     hashtable_aux_t* aux = rec->aux;
@@ -305,11 +314,15 @@ void object_heap_t::finalize(void* obj) {
   if (traits->owner == &m_hashtables) {
     scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
     delete_private(rec->aux);
-    rec->lock.destroy();
     return;
   }
   if (traits->owner == &m_vectors) {
     scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
+    delete_private(rec->elts);
+    return;
+  }
+  if (traits->owner == &m_values) {
+    scm_values_rec_t* rec = (scm_values_rec_t*)obj;
     delete_private(rec->elts);
     return;
   }

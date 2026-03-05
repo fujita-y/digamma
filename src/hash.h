@@ -10,6 +10,7 @@
 scm_obj_t hashtable_ref(scm_obj_t ht, scm_obj_t key, scm_obj_t default_value);
 void hashtable_set(scm_obj_t ht, scm_obj_t key, scm_obj_t value);
 void hashtable_delete(scm_obj_t ht, scm_obj_t key);
+void hashtable_clear(scm_obj_t ht);
 int calc_hashtable_size(int nsize);
 
 unsigned int eqv_hash(scm_obj_t obj, unsigned int bound);

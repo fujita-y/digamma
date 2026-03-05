@@ -5,7 +5,7 @@
   (let ((label-map (make-eq-hashtable))
         (final-code '())
         (current-pc 0)
-        (const-table (make-hashtable equal-hash equal?))
+        (const-table (make-equal-hashtable))
         (const-list '())
         (const-pool-start 0)
         (next-const-idx 0))

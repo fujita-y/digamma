@@ -272,7 +272,7 @@
     (let* ((params-list (flatten-params-opt params))
            (mutated (analyze-mutated-vars-optimizer (make-seq lambda-body)))
            (forbidden (append params-list mutated))
-           (hoisted-map (make-hashtable equal-hash equal?))
+           (hoisted-map (make-equal-hashtable))
            (hoisted-list '()))
 
       (define (transform e forbidden)

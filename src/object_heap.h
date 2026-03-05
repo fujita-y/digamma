@@ -28,6 +28,7 @@ class object_heap_t {
   concurrent_slab_t m_symbols;
   concurrent_slab_t m_strings;
   concurrent_slab_t m_vectors;
+  concurrent_slab_t m_values;
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
   concurrent_slab_t m_environments;
@@ -65,6 +66,7 @@ class object_heap_t {
   void* alloc_symbol() { return alloc_object(m_symbols); }
   void* alloc_string() { return alloc_object(m_strings); }
   void* alloc_vector() { return alloc_object(m_vectors); }
+  void* alloc_values() { return alloc_object(m_values); }
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_environment() { return alloc_object(m_environments); }
