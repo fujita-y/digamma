@@ -89,8 +89,8 @@
                 (let ((local-pair-resolved (assq resolved env)))
                   (if local-pair-resolved
                       (cdr local-pair-resolved)
-                      (let ((global-trans (environment-macro-ref resolved)))
-                        (and global-trans global-trans))))))))))
+                      (and (environment-macro-contains? resolved)
+                           (environment-macro-ref resolved))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
 (define (resolve-core-form sym shadowed-env)

@@ -13,9 +13,16 @@
 (define (environment-macro-ref name)
   (hashtable-ref (core-environment-macro *current-core-environment*) name #f))
 
+(define (environment-macro-contains? name)
+  (hashtable-contains? (core-environment-macro *current-core-environment*) name))
+
+(define (environment-variable-contains? name)
+  (hashtable-contains? (core-environment-variable *current-core-environment*) name))
+
 (define (environment-variable-set! name transformer)
   (hashtable-delete! (core-environment-macro *current-core-environment*) name)
   (hashtable-set! (core-environment-variable *current-core-environment*) name transformer))
 
 (define (environment-variable-ref name)
+  (or (environment-variable-contains? name) (error "environment-variable-ref: symbol not found" name))
   (hashtable-ref (core-environment-variable *current-core-environment*) name #f))
