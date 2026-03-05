@@ -39,6 +39,8 @@ SUBR subr_real_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_string_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_not(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
@@ -91,6 +93,14 @@ SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
 SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1);
 SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]);
 // (call-with-values requires JIT bridge; tested in test_codegen)
+
+// Environment access
+SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -1486,6 +1496,57 @@ void test_hashtable_alist() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// environment-macro-set! / environment-macro-ref / environment-macro-contains?
+// environment-variable-set! / environment-variable-ref / environment-variable-contains?
+// ---------------------------------------------------------------------------
+
+void test_environment_access() {
+  printf("--- environment access ---\n");
+
+  scm_obj_t sym_m = make_symbol("my-macro");
+  scm_obj_t sym_v = make_symbol("my-var");
+  scm_obj_t transformer = make_fixnum(42);
+  scm_obj_t value = make_fixnum(99);
+
+  // macro: set / ref / contains?
+  subr_environment_macro_set(scm_nil, sym_m, transformer);
+  ASSERT_TRUE(subr_environment_macro_ref(scm_nil, sym_m) == transformer);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_m) == scm_true);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, make_symbol("absent")) == scm_false);
+
+  // variable: set / ref / contains?
+  subr_environment_variable_set(scm_nil, sym_v, value);
+  ASSERT_TRUE(subr_environment_variable_ref(scm_nil, sym_v) == value);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_v) == scm_true);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, make_symbol("absent-var")) == scm_false);
+
+  // mutual exclusion
+  scm_obj_t sym_x = make_symbol("x");
+  subr_environment_variable_set(scm_nil, sym_x, make_fixnum(1));
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_x) == scm_true);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_x) == scm_false);
+
+  subr_environment_macro_set(scm_nil, sym_x, make_fixnum(2));
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_x) == scm_true);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_x) == scm_false);
+}
+
+// ---------------------------------------------------------------------------
+// undefined? / unspecified?
+// ---------------------------------------------------------------------------
+
+void test_undef_unspecified() {
+  printf("--- undefined? / unspecified? ---\n");
+  PRED_TRUE(subr_undefined_p, scm_undef);
+  PRED_FALSE(subr_undefined_p, scm_unspecified);
+  PRED_FALSE(subr_undefined_p, scm_nil);
+
+  PRED_TRUE(subr_unspecified_p, scm_unspecified);
+  PRED_FALSE(subr_unspecified_p, scm_undef);
+  PRED_FALSE(subr_unspecified_p, scm_nil);
+}
+
 int main(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -1530,6 +1591,8 @@ int main(int argc, char** argv) {
   test_hashtable_ops();
   test_values_and_entries();
   test_hashtable_alist();
+  test_environment_access();
+  test_undef_unspecified();
 
   heap->destroy();
   delete heap;

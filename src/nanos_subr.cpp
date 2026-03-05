@@ -504,6 +504,12 @@ SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1) { return is_symbol(a1) ? scm_tr
 // vector?  - R6RS 11.13
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1) { return is_vector(a1) ? scm_true : scm_false; }
 
+// undefined? - Nanos extension
+SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_undef) ? scm_true : scm_false; }
+
+// unspecified? - Nanos extension
+SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_unspecified) ? scm_true : scm_false; }
+
 // ============================================================================
 // Vectors  - R6RS 11.13
 // ============================================================================
@@ -990,6 +996,54 @@ SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
 }
 
 // ============================================================================
+// Environment Access
+// ============================================================================
+
+// environment-macro-set!  - digamma core
+// (environment-macro-set! name transformer)
+SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-set!: first argument must be a symbol");
+  object_heap_t::current()->environment_macro_set(a1, a2);
+  return scm_unspecified;
+}
+
+// environment-macro-ref  - digamma core
+// (environment-macro-ref name) => transformer or scm_undef
+SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-ref: argument must be a symbol");
+  return object_heap_t::current()->environment_macro_ref(a1);
+}
+
+// environment-variable-set!  - digamma core
+// (environment-variable-set! name value)
+SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-set!: first argument must be a symbol");
+  object_heap_t::current()->environment_variable_set(a1, a2);
+  return scm_unspecified;
+}
+
+// environment-variable-ref  - digamma core
+// (environment-variable-ref name) => value or scm_undef
+SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-ref: argument must be a symbol");
+  return object_heap_t::current()->environment_variable_ref(a1);
+}
+
+// environment-macro-contains?  - digamma core
+// (environment-macro-contains? name) => #t or #f
+SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-contains?: argument must be a symbol");
+  return object_heap_t::current()->environment_macro_contains(a1) ? scm_true : scm_false;
+}
+
+// environment-variable-contains?  - digamma core
+// (environment-variable-contains? name) => #t or #f
+SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-contains?: argument must be a symbol");
+  return object_heap_t::current()->environment_variable_contains(a1) ? scm_true : scm_false;
+}
+
+// ============================================================================
 // Multiple Return Values
 // ============================================================================
 
@@ -1098,6 +1152,8 @@ void nanos_t::init_subr() {
   reg("string?", (void*)subr_string_p, 1, 0);
   reg("symbol?", (void*)subr_symbol_p, 1, 0);
   reg("vector?", (void*)subr_vector_p, 1, 0);
+  reg("undefined?", (void*)subr_undefined_p, 1, 0);
+  reg("unspecified?", (void*)subr_unspecified_p, 1, 0);
 
   // vectors
   reg("vector", (void*)subr_vector, 0, 1);
@@ -1142,6 +1198,14 @@ void nanos_t::init_subr() {
   reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, 0);
   reg("hashtable-entries", (void*)subr_hashtable_entries, 1, 0);
   reg("hashtable-alist", (void*)subr_hashtable_alist, 1, 0);
+
+  // environment access
+  reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, 0);
+  reg("environment-macro-ref", (void*)subr_environment_macro_ref, 1, 0);
+  reg("environment-macro-contains?", (void*)subr_environment_macro_contains, 1, 0);
+  reg("environment-variable-set!", (void*)subr_environment_variable_set, 2, 0);
+  reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, 0);
+  reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, 0);
 
   // multiple return values
   reg("values", (void*)subr_values, 0, 1);

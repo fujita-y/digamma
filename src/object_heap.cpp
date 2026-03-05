@@ -154,6 +154,24 @@ void object_heap_t::sweep_symbol_table() {
   }
 }
 
+void object_heap_t::environment_macro_set(scm_obj_t key, scm_obj_t value) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  hashtable_delete(env_rec->variables, key);
+  hashtable_set(env_rec->macros, key, value);
+}
+
+scm_obj_t object_heap_t::environment_macro_ref(scm_obj_t key) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t env = heap->m_environment;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  scm_obj_t value = hashtable_ref(env_rec->macros, key, scm_undef);
+  return value;
+}
+
 void object_heap_t::environment_variable_set(scm_obj_t key, scm_obj_t value) {
   assert(is_symbol(key));
   object_heap_t* heap = object_heap_t::current();
@@ -198,6 +216,16 @@ scm_obj_t object_heap_t::environment_variable_cell_ref(scm_obj_t key) {
     return new_cell;
   }
   return cell;
+}
+
+bool object_heap_t::environment_macro_contains(scm_obj_t key) {
+  assert(is_symbol(key));
+  return environment_macro_ref(key) != scm_undef;
+}
+
+bool object_heap_t::environment_variable_contains(scm_obj_t key) {
+  assert(is_symbol(key));
+  return environment_variable_ref(key) != scm_undef;
 }
 
 void object_heap_t::shade(scm_obj_t obj) {
