@@ -89,7 +89,7 @@
                 (let ((local-pair-resolved (assq resolved env)))
                   (if local-pair-resolved
                       (cdr local-pair-resolved)
-                      (let ((global-trans (global-macro-ref resolved)))
+                      (let ((global-trans (environment-macro-ref resolved)))
                         (and global-trans global-trans))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
@@ -375,7 +375,7 @@
     (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env)) (cddr expr)))))
 
 (define (expand-define-syntax expr m-env s-env r-env)
-  (global-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) ''defined)
+  (environment-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) ''defined)
 
 (define (expand-define-module expr m-env s-env r-env)
   (let* ((mod-name (cadr expr)) (decls (cddr expr)))
@@ -393,7 +393,7 @@
                   (else (loop (cdr decls) exports imports (cons decl body-forms)))))))))
 
 (define (expand-import-module expr m-env s-env r-env)
-  (for-each (lambda (b) (if (macro-binding? (cdr b)) (global-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
+  (for-each (lambda (b) (if (macro-binding? (cdr b)) (environment-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
             (apply append (map process-import-set (cdr expr)))) ''imported)
 
 (define (expand-set! expr m-env s-env r-env)

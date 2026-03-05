@@ -27,7 +27,9 @@
    (define (hashtable->alist ht)
      (let-values (((keys vals) (hashtable-entries ht)))
        (map cons (vector->list keys) (vector->list vals)))))
-  (else))
+  (else
+   ;; nanos
+   ))
 
 ;;=============================================================================
 ;; Globals & State

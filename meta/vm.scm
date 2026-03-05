@@ -97,14 +97,14 @@
 (define (vm:op-global-ref ctx inst)
   (let ((reg (vector-ref inst 1))
         (var (vector-ref inst 2)))
-    (vm:reg-set! ctx reg (global-variable-ref var))
+    (vm:reg-set! ctx reg (environment-variable-ref var))
     *vm:continue*))
 
 ;; (global-set! <var> <src>)
 (define (vm:op-global-set! ctx inst)
   (let ((var (vector-ref inst 1))
         (src (vector-ref inst 2)))
-    (global-variable-set! var (vm:reg-ref ctx src))
+    (environment-variable-set! var (vm:reg-ref ctx src))
     *vm:continue*))
 
 ;; (jump <label>)
