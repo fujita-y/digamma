@@ -6,9 +6,12 @@
 #include "printer.h"
 #include "reader.h"
 
+#include <fstream>
+#include <iostream>
 #include <llvm/Support/TargetSelect.h>
 #include <replxx.hxx>
 #include <sstream>
+#include <string>
 
 // ============================================================================
 // Initialization
@@ -50,6 +53,42 @@ void nanos_t::destroy() {
 // Execution & REPL
 // ============================================================================
 
+void nanos_t::load_ir(const char* filename) {
+  std::ifstream ifs(filename);
+  if (!ifs) {
+    puts("Error: failed to open file");
+    return;
+  }
+  reader_t reader(ifs);
+  printer_t printer(std::cout);
+  bool err = false;
+  while (true) {
+    scm_obj_t obj = reader.read(err);
+    if (err) {
+      std::string msg = reader.get_error_message();
+      std::cout << "read error: " << msg << std::endl;
+      exit(1);
+    }
+    if (obj == scm_eof) {
+      break;
+    }
+    if (is_cons(obj)) {
+      printf("codegen: ");
+      printer.write(CAR(CDR(obj)));
+      puts("");
+      try {
+        auto func = codegen_t::current()->compile(obj);
+        intptr_t result = func();
+        printf("(0x%016lx)\n", result);
+        printer.write((scm_obj_t)result);
+        puts("");
+      } catch (std::exception& e) {
+        printf("%s\n", e.what());
+      }
+    }
+  }
+}
+
 void nanos_t::run() {
   puts(";; nanos - a small virtual machine for bootstrapping, compile nanos-ir to native code.");
 #if USE_TBI
@@ -72,6 +111,12 @@ void nanos_t::run() {
 
     std::string line(cinput);
     if (input_buffer.empty() && line.empty()) continue;
+
+    if (line.starts_with("!")) {
+      std::string filename = line.substr(1);
+      load_ir(filename.c_str());
+      continue;
+    }
 
     input_buffer += line + "\n";
 

@@ -15,6 +15,7 @@ class nanos_t {
 
   void init_subr();
   void init_codegen();
+  void load_ir(const char* filename);
 
  public:
   void init();
