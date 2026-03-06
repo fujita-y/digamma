@@ -77,6 +77,10 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
+SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]);
 
 // Hashtables
 SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1);
@@ -941,6 +945,52 @@ void test_pairs_lists_extra() {
   scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
   subr_set_car(scm_nil, p, make_fixnum(99));
   ASSERT_TRUE(CAR(p) == make_fixnum(99));
+
+  // list
+  {
+    scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
+    scm_obj_t l = subr_list(scm_nil, 3, args);
+    ASSERT_TRUE(is_cons(l) && CAR(l) == make_fixnum(1));
+    ASSERT_TRUE(is_cons(CDR(l)) && CAR(CDR(l)) == make_fixnum(2));
+    ASSERT_TRUE(is_cons(CDR(CDR(l))) && CAR(CDR(CDR(l))) == make_fixnum(3));
+    ASSERT_TRUE(CDR(CDR(CDR(l))) == scm_nil);
+  }
+
+  // list-transpose
+  {
+    // ((1 2) (3 4)) -> ((1 3) (2 4))
+    scm_obj_t l1 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil));
+    scm_obj_t l2 = make_cons(make_fixnum(3), make_cons(make_fixnum(4), scm_nil));
+    scm_obj_t args[] = {l1, l2};
+    scm_obj_t res = subr_list_transpose(scm_nil, 2, args);
+    // res should be ((1 3) (2 4))
+    scm_obj_t r1 = CAR(res);
+    scm_obj_t r2 = CAR(CDR(res));
+    ASSERT_TRUE(CAR(r1) == make_fixnum(1) && CAR(CDR(r1)) == make_fixnum(3));
+    ASSERT_TRUE(CAR(r2) == make_fixnum(2) && CAR(CDR(r2)) == make_fixnum(4));
+  }
+
+  // list-transpose+
+  {
+    scm_obj_t l1 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil));
+    scm_obj_t l2 = make_cons(make_fixnum(3), scm_nil);  // different length
+    scm_obj_t args[] = {l1, l2};
+    ASSERT_TRUE(subr_list_transpose_plus(scm_nil, 2, args) == scm_false);
+  }
+
+  // cons*
+  {
+    // (cons* 1 2 3) -> (1 2 . 3)
+    scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
+    scm_obj_t res = subr_cons_ast(scm_nil, 3, args);
+    ASSERT_TRUE(CAR(res) == make_fixnum(1));
+    ASSERT_TRUE(CAR(CDR(res)) == make_fixnum(2));
+    ASSERT_TRUE(CDR(CDR(res)) == make_fixnum(3));
+
+    // (cons* 1) -> 1
+    scm_obj_t args1[] = {make_fixnum(1)};
+    ASSERT_TRUE(subr_cons_ast(scm_nil, 1, args1) == make_fixnum(1));
+  }
 }
 
 // ---------------------------------------------------------------------------

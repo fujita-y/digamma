@@ -19,6 +19,24 @@
 #include <random>
 #include <sstream>
 
+static int safe_list_length(scm_obj_t lst) {
+  int len = 0;
+  scm_obj_t slow = lst;
+  scm_obj_t fast = lst;
+  while (true) {
+    if (fast == scm_nil) return len;
+    if (!is_cons(fast)) return -1;
+    fast = CDR(fast);
+    len++;
+    if (fast == scm_nil) return len;
+    if (!is_cons(fast)) return -1;
+    fast = CDR(fast);
+    len++;
+    slow = CDR(slow);
+    if (slow == fast) return -2;  // cycle
+  }
+}
+
 // ============================================================================
 // Arithmetic  - R6RS 11.7
 // ============================================================================
@@ -235,6 +253,83 @@ SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
     list = make_cons(argv[i], list);
   }
   return list;
+}
+
+static scm_obj_t do_transpose(int each_len, int argc, scm_obj_t argv[]) {
+  scm_obj_t ans = scm_nil;
+  scm_obj_t ans_tail = scm_nil;
+  for (int i = 0; i < each_len; i++) {
+    scm_obj_t elt = make_cons(CAR(argv[0]), scm_nil);
+    scm_obj_t elt_tail = elt;
+    argv[0] = CDR(argv[0]);
+    for (int n = 1; n < argc; n++) {
+      CDR(elt_tail) = make_cons(CAR(argv[n]), scm_nil);
+      elt_tail = CDR(elt_tail);
+      argv[n] = CDR(argv[n]);
+    }
+    if (ans == scm_nil) {
+      ans = make_cons(elt, scm_nil);
+      ans_tail = ans;
+    } else {
+      CDR(ans_tail) = make_cons(elt, scm_nil);
+      ans_tail = CDR(ans_tail);
+    }
+  }
+  return ans;
+}
+
+SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc >= 1) {
+    int each_len = safe_list_length(argv[0]);
+    if (each_len >= 0) {
+      for (int i = 1; i < argc; i++) {
+        int len = safe_list_length(argv[i]);
+        if (len >= 0) {
+          if (len == each_len) continue;
+          throw std::runtime_error("list-transpose: all lists must have same length");
+        }
+        throw std::runtime_error("list-transpose: arguments must be proper lists");
+      }
+      return do_transpose(each_len, argc, argv);
+    }
+    throw std::runtime_error("list-transpose: arguments must be proper lists");
+  }
+  throw std::runtime_error("list-transpose: wrong number of arguments");
+}
+
+SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc >= 1) {
+    int each_len = safe_list_length(argv[0]);
+    if (each_len >= 0) {
+      for (int i = 1; i < argc; i++) {
+        int len = safe_list_length(argv[i]);
+        if (len >= 0) {
+          if (len == each_len) continue;
+          return scm_false;
+        }
+        return scm_false;
+      }
+      return do_transpose(each_len, argc, argv);
+    }
+    return scm_false;
+  }
+  throw std::runtime_error("list-transpose+: wrong number of arguments");
+}
+
+SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 0) {
+    if (argc == 1) return argv[0];
+    scm_obj_t obj = make_cons(argv[0], scm_nil);
+    scm_obj_t tail = obj;
+    for (int i = 1; i < argc - 1; i++) {
+      scm_obj_t e = make_cons(argv[i], scm_nil);
+      CDR(tail) = e;
+      tail = e;
+    }
+    CDR(tail) = argv[argc - 1];
+    return obj;
+  }
+  throw std::runtime_error("cons*: wrong number of arguments");
 }
 
 static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
@@ -1144,6 +1239,10 @@ void nanos_t::init_subr() {
   reg("cadddr", (void*)subr_cadddr, 1, 0);
   reg("set-car!", (void*)subr_set_car, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
+  reg("list", (void*)subr_list, 0, 1);
+  reg("list-transpose", (void*)subr_list_transpose, 1, 1);
+  reg("list-transpose+", (void*)subr_list_transpose_plus, 1, 1);
+  reg("cons*", (void*)subr_cons_ast, 1, 1);
   reg("list-ref", (void*)subr_list_ref, 2, 0);
   reg("list->vector", (void*)subr_list_to_vector, 1, 0);
   reg("memq", (void*)subr_memq, 2, 0);
@@ -1152,7 +1251,6 @@ void nanos_t::init_subr() {
   reg("assq", (void*)subr_assq, 2, 0);
   reg("assoc", (void*)subr_assoc, 2, 0);
   reg("reverse", (void*)subr_reverse, 1, 0);
-  reg("list", (void*)subr_list, 0, 1);
   reg("append", (void*)subr_append, 0, 1);
 
   // predicates & logic
