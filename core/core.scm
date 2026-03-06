@@ -23,5 +23,6 @@
 
 ;; Optmizer and Compiler
 (load "optimizer.scm")
+(load "lambda-lift.scm")
 (load "bytecode.scm")
 (load "compiler.scm")

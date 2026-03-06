@@ -15,7 +15,8 @@
   (define (process exp)
     (let* ((expanded (macroexpand exp))
            (optimized (optimize expanded))
-           (code (compile optimized)))
+           (lifted (lambda-lift optimized))
+           (code (compile lifted)))
       code))
   (with-input-from-file input-file
     (lambda ()
@@ -32,6 +33,7 @@
     "core/syntax-case.scm"
     "core/macroexpand.scm"
     "core/optimizer.scm"
+    "core/lambda-lift.scm"
     "core/compiler.scm"))
 
 (with-output-to-file "boot/core-ir.lst" 
