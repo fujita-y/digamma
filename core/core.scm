@@ -4,6 +4,9 @@
 ;; Core system loader
 ;; Loads components in topological order to minimize forward references
 
+;; Compatibility
+(load "host.scm")
+
 ;; Common utilities
 (load "common.scm")
 
