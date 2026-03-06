@@ -811,7 +811,7 @@ SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
   static int gensym_counter = 1;
   if (argc > 1) throw std::runtime_error("gensym: too many arguments");
   if (argc == 1 && !is_string(argv[0])) throw std::runtime_error("gensym: argument must be a string");
-  const char* prefix = (argc == 0) ? "tmp" : (const char*)string_name(argv[0]);
+  const char* prefix = (argc == 0) ? "gensym" : (const char*)string_name(argv[0]);
   struct timeval tv;
   gettimeofday(&tv, NULL);
   char buf[128];

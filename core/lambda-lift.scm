@@ -4,16 +4,14 @@
 ;; Lambda Lifting Pass
 
 (define (flatten-params-ll params)
-  (cond ((null? params) '())
-        ((symbol? params) (list params))
-        ((pair? params) (cons (car params) (flatten-params-ll (cdr params))))
-        (else '())))
+  (let loop ((p params) (acc '()))
+    (cond ((null? p) (reverse acc))
+          ((symbol? p) (reverse (cons p acc)))
+          ((pair? p) (loop (cdr p) (cons (car p) acc)))
+          (else (reverse acc)))))
 
 (define (intersect-ll l1 l2)
-  (let loop ((l1 l1) (acc '()))
-    (cond ((null? l1) (reverse acc))
-          ((memq (car l1) l2) (loop (cdr l1) (cons (car l1) acc)))
-          (else (loop (cdr l1) acc)))))
+  (filter (lambda (x) (memq x l2)) l1))
 
 (define (generate-lifted-name sym)
   (string->symbol
@@ -61,40 +59,33 @@
                                       (candidate-lams (map caddr sets)))
                                  (let fixpoint ((forbidden (append env (set-minus vars candidate-vars)))
                                                 (liftable-sets sets))
-                                   (let* ((new-liftable '())
-                                          (new-forbidden forbidden)
-                                          (changed #f))
-                                     (for-each
-                                      (lambda (s)
-                                        (let* ((var (cadr s))
-                                               (lam (caddr s))
-                                               (fv (analyze-free-vars-optimizer lam '())))
-                                          (if (null? (intersect-ll fv forbidden))
-                                              (set! new-liftable (cons s new-liftable))
-                                              (begin
-                                                (set! changed #t)
-                                                (set! new-forbidden (cons var new-forbidden))))))
-                                      liftable-sets)
-                                     (if changed
-                                         (fixpoint new-forbidden (reverse new-liftable))
-                                         (let ((final-liftable (reverse new-liftable))
-                                               (final-not-liftable (filter (lambda (s) (memq (cadr s) new-forbidden)) sets)))
-                                           
-                                           (let ((new-renames renames))
-                                             (for-each
-                                              (lambda (s)
-                                                (let ((old-var (cadr s)))
-                                                  (set! new-renames (cons (cons old-var (generate-lifted-name old-var)) new-renames))))
-                                              final-liftable)
-
-                                             (for-each
-                                              (lambda (s)
-                                                (let* ((var (cadr s))
-                                                       (new-var (cdr (assq var new-renames)))
-                                                       (lam (caddr s))
-                                                       (walked-lam (walk lam '() new-renames)))
-                                                  (set! lifted-defs (cons `(define ,new-var ,walked-lam) lifted-defs))))
-                                              final-liftable)
+                                   (let loop ((rest liftable-sets) (new-liftable '()) (new-forbidden forbidden) (changed #f))
+                                     (if (pair? rest)
+                                         (let* ((s (car rest))
+                                                (var (cadr s))
+                                                (lam (caddr s))
+                                                (fv (analyze-free-vars-optimizer lam '())))
+                                           (if (null? (intersect-ll fv forbidden))
+                                               (loop (cdr rest) (cons s new-liftable) new-forbidden changed)
+                                               (loop (cdr rest) new-liftable (cons var new-forbidden) #t)))
+                                         (if changed
+                                             (fixpoint new-forbidden (reverse new-liftable))
+                                             (let* ((final-liftable (reverse new-liftable))
+                                                    (final-not-liftable (filter (lambda (s) (memq (cadr s) new-forbidden)) sets))
+                                                    (new-renames
+                                                     (append (map (lambda (s)
+                                                                    (let ((old-var (cadr s)))
+                                                                      (cons old-var (generate-lifted-name old-var))))
+                                                                  final-liftable)
+                                                             renames)))
+                                               (for-each
+                                                (lambda (s)
+                                                  (let* ((var (cadr s))
+                                                         (new-var (cdr (assq var new-renames)))
+                                                         (lam (caddr s))
+                                                         (walked-lam (walk lam '() new-renames)))
+                                                    (set! lifted-defs (cons `(define ,new-var ,walked-lam) lifted-defs))))
+                                                final-liftable)
                                              
                                              (let* ((lifted-vars (map cadr final-liftable))
                                                     (residual-sets (map (lambda (s) `(set! ,(cadr s) ,(walk (caddr s) new-env new-renames))) final-not-liftable))
