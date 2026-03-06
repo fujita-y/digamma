@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <random>
 #include <sstream>
 
 // ============================================================================
@@ -818,6 +819,29 @@ SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_uninterned_symbol(buf);
 }
 
+SUBR subr_uuid(scm_obj_t self) {
+  static thread_local std::random_device rd;
+  static thread_local std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(0, 15);
+  std::uniform_int_distribution<> dis_variant(8, 11);
+
+  char buf[37];
+  const char* hex = "0123456789abcdef";
+  for (int i = 0; i < 36; i++) {
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      buf[i] = '-';
+    } else if (i == 14) {
+      buf[i] = '4';  // Version 4
+    } else if (i == 19) {
+      buf[i] = hex[dis_variant(gen)];  // Variant: 8, 9, a, or b
+    } else {
+      buf[i] = hex[dis(gen)];
+    }
+  }
+  buf[36] = '\0';
+  return make_string(buf);
+}
+
 // ============================================================================
 // Error  - R6RS 11.14 (simplified: throws runtime_error instead of raising a condition)
 // ============================================================================
@@ -1215,6 +1239,7 @@ void nanos_t::init_subr() {
   reg("collect", (void*)subr_collect, 0, 0);
   reg("safepoint", (void*)subr_safepoint, 0, 0);
   reg("gensym", (void*)subr_gensym, 0, 1);
+  reg("uuid", (void*)subr_uuid, 0, 0);
 
   // application & control
   reg("error", (void*)subr_error, 1, 1);

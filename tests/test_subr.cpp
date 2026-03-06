@@ -101,6 +101,7 @@ SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1);
 SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
 SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
+SUBR subr_uuid(scm_obj_t self);
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -1547,6 +1548,38 @@ void test_undef_unspecified() {
   PRED_FALSE(subr_unspecified_p, scm_nil);
 }
 
+// ---------------------------------------------------------------------------
+// uuid
+// ---------------------------------------------------------------------------
+
+void test_uuid() {
+  printf("--- uuid ---\n");
+  scm_obj_t u1 = subr_uuid(scm_nil);
+  scm_obj_t u2 = subr_uuid(scm_nil);
+  ASSERT_TRUE(is_string(u1));
+  ASSERT_TRUE(is_string(u2));
+  ASSERT_TRUE(subr_string_length(scm_nil, u1) == make_fixnum(36));
+  ASSERT_TRUE(subr_string_length(scm_nil, u2) == make_fixnum(36));
+  ASSERT_FALSE(u1 == u2);
+  ASSERT_FALSE(strcmp((const char*)string_name(u1), (const char*)string_name(u2)) == 0);
+
+  // Check format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  const char* s1 = (const char*)string_name(u1);
+  for (int i = 0; i < 36; i++) {
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      ASSERT_TRUE(s1[i] == '-');
+    } else if (i == 14) {
+      ASSERT_TRUE(s1[i] == '4');
+    } else if (i == 19) {
+      char c = s1[i];
+      ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b');
+    } else {
+      char c = s1[i];
+      ASSERT_TRUE((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+    }
+  }
+}
+
 int main(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -1593,6 +1626,7 @@ int main(int argc, char** argv) {
   test_hashtable_alist();
   test_environment_access();
   test_undef_unspecified();
+  test_uuid();
 
   heap->destroy();
   delete heap;
