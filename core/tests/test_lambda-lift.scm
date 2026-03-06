@@ -3,9 +3,28 @@
 (define *pass-count* 0)
 (define *fail-count* 0)
 
+(define (match-lifted? lifted expected)
+  (cond ((and (symbol? lifted) (symbol? expected))
+         (let ((ls (symbol->string lifted))
+               (es (symbol->string expected)))
+           ;; If expected has __ prefix, it means it's a lifted function name
+           ;; so we just check if the actual name starts with the expected prefix.
+           (if (and (> (string-length es) 2)
+                    (char=? (string-ref es 0) #\_)
+                    (char=? (string-ref es 1) #\_))
+               (and (>= (string-length ls) (string-length es))
+                    (string=? (substring ls 0 (string-length es)) es))
+               (eq? lifted expected))))
+        ((and (pair? lifted) (pair? expected))
+         (and (match-lifted? (car lifted) (car expected))
+              (match-lifted? (cdr lifted) (cdr expected))))
+        (else
+         (equal? lifted expected))))
+
 (define (test name expr expected)
-  (let ((lifted (lambda-lift expr)))
-    (if (equal? lifted expected)
+  (let* ((lifted (lambda-lift expr))
+         (passed? (match-lifted? lifted expected)))
+    (if passed?
         (begin
           (set! *pass-count* (+ *pass-count* 1))
           (display "PASS: ") (display name) (newline))
@@ -23,8 +42,8 @@
          (set! f (lambda (x) (+ x 1)))
          (f 10))
       '(begin
-         (define f (lambda (x) (+ x 1)))
-         (f 10)))
+         (define __f_ (lambda (x) (+ x 1)))
+         (__f_ 10)))
 
 ;; Test 2: Don't lift if lambda has free variables
 (test "No lift (free vars)"
@@ -44,9 +63,9 @@
          (set! g (lambda (y) (f y)))
          (f 1))
       '(begin
-         (define f (lambda (x) (g x)))
-         (define g (lambda (y) (f y)))
-         (f 1)))
+         (define __f_ (lambda (x) (__g_ x)))
+         (define __g_ (lambda (y) (__f_ y)))
+         (__f_ 1)))
 
 ;; Test 4: Partially liftable (one has no free vars, one has free vars)
 (test "Partial lift"
@@ -83,23 +102,23 @@
                        ((lambda (lst.12) (map-n.5 proc.1 lst.12)) tmp.10.11)
                        (error 'map "expected same length proper lists" (cons* proc.1 lst1.2 lst2.3))))))))
       '(begin
-         (define map-1.4
+         (define __map-1.4_
            (lambda (proc.6 lst.7)
-             (if (null? lst.7) '() (cons (proc.6 (car lst.7)) (map-1.4 proc.6 (cdr lst.7))))))
-         (define map-n.5
+             (if (null? lst.7) '() (cons (proc.6 (car lst.7)) (__map-1.4_ proc.6 (cdr lst.7))))))
+         (define __map-n.5_
            (lambda (proc.8 lst.9)
              (if (null? lst.9)
                  '()
-                 (cons (apply proc.8 (car lst.9)) (map-n.5 proc.8 (cdr lst.9))))))
+                 (cons (apply proc.8 (car lst.9)) (__map-n.5_ proc.8 (cdr lst.9))))))
          (define map
            (lambda (proc.1 lst1.2 . lst2.3)
              (if (null? lst2.3)
                  (if (list? lst1.2)
-                     (map-1.4 proc.1 lst1.2)
+                     (__map-1.4_ proc.1 lst1.2)
                      (error 'map "expected proper list" (cons* proc.1 lst1.2 lst2.3)))
                  (let ((tmp.10.11 (apply list-transpose+ lst1.2 lst2.3)))
                    (if tmp.10.11
-                       ((lambda (lst.12) (map-n.5 proc.1 lst.12)) tmp.10.11)
+                       ((lambda (lst.12) (__map-n.5_ proc.1 lst.12)) tmp.10.11)
                        (error 'map "expected same length proper lists" (cons* proc.1 lst1.2 lst2.3)))))))))
 
 (newline)

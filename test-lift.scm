@@ -3,6 +3,7 @@
 (add-load-path "./meta")
 
 (load "core.scm")
+(load "lambda-lift.scm")
 
 (define expr
   '(define map
@@ -31,4 +32,5 @@
 (let* ((expanded (macroexpand expr))
        (optimized (optimize expanded))
        (lifted (lambda-lift optimized)))
-  (pretty-print lifted))
+  (pretty-print lifted)
+  (exit))
