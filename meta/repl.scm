@@ -92,6 +92,8 @@
   (environment-variable-set! 'closure? closure?)
   (environment-variable-set! 'call/cc call/cc)
   (environment-variable-set! 'call/1cc call/cc)
+  (environment-variable-set! 'call-with-values call-with-values)
+  (environment-variable-set! 'values values)
   #t)
 
 (define repl:prelude

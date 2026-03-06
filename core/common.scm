@@ -6,7 +6,6 @@
 
 (cond-expand
   (gauche
-   (use srfi-9)
    (define (make-eq-hashtable) (make-hash-table 'eq?))
    (define (make-eqv-hashtable) (make-hash-table 'eqv?))
    (define (make-equal-hashtable) (make-hash-table 'equal?))
@@ -23,7 +22,6 @@
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj)))
   (ypsilon
-   (import (srfi 9))
    (define (hashtable->alist ht)
      (let-values (((keys vals) (hashtable-entries ht)))
        (map cons (vector->list keys) (vector->list vals)))))
