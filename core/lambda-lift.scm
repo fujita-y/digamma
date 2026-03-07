@@ -15,7 +15,7 @@
 
 (define (generate-lifted-name sym)
   (string->symbol
-   (string-append "__" (symbol->string sym) "_" (uuid))))
+   (string-append (symbol->string sym) "_" (uuid))))
 
 (define (lambda-lift expr)
   (let ((lifted-defs '()))

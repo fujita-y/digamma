@@ -494,7 +494,7 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
 
 void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
   // Check if it is a global closure (known at compile time but not in this module's function_map)
-  if (inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) {
+  if (is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) {
     // Attempt to resolve it as a global closure
     if (closure_params.find(inst.closure_label) != closure_params.end()) {
       auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
@@ -591,7 +591,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
   }
 
-  if (inst.closure_label != scm_nil && function_map.count(inst.closure_label)) {
+  if (is_symbol(inst.closure_label) && function_map.count(inst.closure_label)) {
     llvm::Function* target_func = function_map[inst.closure_label];
 
     // Get closure parameters from compile-time info
@@ -919,8 +919,8 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
   }
 
   // Check if it's a known closure (global or local) call optimization
-  if ((inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) ||
-      (inst.closure_label != scm_nil && function_map.count(inst.closure_label))) {
+  if ((is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) ||
+      (is_symbol(inst.closure_label) && function_map.count(inst.closure_label))) {
     emit_known_closure_call(inst, is_tail);
     return;
   }

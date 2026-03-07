@@ -324,7 +324,7 @@
 
 (define (gen-label ctx . type)
   (if (and (not (null? type)) (eq? (car type) 'closure))
-      (string->symbol (string-append "C" (number->string (compiler-ctx-inc-closure-labels! ctx))))
+      (string->symbol (string-append "C" (number->string (compiler-ctx-inc-closure-labels! ctx)) "_"(uuid)))
       (string->symbol (string-append "L" (number->string (compiler-ctx-inc-labels! ctx))))))
 
 (define (make-reg i) (string->symbol (string-append "r" (number->string i))))
