@@ -103,6 +103,14 @@
       (match-rec-pattern '(let ((f #f)) 123))
       #f)
 
+(test "match-rec-pattern simple recursion true match"
+      (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (list 2 (<name> 9) n))) <name>))
+      #t)
+
+(test "match-rec-pattern nested lambda false match"
+      (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (list 2 (lambda () (<name> 9)) n))) <name>))
+      #f)
+
 (test "generate-temporary-symbol test"
       (let ((s1 (generate-temporary-symbol "t"))
             (s2 (generate-temporary-symbol "t")))
