@@ -84,16 +84,11 @@
   (environment-variable-set! 'hashtable-ref hashtable-ref)
   (environment-variable-set! 'hashtable-contains? hashtable-contains?)
   (environment-variable-set! 'hashtable-delete! hashtable-delete!)
-  (environment-variable-set! 'closure-code closure-code)
-  (environment-variable-set! 'closure-label closure-label)
-  (environment-variable-set! 'closure-free closure-free)
-  (environment-variable-set! 'closure-fixed-argc closure-fixed-argc)
-  (environment-variable-set! 'closure-has-rest closure-has-rest)
-  (environment-variable-set! 'closure? closure?)
   (environment-variable-set! 'call/cc call/cc)
   (environment-variable-set! 'call/1cc call/cc)
   (environment-variable-set! 'call-with-values call-with-values)
   (environment-variable-set! 'values values)
+  (environment-variable-set! 'dynamic-wind dynamic-wind)
   #t)
 
 (define repl:prelude

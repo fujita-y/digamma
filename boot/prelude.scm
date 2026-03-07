@@ -39,3 +39,32 @@
         (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (for-each-n proc lst)))
               (else (error'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
+(define make-parameter
+  (lambda (init . rest)
+    (define parameter-proc-0
+      (lambda ()
+        (let ((value #f))
+          (lambda args
+            (if (null? args)
+                value
+                (set! value (car args)))))))
+    (define parameter-proc-1
+      (lambda (converter)
+        (if converter
+            (let ((value #f))
+              (lambda args
+                (cond ((null? args) value)
+                      ((or (null? (cdr args)) (cadr args))
+                      (set! value (converter (car args))))
+                      (else
+                        (set! value (car args))))))
+            (parameter-proc-0))))
+    (let ((param
+            (cond ((null? rest)
+                   (parameter-proc-0))
+                  ((null? (cdr rest))
+                   (parameter-proc-1 (car rest)))
+                  (else
+                   (error 'make-parameter "wrong number of arguments" (cons* init rest))))))
+      (begin (param init) param))))
+

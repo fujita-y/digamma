@@ -21,6 +21,8 @@
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj)))
   (ypsilon
+   (define (uuid) (make-uuid))
+   (define (make-equal-hashtable) (make-hashtable equal-hash equal?))
    (define (hashtable->alist ht)
      (let-values (((keys vals) (hashtable-entries ht)))
        (map cons (vector->list keys) (vector->list vals)))))
