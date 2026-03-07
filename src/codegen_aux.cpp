@@ -7,10 +7,18 @@
 #include <boost/context/continuation.hpp>
 #include "codegen.h"
 #include "object_heap.h"
+#include "printer.h"
 
 static thread_local bool* s_stop_the_world = nullptr;
 
 static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
+
+std::string scm_obj_to_string(scm_obj_t obj) {
+  std::stringstream ss;
+  printer_t printer(ss);
+  printer.write(obj);
+  return ss.str();
+}
 
 bool is_side_effect_free_aux_helper(const char* name) {
   // return true if function no need to call if returned value is not used
@@ -99,18 +107,18 @@ extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {
   return (scm_obj_t)bridge(proc, 0, nullptr);
 }
 
-extern "C" void c_test_application(scm_obj_t proc, int argc) {
+extern "C" void c_test_application(scm_obj_t proc, int argc, const char* name) {
   if (!is_closure(proc)) [[unlikely]] {
-    throw std::runtime_error("error in codegen: attempt to call a non-procedure");
+    throw std::runtime_error("error: attempt to call a non-procedure " + scm_obj_to_string(proc) + " in variable " + name);
   }
   scm_closure_rec_t* closure = (scm_closure_rec_t*)to_address(proc);
   if (closure->rest) [[unlikely]] {
     if (argc < closure->argc) [[unlikely]] {
-      throw std::runtime_error("error in codegen: wrong number of arguments");
+      throw std::runtime_error("error: too few arguments to apply " + scm_obj_to_string(proc) + " in variable " + name);
     }
   } else {
     if (argc != closure->argc) [[unlikely]] {
-      throw std::runtime_error("error in codegen: wrong number of arguments");
+      throw std::runtime_error("error: too many arguments to apply " + scm_obj_to_string(proc) + " in variable " + name);
     }
   }
 }
