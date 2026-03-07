@@ -172,7 +172,11 @@
                                      (pair? (cddr first))
                                      (let ((val (caddr first)))
                                        (and (pair? val)
-                                            (eq? (car val) 'lambda)))))))))))))
+                                            (eq? (car val) 'lambda)))
+                                     (pair? (cdr body))
+                                     (let ((second (cadr body)))
+                                        (and (eq? second name)
+                                             (null? (cddr body))))))))))))))
     (match? expr)))
 
 (define (generate-temporary-symbol prefix)
