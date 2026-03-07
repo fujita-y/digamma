@@ -26,9 +26,15 @@
             (loop (cons (process input) output) (read)))))))
 
 ;; macro dependency injection
-;; parameterize
-;; let-values
+(with-input-from-file "boot/host_macro.scm"
+  (lambda ()
+        (let loop ((input (read)))
+        (if (not (eof-object? input))
+            (begin
+              (macroexpand input)
+              (loop (read)))))))
 
+;; compile core to ir
 (define source-files
   '("boot/prelude.scm"
     "core/common.scm"
