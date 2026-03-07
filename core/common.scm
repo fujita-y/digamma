@@ -183,11 +183,7 @@
                                        (let ((val (caddr first)))
                                          (and (pair? val)
                                               (eq? (car val) 'lambda)
-                                              (not (name-in-nested-lambda? name (cddr val) 0))))
-                                       (pair? (cdr body))
-                                       (let ((second (cadr body)))
-                                          (and (eq? second name)
-                                               (null? (cddr body))))))))))))))
+                                              (not (name-in-nested-lambda? name (cddr val) 0))))))))))))))
       (match? expr))))
 
 (define (generate-temporary-symbol prefix)
