@@ -25,6 +25,10 @@
             (reverse output)
             (loop (cons (process input) output) (read)))))))
 
+;; macro dependency injection
+;; parameterize
+;; let-values
+
 (define source-files
   '("boot/prelude.scm"
     "core/common.scm"
@@ -36,7 +40,7 @@
     "core/lambda-lift.scm"
     "core/compiler.scm"))
 
-(with-output-to-file "boot/core-ir.lst" 
+(with-output-to-file "boot/core.ir" 
   (lambda ()
     (map 
       (lambda (source) 

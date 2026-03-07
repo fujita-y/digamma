@@ -86,9 +86,13 @@
   (environment-variable-set! 'hashtable-delete! hashtable-delete!)
   (environment-variable-set! 'call/cc call/cc)
   (environment-variable-set! 'call/1cc call/cc)
-  (environment-variable-set! 'call-with-values call-with-values)
   (environment-variable-set! 'values values)
+
+  ; Followings does not work since it calls nanos:closure from native implementation
+  ; to work such subrs, need to add own implementation in repl:prelude like map or for-each.
+  (environment-variable-set! 'call-with-values call-with-values)
   (environment-variable-set! 'dynamic-wind dynamic-wind)
+
   #t)
 
 (define repl:prelude

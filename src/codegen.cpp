@@ -1010,6 +1010,7 @@ void codegen_t::analyze_closure_labels() {
                   closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
                 }
               } else {
+                std::cerr << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
                 current_state.regs[inst.rn1] = make_string((const char*)symbol_name(inst.opr2));
               }
             }
