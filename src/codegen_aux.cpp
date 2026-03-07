@@ -17,7 +17,6 @@ bool is_side_effect_free_aux_helper(const char* name) {
   if (starts_with(name, "c_make_closure")) return true;
   if (starts_with(name, "c_make_cons")) return true;
   if (starts_with(name, "c_construct_rest_list")) return true;
-  if (starts_with(name, "c_test_application")) return true;
   return false;
 }
 
