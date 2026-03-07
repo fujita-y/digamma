@@ -31,3 +31,15 @@
     ((let*-values (binding rest ...) body1 body2 ...)
      (let-values (binding)
        (let*-values (rest ...) body1 body2 ...)))))
+
+(define-syntax unless
+  (syntax-rules ()
+    ((unless condition body ...)
+     (if (not condition)
+         (begin body ...)))))
+
+(define-syntax when
+  (syntax-rules ()
+    ((when test result1 result2 ...)
+     (if test
+         (begin result1 result2 ...)))))
