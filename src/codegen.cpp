@@ -154,6 +154,12 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 // --------------------------------------------------------------------------
 
 void codegen_t::phase0_create_module() {
+  if (!closure_bridge_initialized) {
+    // Initialize bridge (this creates a standalone module, compiles the body, and gives it to JIT)
+    (void)get_call_closure_bridge_ptr();
+    closure_bridge_initialized = true;
+  }
+
   std::string mod_name = "jit_module_main_" + generate_unique_suffix();
   this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, CT);
   this->main_module = this->main_module_uptr.get();

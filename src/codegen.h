@@ -131,6 +131,8 @@ class codegen_t {
   //  Code generation state
   // --------------------------------------------------------------------------
 
+  bool closure_bridge_initialized = false;
+
   llvm::Function* main_function = nullptr;
   llvm::Function* current_function = nullptr;
   llvm::Value* current_closure_self = nullptr;  // 'self' argument of the current closure
