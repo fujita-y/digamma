@@ -7,6 +7,9 @@
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Process.h>
+#include "llvm/ExecutionEngine/Orc/EHFrameRegistrationPlugin.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -26,6 +29,8 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
       CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *CompileLayer, this->EPCIU->getLazyCallThroughManager(),
                                                       [this]() { return this->EPCIU->createIndirectStubsManager(); })),
       MainJD(this->ES->createBareJITDylib("<main>")) {
+  ExitOnError ExitOnErr;
+  ObjectLayer->addPlugin(ExitOnErr(EHFrameRegistrationPlugin::Create(*this->ES)));
   MainJD.addGenerator(cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(this->DL.getGlobalPrefix())));
 #ifndef NDEBUG
   CompileLayer->setNotifyCompiled([](MaterializationResponsibility &R, ThreadSafeModule TSM) { errs() << "Generating native code...\n"; });
