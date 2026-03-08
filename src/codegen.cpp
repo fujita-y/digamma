@@ -132,12 +132,14 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
     analyze_closure_labels();
+#ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
     }
     for (const auto& func : functions) {
       dump_instructions(func.instructions);
     }
+#endif
     phase2_create_functions();
     phase3_generate_code();
     phase4_optimize_and_verify();
@@ -349,6 +351,7 @@ void codegen_t::phase4_optimize_and_verify() {
   }
 
   // Dump IR to file for debugging and inspection
+#ifndef NDEBUG
   std::error_code EC;
   llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
   if (EC) {
@@ -366,6 +369,7 @@ void codegen_t::phase4_optimize_and_verify() {
       closure_module_uptr->print(dest2, nullptr);
     }
   }
+#endif
 }
 
 // Helper function to find which llvm::Function an llvm::User belongs to,
