@@ -356,13 +356,92 @@ void codegen_t::phase4_optimize_and_verify() {
   } else {
     main_module_uptr->print(dest, nullptr);
   }
+
   if (functions.size() > 1) {
+    prune_unused_closures();
     llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
     if (EC) {
       llvm::errs() << "Could not open file: " << EC.message() << "\n";
     } else {
       closure_module_uptr->print(dest2, nullptr);
     }
+  }
+}
+
+// Helper function to find which llvm::Function an llvm::User belongs to,
+// by looking through Instruction and ConstantExpr.
+static llvm::Function* getUserFunction(llvm::User* U) {
+  if (auto* I = llvm::dyn_cast<llvm::Instruction>(U)) {
+    return I->getFunction();
+  }
+  if (auto* CE = llvm::dyn_cast<llvm::ConstantExpr>(U)) {
+    for (llvm::User* CEU : CE->users()) {
+      if (llvm::Function* F = getUserFunction(CEU)) {
+        return F;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void codegen_t::prune_unused_closures() {
+  std::set<llvm::Function*> reachable;
+  std::vector<llvm::Function*> worklist;
+
+  llvm::Module* main_mod = main_module_uptr.get();
+  llvm::Module* clo_mod = closure_module_uptr.get();
+
+  // 1. Establish the root set from main_module.
+  // Any function declaration in main_module that has uses is a root.
+  for (llvm::Function& f : *main_mod) {
+    if (f.isDeclaration() && !f.use_empty()) {
+      if (llvm::Function* target = clo_mod->getFunction(f.getName())) {
+        if (reachable.insert(target).second) {
+          worklist.push_back(target);
+        }
+      }
+    }
+  }
+
+  // 2. Build edges: for each function in closure_module, find which functions use it.
+  // edge: user_func -> target_func
+  std::map<llvm::Function*, std::vector<llvm::Function*>> cg;
+  for (llvm::Function& target_func : *clo_mod) {
+    if (target_func.isDeclaration()) continue;
+
+    for (llvm::User* U : target_func.users()) {
+      if (llvm::Function* user_func = getUserFunction(U)) {
+        // If the user is inside closure_module, record the edge.
+        if (user_func->getParent() == clo_mod) {
+          cg[user_func].push_back(&target_func);
+        }
+      }
+    }
+  }
+
+  // 3. Trace reachable functions in closure_module
+  while (!worklist.empty()) {
+    llvm::Function* curr = worklist.back();
+    worklist.pop_back();
+
+    for (llvm::Function* target : cg[curr]) {
+      if (reachable.insert(target).second) {
+        worklist.push_back(target);
+      }
+    }
+  }
+
+  // 4. Prune unreachable functions
+  std::vector<llvm::Function*> to_delete;
+  for (llvm::Function& f : *clo_mod) {
+    if (!f.isDeclaration() && reachable.find(&f) == reachable.end()) {
+      to_delete.push_back(&f);
+    }
+  }
+
+  for (llvm::Function* f : to_delete) {
+    std::cerr << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
+    f->eraseFromParent();
   }
 }
 

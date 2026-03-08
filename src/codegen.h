@@ -177,6 +177,7 @@ class codegen_t {
   void phase2_create_functions();
   void phase3_generate_code();
   void phase4_optimize_and_verify();
+  void prune_unused_closures();
   compiled_code_t phase5_finalize();
 
   // Configure a new Module with JIT data layout, target triple, PIC/PIE level
