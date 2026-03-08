@@ -107,6 +107,10 @@
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (if (eq? n 0) 1 (<name> (- n 1))))) <name>))
       #t)
 
+(test "match-rec-pattern tail recursion in let true match"
+      (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (let ((x (- n 1))) (<name> x)))) <name>))
+      #t)
+
 (test "match-rec-pattern non-tail recursion false match"
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (list 2 (<name> 9) n))) <name>))
       #f)
