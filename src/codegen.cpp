@@ -154,10 +154,9 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 // --------------------------------------------------------------------------
 
 void codegen_t::phase0_create_module() {
-  if (!closure_bridge_initialized) {
+  if (cached_call_closure_bridge == nullptr) {
     // Initialize bridge (this creates a standalone module, compiles the body, and gives it to JIT)
     (void)get_call_closure_bridge_ptr();
-    closure_bridge_initialized = true;
   }
 
   std::string mod_name = "jit_module_main_" + generate_unique_suffix();
@@ -322,23 +321,24 @@ void codegen_t::phase3_generate_code() {
 //  Phase 4: Verification and optimization
 // --------------------------------------------------------------------------
 
+void codegen_t::optimize_module(llvm::Module& mod) {
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  llvm::PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+  MPM.run(mod, MAM);
+}
+
 void codegen_t::phase4_optimize_and_verify() {
-  auto optimize_module = [](llvm::Module& mod) {
-    llvm::LoopAnalysisManager LAM;
-    llvm::FunctionAnalysisManager FAM;
-    llvm::CGSCCAnalysisManager CGAM;
-    llvm::ModuleAnalysisManager MAM;
-
-    llvm::PassBuilder PB;
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
-    MPM.run(mod, MAM);
-  };
 
   // Verify all functions first
   for (auto const& [label, func] : function_map) {

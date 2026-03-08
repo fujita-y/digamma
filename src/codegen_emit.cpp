@@ -438,6 +438,7 @@ void* codegen_t::get_call_closure_bridge_ptr() {
 
     (void)get_or_create_call_closure_bridge();
 
+    optimize_module(*main_module);
     // Move context into ThreadSafeContext owned by the JIT.
     // CompileScope::~CompileScope will restore the previous context.
     llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
