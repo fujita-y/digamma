@@ -35,13 +35,22 @@
 
 (display "\n>>> Lambda Lifting\n")
 
-;; Test 1: Lift a simple let-bound lambda (using set!) with no free vars
-(test "Simple lift (no free vars)"
+;; Test 1: Single binding that matches match-rec-pattern should NOT be lifted now
+(test "Single un-nested recursive let (match-rec-pattern)"
       '(let ((f #f))
          (set! f (lambda (x) (+ x 1)))
          (f 10))
+      '(let ((f #f))
+         (set! f (lambda (x) (+ x 1)))
+         (f 10)))
+
+;; Test 1.5: Single binding that fails match-rec-pattern (self captured in nested lambda) SHOULD lift
+(test "Single lift (escaping self in nested lambda)"
+      '(let ((f #f))
+         (set! f (lambda (x) (lambda () (f x))))
+         (f 10))
       '(begin
-         (define f_ (lambda (x) (+ x 1)))
+         (define f_ (lambda (x) (lambda () (f_ x))))
          (f_ 10)))
 
 ;; Test 2: Don't lift if lambda has free variables
