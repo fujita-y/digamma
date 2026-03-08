@@ -440,7 +440,9 @@ void codegen_t::prune_unused_closures() {
   }
 
   for (llvm::Function* f : to_delete) {
-    std::cerr << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
+#ifndef NDEBUG
+    std::cout << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
+#endif
     f->eraseFromParent();
   }
 }
@@ -1089,7 +1091,9 @@ void codegen_t::analyze_closure_labels() {
                   closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
                 }
               } else {
-                std::cerr << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
+#ifndef NDEBUG
+                std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
+#endif
                 current_state.regs[inst.rn1] = make_string((const char*)symbol_name(inst.opr2));
               }
             }
