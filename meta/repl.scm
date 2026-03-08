@@ -87,6 +87,7 @@
   (environment-variable-set! 'call/cc call/cc)
   (environment-variable-set! 'call/1cc call/cc)
   (environment-variable-set! 'values values)
+  (environment-variable-set! 'every? every?)
 
   ; Followings does not work since it calls nanos:closure from native implementation
   ; to work such subrs, need to add own implementation in repl:prelude like map or for-each.

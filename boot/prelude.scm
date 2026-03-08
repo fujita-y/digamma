@@ -68,3 +68,20 @@
                    (error 'make-parameter "wrong number of arguments" (cons* init rest))))))
       (begin (param init) param))))
 
+(define (every? pred lis1 . lists)
+  (let ((lists (cons lis1 lists)))
+    (if (null? (cdr lists))
+        ;; Single list case
+        (let lp ((l (car lists)))
+          (cond ((null? l) #t)
+                ((null? (cdr l)) (pred (car l)))
+                ((pred (car l)) (lp (cdr l)))
+                (else #f)))
+        ;; Multi-list case
+        (let lp ((l lists))
+          (cond ((null? (car l)) #t) ; Any list empty?
+                ((null? (cadar l)) ; Is this the last element?
+                 (apply pred (map car l)))
+                ((apply pred (map car l))
+                 (lp (map cdr l)))
+                (else #f))))))
