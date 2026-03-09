@@ -137,8 +137,8 @@ int main() {
   heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   run_test("SimpleLocalClosure", [](ClosureAnalysisTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (ret))
-    env.analyze("((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (ret))");
+    // ((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (ret))
+    env.analyze("((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (ret))");
 
     const Instruction* call_inst = env.find_first_instruction(Opcode::CALL);
     if (!call_inst) {
@@ -162,8 +162,8 @@ int main() {
   });
 
   run_test("GlobalClosure", [](ClosureAnalysisTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (global-set! g r0) (global-ref r1 g) (call r1 0) (ret) (label C1) (ret))
-    env.analyze("((make-closure r0 C1 () #f 0 #f) (global-set! g r0) (global-ref r1 g) (call r1 0) (ret) (label C1) (ret))");
+    // ((make-closure r0 C1 () 0 #f) (global-set! g r0) (global-ref r1 g) (call r1 0) (ret) (label C1) (ret))
+    env.analyze("((make-closure r0 C1 () 0 #f) (global-set! g r0) (global-ref r1 g) (call r1 0) (ret) (label C1) (ret))");
 
     const Instruction* call_inst = env.find_first_instruction(Opcode::CALL);
     if (!call_inst) {
@@ -202,14 +202,14 @@ int main() {
 
   run_test("ControlFlowMerge_Same", [](ClosureAnalysisTest& env) -> bool {
     // If both branches set r0 to C1, then after join r0 should be C1
-    // ((make-closure r1 C1 () #f 0 #f)
+    // ((make-closure r1 C1 () 0 #f)
     //  (if L1 L2)
     //  (label L1) (mov r0 r1) (jump L3)
     //  (label L2) (mov r0 r1) (label L3)
     //  (call r0 0) (ret)
     //  (label C1) (ret))
     env.analyze(
-        "((make-closure r1 C1 () #f 0 #f) "
+        "((make-closure r1 C1 () 0 #f) "
         "(if L1 L2) "
         "(label L1) (mov r0 r1) (jump L3) "
         "(label L2) (mov r0 r1) (label L3) "
@@ -228,8 +228,8 @@ int main() {
 
   run_test("ControlFlowMerge_Diff", [](ClosureAnalysisTest& env) -> bool {
     // If branches set r0 to different closures, result should be nil (conservative)
-    // ((make-closure r1 C1 () #f 0 #f)
-    //  (make-closure r2 C2 () #f 0 #f)
+    // ((make-closure r1 C1 () 0 #f)
+    //  (make-closure r2 C2 () 0 #f)
     //  (if L1 L2)
     //  (label L1) (mov r0 r1) (jump L3)
     //  (label L2) (mov r0 r2) (label L3)
@@ -237,8 +237,8 @@ int main() {
     //  (label C1) (ret)
     //  (label C2) (ret))
     env.analyze(
-        "((make-closure r1 C1 () #f 0 #f) "
-        "(make-closure r2 C2 () #f 0 #f) "
+        "((make-closure r1 C1 () 0 #f) "
+        "(make-closure r2 C2 () 0 #f) "
         "(if L1 L2) "
         "(label L1) (mov r0 r1) (jump L3) "
         "(label L2) (mov r0 r2) (label L3) "
@@ -257,8 +257,8 @@ int main() {
   });
 
   run_test("TailCallAnalysis", [](ClosureAnalysisTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (tail-call r0 0) (label C1) (ret))
-    env.analyze("((make-closure r0 C1 () #f 0 #f) (tail-call r0 0) (label C1) (ret))");
+    // ((make-closure r0 C1 () 0 #f) (tail-call r0 0) (label C1) (ret))
+    env.analyze("((make-closure r0 C1 () 0 #f) (tail-call r0 0) (label C1) (ret))");
 
     const Instruction* inst = env.find_first_instruction(Opcode::TAIL_CALL);
     if (!inst) return false;
@@ -283,7 +283,7 @@ int main() {
     // So simple recursion should work if main comes first.
 
     env.analyze(
-        "((make-closure r0 C1 () #f 0 #f) "
+        "((make-closure r0 C1 () 0 #f) "
         "(global-set! fib r0) "
         "(call r0 0) (ret) "
         "(label C1) "
@@ -374,14 +374,14 @@ int main() {
   });
 
   run_test("GlobalHeapClosure_WriteRead", [](ClosureAnalysisTest& env) -> bool {
-    // ((make-closure r5 C9 () #f 0 #f)
+    // ((make-closure r5 C9 () 0 #f)
     //  (global-set! foo r5)
     //  (global-ref r3 foo)
     //  (call r3 0)
     //  (ret)
     //  (label C9) (ret))
     env.analyze(
-        "((make-closure r5 C9 () #f 0 #f) "
+        "((make-closure r5 C9 () 0 #f) "
         "(global-set! foo r5) "
         "(global-ref r3 foo) "
         "(call r3 0) (ret) "

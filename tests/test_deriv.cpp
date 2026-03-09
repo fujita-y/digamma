@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
 
     // Define map
     scm_obj_t map_code = env.read_code(
-        "((make-closure r0 C1 () #f 2 #f) (global-set! map r0) (ret) "
+        "((make-closure r0 C1 () 2 #f) (global-set! map r0) (ret) "
         "(label C1) (mov r3 r1) (mov r2 r0) (mov r4 r3) (global-ref r5 null?) (mov r0 r4) "
         "(call r5 1) (if L1 L2) (label L1) (const r0 ()) (ret) (label L2) (mov r6 r3) "
         "(global-ref r7 car) (mov r0 r6) (call r7 1) (mov r5 r0) (mov r6 r2) (call r6 1) "
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
 
     // Define deriv
     scm_obj_t deriv_code = env.read_code(
-        "((make-closure r0 C1 () #f 1 #f) (global-set! deriv r0) (ret) "
+        "((make-closure r0 C1 () 1 #f) (global-set! deriv r0) (ret) "
         "(label C1) (mov r4 r0) (mov r6 r0) (global-ref r7 pair?) (call r7 1) (mov r5 r0) "
         "(global-ref r6 not) (call r6 1) (if L1 L2) (label L1) (mov r5 r4) (const r6 x) "
         "(global-ref r7 eq?) (mov r0 r5) (mov r1 r6) (call r7 2) (if L4 L5) (label L4) "
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
         "(global-ref r7 cons) (mov r0 r5) (mov r1 r6) (tail-call r7 2) (label L11) "
         "(mov r6 r4) (global-ref r7 car) (mov r0 r6) (call r7 1) (mov r5 r0) (const r6 *) "
         "(global-ref r7 eq?) (mov r1 r6) (call r7 2) (if L13 L14) (label L13) (const r5 *) "
-        "(mov r6 r4) (const r0 +) (mov r8 r0) (make-closure r0 C2 () #f 1 #f) (mov r10 r0) "
+        "(mov r6 r4) (const r0 +) (mov r8 r0) (make-closure r0 C2 () 1 #f) (mov r10 r0) "
         "(mov r12 r4) (global-ref r13 cdr) (mov r0 r12) (call r13 1) (mov r11 r0) "
         "(global-ref r12 map) (mov r0 r10) (mov r1 r11) (call r12 2) (mov r9 r0) "
         "(global-ref r10 cons) (mov r0 r8) (mov r1 r9) (call r10 2) (mov r7 r0) "
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
 
     // Define map
     scm_obj_t map_code = env.read_code(R"(
-      ((make-closure r0 C1 () #f 2 #f)
+      ((make-closure r0 C1 () 2 #f)
        (global-set! map r0)
        (ret)
        (label C1)
@@ -275,7 +275,7 @@ int main(int argc, char** argv) {
 
     // Run test case
     scm_obj_t test_case = env.read_code(R"(
-      ((make-closure r0 C1 () #f 1 #f) 
+      ((make-closure r0 C1 () 1 #f) 
        (mov r2 r0) 
        (const r3 (1 2 3)) 
        (global-ref r4 map) 
@@ -311,13 +311,13 @@ int main(int argc, char** argv) {
 
     // Define map
     scm_obj_t map_code = env.read_code(R"(
-      ((make-closure r0 C1 () #f 2 #f) (global-set! map r0) (ret) (label C1) (mov r2 r1) (mov r1 r0) (const r0 #f) (mov r3 r0) (closure-self r3) (make-closure r0 C2 (r3) #f 2 #f) (mov r3 r0) (mov r4 r1) (mov r0 r2) (mov r5 r0) (mov r6 r3) (mov r0 r4) (mov r1 r5) (tail-call r6 2) (label C2) (mov r3 r1) (mov r2 r0) (mov r4 r3) (global-ref r5 null?) (mov r0 r4) (call r5 1) (if L1 L2) (label L1) (const r0 ()) (ret) (label L2) (mov r6 r3) (global-ref r7 car) (mov r0 r6) (call r7 1) (mov r5 r0) (mov r6 r2) (call r6 1) (mov r4 r0) (mov r6 r2) (mov r8 r3) (global-ref r9 cdr) (mov r0 r8) (call r9 1) (mov r7 r0) (closure-self r0) (mov r8 r0) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (global-ref r6 cons) (mov r0 r4) (mov r1 r5) (tail-call r6 2))
+      ((make-closure r0 C1 () 2 #f) (global-set! map r0) (ret) (label C1) (mov r2 r1) (mov r1 r0) (const r0 #f) (mov r3 r0) (closure-self r3) (make-closure r0 C2 (r3) 2 #f) (mov r3 r0) (mov r4 r1) (mov r0 r2) (mov r5 r0) (mov r6 r3) (mov r0 r4) (mov r1 r5) (tail-call r6 2) (label C2) (mov r3 r1) (mov r2 r0) (mov r4 r3) (global-ref r5 null?) (mov r0 r4) (call r5 1) (if L1 L2) (label L1) (const r0 ()) (ret) (label L2) (mov r6 r3) (global-ref r7 car) (mov r0 r6) (call r7 1) (mov r5 r0) (mov r6 r2) (call r6 1) (mov r4 r0) (mov r6 r2) (mov r8 r3) (global-ref r9 cdr) (mov r0 r8) (call r9 1) (mov r7 r0) (closure-self r0) (mov r8 r0) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (global-ref r6 cons) (mov r0 r4) (mov r1 r5) (tail-call r6 2))
     )");
     env.codegen->compile(map_code)();
 
     // Run test case
     scm_obj_t test_case = env.read_code(R"(
-      ((make-closure r0 C1 () #f 1 #f) (mov r2 r0) (const r3 (1 2 3)) (global-ref r4 map) (mov r1 r3) (call r4 2) (ret) (label C1) (mov r2 r0) (const r3 5) (mov r4 r2) (global-ref r5 list) (mov r0 r3) (mov r1 r4) (tail-call r5 2))
+      ((make-closure r0 C1 () 1 #f) (mov r2 r0) (const r3 (1 2 3)) (global-ref r4 map) (mov r1 r3) (call r4 2) (ret) (label C1) (mov r2 r0) (const r3 5) (mov r4 r2) (global-ref r5 list) (mov r0 r3) (mov r1 r4) (tail-call r5 2))
     )");
     intptr_t result = env.codegen->compile(test_case)();
 
@@ -344,11 +344,11 @@ int main(int argc, char** argv) {
 
     // Define nqueens and its helper functions
     scm_obj_t nqueens_code = env.read_code(R"(
-      ((make-closure r0 C1 () #f 1 #f) (global-set! nqueens r0) (ret)
-       (label C1) (mov r3 r0) (const r0 *undefined*) (mov r4 r0) (make-cell r4) (const r0 *undefined*) (mov r5 r0) (make-cell r5) (const r0 *undefined*) (mov r6 r0) (make-cell r6) (make-closure r0 C2 () #f 1 #f) (reg-cell-set! r4 r0) (make-closure r0 C4 (r6 r5) #f 3 #f) (reg-cell-set! r5 r0) (make-closure r0 C5 (r6) #f 3 #f) (reg-cell-set! r6 r0) (mov r8 r3) (reg-cell-ref r9 r4) (mov r0 r8) (call r9 1) (mov r7 r0) (const r8 ()) (const r9 ()) (reg-cell-ref r10 r5) (mov r1 r8) (mov r2 r9) (tail-call r10 3)
+      ((make-closure r0 C1 () 1 #f) (global-set! nqueens r0) (ret)
+       (label C1) (mov r3 r0) (const r0 *undefined*) (mov r4 r0) (make-cell r4) (const r0 *undefined*) (mov r5 r0) (make-cell r5) (const r0 *undefined*) (mov r6 r0) (make-cell r6) (make-closure r0 C2 () 1 #f) (reg-cell-set! r4 r0) (make-closure r0 C4 (r6 r5) 3 #f) (reg-cell-set! r5 r0) (make-closure r0 C5 (r6) 3 #f) (reg-cell-set! r6 r0) (mov r8 r3) (reg-cell-ref r9 r4) (mov r0 r8) (call r9 1) (mov r7 r0) (const r8 ()) (const r9 ()) (reg-cell-ref r10 r5) (mov r1 r8) (mov r2 r9) (tail-call r10 3)
        (label C5) (mov r5 r2) (mov r4 r1) (mov r3 r0) (mov r6 r5) (global-ref r7 null?) (mov r0 r6) (call r7 1) (if L16 L17) (label L16) (const r0 #t) (ret) (label L17) (mov r8 r5) (global-ref r9 car) (mov r0 r8) (call r9 1) (mov r7 r0) (mov r9 r3) (mov r10 r4) (global-ref r11 +) (mov r0 r9) (mov r1 r10) (call r11 2) (mov r8 r0) (global-ref r9 =) (mov r0 r7) (mov r1 r8) (call r9 2) (mov r6 r0) (global-ref r7 not) (call r7 1) (if L19 L20) (label L19) (mov r8 r5) (global-ref r9 car) (mov r0 r8) (call r9 1) (mov r7 r0) (mov r9 r3) (mov r10 r4) (global-ref r11 -) (mov r0 r9) (mov r1 r10) (call r11 2) (mov r8 r0) (global-ref r9 =) (mov r0 r7) (mov r1 r8) (call r9 2) (mov r6 r0) (global-ref r7 not) (call r7 1) (if L22 L23) (label L22) (mov r6 r3) (mov r8 r4) (const r9 1) (global-ref r10 +) (mov r0 r8) (mov r1 r9) (call r10 2) (mov r7 r0) (mov r9 r5) (global-ref r10 cdr) (mov r0 r9) (call r10 1) (mov r8 r0) (closure-cell-ref r9 0) (mov r0 r6) (mov r1 r7) (mov r2 r8) (tail-call r9 3) (label L23) (const r0 #f) (ret) (label L20) (const r0 #f) (ret)
        (label C4) (mov r5 r2) (mov r4 r1) (mov r3 r0) (mov r6 r0) (global-ref r7 null?) (call r7 1) (if L4 L5) (label L4) (mov r6 r4) (global-ref r7 null?) (mov r0 r6) (call r7 1) (if L7 L8) (label L7) (global-ref r0 trace?) (if L10 L11) (label L10) (mov r6 r5) (global-ref r7 write) (mov r0 r6) (call r7 1) (global-ref r0 newline) (mov r6 r0) (call r6 0) (jump L12) (label L11) (const r0 #f) (label L12) (const r0 1) (ret) (label L8) (const r0 0) (ret) (label L5) (mov r8 r3) (global-ref r9 car) (mov r0 r8) (call r9 1) (mov r7 r0) (const r8 1) (mov r9 r5) (closure-cell-ref r10 0) (mov r1 r8) (mov r2 r9) (call r10 3) (if L13 L14) (label L13) (mov r9 r3) (global-ref r10 cdr) (mov r0 r9) (call r10 1) (mov r8 r0) (mov r9 r4) (global-ref r10 append) (mov r1 r9) (call r10 2) (mov r7 r0) (const r8 ()) (mov r11 r3) (global-ref r12 car) (mov r0 r11) (call r12 1) (mov r10 r0) (mov r11 r5) (global-ref r12 cons) (mov r1 r11) (call r12 2) (mov r9 r0) (closure-cell-ref r10 1) (mov r0 r7) (mov r1 r8) (mov r2 r9) (call r10 3) (jump L15) (label L14) (const r0 0) (label L15) (mov r6 r0) (mov r9 r3) (global-ref r10 cdr) (mov r0 r9) (call r10 1) (mov r8 r0) (mov r11 r3) (global-ref r12 car) (mov r0 r11) (call r12 1) (mov r10 r0) (mov r11 r4) (global-ref r12 cons) (mov r1 r11) (call r12 2) (mov r9 r0) (mov r10 r5) (closure-cell-ref r11 1) (mov r0 r8) (mov r1 r9) (mov r2 r10) (call r11 3) (mov r7 r0) (global-ref r8 +) (mov r0 r6) (mov r1 r7) (tail-call r8 2)
-       (label C2) (mov r1 r0) (const r0 #f) (mov r2 r0) (closure-self r2) (make-closure r0 C3 (r2) #f 2 #f) (mov r2 r0) (mov r3 r1) (const r0 ()) (mov r4 r0) (mov r5 r2) (mov r0 r3) (mov r1 r4) (tail-call r5 2)
+       (label C2) (mov r1 r0) (const r0 #f) (mov r2 r0) (closure-self r2) (make-closure r0 C3 (r2) 2 #f) (mov r2 r0) (mov r3 r1) (const r0 ()) (mov r4 r0) (mov r5 r2) (mov r0 r3) (mov r1 r4) (tail-call r5 2)
        (label C3) (mov r3 r1) (mov r2 r0) (mov r4 r0) (const r5 0) (global-ref r6 =) (mov r1 r5) (call r6 2) (if L1 L2) (label L1) (mov r0 r3) (ret) (label L2) (mov r5 r2) (const r6 1) (global-ref r7 -) (mov r0 r5) (mov r1 r6) (call r7 2) (mov r4 r0) (mov r6 r2) (mov r7 r3) (global-ref r8 cons) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (closure-self r0) (mov r6 r0) (mov r0 r4) (mov r1 r5) (tail-call r6 2)))
     )");
     env.codegen->compile(nqueens_code)();

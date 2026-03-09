@@ -12,7 +12,7 @@
 ;;   (call <proc-reg> <n-args>)            - Call procedure in <proc-reg> with <n-args> arguments
 ;;   (tail-call <proc-reg> <n-args>)       - Tail call procedure in <proc-reg> with <n-args> arguments
 ;;   (ret)                                 - Return from procedure (result in r0)
-;;   (make-closure <dst-reg> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
+;;   (make-closure <dst-reg> <label> <free-indices> <fixed-argc> <has-rest?>)
 ;;                                         - Create closure at <label> capturing free vars from <free-indices>
 ;;   (closure-ref <reg> <idx>)             - Load free variable at env[<idx>] into <reg>
 ;;   (closure-cell-ref <reg> <idx>)        - Load value from cell at env[<idx>] into <reg>
@@ -198,13 +198,13 @@
         (vm:reg-set! ctx 0 res)
         *vm:continue*)))
 
-;; (make-closure <dst> <label> <free-indices> <stack-alloc?> <fixed-argc> <has-rest?>)
+;; (make-closure <dst> <label> <free-indices> <fixed-argc> <has-rest?>)
 (define (vm:op-make-closure ctx inst)
   (let ((dst (vector-ref inst 1))
         (label (vector-ref inst 2))
         (free-indices (vector-ref inst 3))
-        (fixed-argc (vector-ref inst 5))
-        (has-rest (vector-ref inst 6)))
+        (fixed-argc (vector-ref inst 4))
+        (has-rest (vector-ref inst 5)))
     (let ((free-vals (map (lambda (idx) (vm:reg-ref ctx idx)) free-indices)))
       (let ((cl (make-nanos:closure-vec label (list->vector free-vals) (ctx-code ctx) fixed-argc has-rest)))
         (vm:reg-set! ctx dst cl))

@@ -761,8 +761,8 @@ void codegen_t::parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst,
   inst.opr1 = operand(inst_obj, 2);            // label (C1)
   inst.free_indices = operand(inst_obj, 3);    // free indices list
 
-  inst.argc = fixnum(operand(inst_obj, 5));
-  inst.has_rest = (operand(inst_obj, 6) == scm_true);
+  inst.argc = fixnum(operand(inst_obj, 4));
+  inst.has_rest = (operand(inst_obj, 5) == scm_true);
 
   // Record closure parameters for function generation
   closure_params[inst.opr1] = {inst.argc, inst.has_rest};

@@ -167,17 +167,17 @@ int main(int argc, char** argv) {
   });
 
   run_test("MakeClosure", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 42) (ret)) ;=> closure address
+    // ((make-closure r0 C1 () 0 #f) (ret) (label C1) (const r0 42) (ret)) ;=> closure address
     // We check if the result is a closure heap object.
-    scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 42) (ret))");
+    scm_obj_t code = env.read_code("((make-closure r0 C1 () 0 #f) (ret) (label C1) (const r0 42) (ret))");
     scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     return is_closure(result);
   });
 
   run_test("MakeClosureCapture", [](CodegenTest& env) -> bool {
-    // ((const r1 123) (make-closure r0 C1 (r1) #f 0 #f) (ret) (label C1) (const r0 42) (ret))
+    // ((const r1 123) (make-closure r0 C1 (r1) 0 #f) (ret) (label C1) (const r0 42) (ret))
     // Check if closure captures r1 (val 123) at env[0]
-    scm_obj_t code = env.read_code("((const r1 123) (make-closure r0 C1 (r1) #f 0 #f) (ret) (label C1) (const r0 42) (ret))");
+    scm_obj_t code = env.read_code("((const r1 123) (make-closure r0 C1 (r1) 0 #f) (ret) (label C1) (const r0 42) (ret))");
     scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
@@ -195,9 +195,9 @@ int main(int argc, char** argv) {
   });
 
   run_test("MakeClosureLiterals", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))
+    // ((make-closure r0 C1 () 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))
     // Check if closure has literals vector with (1 . 2)
-    scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))");
+    scm_obj_t code = env.read_code("((make-closure r0 C1 () 0 #f) (ret) (label C1) (const r0 (1 . 2)) (ret))");
     scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
@@ -224,9 +224,9 @@ int main(int argc, char** argv) {
   });
 
   run_test("MakeClosureArgs", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 5 #t) (ret) (label C1) (const r0 42) (ret))
+    // ((make-closure r0 C1 () 5 #t) (ret) (label C1) (const r0 42) (ret))
     // Check argc=5, rest=1
-    scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 5 #t) (ret) (label C1) (const r0 42) (ret))");
+    scm_obj_t code = env.read_code("((make-closure r0 C1 () 5 #t) (ret) (label C1) (const r0 42) (ret))");
     scm_obj_t result = (scm_obj_t)env.codegen->compile(code)();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
@@ -278,9 +278,9 @@ int main(int argc, char** argv) {
   });
 
   run_test("CallInstruction", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))
+    // ((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))
     // Call C1, result should be in r0 (42)
-    scm_obj_t code = env.read_code("((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))");
+    scm_obj_t code = env.read_code("((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (const r0 42) (ret))");
     intptr_t result = env.codegen->compile(code)();
     if (result != make_fixnum(42)) {
       printf("CallInstruction mismatch: expected 42, got %ld\n", result);
@@ -291,8 +291,8 @@ int main(int argc, char** argv) {
 
   run_test("GlobalClosureCall", [](CodegenTest& env) -> bool {
     // Sequence 1: Create closure and set to global 'a'
-    // ((make-closure r0 C1 () #f 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))
-    scm_obj_t code1 = env.read_code("((make-closure r0 C1 () #f 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))");
+    // ((make-closure r0 C1 () 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))
+    scm_obj_t code1 = env.read_code("((make-closure r0 C1 () 1 #f) (global-set! a r0) (ret) (label C1) (mov r1 r0) (ret))");
     env.codegen->compile(code1)();
 
     // Sequence 2: Get global 'a' and call it
@@ -309,12 +309,12 @@ int main(int argc, char** argv) {
   });
 
   run_test("NestedClosure", [](CodegenTest& env) -> bool {
-    // (make-closure r0 C1 () #f 0 #f) (call r0 0) (global-set! inner r0) (ret)
-    // (label C1) (const r1 999) (make-closure r0 C2 (r1) #f 0 #f) (ret)
+    // (make-closure r0 C1 () 0 #f) (call r0 0) (global-set! inner r0) (ret)
+    // (label C1) (const r1 999) (make-closure r0 C2 (r1) 0 #f) (ret)
     // (label C2) (ret)
     scm_obj_t code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) (call r0 0) (global-set! inner r0) (ret) "
-        "(label C1) (const r1 999) (make-closure r0 C2 (r1) #f 0 #f) (ret) "
+        "((make-closure r0 C1 () 0 #f) (call r0 0) (global-set! inner r0) (ret) "
+        "(label C1) (const r1 999) (make-closure r0 C2 (r1) 0 #f) (ret) "
         "(label C2) (ret))");
 
     env.codegen->compile(code)();
@@ -349,11 +349,11 @@ int main(int argc, char** argv) {
   });
 
   run_test("ClosureArgsSum", [](CodegenTest& env) -> bool {
-    // ((const r0 10) (const r1 20) (const r2 30) (make-closure r3 C1 () #f 3 #f) (call r3 3) (ret)
+    // ((const r0 10) (const r1 20) (const r2 30) (make-closure r3 C1 () 3 #f) (call r3 3) (ret)
     //  (label C1) (mov r0 r2) (ret))
     scm_obj_t code = env.read_code(
         "((const r0 10) (const r1 20) (const r2 30) "
-        "(make-closure r3 C1 () #f 3 #f) "
+        "(make-closure r3 C1 () 3 #f) "
         "(call r3 3) (ret) "
         "(label C1) (mov r0 r2) (ret))");
 
@@ -380,10 +380,10 @@ int main(int argc, char** argv) {
   });
 
   run_test("ClosureControlFlow", [](CodegenTest& env) -> bool {
-    // ((make-closure r3 C1 () #f 1 #f) (const r0 #f) (call r3 1) (ret)
+    // ((make-closure r3 C1 () 1 #f) (const r0 #f) (call r3 1) (ret)
     //  (label C1) (if L1 L2) (label L1) (const r0 1) (ret) (label L2) (const r0 2) (ret))
     scm_obj_t code = env.read_code(
-        "((make-closure r3 C1 () #f 1 #f) "
+        "((make-closure r3 C1 () 1 #f) "
         "(const r0 #f) "
         "(call r3 1) (ret) "
         "(label C1) (if L1 L2) "
@@ -399,14 +399,14 @@ int main(int argc, char** argv) {
   });
 
   run_test("RestArgumentsExact", [](CodegenTest& env) -> bool {
-    // ((make-closure r5 C1 () #f 2 #t)
+    // ((make-closure r5 C1 () 2 #t)
     //  (const r0 10) (const r1 20)
     //  (call r5 2) (ret)
     //  (label C1) (mov r0 r2) (ret))
     // Call with 2 args. Fixed=2. Rest should be nil.
     // Rest is in r2.
     scm_obj_t code = env.read_code(
-        "((make-closure r5 C1 () #f 2 #t) "
+        "((make-closure r5 C1 () 2 #t) "
         "(const r0 10) (const r1 20) "
         "(call r5 2) (ret) "
         "(label C1) (mov r0 r2) (ret))");
@@ -420,14 +420,14 @@ int main(int argc, char** argv) {
   });
 
   run_test("RestArgumentsExtra", [](CodegenTest& env) -> bool {
-    // ((make-closure r5 C1 () #f 2 #t)
+    // ((make-closure r5 C1 () 2 #t)
     //  (const r0 10) (const r1 20) (const r2 30) (const r3 40)
     //  (call r5 4) (ret)
     //  (label C1) (mov r0 r2) (ret))
     // Call with 4 args. Fixed=2. Rest should be (30 40).
     // Note: r2 is the rest argument (index 2 in callee).
     scm_obj_t code = env.read_code(
-        "((make-closure r5 C1 () #f 2 #t) "
+        "((make-closure r5 C1 () 2 #t) "
         "(const r0 10) (const r1 20) (const r2 30) (const r3 40) "
         "(call r5 4) (ret) "
         "(label C1) (mov r0 r2) (ret))");
@@ -459,10 +459,10 @@ int main(int argc, char** argv) {
   });
 
   run_test("GlobalClosureRest", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 2 #t) (global-set! a r0) (ret) (label C1) (mov r3 r2) (mov r2 r1) (mov r1 r0) (mov r0 r3) (ret))
+    // ((make-closure r0 C1 () 2 #t) (global-set! a r0) (ret) (label C1) (mov r3 r2) (mov r2 r1) (mov r1 r0) (mov r0 r3) (ret))
     // Setup closure in global 'a'
     scm_obj_t SETUP_CODE = env.read_code(
-        "((make-closure r0 C1 () #f 2 #t) (global-set! a r0) (ret) "
+        "((make-closure r0 C1 () 2 #t) (global-set! a r0) (ret) "
         "(label C1) (mov r3 r2) (mov r2 r1) (mov r1 r0) (mov r0 r3) (ret))");
     env.codegen->compile(SETUP_CODE)();
 
@@ -506,12 +506,12 @@ int main(int argc, char** argv) {
   });
 
   run_test("ClosureRef", [](CodegenTest& env) -> bool {
-    // ((const r1 123) (make-closure r0 C1 (r1) #f 0 #f) (call r0 0) (ret)
+    // ((const r1 123) (make-closure r0 C1 (r1) 0 #f) (call r0 0) (ret)
     //  (label C1) (closure-ref r0 0) (ret))
     // Closure captures r1 (123). C1 reads index 0 of free vars -> 123.
     scm_obj_t code = env.read_code(
         "((const r1 123) "
-        "(make-closure r0 C1 (r1) #f 0 #f) "
+        "(make-closure r0 C1 (r1) 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) (closure-ref r0 0) (ret))");
 
@@ -524,7 +524,7 @@ int main(int argc, char** argv) {
   });
 
   run_test("ClosureSet", [](CodegenTest& env) -> bool {
-    // ((const r1 10) (make-closure r0 C1 (r1) #f 0 #f) (call r0 0) (ret)
+    // ((const r1 10) (make-closure r0 C1 (r1) 0 #f) (call r0 0) (ret)
     //  (label C1)
     //  (closure-ref r0 0)      ; r0 = 10
     //  (const r1 20)
@@ -534,7 +534,7 @@ int main(int argc, char** argv) {
     //  (ret))
     scm_obj_t code = env.read_code(
         "((const r1 10) "
-        "(make-closure r0 C1 (r1) #f 0 #f) "
+        "(make-closure r0 C1 (r1) 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) "
         "(closure-ref r0 0) "
@@ -553,12 +553,12 @@ int main(int argc, char** argv) {
   });
 
   run_test("ClosureSelf", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret)
+    // ((make-closure r0 C1 () 0 #f) (call r0 0) (ret)
     //  (label C1)
     //  (closure-self r0)
     //  (ret))
     scm_obj_t code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) "
+        "((make-closure r0 C1 () 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) "
         "(closure-self r0) "
@@ -593,7 +593,7 @@ int main(int argc, char** argv) {
   run_test("ClosureCellRef", [](CodegenTest& env) -> bool {
     // ((const r1 123)
     //  (make-cell r1)           ; r1 is now a cell containing 123
-    //  (make-closure r0 C1 (r1) #f 0 #f)
+    //  (make-closure r0 C1 (r1) 0 #f)
     //  (call r0 0) (ret)
     //  (label C1)
     //  (closure-cell-ref r0 0)  ; r0 = cell-value(env[0])
@@ -601,7 +601,7 @@ int main(int argc, char** argv) {
     scm_obj_t code = env.read_code(
         "((const r1 123) "
         "(make-cell r1) "
-        "(make-closure r0 C1 (r1) #f 0 #f) "
+        "(make-closure r0 C1 (r1) 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) "
         "(closure-cell-ref r0 0) "
@@ -618,7 +618,7 @@ int main(int argc, char** argv) {
   run_test("ClosureCellSet", [](CodegenTest& env) -> bool {
     // ((const r1 123)
     //  (make-cell r1)           ; r1 is now a cell containing 123
-    //  (make-closure r0 C1 (r1) #f 0 #f)
+    //  (make-closure r0 C1 (r1) 0 #f)
     //  (call r0 0) (ret)
     //  (label C1)
     //  (const r2 456)
@@ -628,7 +628,7 @@ int main(int argc, char** argv) {
     scm_obj_t code = env.read_code(
         "((const r1 123) "
         "(make-cell r1) "
-        "(make-closure r0 C1 (r1) #f 0 #f) "
+        "(make-closure r0 C1 (r1) 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) "
         "(const r2 456) "
@@ -687,8 +687,8 @@ int main(int argc, char** argv) {
   });
 
   run_test("TailCall", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f)
-    //  (make-closure r1 C2 (r0) #f 0 #f)
+    // ((make-closure r0 C1 () 0 #f)
+    //  (make-closure r1 C2 (r0) 0 #f)
     //  (call r1 0)
     //  (ret)
     //  (label C1)
@@ -698,8 +698,8 @@ int main(int argc, char** argv) {
     //  (closure-ref r0 0)
     //  (tail-call r0 0))
     scm_obj_t code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) "
-        "(make-closure r1 C2 (r0) #f 0 #f) "
+        "((make-closure r0 C1 () 0 #f) "
+        "(make-closure r1 C2 (r0) 0 #f) "
         "(call r1 0) "
         "(ret) "
         "(label C1) "
@@ -791,7 +791,7 @@ int main(int argc, char** argv) {
 
     // Build producer closure: (lambda () (values 10 20))
     scm_obj_t prod_code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) (ret)"
+        "((make-closure r0 C1 () 0 #f) (ret)"
         " (label C1)"
         "   (const r1 10) (const r2 20)"
         "   (global-ref r3 values)"
@@ -803,7 +803,7 @@ int main(int argc, char** argv) {
     // Build consumer closure: (lambda (a b) (+ a b))
     c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1));
     scm_obj_t cons_code = env.read_code(
-        "((make-closure r0 C2 () #f 2 #f) (ret)"
+        "((make-closure r0 C2 () 2 #f) (ret)"
         " (label C2)"
         "   (global-ref r2 +)"
         "   (call r2 2)"
@@ -828,14 +828,14 @@ int main(int argc, char** argv) {
 
     // Producer: (lambda () 42)  — returns a plain fixnum, not a values object
     scm_obj_t prod_code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) (ret)"
+        "((make-closure r0 C1 () 0 #f) (ret)"
         " (label C1) (const r0 42) (ret))");
     scm_obj_t producer = (scm_obj_t)env.codegen->compile(prod_code)();
     if (!is_closure(producer)) return false;
 
     // Consumer: (lambda (x) x)  — identity
     scm_obj_t cons_code = env.read_code(
-        "((make-closure r0 C2 () #f 1 #f) (ret)"
+        "((make-closure r0 C2 () 1 #f) (ret)"
         " (label C2) (ret))");  // r0 already holds arg0
     scm_obj_t consumer = (scm_obj_t)env.codegen->compile(cons_code)();
     if (!is_closure(consumer)) return false;

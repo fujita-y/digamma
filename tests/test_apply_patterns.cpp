@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
     // (apply f '(10))
     // f = (lambda (x) (+ x 1))
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 C1 () #f 1 #f) (global-set! f r0) (ret) "
+        "((make-closure r0 C1 () 1 #f) (global-set! f r0) (ret) "
         "(label C1) (const r1 1) (global-ref r2 +) (call r2 2) (ret))");
     env.codegen->compile(setup)();
 
