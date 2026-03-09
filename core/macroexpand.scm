@@ -308,7 +308,9 @@
                    (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
                    (let ((core-sym (resolve-core-form head s-env)))
                      (let ((handler (and core-sym (lookup-handler core-sym))))
-                       (if handler (handler expr m-env s-env r-env) (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
+                       (if handler 
+                           (handler expr m-env s-env r-env) 
+                           (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
              (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
       ((symbol? expr)
        (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
