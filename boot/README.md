@@ -20,3 +20,10 @@ gosh boot/build-core-ir.scm
 !../boot/core.ir
 ((const r1 (- 3)) (global-ref r2 macroexpand) (mov r0 r1) (call r2 1) (ret))
 
+FIX THE ISSUE
+
+macroexpand.scm:313
+(map-improper (lambda (x) (expand x m-env s-env r-env)) expr)
+=>
+(map-improper (lambda (x) (apply expand x m-env s-env r-env '())) expr)
+
