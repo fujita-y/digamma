@@ -398,6 +398,38 @@
 ;; 5. Core Handlers
 ;;=============================================================================
 
+(define (optimize-inner expr bound-vars)
+  (cond
+    ((symbol? expr)
+     (if (and (hashtable-contains? global-env expr)
+              (not (memq expr bound-vars)))
+         (hashtable-ref global-env expr #f)
+         expr))
+
+    ((not (pair? expr)) expr)
+
+    ((eq? (car expr) 'quote) expr)
+
+    ((eq? (car expr) 'if) (opt-if expr bound-vars))
+
+    ((eq? (car expr) 'begin) (opt-begin expr bound-vars))
+
+    ((eq? (car expr) 'lambda) (opt-lambda expr bound-vars))
+
+    ((eq? (car expr) 'let) (opt-let expr bound-vars))
+
+    ((eq? (car expr) 'set!)
+     `(set! ,(cadr expr) ,(optimize-inner (caddr expr) bound-vars)))
+
+    ((eq? (car expr) 'define)
+     (let ((var (cadr expr))
+           (val (optimize-inner (caddr expr) bound-vars)))
+       (if (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)))
+           (hashtable-set! global-env var val))
+       `(define ,var ,val)))
+
+    (else (opt-app expr bound-vars))))
+
 (define (opt-if expr bound-vars)
   (let ((test (optimize-inner (cadr expr) bound-vars))
         (then (optimize-inner (caddr expr) bound-vars))
@@ -479,38 +511,6 @@
 ;;=============================================================================
 ;; 6. Dispatcher & Entry Points
 ;;=============================================================================
-
-(define (optimize-inner expr bound-vars)
-  (cond
-    ((symbol? expr)
-     (if (and (hashtable-contains? global-env expr)
-              (not (memq expr bound-vars)))
-         (hashtable-ref global-env expr #f)
-         expr))
-
-    ((not (pair? expr)) expr)
-
-    ((eq? (car expr) 'quote) expr)
-
-    ((eq? (car expr) 'if) (opt-if expr bound-vars))
-
-    ((eq? (car expr) 'begin) (opt-begin expr bound-vars))
-
-    ((eq? (car expr) 'lambda) (opt-lambda expr bound-vars))
-
-    ((eq? (car expr) 'let) (opt-let expr bound-vars))
-
-    ((eq? (car expr) 'set!)
-     `(set! ,(cadr expr) ,(optimize-inner (caddr expr) bound-vars)))
-
-    ((eq? (car expr) 'define)
-     (let ((var (cadr expr))
-           (val (optimize-inner (caddr expr) bound-vars)))
-       (if (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)))
-           (hashtable-set! global-env var val))
-       `(define ,var ,val)))
-
-    (else (opt-app expr bound-vars))))
 
 ;; Perform a single optimization pass.
 (define (optimize-once expr)

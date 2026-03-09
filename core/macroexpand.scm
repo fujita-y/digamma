@@ -295,6 +295,26 @@
 ;; SECTION 6: Expansion Handlers
 ;;=============================================================================
 
+(define (expand expr . args)
+  (let* ((m-env (if (null? args) '() (car args)))
+         (s-env (if (or (null? args) (null? (cdr args))) '() (cadr args)))
+         (r-env (if (or (null? args) (null? (cdr args)) (null? (cddr args))) '() (caddr args))))
+    (cond
+      ((pair? expr)
+       (let ((head (car expr)))
+         (if (symbol? head)
+              (let ((transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
+                (if transformer (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+                    (let ((core-sym (resolve-core-form head s-env)))
+                      (let ((handler (and core-sym (lookup-handler core-sym))))
+                        (if handler (handler expr m-env s-env r-env) (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
+              (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
+      ((symbol? expr)
+       (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
+         (if transformer (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+             (resolve-variable expr m-env s-env r-env))))
+      (else expr))))
+
 (define (expand-lambda expr m-env s-env r-env)
   (let* ((params (cadr expr)) (body (cddr expr))
          (p-names (get-param-names params))
@@ -479,26 +499,6 @@
     ((set!) expand-set!) ((if) expand-if) ((cond) expand-cond) ((and) expand-and) ((or) expand-or) ((case) expand-case)
     ((define) expand-define) ((begin) expand-begin) ((quote) expand-quote) ((quasiquote) expand-quasiquote-form)
     ((define-module) expand-define-module) ((import-module) expand-import-module) (else #f)))
-
-(define (expand expr . args)
-  (let* ((m-env (if (null? args) '() (car args)))
-         (s-env (if (or (null? args) (null? (cdr args))) '() (cadr args)))
-         (r-env (if (or (null? args) (null? (cdr args)) (null? (cddr args))) '() (caddr args))))
-    (cond
-      ((pair? expr)
-       (let ((head (car expr)))
-         (if (symbol? head)
-              (let ((transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
-                (if transformer (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
-                    (let ((core-sym (resolve-core-form head s-env)))
-                      (let ((handler (and core-sym (lookup-handler core-sym))))
-                        (if handler (handler expr m-env s-env r-env) (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
-              (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
-      ((symbol? expr)
-       (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
-         (if transformer (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
-             (resolve-variable expr m-env s-env r-env))))
-      (else expr))))
 
 ;;=============================================================================
 ;; SECTION 8: Cleanup & Entry Point
