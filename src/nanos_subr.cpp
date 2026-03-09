@@ -242,6 +242,7 @@ SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(se
 SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
 SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
 SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
 SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
@@ -599,6 +600,12 @@ SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1) { return is_symbol(a1) ? scm_tr
 
 // vector?  - R6RS 11.13
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1) { return is_vector(a1) ? scm_true : scm_false; }
+
+// undefined - Nanos extension
+SUBR subr_undefined(scm_obj_t self) { return scm_undef; }
+
+// unspecified - Nanos extension
+SUBR subr_unspecified(scm_obj_t self) { return scm_unspecified; }
 
 // undefined? - Nanos extension
 SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_undef) ? scm_true : scm_false; }
@@ -1234,6 +1241,7 @@ void nanos_t::init_subr() {
   reg("cadr", (void*)subr_cadr, 1, 0);
   reg("cddr", (void*)subr_cddr, 1, 0);
   reg("cadar", (void*)subr_cadar, 1, 0);
+  reg("caddar", (void*)subr_caddar, 1, 0);
   reg("caddr", (void*)subr_caddr, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
@@ -1274,6 +1282,8 @@ void nanos_t::init_subr() {
   reg("string?", (void*)subr_string_p, 1, 0);
   reg("symbol?", (void*)subr_symbol_p, 1, 0);
   reg("vector?", (void*)subr_vector_p, 1, 0);
+  reg("undefined", (void*)subr_undefined, 0, 0);
+  reg("unspecified", (void*)subr_unspecified, 0, 0);
   reg("undefined?", (void*)subr_undefined_p, 1, 0);
   reg("unspecified?", (void*)subr_unspecified_p, 1, 0);
 
