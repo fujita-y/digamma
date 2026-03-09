@@ -339,7 +339,6 @@ void codegen_t::optimize_module(llvm::Module& mod) {
 }
 
 void codegen_t::phase4_optimize_and_verify() {
-
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
@@ -723,6 +722,11 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
   if (current_closure_label != scm_nil) {
     if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
       current_literals.push_back(inst.opr1);
+    }
+  } else {
+    if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
+      puts("IMPORTANT: non closure literals found added to root to protect from GC");
+      object_heap_t::current()->add_root(inst.opr1);
     }
   }
 }

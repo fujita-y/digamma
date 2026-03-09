@@ -572,7 +572,11 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         if (cdecl == 0) {
           call->setCallingConv(CLOSURE_CALLING_CONV);
           if (is_tail) {
-            call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+            if (!has_rest) {
+              call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+            } else {
+              call->setTailCallKind(llvm::CallInst::TCK_Tail);
+            }
             BL.CreateRet(call);
           } else {
             set_reg(0, call);
@@ -657,7 +661,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     call->setCallingConv(CLOSURE_CALLING_CONV);
 
     if (is_tail) {
-      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      if (!has_rest) {
+        call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      }
       BL.CreateRet(call);
     } else {
       set_reg(0, call);
@@ -725,7 +731,6 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   llvm::CallInst* call_s = BL.CreateCall(funcType, func_ptr, args, "rest_call_s");
   call_s->setCallingConv(CLOSURE_CALLING_CONV);
   if (is_tail) {
-    call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     BL.CreateRet(call_s);
   } else {
     BL.CreateBr(local_merge);
