@@ -574,8 +574,6 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           if (is_tail) {
             if (!has_rest) {
               call->setTailCallKind(llvm::CallInst::TCK_MustTail);
-            } else {
-              call->setTailCallKind(llvm::CallInst::TCK_Tail);
             }
             BL.CreateRet(call);
           } else {
