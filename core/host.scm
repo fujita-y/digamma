@@ -5,6 +5,7 @@
   (gauche
    (use rfc.uuid)
    (define (uuid) (uuid->string (uuid4)))
+   (define (unspecified) (if #f #f))
    (define (make-eq-hashtable) (make-hash-table 'eq?))
    (define (make-eqv-hashtable) (make-hash-table 'eqv?))
    (define (make-equal-hashtable) (make-hash-table 'equal?))

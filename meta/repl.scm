@@ -89,6 +89,7 @@
   (environment-variable-set! 'values values)
   (environment-variable-set! 'every? every?)
   (environment-variable-set! 'macroexpand macroexpand)
+  (environment-variable-set! 'unspecified unspecified)
 
   ; Followings does not work since it calls nanos:closure from native implementation
   ; to work such subrs, need to add own implementation in repl:prelude like map or for-each.
