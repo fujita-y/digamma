@@ -357,24 +357,31 @@ void codegen_t::phase4_optimize_and_verify() {
 
   // Dump IR to file for debugging and inspection
 #ifndef NDEBUG
-  std::error_code EC;
-  llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
-  if (EC) {
-    llvm::errs() << "Could not open file: " << EC.message() << "\n";
-  } else {
-    main_module_uptr->print(dest, nullptr);
-  }
-
-  if (functions.size() > 1) {
-    prune_unused_closures();
-    llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
     if (EC) {
       llvm::errs() << "Could not open file: " << EC.message() << "\n";
     } else {
-      closure_module_uptr->print(dest2, nullptr);
+      main_module_uptr->print(dest, nullptr);
     }
   }
 #endif
+
+  if (functions.size() > 1) {
+    prune_unused_closures();
+#ifndef NDEBUG
+    {
+      std::error_code EC;
+      llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
+      if (EC) {
+        llvm::errs() << "Could not open file: " << EC.message() << "\n";
+      } else {
+        closure_module_uptr->print(dest2, nullptr);
+      }
+    }
+#endif
+  }
 }
 
 // Helper function to find which llvm::Function an llvm::User belongs to,
