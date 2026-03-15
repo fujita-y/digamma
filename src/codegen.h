@@ -180,6 +180,7 @@ class codegen_t {
   void optimize_module(llvm::Module& mod);
   void prune_unused_closures();
   compiled_code_t phase5_finalize();
+  void reset_compile_state();
 
   // Configure a new Module with JIT data layout, target triple, PIC/PIE level
   void configure_module(llvm::Module& M);

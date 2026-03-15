@@ -126,6 +126,25 @@ std::string codegen_t::generate_unique_suffix() {
 //  compile() — top-level entry point
 // --------------------------------------------------------------------------
 
+void codegen_t::reset_compile_state() {
+  // Drop LLVM modules first (they may reference the context that CompileScope
+  // is about to swap back, so release them before the context is restored).
+  main_module_uptr.reset();
+  closure_module_uptr.reset();
+  main_module            = nullptr;
+  closure_module         = nullptr;
+  main_function          = nullptr;
+  current_function       = nullptr;
+  current_function_info  = nullptr;
+  current_closure_self   = nullptr;
+  functions.clear();
+  allocas.clear();
+  labels.clear();
+  function_map.clear();
+  closure_literals.clear();
+  closure_params.clear();
+}
+
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   CompileScope scope(*this);
   try {
@@ -145,6 +164,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase4_optimize_and_verify();
     return phase5_finalize();
   } catch (...) {
+    reset_compile_state();
     throw;
   }
 }
