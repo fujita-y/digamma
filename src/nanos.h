@@ -23,6 +23,7 @@ class nanos_t {
   void destroy();
   void run();
   scm_obj_t call_core_eval(scm_obj_t obj);
+  scm_obj_t call_macroexpand(scm_obj_t obj);
 };
 
 #endif  // NANOS_H_INCLUDED

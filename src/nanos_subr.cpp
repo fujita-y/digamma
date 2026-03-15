@@ -680,19 +680,11 @@ SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   const char* s = (const char*)string_name(a1);
   intptr_t idx = fixnum(a2);
   intptr_t len = (intptr_t)strlen(s);
-  if (idx < 0 || idx >= len) throw std::runtime_error("string-ref: index out of bounds");
+  if (idx < 0 || idx >= len)
+    throw std::runtime_error("string-ref: index out of bounds: " + scm_obj_to_string(a1) + ", " + scm_obj_to_string(a2));
   // Decode UTF-8 character at byte position idx
   const uint8_t* p = (const uint8_t*)s + idx;
-  uint32_t ucs4;
-  if (*p < 0x80) {
-    ucs4 = *p;
-  } else if ((*p & 0xE0) == 0xC0) {
-    ucs4 = ((uint32_t)(*p & 0x1F) << 6) | (p[1] & 0x3F);
-  } else if ((*p & 0xF0) == 0xE0) {
-    ucs4 = ((uint32_t)(*p & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-  } else {
-    ucs4 = ((uint32_t)(*p & 0x07) << 18) | ((uint32_t)(p[1] & 0x3F) << 12) | ((uint32_t)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-  }
+  uint32_t ucs4 = *p;  // [TODO] unicode support
   return make_char(ucs4);
 }
 
