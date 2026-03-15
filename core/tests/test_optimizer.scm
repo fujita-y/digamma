@@ -68,10 +68,6 @@
       '(if (if a b c) d e)
       '(if a (if b d e) (if c d e)))
 
-(test "Boolean simplification"
-      '(if (> x 0) #t #f)
-      '(> x 0))
-
 (test "Global constant propagation"
       '(begin (define x 10) (+ x 5))
       '(begin (define x 10) (+ 10 5)))

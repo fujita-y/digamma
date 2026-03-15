@@ -51,12 +51,6 @@
             tail
             (cons (car lst) tail)))))
 
-(define (boolean-true? x)
-  (or (eq? x #t) (equal? x ''#t)))
-
-(define (boolean-false? x)
-  (or (eq? x #f) (equal? x ''#f) (null? x)))
-
 (define (is-licm-var? sym)
   (let ((s (symbol->string sym)))
     (and (> (string-length s) 5)
@@ -248,7 +242,7 @@
 (define (try-drop-lambda var val if-expr)
   (let* ((test-clause  (cadr if-expr))
          (then-clause (caddr if-expr))
-         (else-clause (if (null? (cdddr if-expr)) ''#f (cadddr if-expr)))
+         (else-clause (if (null? (cdddr if-expr)) '(unspecified) (cadddr if-expr)))
          (used-in-test (memq var (analyze-used-vars test-clause)))
          (used-in-then (memq var (analyze-used-vars then-clause)))
          (used-in-else (memq var (analyze-used-vars else-clause))))
@@ -305,7 +299,7 @@
           ((eq? (car e) 'if)
            `(if ,(transform (cadr e) forbidden)
                 ,(transform (caddr e) forbidden)
-                ,(if (null? (cadddr e)) ''#f (transform (cadddr e) forbidden))))
+                ,(if (null? (cadddr e)) '(unspecified) (transform (cadddr e) forbidden))))
           ((eq? (car e) 'set!)
            `(set! ,(cadr e) ,(transform (caddr e) forbidden)))
           ((eq? (car e) 'begin)
@@ -433,15 +427,12 @@
 (define (opt-if expr bound-vars)
   (let ((test (optimize-inner (cadr expr) bound-vars))
         (then (optimize-inner (caddr expr) bound-vars))
-        (els (if (null? (cdddr expr)) ''#f (optimize-inner (cadddr expr) bound-vars))))
+        (els (if (null? (cdddr expr)) '(unspecified) (optimize-inner (cadddr expr) bound-vars))))
     (cond
       ;; If-lifting: (if (if a b c) d e) -> (if a (if b d e) (if c d e))
       ((and (pair? test) (eq? (car test) 'if))
        (let ((a (cadr test)) (b (caddr test)) (c (cadddr test)))
          (optimize-inner `(if ,a (if ,b ,then ,els) (if ,c ,then ,els)) bound-vars)))
-
-      ;; Boolean simplification
-      ((and (boolean-true? then) (boolean-false? els)) test)
 
       ((and (pair? test) (eq? (car test) 'quote))
        (if (cadr test) then els))
@@ -456,7 +447,7 @@
   (let* ((exprs (map (lambda (e) (optimize-inner e bound-vars)) (cdr expr)))
          (flattened (apply append (map (lambda (x) (if (and (pair? x) (eq? (car x) 'begin)) (cdr x) (list x))) exprs)))
          (filtered (filter (lambda (x) (has-effects? x)) (take flattened (max 0 (- (length flattened) 1))))))
-    (let ((last-val (if (null? flattened) ''#f (car (reverse flattened)))))
+    (let ((last-val (if (null? flattened) '(unspecified) (car (reverse flattened)))))
       (if (null? filtered)
           last-val
           `(begin ,@filtered ,last-val)))))

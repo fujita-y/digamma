@@ -99,7 +99,7 @@
                       ((eq? (car e) 'if)
                        `(if ,(walk (cadr e) env renames)
                             ,(walk (caddr e) env renames)
-                            ,(if (null? (cdddr e)) ''#f (walk (cadddr e) env renames))))
+                            ,(if (null? (cdddr e)) '(unspecified) (walk (cadddr e) env renames))))
                       ((eq? (car e) 'begin)
                        `(begin ,@(map (lambda (x) (walk x env renames)) (cdr e))))
                       ((eq? (car e) 'set!)

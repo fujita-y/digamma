@@ -37,7 +37,7 @@
             (for-each-1 proc lst1)
             (error 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))
         (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (for-each-n proc lst)))
-              (else (error'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
+              (else (error 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
 (define make-parameter
   (lambda (init . rest)
