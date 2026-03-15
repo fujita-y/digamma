@@ -138,13 +138,13 @@ SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error("<: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error("<: arguments must be fixnums");
-    if (first < argv[i]) {
-      first = argv[i];
+    if (first < fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -158,13 +158,13 @@ SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error(">: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error(">: arguments must be fixnums");
-    if (first > argv[i]) {
-      first = argv[i];
+    if (first > fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -178,13 +178,13 @@ SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error("<=: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error("<=: arguments must be fixnums");
-    if (first <= argv[i]) {
-      first = argv[i];
+    if (first <= fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -198,13 +198,13 @@ SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error(">=: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error(">=: arguments must be fixnums");
-    if (first >= argv[i]) {
-      first = argv[i];
+    if (first >= fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
