@@ -1,0 +1,5 @@
+(define (core-eval expr env)
+  (let* ((expanded (macroexpand expr))
+         (optimized (optimize expanded))
+         (coreform (compile optimized)))
+    (codegen-and-run coreform)))

@@ -7,7 +7,7 @@
 (define *fail-count* 0)
 
 (define (test name expr expected)
-  (let ((result (eval (macroexpand expr 'strip) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr 'strip) (interaction-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))

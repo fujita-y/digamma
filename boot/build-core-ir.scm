@@ -44,7 +44,8 @@
     "core/macroexpand.scm"
     "core/optimizer.scm"
     "core/lambda-lift.scm"
-    "core/compiler.scm"))
+    "core/compiler.scm"
+    "core/eval.scm"))
 
 (with-output-to-file "boot/core.ir" 
   (lambda ()

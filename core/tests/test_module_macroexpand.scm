@@ -19,7 +19,7 @@
           (display "  Actual:   ") (write result) (newline)))))
 
 (define (test-eval name expr expected)
-  (let ((result (eval (macroexpand expr) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr) (interaction-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
