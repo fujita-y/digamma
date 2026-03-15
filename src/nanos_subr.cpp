@@ -234,7 +234,7 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
     return cons->cdr;
   }
-  throw std::runtime_error("cdr: argument must be a cons cell");
+  throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
 
 // cadr, caddr, caar, cadar, cadddr, cddr, cdddr  - R6RS 11.9

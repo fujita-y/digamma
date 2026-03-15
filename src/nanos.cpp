@@ -184,23 +184,23 @@ void nanos_t::run() {
     }
 
     for (scm_obj_t obj : objs) {
-      if (is_cons(obj)) {
-        try {
-          // auto func = codegen_t::current()->compile(obj);
-          // scm_obj_t result = (scm_obj_t)func();
+      //      if (is_cons(obj)) {
+      try {
+        // auto func = codegen_t::current()->compile(obj);
+        // scm_obj_t result = (scm_obj_t)func();
 
-          scm_obj_t result = call_core_eval(obj);
+        scm_obj_t result = call_core_eval(obj);
 
-          printf("(0x%016lx)\n", result);
-          printer.write(result);
-          puts("");
-        } catch (std::exception& e) {
-          printf("%s\n", e.what());
-        }
-      } else {
-        printer.write(obj);
+        printf("(0x%016lx)\n", result);
+        printer.write(result);
         puts("");
+      } catch (std::exception& e) {
+        printf("%s\n", e.what());
       }
+      //      } else {
+      //        printer.write(obj);
+      //        puts("");
+      //      }
     }
   }
 }
