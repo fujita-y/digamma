@@ -203,27 +203,19 @@ void nanos_t::run() {
     }
 
     for (scm_obj_t obj : objs) {
-      //      if (is_cons(obj)) {
       try {
-        // auto func = codegen_t::current()->compile(obj);
-        // scm_obj_t result = (scm_obj_t)func();
-
         scm_obj_t result1 = call_macroexpand(obj);
         printf("macroexpand (0x%016lx)\n", result1);
         printer.write(result1);
-        puts("");
+        puts("\n");
 
         scm_obj_t result2 = call_core_eval(obj);
         printf("core-eval (0x%016lx)\n", result2);
         printer.write(result2);
-        puts("");
+        puts("\n");
       } catch (std::exception& e) {
         printf("%s\n", e.what());
       }
-      //      } else {
-      //        printer.write(obj);
-      //        puts("");
-      //      }
     }
   }
 }
