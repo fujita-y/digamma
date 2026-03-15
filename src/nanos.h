@@ -5,6 +5,7 @@
 #define NANOS_H_INCLUDED
 
 #include "core.h"
+#include "object.h"
 #include <memory>
 #include "nanos_jit.h"
 
@@ -21,6 +22,7 @@ class nanos_t {
   void init();
   void destroy();
   void run();
+  scm_obj_t call_core_eval(scm_obj_t obj);
 };
 
 #endif  // NANOS_H_INCLUDED

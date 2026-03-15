@@ -89,6 +89,25 @@ void nanos_t::load_ir(const char* filename) {
   }
 }
 
+scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
+  object_heap_t* heap = object_heap_t::current();
+  scm_obj_t core_eval = heap->environment_variable_ref(make_symbol("core-eval"));
+  if (core_eval == scm_undef) {
+    throw std::runtime_error("core-eval not found in current environment");
+  }
+  if (!is_closure(core_eval)) {
+    throw std::runtime_error("core-eval is not a closure");
+  }
+
+  codegen_t* cg = codegen_t::current();
+  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
+  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
+  auto bridge = (bridge_func_t)bridge_ptr;
+
+  scm_obj_t args[2] = {obj, scm_nil};
+  return (scm_obj_t)bridge(core_eval, 2, args);
+}
+
 void nanos_t::run() {
   puts(";; nanos - a small virtual machine for bootstrapping, compile nanos-ir to native code.");
 #if USE_TBI
@@ -167,10 +186,13 @@ void nanos_t::run() {
     for (scm_obj_t obj : objs) {
       if (is_cons(obj)) {
         try {
-          auto func = codegen_t::current()->compile(obj);
-          intptr_t result = func();
+          // auto func = codegen_t::current()->compile(obj);
+          // scm_obj_t result = (scm_obj_t)func();
+
+          scm_obj_t result = call_core_eval(obj);
+
           printf("(0x%016lx)\n", result);
-          printer.write((scm_obj_t)result);
+          printer.write(result);
           puts("");
         } catch (std::exception& e) {
           printf("%s\n", e.what());

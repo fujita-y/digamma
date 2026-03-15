@@ -19,6 +19,7 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
 SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform);
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -911,6 +912,13 @@ int main(int argc, char** argv) {
       return false;
     }
     return true;
+  });
+
+  run_test("CodegenAndRunSubr", [](CodegenTest& env) -> bool {
+    // ((const r0 123) (ret)) ;=> 123
+    scm_obj_t code = env.read_code("((const r0 123) (ret))");
+    scm_obj_t result = subr_codegen_and_run(scm_nil, code);
+    return result == make_fixnum(123);
   });
 
   heap->destroy();

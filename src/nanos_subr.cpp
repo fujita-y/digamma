@@ -1210,6 +1210,17 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
   }
 }
 
+// codegen-and-run - Nanos extension
+SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
+  try {
+    auto func = codegen_t::current()->compile(coreform);
+    intptr_t result = func();
+    return (scm_obj_t)result;
+  } catch (std::exception& e) {
+    throw std::runtime_error(e.what());
+  }
+}
+
 // ============================================================================
 // Initialization & Registration
 // ============================================================================
@@ -1355,6 +1366,7 @@ void nanos_t::init_subr() {
   reg("call/ec", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
+  reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
   c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
