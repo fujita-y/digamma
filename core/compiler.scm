@@ -12,8 +12,7 @@
   '(const mov global-ref closure-ref closure-cell-ref reg-cell-ref))
 
 (define ops-memory-pairs
-  '((global-set! . global-ref)
-    (reg-cell-set! . reg-cell-ref)
+  '((reg-cell-set! . reg-cell-ref)
     (closure-cell-set! . closure-cell-ref)
     (closure-set! . closure-ref)))
 
@@ -120,8 +119,50 @@
 ;;=============================================================================
 ;; SECTION 4: Peephole Optimizer
 ;;=============================================================================
+;;
+;; Scans a short sliding window over the instruction stream and rewrites
+;; redundant or suboptimal patterns into cheaper equivalents.  The outer
+;; driver (`peephole-optimize`) re-runs the single pass until a fixed point
+;; is reached, which lets cascaded rewrites take effect.
+;;
+;; The pass applies four rules in order:
+;;
+;;   Rule 0 (inline)       -- eliminate self-moves: (mov rX rX) => <deleted>
+;;   optimize-two-inst     -- 2-instruction window
+;;   optimize-three-inst   -- 3-instruction window
+;;   optimize-restore-chain -- mov + intervening loads + reverse-mov
+;;
 
 (define (optimize-two-inst code)
+  ;; Matches two consecutive instructions and rewrites them when one of the
+  ;; following patterns is detected.
+  ;;
+  ;; Pattern A – Redundant symmetric mov pair
+  ;;
+  ;;   Two consecutive movs that copy the same two registers in opposite
+  ;;   directions; the second is always a no-op because the first already put
+  ;;   the desired value in place.
+  ;;
+  ;;     before: (mov rA rB) (mov rB rA)
+  ;;     after:  (mov rA rB)
+  ;;
+  ;; Pattern B – Store immediately followed by same-destination reload
+  ;;
+  ;;   A store into a memory cell (closure / reg-cell / closure-cell) followed
+  ;;   immediately by a reload of that same location back into the same
+  ;;   destination register is redundant – the destination already holds the
+  ;;   right value after the store.
+  ;;
+  ;;     before: (closure-set! foo r0) (closure-ref r0 foo)
+  ;;     after:  (closure-set! foo r0)
+  ;;
+  ;; Pattern C – Store immediately followed by different-destination reload
+  ;;
+  ;;   As Pattern B, but the reload targets a different register.  The load
+  ;;   is replaced by a cheaper mov from the stored-value register.
+  ;;
+  ;;     before: (closure-set! foo r2) (closure-ref r1 foo)
+  ;;     after:  (closure-set! foo r2) (mov r1 r2)
   (if (null? (cdr code))
       #f
       (let ((i1 (car code))
@@ -151,6 +192,49 @@
          (else #f)))))
 
 (define (optimize-three-inst code)
+  ;; Matches three consecutive instructions that follow one of the structural
+  ;; shapes below and collapses them into a shorter sequence.
+  ;;
+  ;; The guard at the top of the function requires:
+  ;;   i1 – a load or a memory-pair store
+  ;;   i2 – any load instruction
+  ;;   i3 – a load instruction OR the matching ref half of i1's store
+  ;;
+  ;; Pattern A – non-mov load piped through a mov into another register
+  ;;
+  ;;   When a non-mov load writes rA, the next instruction moves rA into rB,
+  ;;   and the instruction after that also reads rA (to fill rC), the load
+  ;;   can be duplicated directly into rB, saving one register round-trip.
+  ;;
+  ;;     before: (const r1 42) (mov r2 r1) (mov r3 r1)
+  ;;     after:  (const r2 42) (mov r3 r1)
+  ;;
+  ;; Pattern B – plain mov piped through a second mov (no aliasing cycle)
+  ;;
+  ;;   Same shape as Pattern A but the producer is a plain mov.  The hazard
+  ;;   guard (not (eq? dst1 src3)) prevents rewriting when rA appears on the
+  ;;   RHS of i3, which would change the semantics.
+  ;;
+  ;;     before: (mov r1 r5) (mov r2 r1) (mov r3 r0)
+  ;;     after:  (mov r2 r5) (mov r3 r0)
+  ;;
+  ;; Pattern C – restore-mov that undoes a save-mov around a pure load
+  ;;
+  ;;   (mov rA rB) saves rB into rA.  After a pure load into an unrelated rC,
+  ;;   (mov rB rA) puts rB's original value back – which it already has, so
+  ;;   the third instruction is dropped.  rC must not alias rA or rB.
+  ;;
+  ;;     before: (mov r1 r2) (const r3 0) (mov r2 r1)
+  ;;     after:  (mov r1 r2) (const r3 0)
+  ;;
+  ;; Pattern D – store followed by reload of the same slot (with one load in between)
+  ;;
+  ;;   If i1 is a memory store and i3 loads from the same slot, the reload
+  ;;   can be replaced by a cheaper mov from the original source register.
+  ;;   i2 is an intervening pure load that must not touch the stored source.
+  ;;
+  ;;     before: (closure-set! foo r2) (const r3 0) (closure-ref r1 foo)
+  ;;     after:  (closure-set! foo r2) (const r3 0) (mov r1 r2)
   (if (null? (cddr code))
       #f
       (let ((i1 (car code)) (i2 (cadr code)) (i3 (caddr code)))
@@ -190,6 +274,20 @@
             #f))))
 
 (define (optimize-restore-chain code)
+  ;; Eliminates a reverse-mov that undoes an earlier save-mov, even when up
+  ;; to 20 pure load instructions intervene between the two movs.
+  ;;
+  ;; The pattern:
+  ;;   - i1 is (mov rA rB)  – saves rB into rA
+  ;;   - then zero or more load instructions that write neither rA nor rB
+  ;;   - then (mov rB rA)   – would restore, but rA hasn't changed so it's
+  ;;                          equivalent to a no-op and is deleted
+  ;;
+  ;; The intervening instructions are collected and re-emitted in order;
+  ;; only the final reverse-mov is dropped.
+  ;;
+  ;;   before: (mov r1 r0) (const r2 42) (closure-ref r3 0) (mov r0 r1)
+  ;;   after:  (mov r1 r0) (const r2 42) (closure-ref r3 0)
   (if (null? code)
       #f
       (let ((i1 (car code)))
