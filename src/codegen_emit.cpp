@@ -188,6 +188,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   scm_obj_t literals = scm_nil;
   if (closure_literals.count(inst.opr1)) {
     literals = closure_literals[inst.opr1];
+    object_heap_t::current()->literals_add(literals);
   }
   llvm::Value* literals_val = createInt64Constant(CT, (uint64_t)literals);
 
