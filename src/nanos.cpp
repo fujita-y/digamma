@@ -202,27 +202,27 @@ void nanos_t::run() {
       input_buffer.clear();
     }
 
+#define IR_MODE 0
+
     for (scm_obj_t obj : objs) {
       try {
-        /*
+#if IR_MODE
         codegen_t* cg = codegen_t::current();
         auto func = cg->compile(obj);
         intptr_t result = func();
         printf("(0x%016lx)\n", result);
         printer.write((scm_obj_t)result);
         puts("\n");
-        */
-
+#else
         scm_obj_t result1 = call_macroexpand(obj);
         printf("macroexpand (0x%016lx)\n", result1);
         printer.write(result1);
         puts("\n");
-
         scm_obj_t result2 = call_core_eval(obj);
         printf("core-eval (0x%016lx)\n", result2);
         printer.write(result2);
         puts("\n");
-
+#endif
       } catch (std::exception& e) {
         printf("%s\n", e.what());
       }
