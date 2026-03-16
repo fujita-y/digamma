@@ -95,7 +95,7 @@ void nanos_t::load_ir(const char* filename) {
   }
 }
 
-scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
+scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
   object_heap_t* heap = object_heap_t::current();
   scm_obj_t core_eval = heap->environment_variable_ref(make_symbol("core-eval"));
   if (core_eval == scm_undef) {
@@ -112,25 +112,6 @@ scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
 
   scm_obj_t args[2] = {obj, scm_nil};
   return (scm_obj_t)bridge(core_eval, 2, args);
-}
-
-scm_obj_t nanos_t::call_macroexpand(scm_obj_t obj) {
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t macroexpand = heap->environment_variable_ref(make_symbol("macroexpand"));
-  if (macroexpand == scm_undef) {
-    throw std::runtime_error("macroexpand not found in current environment");
-  }
-  if (!is_closure(macroexpand)) {
-    throw std::runtime_error("macroexpand is not a closure");
-  }
-
-  codegen_t* cg = codegen_t::current();
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
-
-  scm_obj_t args[1] = {obj};
-  return (scm_obj_t)bridge(macroexpand, 1, args);
 }
 
 void nanos_t::run() {
@@ -222,11 +203,7 @@ void nanos_t::run() {
         printer.write((scm_obj_t)result);
         puts("\n");
 #else
-        scm_obj_t result1 = call_macroexpand(obj);
-        printf("macroexpand (0x%016lx)\n", result1);
-        printer.write(result1);
-        puts("\n");
-        scm_obj_t result2 = call_core_eval(obj);
+        scm_obj_t result2 = core_eval(obj);
         printf("core-eval (0x%016lx)\n", result2);
         printer.write(result2);
         puts("\n");

@@ -17,13 +17,12 @@ class nanos_t {
   void init_subr();
   void init_codegen();
   void load_ir(const char* filename);
+  scm_obj_t core_eval(scm_obj_t obj);
 
  public:
   void init();
   void destroy();
   void run();
-  scm_obj_t call_core_eval(scm_obj_t obj);
-  scm_obj_t call_macroexpand(scm_obj_t obj);
 };
 
 #endif  // NANOS_H_INCLUDED
