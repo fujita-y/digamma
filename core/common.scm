@@ -196,7 +196,8 @@
                        (check-seq (cdr seq) tail?)))))
     (check-seq exprs #t))
 
-  (and (pair? expr)
+  (and #f ;; disable named let optimization for now
+       (pair? expr)
        (eq? (car expr) 'let)
        (let ((bindings (cadr expr)) (body (cddr expr)))
          (and (pair? bindings)
