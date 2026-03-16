@@ -37,14 +37,6 @@
                          (new-env (append (flatten-params-ll params) env)))
                     `(lambda ,params ,@(map (lambda (x) (walk x new-env renames)) body))))
 
-                (define (process-let-rec-pattern e)
-                  (let* ((bindings (cadr e))
-                         (body (cddr e))
-                         (vars (map car bindings))
-                         (new-env (append vars env)))
-                    `(let ,(map (lambda (b) (list (car b) (walk (cadr b) env renames))) bindings)
-                       ,@(map (lambda (x) (walk x new-env renames)) body))))
-
                 (define (process-let e)
                   (let* ((bindings (cadr e))
                          (vars (map car bindings))
@@ -106,7 +98,6 @@
                        `(set! ,(lookup (cadr e)) ,(walk (caddr e) env renames)))
                       ((eq? (car e) 'define) (process-define e))
                       ((eq? (car e) 'lambda) (process-lambda e))
-                      ((and (eq? (car e) 'let) (match-rec-pattern e)) (process-let-rec-pattern e))
                       ((eq? (car e) 'let) (process-let e))
                       (else (map (lambda (x) (walk x env renames)) e))))))
       (let ((new-expr (walk expr '() '())))

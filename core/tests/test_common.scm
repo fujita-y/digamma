@@ -95,27 +95,27 @@
 ;; =============================================================================
 (display "\n>>> Patterns\n")
 
-(test "match-rec-pattern (let ((f ...)) (set! f (lambda ...)))"
+#;(test "match-rec-pattern (let ((f ...)) (set! f (lambda ...)))"
       (match-rec-pattern '(let ((f #f)) (set! f (lambda (x) x)) f))
       #t)
 
-(test "match-rec-pattern (let ((f ...)) 123)"
+#;(test "match-rec-pattern (let ((f ...)) 123)"
       (match-rec-pattern '(let ((f #f)) 123))
       #f)
 
-(test "match-rec-pattern simple tail recursion true match"
+#;(test "match-rec-pattern simple tail recursion true match"
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (if (eq? n 0) 1 (<name> (- n 1))))) <name>))
       #t)
 
-(test "match-rec-pattern tail recursion in let true match"
+#;(test "match-rec-pattern tail recursion in let true match"
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (let ((x (- n 1))) (<name> x)))) <name>))
       #t)
 
-(test "match-rec-pattern non-tail recursion false match"
+#;(test "match-rec-pattern non-tail recursion false match"
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (list 2 (<name> 9) n))) <name>))
       #f)
 
-(test "match-rec-pattern nested lambda false match"
+#;(test "match-rec-pattern nested lambda false match"
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (if n (lambda () (<name> 9)) 1))) <name>))
       #f)
 

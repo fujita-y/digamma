@@ -36,7 +36,7 @@
 (display "\n>>> Lambda Lifting\n")
 
 ;; Test 1: Single binding that matches match-rec-pattern should NOT be lifted now
-(test "Single un-nested recursive let (match-rec-pattern)"
+#;(test "Single un-nested recursive let (match-rec-pattern)"
       '(let ((f #f))
          (set! f (lambda (x) (+ x 1)))
          (f 10))

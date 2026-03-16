@@ -477,12 +477,7 @@
                         (eq? (car (car body-exprs)) 'begin))
                    (cdr (car body-exprs))
                    body-exprs)))
-
-    (let ((candidate `(let ,bindings ,@body)))
-      (if (match-rec-pattern candidate)
-          (let ((licm-res (opt-licm candidate bound-vars)))
-             (if licm-res licm-res (opt-let-inner bindings body bound-vars)))
-          (opt-let-inner bindings body bound-vars)))))
+    (opt-let-inner bindings body bound-vars)))
 
 (define (opt-app expr bound-vars)
   (let ((proc (optimize-inner (car expr) bound-vars))
