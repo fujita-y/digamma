@@ -650,7 +650,7 @@ SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (n < 0 || n >= sz) throw std::runtime_error("vector-set!: index out of bounds");
   object_heap_t::current()->write_barrier(a3);
   vector_elts(a1)[n] = a3;
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // vector->list  - R6RS 11.13
@@ -872,19 +872,19 @@ SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // write  - R6RS 8.3
 SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).write(a1);
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // display  - R6RS 8.3
 SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).display(a1);
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // newline  - R6RS 8.3
 SUBR subr_newline(scm_obj_t self) {
   std::cout << std::endl;
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // ============================================================================
@@ -893,12 +893,12 @@ SUBR subr_newline(scm_obj_t self) {
 
 SUBR subr_collect(scm_obj_t self) {
   object_heap_t::current()->collect();
-  return scm_undef;
+  return scm_unspecified;
 }
 
 SUBR subr_safepoint(scm_obj_t self) {
   object_heap_t::current()->safepoint();
-  return scm_undef;
+  return scm_unspecified;
 }
 
 SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
