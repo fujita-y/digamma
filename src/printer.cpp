@@ -107,6 +107,26 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
       out << ")";
       return;
     }
+    if (is_closure(obj)) {
+      out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
+      return;
+    }
+    if (is_environment(obj)) {
+      out << std::format("#<environment {:#x}>", (uintptr_t)obj);
+      return;
+    }
+    if (is_cell(obj)) {
+      out << std::format("#<cell {:#x}>", (uintptr_t)obj);
+      return;
+    }
+    if (is_escape(obj)) {
+      out << std::format("#<escape {:#x}>", (uintptr_t)obj);
+      return;
+    }
+    if (is_continuation(obj)) {
+      out << std::format("#<continuation {:#x}>", (uintptr_t)obj);
+      return;
+    }
   }
 
   if (is_cons(obj)) {
@@ -188,10 +208,6 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
           break;
       }
     }
-    return;
-  }
-  if (is_closure(obj)) {
-    out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
     return;
   }
 
