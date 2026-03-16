@@ -13,6 +13,8 @@
 #include <sstream>
 #include <string>
 
+#define IR_MODE 0
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -73,15 +75,19 @@ void nanos_t::load_ir(const char* filename) {
       break;
     }
     if (is_cons(obj)) {
+#ifndef NDEBUG
       printf("codegen: ");
       printer.write(CAR(CDR(obj)));
       puts("");
+#endif
       try {
         auto func = codegen_t::current()->compile(obj);
         intptr_t result = func();
+#ifndef NDEBUG
         printf("(0x%016lx)\n", result);
         printer.write((scm_obj_t)result);
         puts("");
+#endif
       } catch (std::exception& e) {
         printf("%s\n", e.what());
       }
@@ -142,7 +148,11 @@ void nanos_t::run() {
   std::string input_buffer;
 
   while (true) {
+#if IR_MODE
+    char const* cinput = rx->input(input_buffer.empty() ? "nanos-ir> " : "        ");
+#else
     char const* cinput = rx->input(input_buffer.empty() ? "> " : "  ");
+#endif
     if (cinput == nullptr) {
       break;  // EOF
     }
@@ -201,8 +211,6 @@ void nanos_t::run() {
       }
       input_buffer.clear();
     }
-
-#define IR_MODE 0
 
     for (scm_obj_t obj : objs) {
       try {

@@ -115,221 +115,7 @@
     (else '())))
 
 ;;=============================================================================
-;; SECTION 4: Peephole Optimizer
-;;=============================================================================
-;;
-;; Scans a short sliding window over the instruction stream and rewrites
-;; redundant or suboptimal patterns into cheaper equivalents.  The outer
-;; driver (`peephole-optimize`) re-runs the single pass until a fixed point
-;; is reached, which lets cascaded rewrites take effect.
-;;
-;; The pass applies four rules in order:
-;;
-;;   Rule 0 (inline)       -- eliminate self-moves: (mov rX rX) => <deleted>
-;;   optimize-two-inst     -- 2-instruction window
-;;   optimize-three-inst   -- 3-instruction window
-;;   optimize-restore-chain -- mov + intervening loads + reverse-mov
-;;
-
-(define (optimize-two-inst code)
-  ;; Matches two consecutive instructions and rewrites them when one of the
-  ;; following patterns is detected.
-  ;;
-  ;; Pattern A – Redundant symmetric mov pair
-  ;;
-  ;;   Two consecutive movs that copy the same two registers in opposite
-  ;;   directions; the second is always a no-op because the first already put
-  ;;   the desired value in place.
-  ;;
-  ;;     before: (mov rA rB) (mov rB rA)
-  ;;     after:  (mov rA rB)
-  ;;
-  ;; Pattern B – Store immediately followed by same-destination reload
-  ;;
-  ;;   A store into a memory cell (closure / reg-cell / closure-cell) followed
-  ;;   immediately by a reload of that same location back into the same
-  ;;   destination register is redundant – the destination already holds the
-  ;;   right value after the store.
-  ;;
-  ;;     before: (closure-set! foo r0) (closure-ref r0 foo)
-  ;;     after:  (closure-set! foo r0)
-  ;;
-  ;; Pattern C – Store immediately followed by different-destination reload
-  ;;
-  ;;   As Pattern B, but the reload targets a different register.  The load
-  ;;   is replaced by a cheaper mov from the stored-value register.
-  ;;
-  ;;     before: (closure-set! foo r2) (closure-ref r1 foo)
-  ;;     after:  (closure-set! foo r2) (mov r1 r2)
-  (if (null? (cdr code))
-      #f
-      (let ((i1 (car code))
-            (i2 (cadr code)))
-        (cond
-         ((and (pair? i1) (eq? (inst-op i1) 'mov)
-               (pair? i2) (eq? (inst-op i2) 'mov)
-               (eq? (inst-arg1 i1) (inst-arg2 i2))
-               (eq? (inst-arg2 i1) (inst-arg1 i2)))
-          (cons i1 (cddr code)))
-         ((let loop ((pairs ops-memory-pairs))
-            (if (null? pairs)
-                #f
-                (let* ((pair (car pairs))
-                       (set-op (car pair))
-                       (ref-op (cdr pair)))
-                  (if (and (eq? (inst-op i1) set-op)
-                           (eq? (inst-op i2) ref-op))
-                      (cond ((and (eq? (inst-arg1 i1) (inst-arg2 i2))
-                                  (eq? (inst-arg2 i1) (inst-arg1 i2)))
-                             (cons i1 (cddr code)))
-                            ((eq? (inst-arg1 i1) (inst-arg2 i2))
-                             (cons i1 (cons `(mov ,(inst-arg1 i2) ,(inst-arg2 i1)) (cddr code))))
-                            (else
-                             (loop (cdr pairs))))
-                      (loop (cdr pairs)))))))
-         (else #f)))))
-
-(define (optimize-three-inst code)
-  ;; Matches three consecutive instructions that follow one of the structural
-  ;; shapes below and collapses them into a shorter sequence.
-  ;;
-  ;; The guard at the top of the function requires:
-  ;;   i1 – a load or a memory-pair store
-  ;;   i2 – any load instruction
-  ;;   i3 – a load instruction OR the matching ref half of i1's store
-  ;;
-  ;; Pattern A – non-mov load piped through a mov into another register
-  ;;
-  ;;   When a non-mov load writes rA, the next instruction moves rA into rB,
-  ;;   and the instruction after that also reads rA (to fill rC), the load
-  ;;   can be duplicated directly into rB, saving one register round-trip.
-  ;;
-  ;;     before: (const r1 42) (mov r2 r1) (mov r3 r1)
-  ;;     after:  (const r2 42) (mov r3 r1)
-  ;;
-  ;; Pattern B – plain mov piped through a second mov (no aliasing cycle)
-  ;;
-  ;;   Same shape as Pattern A but the producer is a plain mov.  The hazard
-  ;;   guard (not (eq? dst1 src3)) prevents rewriting when rA appears on the
-  ;;   RHS of i3, which would change the semantics.
-  ;;
-  ;;     before: (mov r1 r5) (mov r2 r1) (mov r3 r0)
-  ;;     after:  (mov r2 r5) (mov r3 r0)
-  ;;
-  ;; Pattern C – restore-mov that undoes a save-mov around a pure load
-  ;;
-  ;;   (mov rA rB) saves rB into rA.  After a pure load into an unrelated rC,
-  ;;   (mov rB rA) puts rB's original value back – which it already has, so
-  ;;   the third instruction is dropped.  rC must not alias rA or rB.
-  ;;
-  ;;     before: (mov r1 r2) (const r3 0) (mov r2 r1)
-  ;;     after:  (mov r1 r2) (const r3 0)
-  ;;
-  ;; Pattern D – store followed by reload of the same slot (with one load in between)
-  ;;
-  ;;   If i1 is a memory store and i3 loads from the same slot, the reload
-  ;;   can be replaced by a cheaper mov from the original source register.
-  ;;   i2 is an intervening pure load that must not touch the stored source.
-  ;;
-  ;;     before: (closure-set! foo r2) (const r3 0) (closure-ref r1 foo)
-  ;;     after:  (closure-set! foo r2) (const r3 0) (mov r1 r2)
-  (if (null? (cddr code))
-      #f
-      (let ((i1 (car code)) (i2 (cadr code)) (i3 (caddr code)))
-        (if (and (pair? i1) (or (memq (inst-op i1) ops-loads) (assq (inst-op i1) ops-memory-pairs))
-                 (pair? i2) (memq (inst-op i2) ops-loads)
-                 (pair? i3) (or (memq (inst-op i3) ops-loads)
-                                (let ((p (assq (inst-op i1) ops-memory-pairs)))
-                                  (and p (eq? (inst-op i3) (cdr p))))))
-            (let ((dst1 (inst-arg1 i1)) (src1 (inst-arg2 i1))
-                  (dst2 (inst-arg1 i2)) (src2 (inst-arg2 i2))
-                  (dst3 (inst-arg1 i3)) (src3 (inst-arg2 i3)))
-              (cond
-               ((and (memq (inst-op i1) (delete 'mov ops-loads))
-                     (eq? dst1 src2)
-                     (eq? dst1 dst3))
-                (cons `(,(inst-op i1) ,dst2 ,src1) (cons i3 (cdddr code))))
-               ((and (eq? (inst-op i1) 'mov)
-                     (eq? dst1 src2)
-                     (eq? dst1 dst3)
-                     (not (eq? dst1 src3)))
-                (cons `(mov ,dst2 ,src1) (cons i3 (cdddr code))))
-               ((and (eq? (inst-op i1) 'mov)
-                     (memq (inst-op i2) (delete 'mov ops-loads))
-                     (eq? (inst-op i3) 'mov)
-                     (eq? dst1 src3)
-                     (eq? src1 dst3)
-                     (not (eq? dst2 dst1))
-                     (not (eq? dst2 src1)))
-                (cons i1 (cons i2 (cdddr code))))
-               ((let ((pair (assq (inst-op i1) ops-memory-pairs)))
-                  (and pair (eq? (inst-op i3) (cdr pair))
-                       (eq? dst1 src3)
-                       (not (eq? dst2 src1))
-                       (or (not (symbol? dst1)) (not (eq? dst2 dst1)))))
-                (cons i1 (cons i2 (cons `(mov ,dst3 ,src1) (cdddr code)))))
-               (else #f)))
-            #f))))
-
-(define (optimize-restore-chain code)
-  ;; Eliminates a reverse-mov that undoes an earlier save-mov, even when up
-  ;; to 20 pure load instructions intervene between the two movs.
-  ;;
-  ;; The pattern:
-  ;;   - i1 is (mov rA rB)  – saves rB into rA
-  ;;   - then zero or more load instructions that write neither rA nor rB
-  ;;   - then (mov rB rA)   – would restore, but rA hasn't changed so it's
-  ;;                          equivalent to a no-op and is deleted
-  ;;
-  ;; The intervening instructions are collected and re-emitted in order;
-  ;; only the final reverse-mov is dropped.
-  ;;
-  ;;   before: (mov r1 r0) (const r2 42) (closure-ref r3 0) (mov r0 r1)
-  ;;   after:  (mov r1 r0) (const r2 42) (closure-ref r3 0)
-  (if (null? code)
-      #f
-      (let ((i1 (car code)))
-        (if (and (pair? i1) (eq? (inst-op i1) 'mov))
-            (let ((rA (inst-arg1 i1))
-                  (rB (inst-arg2 i1)))
-              (let loop ((rest (cdr code)) (acc '()) (count 0))
-                (cond ((or (null? rest) (> count 20)) #f)
-                      (else
-                       (let ((next (car rest)))
-                         (cond ((and (eq? (inst-op next) 'mov)
-                                     (eq? (inst-arg1 next) rB)
-                                     (eq? (inst-arg2 next) rA))
-                                (cons i1 (append (reverse acc) (cdr rest))))
-                               ((and (memq (inst-op next) ops-loads)
-                                     (not (eq? (inst-arg1 next) rA))
-                                     (not (eq? (inst-arg1 next) rB)))
-                                (loop (cdr rest) (cons next acc) (+ count 1)))
-                               (else #f)))))))
-            #f))))
-
-(define (peephole-optimize-pass code)
-  (cond ((null? code) '())
-        ((null? (cdr code))
-         (let ((inst (car code)))
-           (if (and (pair? inst) (eq? (inst-op inst) 'mov) (eq? (inst-arg1 inst) (inst-arg2 inst)))
-               '()
-               code)))
-        ((and (pair? (car code)) (eq? (inst-op (car code)) 'mov) (eq? (inst-arg1 (car code)) (inst-arg2 (car code))))
-         (peephole-optimize-pass (cdr code)))
-        ((optimize-two-inst code) => peephole-optimize-pass)
-        ((optimize-three-inst code) => peephole-optimize-pass)
-        ((optimize-restore-chain code) => peephole-optimize-pass)
-        (else (cons (car code) (peephole-optimize-pass (cdr code))))))
-
-(define (peephole-optimize code)
-  (let loop ((current code))
-    (let ((next (peephole-optimize-pass current)))
-      (if (equal? current next)
-          current
-          (loop next)))))
-
-;;=============================================================================
-;; SECTION 5: Max Outgoing Args Analysis
+;; SECTION 4: Max Outgoing Args Analysis
 ;;=============================================================================
 
 (define (analyze-max-outgoing-args expr)
@@ -361,7 +147,7 @@
          (apply max 0 (map analyze-max-outgoing-args expr)))))
 
 ;;=============================================================================
-;; SECTION 6: Compiler Context & Register Helpers
+;; SECTION 5: Compiler Context & Register Helpers
 ;;=============================================================================
 
 (define (make-compiler-context mutated-vars) (vector '() 0 0 '() mutated-vars))
@@ -395,7 +181,7 @@
                     (loop (cdr e)))))))))
 
 ;;=============================================================================
-;; SECTION 7: Code Generation
+;; SECTION 6: Code Generation
 ;;=============================================================================
 
 (define (codegen expr env next-reg tail? ctx)
@@ -566,7 +352,7 @@
             (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope)))))))
 
 ;;=============================================================================
-;; SECTION 8: Main Compiler
+;; SECTION 7: Main Compiler
 ;;=============================================================================
 
 (define (compile expr)
@@ -575,6 +361,5 @@
     (codegen expr '() (max 1 (analyze-max-outgoing-args expr)) #f ctx)
     (compiler-ctx-emit! ctx `(ret))
     (let* ((main-code (reverse (compiler-ctx-code ctx)))
-           (closure-code (apply append (compiler-ctx-all-closures ctx)))
-           (all-code (peephole-optimize (append main-code closure-code))))
-      all-code)))
+           (closure-code (apply append (compiler-ctx-all-closures ctx))))
+      (append main-code closure-code))))
