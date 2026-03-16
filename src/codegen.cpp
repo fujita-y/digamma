@@ -131,12 +131,12 @@ void codegen_t::reset_compile_state() {
   // is about to swap back, so release them before the context is restored).
   main_module_uptr.reset();
   closure_module_uptr.reset();
-  main_module            = nullptr;
-  closure_module         = nullptr;
-  main_function          = nullptr;
-  current_function       = nullptr;
-  current_function_info  = nullptr;
-  current_closure_self   = nullptr;
+  main_module = nullptr;
+  closure_module = nullptr;
+  main_function = nullptr;
+  current_function = nullptr;
+  current_function_info = nullptr;
+  current_closure_self = nullptr;
   functions.clear();
   allocas.clear();
   labels.clear();
@@ -389,7 +389,8 @@ void codegen_t::phase4_optimize_and_verify() {
 #endif
 
   if (functions.size() > 1) {
-    prune_unused_closures();
+    // No effects without named let optimization
+    // prune_unused_closures();
 #ifndef NDEBUG
     {
       std::error_code EC;
