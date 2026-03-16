@@ -204,6 +204,15 @@ void nanos_t::run() {
 
     for (scm_obj_t obj : objs) {
       try {
+        /*
+        codegen_t* cg = codegen_t::current();
+        auto func = cg->compile(obj);
+        intptr_t result = func();
+        printf("(0x%016lx)\n", result);
+        printer.write((scm_obj_t)result);
+        puts("\n");
+        */
+
         scm_obj_t result1 = call_macroexpand(obj);
         printf("macroexpand (0x%016lx)\n", result1);
         printer.write(result1);
@@ -213,6 +222,7 @@ void nanos_t::run() {
         printf("core-eval (0x%016lx)\n", result2);
         printer.write(result2);
         puts("\n");
+
       } catch (std::exception& e) {
         printf("%s\n", e.what());
       }

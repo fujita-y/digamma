@@ -433,7 +433,7 @@
         `(define ,head ,@(flatten-begins (map-improper (lambda (x) (expand x m-env s-env r-env)) (cddr expr)))))))
 
 (define (expand-cond expr m-env s-env r-env)
-  (let recur ((clauses (cdr expr)))
+  (let ((clauses (cdr expr)))
     (if (null? clauses) '(begin)
         (let ((clause (car clauses)) (rest (cdr clauses)))
           (cond ((core-form? (car clause) 'else s-env) 

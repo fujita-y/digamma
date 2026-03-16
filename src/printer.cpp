@@ -109,6 +109,10 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
     }
   }
 
+  if (obj == (scm_obj_t) nullptr) {
+    out << "#<null>";
+    return;
+  }
   if (is_cons(obj)) {
     out << "(";
     print(((scm_cons_rec_t*)obj)->car, display_mode);
