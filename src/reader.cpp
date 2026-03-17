@@ -82,7 +82,14 @@ scm_obj_t reader_t::read(bool& err) {
 
   switch (c) {
     case '(':
-      return read_list(err);
+      return read_list(err, ')');
+    case '[':
+      return read_list(err, ']');
+    case ')':
+    case ']':
+      err = true;
+      error_message = "unexpected closing bracket";
+      return scm_undef;
     case '"':
       return read_string(err);
     case '\'':
@@ -100,7 +107,11 @@ scm_obj_t reader_t::read(bool& err) {
       int next = peek_char();
       if (next == '(') {
         get_char();
-        return read_vector(err);
+        return read_vector(err, ')');
+      }
+      if (next == '[') {
+        get_char();
+        return read_vector(err, ']');
       }
       if (next == ';') {
         get_char();
@@ -119,7 +130,11 @@ scm_obj_t reader_t::read(bool& err) {
           get_char();
           if (peek_char() == '(') {
             get_char();
-            return read_u8vector(err);
+            return read_u8vector(err, ')');
+          }
+          if (peek_char() == '[') {
+            get_char();
+            return read_u8vector(err, ']');
           }
           // handle error or other #u syntax?
         }
@@ -178,7 +193,7 @@ scm_obj_t reader_t::read(bool& err) {
   return scm_undef;
 }
 
-scm_obj_t reader_t::read_list(bool& err) {
+scm_obj_t reader_t::read_list(bool& err, int close_char) {
   scm_obj_t head = scm_nil;
   scm_obj_t tail = scm_nil;
 
@@ -190,26 +205,32 @@ scm_obj_t reader_t::read_list(bool& err) {
       error_message = "unexpected end-of-file while reading list";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      return head;  // proper list
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        return head;  // proper list
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     if (c == '.' && head != scm_nil) {
       // Check if it is really a dot or part of symbol
       get_char();
       int next = peek_char();
       // If delimiter, it's a dot
-      if (isspace(next) || next == ')' || next == EOF) {
+      if (isspace(next) || next == ')' || next == ']' || next == EOF) {
         scm_obj_t last = read(err);
         if (err) return scm_undef;
 
         skip_whitespace();
-        if (peek_char() != ')') {
+        if (peek_char() != close_char) {
           err = true;  // dot must be followed by one element and then close paren
-          error_message = "more than one item following dot('.') while reading list";
+          error_message = "more than one item following dot('.') while reading list or mismatched parentheses";
           return scm_undef;
         }
-        get_char();  // consume ')'
+        get_char();  // consume closing bracket
         scm_cons_rec_t* cons = (scm_cons_rec_t*)tail;
         cons->cdr = last;
         return head;
@@ -234,7 +255,7 @@ scm_obj_t reader_t::read_list(bool& err) {
   }
 }
 
-scm_obj_t reader_t::read_vector(bool& err) {
+scm_obj_t reader_t::read_vector(bool& err, int close_char) {
   std::vector<scm_obj_t> elts;
   while (true) {
     skip_whitespace();
@@ -244,9 +265,15 @@ scm_obj_t reader_t::read_vector(bool& err) {
       error_message = "unexpected end-of-file while reading vector";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      break;
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        break;
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     elts.push_back(read(err));
     if (err) return scm_undef;
@@ -257,7 +284,7 @@ scm_obj_t reader_t::read_vector(bool& err) {
   return vec;
 }
 
-scm_obj_t reader_t::read_u8vector(bool& err) {
+scm_obj_t reader_t::read_u8vector(bool& err, int close_char) {
   std::vector<uint8_t> elts;
   while (true) {
     skip_whitespace();
@@ -267,9 +294,15 @@ scm_obj_t reader_t::read_u8vector(bool& err) {
       error_message = "unexpected end-of-file while reading u8vector";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      break;
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        break;
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     scm_obj_t obj = read(err);
     if (err) return scm_undef;

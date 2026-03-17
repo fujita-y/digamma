@@ -288,6 +288,53 @@ void test_reader() {
     heap->destroy();
     delete heap;
   }
+
+  // Test square brackets
+  {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("[1 2 3]");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for [1 2 3]");
+    assert(is_cons(obj));
+    assert(fixnum(((scm_cons_rec_t*)obj)->car) == 1);
+    std::cout << "List [1 2 3] passed" << std::endl;
+    heap->destroy();
+    delete heap;
+  }
+
+  // Mixed pairing test
+  {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("(1 [2 3] 4)");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for (1 [2 3] 4)");
+    assert(is_cons(obj));
+    std::cout << "Mixed paired list (1 [2 3] 4) passed" << std::endl;
+    heap->destroy();
+    delete heap;
+  }
+
+  // Vector with square brackets
+  {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss("#[1 2]");
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for #[1 2]");
+    assert(is_vector(obj));
+    assert(vector_nsize(obj) == 2);
+    std::cout << "Vector #[1 2] passed" << std::endl;
+    heap->destroy();
+    delete heap;
+  }
 }
 
 void test_reader_errors() {
@@ -312,11 +359,16 @@ void test_reader_errors() {
 
   check_error("(1 2", "unexpected end-of-file while reading list");
   check_error("\"foo", "unexpected end-of-file while reading string");
-  check_error("(1 . 2 3)", "more than one item following dot('.') while reading list");
+  check_error("(1 . 2 3)", "more than one item following dot('.') while reading list or mismatched parentheses");
   check_error("#u8(256)", "u8vector element out of range");
   check_error("#u8(a)", "expected fixnum in u8vector");
   check_error("\"\\xZZ;\"", "inline hex escape missing terminating semi-colon");
   check_error("#\\unknown", "invalid lexical syntax");
+  check_error("[1 2 3)", "mismatched parentheses");
+  check_error("(1 2 3]", "mismatched parentheses");
+  check_error("]", "unexpected closing bracket");
+  check_error(")", "unexpected closing bracket");
+  check_error("(1 . 2]", "more than one item following dot('.') while reading list or mismatched parentheses");
 }
 
 int main() {

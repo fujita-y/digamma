@@ -18,9 +18,9 @@ class reader_t {
   void skip_whitespace();
   void skip_line();
   void skip_block_comment();
-  scm_obj_t read_list(bool& err);
-  scm_obj_t read_vector(bool& err);
-  scm_obj_t read_u8vector(bool& err);
+  scm_obj_t read_list(bool& err, int close_char);
+  scm_obj_t read_vector(bool& err, int close_char);
+  scm_obj_t read_u8vector(bool& err, int close_char);
   scm_obj_t read_string(bool& err);
   scm_obj_t read_symbol(int c);
   scm_obj_t read_number(int c, bool& err);
