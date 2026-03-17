@@ -14,7 +14,8 @@
 #include <sstream>
 #include <string>
 
-#define IR_MODE 0
+#define IR_MODE    0
+#define IR_VERBOSE 0
 
 // ============================================================================
 // Initialization
@@ -76,7 +77,7 @@ void nanos_t::load_ir(const char* filename) {
       break;
     }
     if (is_cons(obj)) {
-#ifndef NDEBUG
+#if IR_VERBOSE
       printf("codegen: ");
       printer.write(CAR(CDR(obj)));
       puts("");
@@ -84,13 +85,14 @@ void nanos_t::load_ir(const char* filename) {
       try {
         auto func = codegen_t::current()->compile(obj);
         intptr_t result = func();
-#ifndef NDEBUG
+#if IR_VERBOSE
         printf("(0x%016lx)\n", result);
         printer.write((scm_obj_t)result);
         puts("");
 #endif
       } catch (std::exception& e) {
         printf("%s\n", e.what());
+        exit(1);
       }
     }
   }
@@ -128,90 +130,82 @@ void nanos_t::run() {
   rx->install_window_change_handler();
 
   std::string input_buffer;
+  while (repl(*rx, input_buffer, printer));
+}
+
+bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer) {
+#if IR_MODE
+  char const* cinput = rx.input(input_buffer.empty() ? "nanos-ir> " : "        ");
+#else
+  char const* cinput = rx.input(input_buffer.empty() ? "> " : "  ");
+#endif
+
+  if (cinput == nullptr) return false;
+
+  std::string line(cinput);
+  if (input_buffer.empty() && line.empty()) return true;
+
+  if (line.starts_with("!")) {
+    load_ir(line.substr(1).c_str());
+    return true;
+  }
+
+  input_buffer += line + "\n";
+
+  std::istringstream iss(input_buffer);
+  reader_t reader(iss);
+  std::vector<scm_obj_t> objs;
+  bool incomplete = false;
 
   while (true) {
-#if IR_MODE
-    char const* cinput = rx->input(input_buffer.empty() ? "nanos-ir> " : "        ");
-#else
-    char const* cinput = rx->input(input_buffer.empty() ? "> " : "  ");
-#endif
-    if (cinput == nullptr) {
-      break;  // EOF
-    }
-
-    std::string line(cinput);
-    if (input_buffer.empty() && line.empty()) continue;
-
-    if (line.starts_with("!")) {
-      std::string filename = line.substr(1);
-      load_ir(filename.c_str());
-      continue;
-    }
-
-    input_buffer += line + "\n";
-
-    std::istringstream iss(input_buffer);
-    reader_t reader(iss);
-
     bool err = false;
-    std::vector<scm_obj_t> objs;
-    bool incomplete = false;
+    scm_obj_t obj = reader.read(err);
 
-    while (true) {
-      err = false;
-      scm_obj_t obj = reader.read(err);
-
-      if (err) {
-        std::string msg = reader.get_error_message();
-        if (msg.find("unexpected end-of-file") != std::string::npos) {
-          incomplete = true;
-        } else {
-          puts("Error: read failed");
-          input_buffer.clear();
-        }
-        break;
+    if (err) {
+      if (reader.get_error_message().find("unexpected end-of-file") != std::string::npos) {
+        incomplete = true;
+      } else {
+        std::cout << "Error: " << reader.get_error_message() << std::endl;
+        input_buffer.clear();
       }
-
-      if (obj == scm_eof) {
-        break;
-      }
-
-      objs.push_back(obj);
+      break;
     }
 
-    if (incomplete) {
-      continue;
-    }
+    if (obj == scm_eof) break;
+    objs.push_back(obj);
+  }
 
-    if (!input_buffer.empty()) {
-      std::string hist = input_buffer;
-      while (!hist.empty() && (hist.back() == '\n' || hist.back() == '\r')) {
-        hist.pop_back();
-      }
-      if (!hist.empty()) {
-        rx->history_add(hist);
-      }
-      input_buffer.clear();
-    }
+  if (incomplete) return true;
 
-    for (scm_obj_t obj : objs) {
-      try {
+  // Add to history if full expressions were read
+  std::string hist = input_buffer;
+  while (!hist.empty() && (hist.back() == '\n' || hist.back() == '\r')) hist.pop_back();
+  if (!hist.empty()) rx.history_add(hist);
+  input_buffer.clear();
+
+  for (scm_obj_t obj : objs) {
+    evaluate(obj, printer);
+  }
+
+  return true;
+}
+
+void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
+  try {
 #if IR_MODE
-        codegen_t* cg = codegen_t::current();
-        auto func = cg->compile(obj);
-        intptr_t result = func();
-        printf("(0x%016lx)\n", result);
-        printer.write((scm_obj_t)result);
-        puts("\n");
+    codegen_t* cg = codegen_t::current();
+    auto func = cg->compile(obj);
+    intptr_t result = func();
+    printf("(0x%016lx)\n", result);
+    printer.write((scm_obj_t)result);
+    puts("\n");
 #else
-        scm_obj_t result2 = core_eval(obj);
-        printf("core-eval (0x%016lx)\n", result2);
-        printer.write(result2);
-        puts("\n");
+    scm_obj_t result = core_eval(obj);
+    printf("core-eval (0x%016lx)\n", result);
+    printer.write(result);
+    puts("\n");
 #endif
-      } catch (std::exception& e) {
-        printf("%s\n", e.what());
-      }
-    }
+  } catch (const std::exception& e) {
+    std::cerr << "Error: " << e.what() << std::endl;
   }
 }
