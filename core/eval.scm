@@ -3,6 +3,7 @@
          (optimized (optimize expanded))
          (lifted (lambda-lift optimized))
          (coreform (compile lifted)))
+#|
     (newline)
     (display "macroexpanded form:\n")
     (write expanded)
@@ -20,4 +21,5 @@
     (write coreform)
     (newline)
     (newline)
+|#
     (codegen-and-run coreform)))

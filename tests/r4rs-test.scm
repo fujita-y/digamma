@@ -1,3 +1,15 @@
+(define-syntax do
+  (syntax-rules ()
+    ((do ((var init step) ...)
+            (test expr ...)
+            body ...)
+     (let loop ((var init) ...)
+       (if test
+           (begin expr ...)
+           (begin
+             body ...
+             (loop step ...)))))))
+
 (define cur-section '())(define errs '())
 (define SECTION (lambda args (set! cur-section args) #t))
 (define record-error (lambda (e) (set! errs (cons (list cur-section e) errs))))
@@ -158,6 +170,42 @@
          neg)))))
 ;;From: Allegro Petrofsky <Allegro@Petrofsky.Berkeley.CA.US>
 (test -1 'let (let ((f -)) (let f ((n (f 1))) n)))
+(SECTION 4 2 6)
+(test '(list 3 4) 'quasiquote `(list ,(+ 1 2) 4))
+(test '(list a (quote a)) 'quasiquote (let ((name 'a)) `(list ,name ',name)))
+(test '(a 3 4 5 6 b) 'quasiquote `(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b))
+(test '((foo 7) . cons)
+  'quasiquote
+  `((foo ,(- 10 3)) ,@(cdr '(c)) . ,(car '(cons))))
+
+;;; sqt is defined here because not all implementations are required to
+;;; support it.
+(define (sqt x)
+  (do ((i 0 (+ i 1)))
+      ((> (* i i) x) (- i 1))))
+
+(test '#(10 5 2 4 3 8) 'quasiquote `#(10 5 ,(sqt 4) ,@(map sqt '(16 9)) 8)) ;;; [TODO]
+(test 5 'quasiquote `,(+ 2 3))
+(test '(a `(b ,(+ 1 2) ,(foo 4 d) e) f)
+      'quasiquote `(a `(b ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
+(test '(a `(b ,x ,'y d) e) 'quasiquote
+  (let ((name1 'x) (name2 'y)) `(a `(b ,,name1 ,',name2 d) e)))
+(test '(list 3 4) 'quasiquote (quasiquote (list (unquote (+ 1 2)) 4)))
+(test '`(list ,(+ 1 2) 4) 'quasiquote '(quasiquote (list (unquote (+ 1 2)) 4)))
+(SECTION 5 2 1)
+(define (tprint x) #t)
+(test #t 'tprint (tprint 56))
+(define add3 (lambda (x) (+ x 3)))
+(test 6 'define (add3 3))
+(define first car)
+(test 1 'define (first '(1 2)))
+(define foo (lambda () 9))
+(test 9 'define (foo))
+(define foo foo)
+(test 9 'define (foo))
+;(define foo (let ((foo foo)) (lambda () (+ 1 (foo))))) ;;; [TODO] 
+(test 10 'define (foo))
+
 
 
 (report-errs)

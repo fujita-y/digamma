@@ -111,6 +111,13 @@
      ((and (pair? x) (is-quasiquote? (car x)))
       (list 'list ''quasiquote (expand-qq (cadr x) (+ level 1))))
 
+     ;; Vectors
+     ((vector? x)
+      (let ((lst (vector->list x)))
+        (if (null? lst)
+            ''#()
+            (list 'list->vector (expand-qq-list lst level)))))
+
      ;; Atoms and self-evaluating forms
      ((not (pair? x))
       (if (or (number? x) (boolean? x) (string? x) (null? x) (char? x))
