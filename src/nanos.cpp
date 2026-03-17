@@ -38,7 +38,7 @@ void nanos_t::init_codegen() {
 
 void nanos_t::init() {
   object_heap_t* heap = new object_heap_t();
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 64 * 1024 * 1024);
   init_codegen();
   init_subr();
 }
@@ -56,6 +56,34 @@ void nanos_t::destroy() {
 // ============================================================================
 // Execution & REPL
 // ============================================================================
+
+void nanos_t::load_script(const char* filename) {
+  std::ifstream ifs(filename);
+  if (!ifs) {
+    puts("Error: failed to open file");
+    return;
+  }
+  reader_t reader(ifs);
+  printer_t printer(std::cout);
+  bool err = false;
+  while (true) {
+    scm_obj_t obj = reader.read(err);
+    if (err) {
+      std::string msg = reader.get_error_message();
+      std::cout << "read error: " << msg << std::endl;
+      exit(1);
+    }
+    if (obj == scm_eof) {
+      break;
+    }
+    try {
+      evaluate(obj, printer);
+    } catch (std::exception& e) {
+      printf("%s\n", e.what());
+      exit(1);
+    }
+  }
+}
 
 void nanos_t::load_ir(const char* filename) {
   std::ifstream ifs(filename);
@@ -133,6 +161,12 @@ void nanos_t::run() {
   while (repl(*rx, input_buffer, printer));
 }
 
+static void add_history(replxx::Replxx& rx, const std::string& line) {
+  std::string hist = line;
+  while (!hist.empty() && (hist.back() == '\n' || hist.back() == '\r')) hist.pop_back();
+  if (!hist.empty()) rx.history_add(hist);
+}
+
 bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer) {
 #if IR_MODE
   char const* cinput = rx.input(input_buffer.empty() ? "nanos-ir> " : "        ");
@@ -147,6 +181,12 @@ bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& pri
 
   if (line.starts_with("!")) {
     load_ir(line.substr(1).c_str());
+    add_history(rx, line);
+    return true;
+  }
+  if (line.starts_with("@")) {
+    load_script(line.substr(1).c_str());
+    add_history(rx, line);
     return true;
   }
 
@@ -177,10 +217,7 @@ bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& pri
 
   if (incomplete) return true;
 
-  // Add to history if full expressions were read
-  std::string hist = input_buffer;
-  while (!hist.empty() && (hist.back() == '\n' || hist.back() == '\r')) hist.pop_back();
-  if (!hist.empty()) rx.history_add(hist);
+  add_history(rx, input_buffer);
   input_buffer.clear();
 
   for (scm_obj_t obj : objs) {
@@ -201,7 +238,6 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     puts("\n");
 #else
     scm_obj_t result = core_eval(obj);
-    printf("core-eval (0x%016lx)\n", result);
     printer.write(result);
     puts("\n");
 #endif

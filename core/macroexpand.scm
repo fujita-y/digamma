@@ -353,7 +353,7 @@
                                    (if (null? body) '((begin)) body)))
             `(let ,new-bindings ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env))))))
 
-(define (expand-letrec-star expr m-env s-env r-env)
+(define (expand-letrec* expr m-env s-env r-env)
   (let* ((bindings (cadr expr)) (body (cddr expr))
          (split (split-internal-defines body s-env))
          (i-defs (car split)) (r-body (cdr split))
@@ -504,7 +504,7 @@
     ((lambda) expand-lambda) 
     ((let) expand-let) 
     ((let*) expand-let*)
-    ((letrec*) expand-letrec-star)
+    ((letrec*) expand-letrec*)
     ((letrec) (lambda (e m s r) (expand `(letrec* ,@(cdr e)) m s r)))
     ((set!) expand-set!) 
     ((if) expand-if) 
