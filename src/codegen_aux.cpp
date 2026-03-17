@@ -91,19 +91,14 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
   codegen_t* cg = codegen_t::current();
   if (!cg) throw std::runtime_error("apply: JIT not initialized");
 
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
-
+  auto bridge = cg->call_closure_bridge();
   return (scm_obj_t)bridge(proc, args.size(), args.data());
 }
 
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {
   codegen_t* cg = codegen_t::current();
   if (!cg) throw std::runtime_error("c_call_closure_thunk_0: JIT not initialized");
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
+  auto bridge = cg->call_closure_bridge();
   return (scm_obj_t)bridge(proc, 0, nullptr);
 }
 

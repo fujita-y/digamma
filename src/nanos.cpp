@@ -106,9 +106,7 @@ scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
   }
 
   codegen_t* cg = codegen_t::current();
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
+  auto bridge = cg->call_closure_bridge();
 
   scm_obj_t args[2] = {obj, scm_nil};
   return (scm_obj_t)bridge(core_eval, 2, args);

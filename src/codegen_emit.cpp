@@ -415,13 +415,13 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   return f;
 }
 
-void* codegen_t::get_call_closure_bridge_ptr() {
+codegen_t::bridge_func_t codegen_t::call_closure_bridge() {
   if (cached_call_closure_bridge) return cached_call_closure_bridge;
 
   const char* name = "__nanos_call_closure_bridge";
   auto sym = jit->lookup(name);
   if (sym) {
-    cached_call_closure_bridge = (void*)sym->getValue();
+    cached_call_closure_bridge = sym->toPtr<codegen_t::bridge_func_t>();
     return cached_call_closure_bridge;
   }
 
@@ -458,7 +458,7 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   if (!sym) {
     fatal("%s:%u codegen: failed to look up closure bridge after compilation", __FILE__, __LINE__);
   }
-  cached_call_closure_bridge = (void*)sym->getValue();
+  cached_call_closure_bridge = sym->toPtr<codegen_t::bridge_func_t>();
   return cached_call_closure_bridge;
 }
 

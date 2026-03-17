@@ -1185,9 +1185,7 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 
   codegen_t* cg = codegen_t::current();
   if (!cg) throw std::runtime_error("call-with-values: JIT not initialized");
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
+  auto bridge = cg->call_closure_bridge();
 
   // Step 1: call producer thunk
   scm_obj_t result = (scm_obj_t)bridge(producer, 0, nullptr);
