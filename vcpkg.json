@@ -3,6 +3,7 @@
   "version": "0.9",
   "dependencies": [
     "boost-context",
-    "replxx"
+    "replxx",
+    "cli11"
   ]
 }

@@ -2,6 +2,7 @@
 #include "nanos.h"
 #include "codegen.h"
 #include "nanos_jit.h"
+#include "nanos_options.h"
 #include "object_heap.h"
 #include "printer.h"
 #include "reader.h"
@@ -119,6 +120,8 @@ void nanos_t::run() {
 #else
   puts(";; USE_TBI == 0");
 #endif
+  std::cout << ";; boot_file: " << nanos_options::boot_file << std::endl;
+  std::cout << ";; script_file: " << nanos_options::script_file << std::endl;
 
   printer_t printer(std::cout);
   auto rx = std::make_unique<replxx::Replxx>();

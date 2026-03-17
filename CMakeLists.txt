@@ -67,6 +67,7 @@ endif()
 find_package(Boost CONFIG REQUIRED COMPONENTS context)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
+find_package(CLI11 CONFIG REQUIRED)
 
 # ==============================================================================
 # Compiler Configuration
@@ -153,6 +154,7 @@ set(NANOS_CORE_SOURCES
   src/codegen_emit.cpp
   src/nanos_subr.cpp
   src/nanos_context.cpp
+  src/nanos_options.cpp
   src/arch_arm64.cpp
   src/equiv.cpp
 )
@@ -161,7 +163,7 @@ set(NANOS_CORE_SOURCES
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context replxx::replxx Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context replxx::replxx Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets
