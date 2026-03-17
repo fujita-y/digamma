@@ -58,7 +58,8 @@ void nanos_t::destroy() {
 // ============================================================================
 
 void nanos_t::load_script(const char* filename) {
-  std::ifstream ifs(filename);
+  if (strlen(filename) != 0) nanos_options::script_file = filename;
+  std::ifstream ifs(nanos_options::script_file);
   if (!ifs) {
     puts("Error: failed to open file");
     return;
@@ -86,7 +87,8 @@ void nanos_t::load_script(const char* filename) {
 }
 
 void nanos_t::load_ir(const char* filename) {
-  std::ifstream ifs(filename);
+  if (strlen(filename) != 0) nanos_options::boot_file = filename;
+  std::ifstream ifs(nanos_options::boot_file);
   if (!ifs) {
     puts("Error: failed to open file");
     return;

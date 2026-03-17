@@ -2,7 +2,7 @@
 #include "nanos_options.h"
 
 std::string nanos_options::boot_file = "../boot/core.ir";
-std::string nanos_options::script_file = "";
+std::string nanos_options::script_file = "../tests/r4rs-test.scm";
 
 void nanos_options::parse(int argc, char** argv) {
   CLI::App app{"Nanos"};
