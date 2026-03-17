@@ -371,6 +371,16 @@ SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   throw std::runtime_error("set-car!: argument must be a cons cell");
 }
 
+// set-cdr!  - R6RS 11.9
+SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (is_cons(a1)) {
+    object_heap_t::current()->write_barrier(a2);
+    CDR(a1) = a2;
+    return scm_unspecified;
+  }
+  throw std::runtime_error("set-cdr!: argument must be a cons cell");
+}
+
 // length  - R6RS 11.9
 SUBR subr_length(scm_obj_t self, scm_obj_t a1) {
   int len = 0;
@@ -468,6 +478,19 @@ SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
     cur = CDR(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assq: second argument must be a proper list");
+  return scm_false;
+}
+
+// assv  - R6RS 11.9
+SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  scm_obj_t cur = a2;
+  while (is_cons(cur)) {
+    scm_obj_t pair = CAR(cur);
+    if (!is_cons(pair)) throw std::runtime_error("assv: alist must contain pairs");
+    if (eqv_p(CAR(pair), a1)) return pair;
+    cur = CDR(cur);
+  }
+  if (cur != scm_nil) throw std::runtime_error("assv: second argument must be a proper list");
   return scm_false;
 }
 
@@ -1250,6 +1273,7 @@ void nanos_t::init_subr() {
   reg("cdddr", (void*)subr_cdddr, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
   reg("set-car!", (void*)subr_set_car, 2, 0);
+  reg("set-cdr!", (void*)subr_set_cdr, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
   reg("list", (void*)subr_list, 0, 1);
   reg("list-transpose", (void*)subr_list_transpose, 1, 1);
@@ -1261,6 +1285,7 @@ void nanos_t::init_subr() {
   reg("memv", (void*)subr_memv, 2, 0);
   reg("member", (void*)subr_member, 2, 0);
   reg("assq", (void*)subr_assq, 2, 0);
+  reg("assv", (void*)subr_assv, 2, 0);
   reg("assoc", (void*)subr_assoc, 2, 0);
   reg("reverse", (void*)subr_reverse, 1, 0);
   reg("append", (void*)subr_append, 0, 1);
