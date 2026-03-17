@@ -19,7 +19,6 @@
 
 (define *cp0-effort-limit* 100)
 (define *cp0-score-limit* 20)
-(define *licm-count* 0)
 
 ;; Pure side-effect-free primitives that can be removed if their result is unused.
 (define pure-primitives
@@ -50,11 +49,6 @@
         (if (memq (car lst) tail)
             tail
             (cons (car lst) tail)))))
-
-(define (is-licm-var? sym)
-  (let ((s (symbol->string sym)))
-    (and (> (string-length s) 5)
-         (string=? (substring s 0 5) "licm."))))
 
 (define (flatten-params-opt params)
   (cond ((null? params) '())
@@ -283,66 +277,6 @@
 ;; 4. Core Handlers Helpers
 ;;=============================================================================
 
-(define (opt-licm expr bound-vars)
-  (let* ((bindings (cadr expr))
-         (loop-name (caar bindings))
-         (init-val (cadar bindings))
-         (body-seq (cddr expr))
-         (set-expr (car body-seq))
-         (loop-lambda (caddr set-expr))
-         (params (cadr loop-lambda))
-         (lambda-body (cddr loop-lambda)))
-    
-    (let* ((params-list (flatten-params-opt params))
-           (mutated (analyze-mutated-vars-optimizer (make-seq lambda-body)))
-           (forbidden (append params-list mutated))
-           (hoisted-map (make-equal-hashtable))
-           (hoisted-list '()))
-
-      (define (transform e forbidden)
-        (cond
-          ((not (pair? e)) e)
-          ((eq? (car e) 'quote) e)
-          ((and (memq (car e) pure-primitives)
-                (not (has-effects? e))
-                (let ((fvars (analyze-free-vars-optimizer e '())))
-                  (not (any (lambda (v) (memq v forbidden)) fvars))))
-            (if (hashtable-contains? hoisted-map e)
-                (hashtable-ref hoisted-map e #f)
-                (let ((tmp (generate-temporary-symbol "licm.")))
-                  (hashtable-set! hoisted-map e tmp)
-                  (set! hoisted-list (cons (list tmp e) hoisted-list))
-                  tmp)))
-          ((eq? (car e) 'lambda)
-           (let ((new-forbidden (append (flatten-params-opt (cadr e)) forbidden)))
-             `(lambda ,(cadr e) ,@(map (lambda (x) (transform x new-forbidden)) (cddr e)))))
-          ((eq? (car e) 'let)
-           (let* ((bs (cadr e))
-                  (vars (map car bs))
-                  (new-forbidden (append vars forbidden)))
-             `(let ,(map (lambda (b) (list (car b) (transform (cadr b) forbidden))) bs)
-                ,@(map (lambda (x) (transform x new-forbidden)) (cddr e)))))
-          ((eq? (car e) 'if)
-           `(if ,(transform (cadr e) forbidden)
-                ,(transform (caddr e) forbidden)
-                ,(if (null? (cadddr e)) '(unspecified) (transform (cadddr e) forbidden))))
-          ((eq? (car e) 'set!)
-           `(set! ,(cadr e) ,(transform (caddr e) forbidden)))
-          ((eq? (car e) 'begin)
-           `(begin ,@(map (lambda (x) (transform x forbidden)) (cdr e))))
-          ((eq? (car e) 'define)
-           `(define ,(cadr e) ,(transform (caddr e) forbidden)))
-          (else
-           (map (lambda (x) (transform x forbidden)) e))))
-
-      (let ((new-lambda-body (map (lambda (e) (transform e forbidden)) lambda-body)))
-        (if (null? hoisted-list)
-            #f ;; No changes
-            `(let ,(reverse hoisted-list)
-               (let ((,loop-name ,init-val))
-                 (set! ,loop-name (lambda ,params ,@new-lambda-body))
-                 ,@(cdr body-seq))))))))
-
 (define (opt-let-inner bindings body bound-vars)
     ;; Let-floating
     (let ((floated-bindings '())
@@ -379,7 +313,6 @@
                 (let ((var (car b)) (val (cadr b)))
                   (cond
                     ((and (not (memq var mutated-vars))
-                          (not (is-licm-var? var))
                           (safe-to-inline-val? var val (make-seq body) bound-vars mutated-vars)
                           (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)
                             (and (not (has-effects? val)) (<= (get-use-count var (make-seq body)) 1))))
@@ -390,7 +323,6 @@
                     ((and (not (memq var mutated-vars))
                           (pair? val)
                           (eq? (car val) 'lambda)
-                          (not (is-licm-var? var))
                           (should-inline? var val (make-seq body)))
                    (set! body (perform-inlining var val body))
                    (set! body-changed? #t)
