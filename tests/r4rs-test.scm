@@ -184,7 +184,7 @@
   (do ((i 0 (+ i 1)))
       ((> (* i i) x) (- i 1))))
 
-(test '#(10 5 2 4 3 8) 'quasiquote `#(10 5 ,(sqt 4) ,@(map sqt '(16 9)) 8)) ;;; [TODO]
+(test '#(10 5 2 4 3 8) 'quasiquote `#(10 5 ,(sqt 4) ,@(map sqt '(16 9)) 8))
 (test 5 'quasiquote `,(+ 2 3))
 (test '(a `(b ,(+ 1 2) ,(foo 4 d) e) f)
       'quasiquote `(a `(b ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
@@ -203,7 +203,7 @@
 (test 9 'define (foo))
 (define foo foo)
 (test 9 'define (foo))
-;(define foo (let ((foo foo)) (lambda () (+ 1 (foo))))) ;;; [TODO] 
+(define foo (let ((foo foo)) (lambda () (+ 1 (foo)))))
 (test 10 'define (foo))
 
 

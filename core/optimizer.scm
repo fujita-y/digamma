@@ -194,6 +194,32 @@
          (not (and (memq (car expr) pure-primitives)
                    (not (any has-effects? (cdr expr))))))))
 
+(define (used-in-lambda? expr var)
+  (let walk ((e expr) (in-lambda? #f))
+    (cond ((symbol? e) (and (eq? e var) in-lambda?))
+          ((not (pair? e)) #f)
+          ((eq? (car e) 'quote) #f)
+          ((eq? (car e) 'lambda)
+           (if (memq var (flatten-params-opt (cadr e)))
+               #f
+               (any (lambda (be) (walk be #t)) (cddr e))))
+          ((eq? (car e) 'let)
+           (let* ((bindings (cadr e))
+                  (vars (map car bindings))
+                  (inits (map cadr bindings))
+                  (body (cddr e)))
+             (or (any (lambda (init) (walk init in-lambda?)) inits)
+                 (if (memq var vars)
+                     #f
+                     (any (lambda (be) (walk be in-lambda?)) body)))))
+          (else (any (lambda (be) (walk be in-lambda?)) e)))))
+
+(define (safe-to-inline-val? var val body-expr bound-vars mutated-vars)
+  (let ((fvars (analyze-free-vars-optimizer val '())))
+    (and (not (any (lambda (v) (memq v mutated-vars)) fvars))
+         (or (every (lambda (v) (or (memq v bound-vars) (memq v pure-primitives))) fvars)
+             (not (used-in-lambda? body-expr var))))))
+
 ;;=============================================================================
 ;; 3. Transformation Helpers
 ;;=============================================================================
@@ -354,6 +380,7 @@
                   (cond
                     ((and (not (memq var mutated-vars))
                           (not (is-licm-var? var))
+                          (safe-to-inline-val? var val (make-seq body) bound-vars mutated-vars)
                           (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)
                             (and (not (has-effects? val)) (<= (get-use-count var (make-seq body)) 1))))
                    (set! body (map (lambda (e) (substitute e var val)) body))
