@@ -1109,11 +1109,11 @@ SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1) {
   return result;
 }
 
-// hashtable-alist  - digamma extension
-// (hashtable-alist ht) => ((key . value) ...)
+// hashtable->alist  - digamma extension
+// (hashtable->alist ht) => ((key . value) ...)
 // Like hashtable-entries but returns an association list instead of two vectors.
 SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
-  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-alist: argument must be a hashtable");
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable->alist: argument must be a hashtable");
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(a1);
   hashtable_aux_t* aux = ht->aux;
   int nsize = aux->capacity;
@@ -1358,7 +1358,7 @@ void nanos_t::init_subr() {
   reg("hashtable-contains?", (void*)subr_hashtable_contains, 2, 0);
   reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, 0);
   reg("hashtable-entries", (void*)subr_hashtable_entries, 1, 0);
-  reg("hashtable-alist", (void*)subr_hashtable_alist, 1, 0);
+  reg("hashtable->alist", (void*)subr_hashtable_alist, 1, 0);
 
   // environment access
   reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, 0);
