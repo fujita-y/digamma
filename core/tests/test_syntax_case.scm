@@ -378,7 +378,7 @@
 
 ;; Helper for eval tests (from test_syntax_rules.scm)
 (define (test-eval expected expr msg)
-  (let ((expanded (eval (macroexpand expr) (interaction-environment))))
+  (let ((expanded (core-eval (macroexpand expr) (interaction-environment))))
     (if (equal? expected expanded)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -390,7 +390,7 @@
           (display "  Actual:   ") (display expanded) (newline)))))
 
 (define (test-eval-strip expected expr msg)
-  (let ((expanded (eval (macroexpand expr 'strip) (interaction-environment))))
+  (let ((expanded (core-eval (macroexpand expr 'strip) (interaction-environment))))
     (if (equal? expected expanded)
         (begin 
           (set! *pass-count* (+ *pass-count* 1))

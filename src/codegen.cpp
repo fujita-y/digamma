@@ -126,23 +126,45 @@ std::string codegen_t::generate_unique_suffix() {
 //  compile() — top-level entry point
 // --------------------------------------------------------------------------
 
+void codegen_t::reset_compile_state() {
+  // Drop LLVM modules first (they may reference the context that CompileScope
+  // is about to swap back, so release them before the context is restored).
+  main_module_uptr.reset();
+  closure_module_uptr.reset();
+  main_module = nullptr;
+  closure_module = nullptr;
+  main_function = nullptr;
+  current_function = nullptr;
+  current_function_info = nullptr;
+  current_closure_self = nullptr;
+  functions.clear();
+  allocas.clear();
+  labels.clear();
+  function_map.clear();
+  closure_literals.clear();
+  closure_params.clear();
+}
+
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   CompileScope scope(*this);
   try {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
     analyze_closure_labels();
+#ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
     }
     for (const auto& func : functions) {
       dump_instructions(func.instructions);
     }
+#endif
     phase2_create_functions();
     phase3_generate_code();
     phase4_optimize_and_verify();
     return phase5_finalize();
   } catch (...) {
+    reset_compile_state();
     throw;
   }
 }
@@ -152,6 +174,11 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 // --------------------------------------------------------------------------
 
 void codegen_t::phase0_create_module() {
+  if (cached_call_closure_bridge == nullptr) {
+    // Initialize bridge (this creates a standalone module, compiles the body, and gives it to JIT)
+    (void)call_closure_bridge();
+  }
+
   std::string mod_name = "jit_module_main_" + generate_unique_suffix();
   this->main_module_uptr = std::make_unique<llvm::Module>(mod_name, CT);
   this->main_module = this->main_module_uptr.get();
@@ -314,24 +341,24 @@ void codegen_t::phase3_generate_code() {
 //  Phase 4: Verification and optimization
 // --------------------------------------------------------------------------
 
+void codegen_t::optimize_module(llvm::Module& mod) {
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  llvm::PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+  MPM.run(mod, MAM);
+}
+
 void codegen_t::phase4_optimize_and_verify() {
-  auto optimize_module = [](llvm::Module& mod) {
-    llvm::LoopAnalysisManager LAM;
-    llvm::FunctionAnalysisManager FAM;
-    llvm::CGSCCAnalysisManager CGAM;
-    llvm::ModuleAnalysisManager MAM;
-
-    llvm::PassBuilder PB;
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
-    MPM.run(mod, MAM);
-  };
-
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
@@ -349,20 +376,111 @@ void codegen_t::phase4_optimize_and_verify() {
   }
 
   // Dump IR to file for debugging and inspection
-  std::error_code EC;
-  llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
-  if (EC) {
-    llvm::errs() << "Could not open file: " << EC.message() << "\n";
-  } else {
-    main_module_uptr->print(dest, nullptr);
-  }
-  if (functions.size() > 1) {
-    llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
+#ifndef NDEBUG
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
     if (EC) {
       llvm::errs() << "Could not open file: " << EC.message() << "\n";
     } else {
-      closure_module_uptr->print(dest2, nullptr);
+      main_module_uptr->print(dest, nullptr);
     }
+  }
+#endif
+
+  if (functions.size() > 1) {
+    // No effects without named let optimization
+    // prune_unused_closures();
+#ifndef NDEBUG
+    {
+      std::error_code EC;
+      llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
+      if (EC) {
+        llvm::errs() << "Could not open file: " << EC.message() << "\n";
+      } else {
+        closure_module_uptr->print(dest2, nullptr);
+      }
+    }
+#endif
+  }
+}
+
+// Helper function to find which llvm::Function an llvm::User belongs to,
+// by looking through Instruction and ConstantExpr.
+static llvm::Function* getUserFunction(llvm::User* U) {
+  if (auto* I = llvm::dyn_cast<llvm::Instruction>(U)) {
+    return I->getFunction();
+  }
+  if (auto* CE = llvm::dyn_cast<llvm::ConstantExpr>(U)) {
+    for (llvm::User* CEU : CE->users()) {
+      if (llvm::Function* F = getUserFunction(CEU)) {
+        return F;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void codegen_t::prune_unused_closures() {
+  std::set<llvm::Function*> reachable;
+  std::vector<llvm::Function*> worklist;
+
+  llvm::Module* main_mod = main_module_uptr.get();
+  llvm::Module* clo_mod = closure_module_uptr.get();
+
+  // 1. Establish the root set from main_module.
+  // Any function declaration in main_module that has uses is a root.
+  for (llvm::Function& f : *main_mod) {
+    if (f.isDeclaration() && !f.use_empty()) {
+      if (llvm::Function* target = clo_mod->getFunction(f.getName())) {
+        if (reachable.insert(target).second) {
+          worklist.push_back(target);
+        }
+      }
+    }
+  }
+
+  // 2. Build edges: for each function in closure_module, find which functions use it.
+  // edge: user_func -> target_func
+  std::map<llvm::Function*, std::vector<llvm::Function*>> cg;
+  for (llvm::Function& target_func : *clo_mod) {
+    if (target_func.isDeclaration()) continue;
+
+    for (llvm::User* U : target_func.users()) {
+      if (llvm::Function* user_func = getUserFunction(U)) {
+        // If the user is inside closure_module, record the edge.
+        if (user_func->getParent() == clo_mod) {
+          cg[user_func].push_back(&target_func);
+        }
+      }
+    }
+  }
+
+  // 3. Trace reachable functions in closure_module
+  while (!worklist.empty()) {
+    llvm::Function* curr = worklist.back();
+    worklist.pop_back();
+
+    for (llvm::Function* target : cg[curr]) {
+      if (reachable.insert(target).second) {
+        worklist.push_back(target);
+      }
+    }
+  }
+
+  // 4. Prune unreachable functions
+  std::vector<llvm::Function*> to_delete;
+  for (llvm::Function& f : *clo_mod) {
+    if (!f.isDeclaration() && reachable.find(&f) == reachable.end()) {
+      to_delete.push_back(&f);
+    }
+  }
+
+  for (llvm::Function* f : to_delete) {
+#ifndef NDEBUG
+    std::cout << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
+#endif
+    f->eraseFromParent();
   }
 }
 
@@ -633,6 +751,11 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
     if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
       current_literals.push_back(inst.opr1);
     }
+  } else {
+    if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
+      puts("IMPORTANT: non closure literals found added to root to protect from GC");
+      object_heap_t::current()->add_root(inst.opr1);
+    }
   }
 }
 
@@ -670,8 +793,8 @@ void codegen_t::parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst,
   inst.opr1 = operand(inst_obj, 2);            // label (C1)
   inst.free_indices = operand(inst_obj, 3);    // free indices list
 
-  inst.argc = fixnum(operand(inst_obj, 5));
-  inst.has_rest = (operand(inst_obj, 6) == scm_true);
+  inst.argc = fixnum(operand(inst_obj, 4));
+  inst.has_rest = (operand(inst_obj, 5) == scm_true);
 
   // Record closure parameters for function generation
   closure_params[inst.opr1] = {inst.argc, inst.has_rest};
@@ -922,6 +1045,7 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
   func->setVisibility(llvm::GlobalValue::HiddenVisibility);
   func->setCallingConv(CLOSURE_CALLING_CONV);
   func->setDSOLocal(true);
+  func->addFnAttr(llvm::Attribute::NoInline);
 }
 
 // ============================================================================
@@ -1010,7 +1134,10 @@ void codegen_t::analyze_closure_labels() {
                   closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
                 }
               } else {
-                current_state.regs[inst.rn1] = scm_nil;
+#ifndef NDEBUG
+                std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
+#endif
+                current_state.regs[inst.rn1] = make_string((const char*)symbol_name(inst.opr2));
               }
             }
             break;

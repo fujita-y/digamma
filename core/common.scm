@@ -1,33 +1,7 @@
 ;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 ;; See LICENSE file for terms and conditions of use.
 
-;; Common utilities for the Digamma core system.
-;; These functions provide a robust base for syntax expansion, optimization, and compilation.
-
-(cond-expand
-  (gauche
-   (use srfi-9)
-   (define (make-eq-hashtable) (make-hash-table 'eq?))
-   (define (make-eqv-hashtable) (make-hash-table 'eqv?))
-   (define (make-equal-hashtable) (make-hash-table 'equal?))
-   (define (make-hashtable hash-fn equiv-fn)
-     (cond ((eq? equiv-fn equal?) (make-equal-hashtable))
-           ((eq? equiv-fn eqv?) (make-eqv-hashtable))
-           ((eq? equiv-fn eq?) (make-eq-hashtable))
-           (else (make-hash-table equiv-fn))))
-   (define hashtable-clear! hash-table-clear!)
-   (define hashtable-contains? hash-table-exists?)
-   (define hashtable-delete! hash-table-delete!)
-   (define hashtable-ref hash-table-get)
-   (define hashtable-set! hash-table-put!)
-   (define hashtable->alist hash-table->alist)
-   (define (equal-hash obj) (hash obj)))
-  (ypsilon
-   (import (srfi 9))
-   (define (hashtable->alist ht)
-     (let-values (((keys vals) (hashtable-entries ht)))
-       (map cons (vector->list keys) (vector->list vals)))))
-  (else))
+;; Common utilities
 
 ;;=============================================================================
 ;; Globals & State
@@ -176,30 +150,6 @@
 ;; Set difference: s1 minus s2.
 (define (set-minus s1 s2)
   (filter (lambda (x) (not (memq x s2))) s1))
-
-;; Pattern matcher for recursive let (loops)
-;; Matches: (let ((<name> #f)) (set! <name> (lambda ...)) <name>)
-(define (match-rec-pattern expr)
-  (let ((match?
-         (lambda (expr)
-           (and (pair? expr)
-                (eq? (car expr) 'let)
-                (let ((bindings (cadr expr))
-                      (body (cddr expr)))
-                  (and (pair? bindings)
-                       (null? (cdr bindings))
-                       (let ((name (car (car bindings))))
-                         (and (symbol? name)
-                              (pair? body)
-                              (let ((first (car body)))
-                                (and (pair? first)
-                                     (eq? (car first) 'set!)
-                                     (eq? (cadr first) name)
-                                     (pair? (cddr first))
-                                     (let ((val (caddr first)))
-                                       (and (pair? val)
-                                            (eq? (car val) 'lambda)))))))))))))
-    (match? expr)))
 
 (define (generate-temporary-symbol prefix)
   (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))

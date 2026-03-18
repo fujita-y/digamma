@@ -2,10 +2,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "nanos.h"
+#include "nanos_options.h"
 
-int main() {
+int main(int argc, char** argv) {
+  nanos_options::parse(argc, argv);
   nanos_t* nanos = new nanos_t();
   nanos->init();
   nanos->run();

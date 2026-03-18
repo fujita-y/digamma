@@ -204,7 +204,7 @@ inline void* to_address(scm_obj_t x) {
 }
 
 inline bool is_fixnum(scm_obj_t x) { return (x & 0x01) == 0x01; }
-inline bool is_char(scm_obj_t x) { return (x & 0x17) == 0x16; }
+inline bool is_char(scm_obj_t x) { return (x & 0xf7) == 0x16; }
 inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
 inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
 inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }

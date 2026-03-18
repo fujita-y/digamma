@@ -95,6 +95,10 @@ struct compiled_code_t {
 class codegen_t {
   friend class ClosureAnalysisTest;
 
+ public:
+  typedef scm_obj_t (*bridge_func_t)(scm_obj_t, int, scm_obj_t*);
+
+ private:
   // --------------------------------------------------------------------------
   //  Per-function metadata
   // --------------------------------------------------------------------------
@@ -155,7 +159,7 @@ class codegen_t {
   scm_obj_t cached_symbol_label;
   scm_obj_t cached_symbol_apply;
   scm_obj_t cached_symbol_safepoint;
-  void* cached_call_closure_bridge = nullptr;
+  bridge_func_t cached_call_closure_bridge = nullptr;
 
   std::map<scm_obj_t, Opcode> opcode_map;
 
@@ -177,7 +181,10 @@ class codegen_t {
   void phase2_create_functions();
   void phase3_generate_code();
   void phase4_optimize_and_verify();
+  void optimize_module(llvm::Module& mod);
+  void prune_unused_closures();
   compiled_code_t phase5_finalize();
+  void reset_compile_state();
 
   // Configure a new Module with JIT data layout, target triple, PIC/PIE level
   void configure_module(llvm::Module& M);
@@ -292,7 +299,7 @@ class codegen_t {
   compiled_code_t compile(scm_obj_t inst_list);
 
   llvm::Function* get_or_create_call_closure_bridge();
-  void* get_call_closure_bridge_ptr();
+  bridge_func_t call_closure_bridge();
 
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::map<scm_obj_t, std::pair<int, bool>> closure_params;

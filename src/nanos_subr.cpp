@@ -16,7 +16,26 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <random>
 #include <sstream>
+
+static int safe_list_length(scm_obj_t lst) {
+  int len = 0;
+  scm_obj_t slow = lst;
+  scm_obj_t fast = lst;
+  while (true) {
+    if (fast == scm_nil) return len;
+    if (!is_cons(fast)) return -1;
+    fast = CDR(fast);
+    len++;
+    if (fast == scm_nil) return len;
+    if (!is_cons(fast)) return -1;
+    fast = CDR(fast);
+    len++;
+    slow = CDR(slow);
+    if (slow == fast) return -2;  // cycle
+  }
+}
 
 // ============================================================================
 // Arithmetic  - R6RS 11.7
@@ -119,13 +138,13 @@ SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error("<: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error("<: arguments must be fixnums");
-    if (first < argv[i]) {
-      first = argv[i];
+    if (first < fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -139,13 +158,13 @@ SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error(">: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error(">: arguments must be fixnums");
-    if (first > argv[i]) {
-      first = argv[i];
+    if (first > fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -159,13 +178,13 @@ SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error("<=: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error("<=: arguments must be fixnums");
-    if (first <= argv[i]) {
-      first = argv[i];
+    if (first <= fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -179,13 +198,13 @@ SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
   if (!is_fixnum(argv[0])) [[unlikely]]
     throw std::runtime_error(">=: arguments must be fixnums");
-  scm_obj_t first = argv[0];
+  intptr_t first = fixnum(argv[0]);
 
   for (int i = 1; i < argc; i++) {
     if (!is_fixnum(argv[i])) [[unlikely]]
       throw std::runtime_error(">=: arguments must be fixnums");
-    if (first >= argv[i]) {
-      first = argv[i];
+    if (first >= fixnum(argv[i])) {
+      first = fixnum(argv[i]);
       continue;
     }
     return scm_false;
@@ -215,7 +234,7 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
     scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
     return cons->cdr;
   }
-  throw std::runtime_error("cdr: argument must be a cons cell");
+  throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
 
 // cadr, caddr, caar, cadar, cadddr, cddr, cdddr  - R6RS 11.9
@@ -223,6 +242,7 @@ SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(se
 SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
 SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
 SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
 SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
@@ -234,6 +254,83 @@ SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
     list = make_cons(argv[i], list);
   }
   return list;
+}
+
+static scm_obj_t do_transpose(int each_len, int argc, scm_obj_t argv[]) {
+  scm_obj_t ans = scm_nil;
+  scm_obj_t ans_tail = scm_nil;
+  for (int i = 0; i < each_len; i++) {
+    scm_obj_t elt = make_cons(CAR(argv[0]), scm_nil);
+    scm_obj_t elt_tail = elt;
+    argv[0] = CDR(argv[0]);
+    for (int n = 1; n < argc; n++) {
+      CDR(elt_tail) = make_cons(CAR(argv[n]), scm_nil);
+      elt_tail = CDR(elt_tail);
+      argv[n] = CDR(argv[n]);
+    }
+    if (ans == scm_nil) {
+      ans = make_cons(elt, scm_nil);
+      ans_tail = ans;
+    } else {
+      CDR(ans_tail) = make_cons(elt, scm_nil);
+      ans_tail = CDR(ans_tail);
+    }
+  }
+  return ans;
+}
+
+SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc >= 1) {
+    int each_len = safe_list_length(argv[0]);
+    if (each_len >= 0) {
+      for (int i = 1; i < argc; i++) {
+        int len = safe_list_length(argv[i]);
+        if (len >= 0) {
+          if (len == each_len) continue;
+          throw std::runtime_error("list-transpose: all lists must have same length");
+        }
+        throw std::runtime_error("list-transpose: arguments must be proper lists");
+      }
+      return do_transpose(each_len, argc, argv);
+    }
+    throw std::runtime_error("list-transpose: arguments must be proper lists");
+  }
+  throw std::runtime_error("list-transpose: wrong number of arguments");
+}
+
+SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc >= 1) {
+    int each_len = safe_list_length(argv[0]);
+    if (each_len >= 0) {
+      for (int i = 1; i < argc; i++) {
+        int len = safe_list_length(argv[i]);
+        if (len >= 0) {
+          if (len == each_len) continue;
+          return scm_false;
+        }
+        return scm_false;
+      }
+      return do_transpose(each_len, argc, argv);
+    }
+    return scm_false;
+  }
+  throw std::runtime_error("list-transpose+: wrong number of arguments");
+}
+
+SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 0) {
+    if (argc == 1) return argv[0];
+    scm_obj_t obj = make_cons(argv[0], scm_nil);
+    scm_obj_t tail = obj;
+    for (int i = 1; i < argc - 1; i++) {
+      scm_obj_t e = make_cons(argv[i], scm_nil);
+      CDR(tail) = e;
+      tail = e;
+    }
+    CDR(tail) = argv[argc - 1];
+    return obj;
+  }
+  throw std::runtime_error("cons*: wrong number of arguments");
 }
 
 static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
@@ -272,6 +369,16 @@ SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
     return scm_unspecified;
   }
   throw std::runtime_error("set-car!: argument must be a cons cell");
+}
+
+// set-cdr!  - R6RS 11.9
+SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (is_cons(a1)) {
+    object_heap_t::current()->write_barrier(a2);
+    CDR(a1) = a2;
+    return scm_unspecified;
+  }
+  throw std::runtime_error("set-cdr!: argument must be a cons cell");
 }
 
 // length  - R6RS 11.9
@@ -371,6 +478,19 @@ SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
     cur = CDR(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assq: second argument must be a proper list");
+  return scm_false;
+}
+
+// assv  - R6RS 11.9
+SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  scm_obj_t cur = a2;
+  while (is_cons(cur)) {
+    scm_obj_t pair = CAR(cur);
+    if (!is_cons(pair)) throw std::runtime_error("assv: alist must contain pairs");
+    if (eqv_p(CAR(pair), a1)) return pair;
+    cur = CDR(cur);
+  }
+  if (cur != scm_nil) throw std::runtime_error("assv: second argument must be a proper list");
   return scm_false;
 }
 
@@ -504,6 +624,18 @@ SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1) { return is_symbol(a1) ? scm_tr
 // vector?  - R6RS 11.13
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1) { return is_vector(a1) ? scm_true : scm_false; }
 
+// undefined - Nanos extension
+SUBR subr_undefined(scm_obj_t self) { return scm_undef; }
+
+// unspecified - Nanos extension
+SUBR subr_unspecified(scm_obj_t self) { return scm_unspecified; }
+
+// undefined? - Nanos extension
+SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_undef) ? scm_true : scm_false; }
+
+// unspecified? - Nanos extension
+SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_unspecified) ? scm_true : scm_false; }
+
 // ============================================================================
 // Vectors  - R6RS 11.13
 // ============================================================================
@@ -541,7 +673,7 @@ SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (n < 0 || n >= sz) throw std::runtime_error("vector-set!: index out of bounds");
   object_heap_t::current()->write_barrier(a3);
   vector_elts(a1)[n] = a3;
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // vector->list  - R6RS 11.13
@@ -571,19 +703,11 @@ SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   const char* s = (const char*)string_name(a1);
   intptr_t idx = fixnum(a2);
   intptr_t len = (intptr_t)strlen(s);
-  if (idx < 0 || idx >= len) throw std::runtime_error("string-ref: index out of bounds");
+  if (idx < 0 || idx >= len)
+    throw std::runtime_error("string-ref: index out of bounds: " + scm_obj_to_string(a1) + ", " + scm_obj_to_string(a2));
   // Decode UTF-8 character at byte position idx
   const uint8_t* p = (const uint8_t*)s + idx;
-  uint32_t ucs4;
-  if (*p < 0x80) {
-    ucs4 = *p;
-  } else if ((*p & 0xE0) == 0xC0) {
-    ucs4 = ((uint32_t)(*p & 0x1F) << 6) | (p[1] & 0x3F);
-  } else if ((*p & 0xF0) == 0xE0) {
-    ucs4 = ((uint32_t)(*p & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-  } else {
-    ucs4 = ((uint32_t)(*p & 0x07) << 18) | ((uint32_t)(p[1] & 0x3F) << 12) | ((uint32_t)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-  }
+  uint32_t ucs4 = *p;  // [TODO] unicode support
   return make_char(ucs4);
 }
 
@@ -771,19 +895,19 @@ SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // write  - R6RS 8.3
 SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).write(a1);
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // display  - R6RS 8.3
 SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
   printer_t(std::cout).display(a1);
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // newline  - R6RS 8.3
 SUBR subr_newline(scm_obj_t self) {
   std::cout << std::endl;
-  return scm_undef;
+  return scm_unspecified;
 }
 
 // ============================================================================
@@ -792,24 +916,47 @@ SUBR subr_newline(scm_obj_t self) {
 
 SUBR subr_collect(scm_obj_t self) {
   object_heap_t::current()->collect();
-  return scm_undef;
+  return scm_unspecified;
 }
 
 SUBR subr_safepoint(scm_obj_t self) {
   object_heap_t::current()->safepoint();
-  return scm_undef;
+  return scm_unspecified;
 }
 
 SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
   static int gensym_counter = 1;
   if (argc > 1) throw std::runtime_error("gensym: too many arguments");
   if (argc == 1 && !is_string(argv[0])) throw std::runtime_error("gensym: argument must be a string");
-  const char* prefix = (argc == 0) ? "tmp" : (const char*)string_name(argv[0]);
+  const char* prefix = (argc == 0) ? "gensym" : (const char*)string_name(argv[0]);
   struct timeval tv;
   gettimeofday(&tv, NULL);
   char buf[128];
   snprintf(buf, sizeof(buf), "%s_%x%x%x", prefix, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec, (unsigned int)gensym_counter++);
   return make_uninterned_symbol(buf);
+}
+
+SUBR subr_uuid(scm_obj_t self) {
+  static thread_local std::random_device rd;
+  static thread_local std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(0, 15);
+  std::uniform_int_distribution<> dis_variant(8, 11);
+
+  char buf[37];
+  const char* hex = "0123456789abcdef";
+  for (int i = 0; i < 36; i++) {
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      buf[i] = '-';
+    } else if (i == 14) {
+      buf[i] = '4';  // Version 4
+    } else if (i == 19) {
+      buf[i] = hex[dis_variant(gen)];  // Variant: 8, 9, a, or b
+    } else {
+      buf[i] = hex[dis(gen)];
+    }
+  }
+  buf[36] = '\0';
+  return make_string(buf);
 }
 
 // ============================================================================
@@ -962,11 +1109,11 @@ SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1) {
   return result;
 }
 
-// hashtable-alist  - digamma extension
-// (hashtable-alist ht) => ((key . value) ...)
+// hashtable->alist  - digamma extension
+// (hashtable->alist ht) => ((key . value) ...)
 // Like hashtable-entries but returns an association list instead of two vectors.
 SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
-  if (!is_hashtable(a1)) throw std::runtime_error("hashtable-alist: argument must be a hashtable");
+  if (!is_hashtable(a1)) throw std::runtime_error("hashtable->alist: argument must be a hashtable");
   scm_hashtable_rec_t* ht = (scm_hashtable_rec_t*)to_address(a1);
   hashtable_aux_t* aux = ht->aux;
   int nsize = aux->capacity;
@@ -988,6 +1135,57 @@ SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
   }
   return head;
 }
+
+// ============================================================================
+// Environment Access
+// ============================================================================
+
+// environment-macro-set!  - digamma core
+// (environment-macro-set! name transformer)
+SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-set!: first argument must be a symbol");
+  object_heap_t::current()->environment_macro_set(a1, a2);
+  return scm_unspecified;
+}
+
+// environment-macro-ref  - digamma core
+// (environment-macro-ref name) => transformer or scm_undef
+SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-ref: argument must be a symbol");
+  return object_heap_t::current()->environment_macro_ref(a1);
+}
+
+// environment-variable-set!  - digamma core
+// (environment-variable-set! name value)
+SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-set!: first argument must be a symbol");
+  object_heap_t::current()->environment_variable_set(a1, a2);
+  return scm_unspecified;
+}
+
+// environment-variable-ref  - digamma core
+// (environment-variable-ref name) => value or scm_undef
+SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-ref: argument must be a symbol");
+  return object_heap_t::current()->environment_variable_ref(a1);
+}
+
+// environment-macro-contains?  - digamma core
+// (environment-macro-contains? name) => #t or #f
+SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-macro-contains?: argument must be a symbol");
+  return object_heap_t::current()->environment_macro_contains(a1) ? scm_true : scm_false;
+}
+
+// environment-variable-contains?  - digamma core
+// (environment-variable-contains? name) => #t or #f
+SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("environment-variable-contains?: argument must be a symbol");
+  return object_heap_t::current()->environment_variable_contains(a1) ? scm_true : scm_false;
+}
+
+// interaction-environment - R6RS 11.16
+SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_environment; }
 
 // ============================================================================
 // Multiple Return Values
@@ -1013,9 +1211,7 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 
   codegen_t* cg = codegen_t::current();
   if (!cg) throw std::runtime_error("call-with-values: JIT not initialized");
-  void* bridge_ptr = cg->get_call_closure_bridge_ptr();
-  using bridge_func_t = intptr_t (*)(scm_obj_t, int, scm_obj_t*);
-  auto bridge = (bridge_func_t)bridge_ptr;
+  auto bridge = cg->call_closure_bridge();
 
   // Step 1: call producer thunk
   scm_obj_t result = (scm_obj_t)bridge(producer, 0, nullptr);
@@ -1027,6 +1223,17 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
     return (scm_obj_t)bridge(consumer, n, elts);
   } else {
     return (scm_obj_t)bridge(consumer, 1, &result);
+  }
+}
+
+// codegen-and-run - Nanos extension
+SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
+  try {
+    auto func = codegen_t::current()->compile(coreform);
+    intptr_t result = func();
+    return (scm_obj_t)result;
+  } catch (std::exception& e) {
+    throw std::runtime_error(e.what());
   }
 }
 
@@ -1061,20 +1268,26 @@ void nanos_t::init_subr() {
   reg("cadr", (void*)subr_cadr, 1, 0);
   reg("cddr", (void*)subr_cddr, 1, 0);
   reg("cadar", (void*)subr_cadar, 1, 0);
+  reg("caddar", (void*)subr_caddar, 1, 0);
   reg("caddr", (void*)subr_caddr, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
   reg("set-car!", (void*)subr_set_car, 2, 0);
+  reg("set-cdr!", (void*)subr_set_cdr, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
+  reg("list", (void*)subr_list, 0, 1);
+  reg("list-transpose", (void*)subr_list_transpose, 1, 1);
+  reg("list-transpose+", (void*)subr_list_transpose_plus, 1, 1);
+  reg("cons*", (void*)subr_cons_ast, 1, 1);
   reg("list-ref", (void*)subr_list_ref, 2, 0);
   reg("list->vector", (void*)subr_list_to_vector, 1, 0);
   reg("memq", (void*)subr_memq, 2, 0);
   reg("memv", (void*)subr_memv, 2, 0);
   reg("member", (void*)subr_member, 2, 0);
   reg("assq", (void*)subr_assq, 2, 0);
+  reg("assv", (void*)subr_assv, 2, 0);
   reg("assoc", (void*)subr_assoc, 2, 0);
   reg("reverse", (void*)subr_reverse, 1, 0);
-  reg("list", (void*)subr_list, 0, 1);
   reg("append", (void*)subr_append, 0, 1);
 
   // predicates & logic
@@ -1098,6 +1311,10 @@ void nanos_t::init_subr() {
   reg("string?", (void*)subr_string_p, 1, 0);
   reg("symbol?", (void*)subr_symbol_p, 1, 0);
   reg("vector?", (void*)subr_vector_p, 1, 0);
+  reg("undefined", (void*)subr_undefined, 0, 0);
+  reg("unspecified", (void*)subr_unspecified, 0, 0);
+  reg("undefined?", (void*)subr_undefined_p, 1, 0);
+  reg("unspecified?", (void*)subr_unspecified_p, 1, 0);
 
   // vectors
   reg("vector", (void*)subr_vector, 0, 1);
@@ -1141,7 +1358,16 @@ void nanos_t::init_subr() {
   reg("hashtable-contains?", (void*)subr_hashtable_contains, 2, 0);
   reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, 0);
   reg("hashtable-entries", (void*)subr_hashtable_entries, 1, 0);
-  reg("hashtable-alist", (void*)subr_hashtable_alist, 1, 0);
+  reg("hashtable->alist", (void*)subr_hashtable_alist, 1, 0);
+
+  // environment access
+  reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, 0);
+  reg("environment-macro-ref", (void*)subr_environment_macro_ref, 1, 0);
+  reg("environment-macro-contains?", (void*)subr_environment_macro_contains, 1, 0);
+  reg("environment-variable-set!", (void*)subr_environment_variable_set, 2, 0);
+  reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, 0);
+  reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, 0);
+  reg("interaction-environment", (void*)subr_interaction_environment, 0, 0);
 
   // multiple return values
   reg("values", (void*)subr_values, 0, 1);
@@ -1151,6 +1377,7 @@ void nanos_t::init_subr() {
   reg("collect", (void*)subr_collect, 0, 0);
   reg("safepoint", (void*)subr_safepoint, 0, 0);
   reg("gensym", (void*)subr_gensym, 0, 1);
+  reg("uuid", (void*)subr_uuid, 0, 0);
 
   // application & control
   reg("error", (void*)subr_error, 1, 1);
@@ -1158,6 +1385,7 @@ void nanos_t::init_subr() {
   reg("call/ec", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
+  reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
   c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
   c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);

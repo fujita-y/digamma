@@ -5,16 +5,30 @@
 #define NANOS_H_INCLUDED
 
 #include "core.h"
+#include "object.h"
 #include <memory>
+#include <string>
 #include "nanos_jit.h"
 
 #define SUBR extern "C" scm_obj_t
+
+namespace replxx {
+class Replxx;
+}
+class printer_t;
 
 class nanos_t {
   std::unique_ptr<nanos_jit_t> m_jit;
 
   void init_subr();
   void init_codegen();
+
+  void load_ir(const char* filename);
+  void load_script(const char* filename);
+  scm_obj_t core_eval(scm_obj_t obj);
+
+  bool repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer);
+  void evaluate(scm_obj_t obj, printer_t& printer);
 
  public:
   void init();

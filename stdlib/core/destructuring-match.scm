@@ -1,37 +1,12 @@
-;; test_destruct.scm
-;; Test suite for destructuring match macro.
-
-(load "../core.scm")
-
-(define *pass-count* 0)
-(define *fail-count* 0)
-
-(define (test name expr expected)
-  (let ((result (core-eval (macroexpand expr 'strip) (interaction-environment))))
-    (if (equal? result expected)
-        (begin
-          (set! *pass-count* (+ *pass-count* 1))
-          (display "PASS: ") (display name) (newline))
-        (begin
-          (set! *fail-count* (+ *fail-count* 1))
-          (display "FAIL: ") (display name) (newline)
-          (display "  Expected: ") (write expected) (newline)
-          (display "  Actual:   ") (write result) (newline)))))
+(define-module (core destructuring-match) 
+(export destructuring-match)
+(import (core let-values))
+(begin
 
 (define generate-temporary-symbol (lambda () (gensym "tmp")))
 
 (define ca---r (make-eq-hashtable))
 (define cd---r (make-eq-hashtable))
-
-(for-each (lambda (e) (hashtable-set! ca---r (car e) (cdr e)))
-          '((car . caar) (cdr . cadr) (caar . caaar) (cadr . caadr) (cdar . cadar) (cddr . caddr)
-            (caaar . caaaar) (caadr . caaadr) (cadar . caadar) (caddr . caaddr) (cdaar . cadaar)
-            (cdadr . cadadr) (cddar . caddar) (cdddr . cadddr)))
-
-(for-each (lambda (e) (hashtable-set! cd---r (car e) (cdr e)))
-          '((car . cdar) (cdr . cddr) (caar . cdaar) (cadr . cdadr) (cdar . cddar) (cddr . cdddr)
-            (caaar . cdaaar) (caadr . cdaadr) (cadar . cadadar) (caddr . cdaddr) (cdaar . cddaar)
-            (cdadr . cddadr) (cddar . cdddar) (cdddr . cddddr)))
 
 (define car+
   (lambda (expr)
@@ -195,8 +170,7 @@
           (cond ((cse-1 clauses (car lst)) => cse)
                 (else (loop (cdr lst))))))))
 
-(macroexpand
- '(define-syntax destructuring-match
+(define-syntax destructuring-match
     (lambda (x)
       (syntax-case x ()
         ((?_ ?expr ?clauses ...)
@@ -255,18 +229,17 @@
                                      clauses)))
                    (syntax (let ((?datum ?expr) (?pred-lhs ?pred-rhs) ... (?mem #f) ...)
                              (let* (?subexprs ...)
-                               (cond ?dispatch ... (else #f)))))))))))))))
+                               (cond ?dispatch ... (else #f))))))))))))))
 
-(test "simple match"
-      '(destructuring-match '(quote 1)
-         (('quote e) (list 1))
-         (_ (list 'nomatch)))
-      '(1))
+(for-each (lambda (e) (hashtable-set! ca---r (car e) (cdr e)))
+          '((car . caar) (cdr . cadr) (caar . caaar) (cadr . caadr) (cdar . cadar) (cddr . caddr)
+            (caaar . caaaar) (caadr . caaadr) (cadar . caadar) (caddr . caaddr) (cdaar . cadaar)
+            (cdadr . cadadr) (cddar . caddar) (cdddr . cadddr)))
 
-(newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
-(if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
-    (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)
+(for-each (lambda (e) (hashtable-set! cd---r (car e) (cdr e)))
+          '((car . cdar) (cdr . cddr) (caar . cdaar) (cadr . cdadr) (cdar . cddar) (cddr . cdddr)
+            (caaar . cdaaar) (caadr . cdaadr) (cadar . cadadar) (caddr . cdaddr) (cdaar . cddaar)
+            (cdadr . cddadr) (cddar . cdddar) (cdddr . cddddr)))
+))
+
+                               

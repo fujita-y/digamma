@@ -4,6 +4,9 @@
 ;; Core system loader
 ;; Loads components in topological order to minimize forward references
 
+;; Compatibility
+(load "host.scm")
+
 ;; Common utilities
 (load "common.scm")
 
@@ -20,5 +23,6 @@
 
 ;; Optmizer and Compiler
 (load "optimizer.scm")
+(load "lambda-lift.scm")
 (load "bytecode.scm")
 (load "compiler.scm")

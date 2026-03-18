@@ -324,8 +324,9 @@
       (expr)
       (if (eq? expr #t)
           #t
-          (eval (prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
-                (if (null? env) (interaction-environment) env)))))
+          (core-eval (
+              prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
+              (if (null? env) (interaction-environment) env)))))
 
 ;; Main syntax-case expansion engine.
 (define (expand-syntax-case input literals clauses env)

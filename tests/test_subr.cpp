@@ -39,6 +39,8 @@ SUBR subr_real_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_string_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_not(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
@@ -75,6 +77,10 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
+SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]);
 
 // Hashtables
 SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1);
@@ -91,6 +97,15 @@ SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
 SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1);
 SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]);
 // (call-with-values requires JIT bridge; tested in test_codegen)
+
+// Environment access
+SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
+SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
+SUBR subr_uuid(scm_obj_t self);
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -930,6 +945,52 @@ void test_pairs_lists_extra() {
   scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
   subr_set_car(scm_nil, p, make_fixnum(99));
   ASSERT_TRUE(CAR(p) == make_fixnum(99));
+
+  // list
+  {
+    scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
+    scm_obj_t l = subr_list(scm_nil, 3, args);
+    ASSERT_TRUE(is_cons(l) && CAR(l) == make_fixnum(1));
+    ASSERT_TRUE(is_cons(CDR(l)) && CAR(CDR(l)) == make_fixnum(2));
+    ASSERT_TRUE(is_cons(CDR(CDR(l))) && CAR(CDR(CDR(l))) == make_fixnum(3));
+    ASSERT_TRUE(CDR(CDR(CDR(l))) == scm_nil);
+  }
+
+  // list-transpose
+  {
+    // ((1 2) (3 4)) -> ((1 3) (2 4))
+    scm_obj_t l1 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil));
+    scm_obj_t l2 = make_cons(make_fixnum(3), make_cons(make_fixnum(4), scm_nil));
+    scm_obj_t args[] = {l1, l2};
+    scm_obj_t res = subr_list_transpose(scm_nil, 2, args);
+    // res should be ((1 3) (2 4))
+    scm_obj_t r1 = CAR(res);
+    scm_obj_t r2 = CAR(CDR(res));
+    ASSERT_TRUE(CAR(r1) == make_fixnum(1) && CAR(CDR(r1)) == make_fixnum(3));
+    ASSERT_TRUE(CAR(r2) == make_fixnum(2) && CAR(CDR(r2)) == make_fixnum(4));
+  }
+
+  // list-transpose+
+  {
+    scm_obj_t l1 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil));
+    scm_obj_t l2 = make_cons(make_fixnum(3), scm_nil);  // different length
+    scm_obj_t args[] = {l1, l2};
+    ASSERT_TRUE(subr_list_transpose_plus(scm_nil, 2, args) == scm_false);
+  }
+
+  // cons*
+  {
+    // (cons* 1 2 3) -> (1 2 . 3)
+    scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
+    scm_obj_t res = subr_cons_ast(scm_nil, 3, args);
+    ASSERT_TRUE(CAR(res) == make_fixnum(1));
+    ASSERT_TRUE(CAR(CDR(res)) == make_fixnum(2));
+    ASSERT_TRUE(CDR(CDR(res)) == make_fixnum(3));
+
+    // (cons* 1) -> 1
+    scm_obj_t args1[] = {make_fixnum(1)};
+    ASSERT_TRUE(subr_cons_ast(scm_nil, 1, args1) == make_fixnum(1));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1486,6 +1547,89 @@ void test_hashtable_alist() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// environment-macro-set! / environment-macro-ref / environment-macro-contains?
+// environment-variable-set! / environment-variable-ref / environment-variable-contains?
+// ---------------------------------------------------------------------------
+
+void test_environment_access() {
+  printf("--- environment access ---\n");
+
+  scm_obj_t sym_m = make_symbol("my-macro");
+  scm_obj_t sym_v = make_symbol("my-var");
+  scm_obj_t transformer = make_fixnum(42);
+  scm_obj_t value = make_fixnum(99);
+
+  // macro: set / ref / contains?
+  subr_environment_macro_set(scm_nil, sym_m, transformer);
+  ASSERT_TRUE(subr_environment_macro_ref(scm_nil, sym_m) == transformer);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_m) == scm_true);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, make_symbol("absent")) == scm_false);
+
+  // variable: set / ref / contains?
+  subr_environment_variable_set(scm_nil, sym_v, value);
+  ASSERT_TRUE(subr_environment_variable_ref(scm_nil, sym_v) == value);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_v) == scm_true);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, make_symbol("absent-var")) == scm_false);
+
+  // mutual exclusion
+  scm_obj_t sym_x = make_symbol("x");
+  subr_environment_variable_set(scm_nil, sym_x, make_fixnum(1));
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_x) == scm_true);
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_x) == scm_false);
+
+  subr_environment_macro_set(scm_nil, sym_x, make_fixnum(2));
+  ASSERT_TRUE(subr_environment_macro_contains(scm_nil, sym_x) == scm_true);
+  ASSERT_TRUE(subr_environment_variable_contains(scm_nil, sym_x) == scm_false);
+}
+
+// ---------------------------------------------------------------------------
+// undefined? / unspecified?
+// ---------------------------------------------------------------------------
+
+void test_undef_unspecified() {
+  printf("--- undefined? / unspecified? ---\n");
+  PRED_TRUE(subr_undefined_p, scm_undef);
+  PRED_FALSE(subr_undefined_p, scm_unspecified);
+  PRED_FALSE(subr_undefined_p, scm_nil);
+
+  PRED_TRUE(subr_unspecified_p, scm_unspecified);
+  PRED_FALSE(subr_unspecified_p, scm_undef);
+  PRED_FALSE(subr_unspecified_p, scm_nil);
+}
+
+// ---------------------------------------------------------------------------
+// uuid
+// ---------------------------------------------------------------------------
+
+void test_uuid() {
+  printf("--- uuid ---\n");
+  scm_obj_t u1 = subr_uuid(scm_nil);
+  scm_obj_t u2 = subr_uuid(scm_nil);
+  ASSERT_TRUE(is_string(u1));
+  ASSERT_TRUE(is_string(u2));
+  ASSERT_TRUE(subr_string_length(scm_nil, u1) == make_fixnum(36));
+  ASSERT_TRUE(subr_string_length(scm_nil, u2) == make_fixnum(36));
+  ASSERT_FALSE(u1 == u2);
+  ASSERT_FALSE(strcmp((const char*)string_name(u1), (const char*)string_name(u2)) == 0);
+
+  // Check format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  const char* s1 = (const char*)string_name(u1);
+  for (int i = 0; i < 36; i++) {
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      ASSERT_TRUE(s1[i] == '-');
+    } else if (i == 14) {
+      ASSERT_TRUE(s1[i] == '4');
+    } else if (i == 19) {
+      char c = s1[i];
+      ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b');
+    } else {
+      char c = s1[i];
+      ASSERT_TRUE((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+    }
+  }
+}
+
 int main(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -1530,6 +1674,9 @@ int main(int argc, char** argv) {
   test_hashtable_ops();
   test_values_and_entries();
   test_hashtable_alist();
+  test_environment_access();
+  test_undef_unspecified();
+  test_uuid();
 
   heap->destroy();
   delete heap;

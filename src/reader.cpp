@@ -1,43 +1,63 @@
-// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
-// See LICENSE file for terms and conditions of use.
-
 #include "core.h"
 #include "reader.h"
 #include "utf8.h"
+#include <cstdarg>
+#include <cstring>
+
+uint8_t reader_t::s_char_map[256];
+
+static bool s_char_map_initialized = []() {
+  memset(reader_t::s_char_map, 0, 256);
+  for (int i = 0; i < 256; ++i) {
+    if (isspace(i)) reader_t::s_char_map[i] |= reader_t::CHAR_WHITESPACE;
+    if (isdigit(i)) reader_t::s_char_map[i] |= reader_t::CHAR_DIGIT;
+    if (isxdigit(i)) reader_t::s_char_map[i] |= reader_t::CHAR_HEX_DIGIT;
+    if (isalnum(i) || strchr("!$%&*+-./:<=>?@^_~", i)) reader_t::s_char_map[i] |= reader_t::CHAR_SYMBOL;
+    if (strchr("()[]\";#", i)) reader_t::s_char_map[i] |= reader_t::CHAR_DELIMITER;
+  }
+  return true;
+}();
 
 reader_t::reader_t(std::istream& is) : in(is) {}
 
+void reader_t::report_error(bool& err, const char* fmt, ...) {
+  err = true;
+  char buf[1024];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  error_message = buf;
+}
+
 int reader_t::get_char() {
-  if (!buffer.empty()) {
-    int c = buffer.back();
-    buffer.pop_back();
-    return c;
-  }
-  return in.get();
+  if (buffer.empty()) return in.get();
+  int c = buffer.back();
+  buffer.pop_back();
+  return c;
 }
 
 void reader_t::unget_char(int c) { buffer.push_back(c); }
 
 int reader_t::peek_char() {
-  if (!buffer.empty()) {
-    return buffer.back();
+  if (buffer.empty()) {
+    int c = in.get();
+    buffer.push_back(c);
+    return c;
   }
-  int c = in.get();
-  buffer.push_back(c);
-  return c;
+  return buffer.back();
 }
 
 void reader_t::skip_whitespace() {
   int c;
   while ((c = peek_char()) != EOF) {
-    if (isspace(c)) {
+    if (s_char_map[c & 0xff] & CHAR_WHITESPACE) {
       get_char();
     } else if (c == ';') {
       skip_line();
     } else if (c == '#') {
       get_char();
-      int next = peek_char();
-      if (next == '|') {
+      if (peek_char() == '|') {
         get_char();
         skip_block_comment();
       } else {
@@ -82,7 +102,14 @@ scm_obj_t reader_t::read(bool& err) {
 
   switch (c) {
     case '(':
-      return read_list(err);
+      return read_list(err, ')');
+    case '[':
+      return read_list(err, ']');
+    case ')':
+    case ']':
+      err = true;
+      error_message = "unexpected closing bracket";
+      return scm_undef;
     case '"':
       return read_string(err);
     case '\'':
@@ -100,7 +127,11 @@ scm_obj_t reader_t::read(bool& err) {
       int next = peek_char();
       if (next == '(') {
         get_char();
-        return read_vector(err);
+        return read_vector(err, ')');
+      }
+      if (next == '[') {
+        get_char();
+        return read_vector(err, ']');
       }
       if (next == ';') {
         get_char();
@@ -119,7 +150,11 @@ scm_obj_t reader_t::read(bool& err) {
           get_char();
           if (peek_char() == '(') {
             get_char();
-            return read_u8vector(err);
+            return read_u8vector(err, ')');
+          }
+          if (peek_char() == '[') {
+            get_char();
+            return read_u8vector(err, ']');
           }
           // handle error or other #u syntax?
         }
@@ -144,30 +179,21 @@ scm_obj_t reader_t::read(bool& err) {
       break;
     }
     default:
-      // check for number or symbol
-      if (isdigit(c)) {
+      if (s_char_map[c & 0xff] & CHAR_DIGIT) {
         return read_number(c, err);
       }
       if (c == '+' || c == '-') {
-        // Basic heuristic, if it starts with digit, +, - it might be a number.
-        // But + and - can be symbols.
-        // If + or - is followed by space or delimiter, it's a symbol.
-        // If followed by digit, it's a number.
         int next = peek_char();
-        if (isdigit(next) || next == '.') {
+        if ((next != EOF && (s_char_map[next & 0xff] & CHAR_DIGIT)) || next == '.') {
           return read_number(c, err);
         }
-        // Special case for +inf.0, -nan.0 etc?
-        // Simplification: treat as symbol and let symbol parser handle weirdness or return symbol
-        // read_symbol will handle + and -
       }
-      if (c == '.') {  // dot in list or symbol?
-                       // if followed by delimiter, it is dot.
+      if (c == '.') {
         int next = peek_char();
-        if (isspace(next) || next == EOF || next == ')') {
-          return read_symbol(c);  // treat '.' as symbol, let caller handle if it was meant to be improper list separator
+        if (next == EOF || (s_char_map[next & 0xff] & (CHAR_WHITESPACE | CHAR_DELIMITER))) {
+          return read_symbol(c);
         }
-        if (isdigit(next)) {
+        if (s_char_map[next & 0xff] & CHAR_DIGIT) {
           return read_number(c, err);
         }
       }
@@ -178,7 +204,7 @@ scm_obj_t reader_t::read(bool& err) {
   return scm_undef;
 }
 
-scm_obj_t reader_t::read_list(bool& err) {
+scm_obj_t reader_t::read_list(bool& err, int close_char) {
   scm_obj_t head = scm_nil;
   scm_obj_t tail = scm_nil;
 
@@ -190,26 +216,32 @@ scm_obj_t reader_t::read_list(bool& err) {
       error_message = "unexpected end-of-file while reading list";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      return head;  // proper list
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        return head;  // proper list
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     if (c == '.' && head != scm_nil) {
       // Check if it is really a dot or part of symbol
       get_char();
       int next = peek_char();
       // If delimiter, it's a dot
-      if (isspace(next) || next == ')' || next == EOF) {
+      if (next == EOF || (s_char_map[next & 0xff] & (CHAR_WHITESPACE | CHAR_DELIMITER))) {
         scm_obj_t last = read(err);
         if (err) return scm_undef;
 
         skip_whitespace();
-        if (peek_char() != ')') {
+        if (peek_char() != close_char) {
           err = true;  // dot must be followed by one element and then close paren
-          error_message = "more than one item following dot('.') while reading list";
+          error_message = "more than one item following dot('.') while reading list or mismatched parentheses";
           return scm_undef;
         }
-        get_char();  // consume ')'
+        get_char();  // consume closing bracket
         scm_cons_rec_t* cons = (scm_cons_rec_t*)tail;
         cons->cdr = last;
         return head;
@@ -234,7 +266,7 @@ scm_obj_t reader_t::read_list(bool& err) {
   }
 }
 
-scm_obj_t reader_t::read_vector(bool& err) {
+scm_obj_t reader_t::read_vector(bool& err, int close_char) {
   std::vector<scm_obj_t> elts;
   while (true) {
     skip_whitespace();
@@ -244,9 +276,15 @@ scm_obj_t reader_t::read_vector(bool& err) {
       error_message = "unexpected end-of-file while reading vector";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      break;
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        break;
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     elts.push_back(read(err));
     if (err) return scm_undef;
@@ -257,7 +295,7 @@ scm_obj_t reader_t::read_vector(bool& err) {
   return vec;
 }
 
-scm_obj_t reader_t::read_u8vector(bool& err) {
+scm_obj_t reader_t::read_u8vector(bool& err, int close_char) {
   std::vector<uint8_t> elts;
   while (true) {
     skip_whitespace();
@@ -267,9 +305,15 @@ scm_obj_t reader_t::read_u8vector(bool& err) {
       error_message = "unexpected end-of-file while reading u8vector";
       return scm_eof;
     }
-    if (c == ')') {
-      get_char();
-      break;
+    if (c == ')' || c == ']') {
+      if (c == close_char) {
+        get_char();
+        break;
+      } else {
+        err = true;
+        error_message = "mismatched parentheses";
+        return scm_undef;
+      }
     }
     scm_obj_t obj = read(err);
     if (err) return scm_undef;
@@ -338,7 +382,7 @@ scm_obj_t reader_t::read_string(bool& err) {
           int hex = 0;
           while (true) {
             int h = peek_char();
-            if (isxdigit(h)) {
+            if (h != EOF && (s_char_map[h & 0xff] & CHAR_HEX_DIGIT)) {
               get_char();
               hex = hex * 16 + (isdigit(h) ? h - '0' : tolower(h) - 'a' + 10);
             } else if (h == ';') {
@@ -371,22 +415,18 @@ scm_obj_t reader_t::read_string(bool& err) {
 }
 
 static bool is_symbol_char(int c) {
-  return isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '*' || c == '+' || c == '-' || c == '.' || c == '/' || c == ':' ||
-         c == '<' || c == '=' || c == '>' || c == '?' || c == '@' || c == '^' || c == '_' || c == '~';
+  if (c == EOF) return false;
+  return reader_t::s_char_map[c & 0xff] & reader_t::CHAR_SYMBOL;
 }
 
 scm_obj_t reader_t::read_symbol(int c) {
   std::string buf;
   if (c == '|') {
-    // pipe quoted symbol
     while (true) {
       int n = get_char();
-      if (n == EOF) break;  // error
-      if (n == '|') break;
-      if (n == '\\') {
-        n = get_char();
-      }
-      buf.push_back((char)n);
+      if (n == EOF || n == '|') break;
+      if (n == '\\') n = get_char();
+      if (n != EOF) buf.push_back((char)n);
     }
     return make_symbol(buf.c_str());
   }
@@ -394,7 +434,7 @@ scm_obj_t reader_t::read_symbol(int c) {
   buf.push_back((char)c);
   while (true) {
     int next = peek_char();
-    if (is_symbol_char(next)) {
+    if (next != EOF && (s_char_map[next & 0xff] & CHAR_SYMBOL)) {
       buf.push_back((char)get_char());
     } else {
       break;
@@ -425,55 +465,31 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
 
   // Check for prefixes
   while (idx < buf.length() && buf[idx] == '#') {
-    if (idx + 1 >= buf.length()) {
-      err = true;
-      error_message = "invalid lexical syntax";
-      return scm_undef;
-    }
-    char p = tolower(buf[idx + 1]);
+    if (idx + 1 >= buf.length()) return report_error(err, "invalid lexical syntax"), scm_undef;
+    char p = tolower((unsigned char)buf[idx + 1]);
     idx += 2;
     if (p == 'x') {
-      if (has_radix) {
-        err = true;
-        error_message = "duplicate radix prefix";
-        return scm_undef;
-      }
+      if (has_radix) return report_error(err, "duplicate radix prefix"), scm_undef;
       radix = 16;
       has_radix = true;
     } else if (p == 'b') {
-      if (has_radix) {
-        err = true;
-        error_message = "duplicate radix prefix";
-        return scm_undef;
-      }
+      if (has_radix) return report_error(err, "duplicate radix prefix"), scm_undef;
       radix = 2;
       has_radix = true;
     } else if (p == 'o') {
-      if (has_radix) {
-        err = true;
-        error_message = "duplicate radix prefix";
-        return scm_undef;
-      }
+      if (has_radix) return report_error(err, "duplicate radix prefix"), scm_undef;
       radix = 8;
       has_radix = true;
     } else if (p == 'd') {
-      if (has_radix) {
-        err = true;
-        error_message = "duplicate radix prefix";
-        return scm_undef;
-      }
+      if (has_radix) return report_error(err, "duplicate radix prefix"), scm_undef;
       radix = 10;
       has_radix = true;
     } else if (p == 'e') {
-      err = true;
-      error_message = "exactness prefix #e not supported";
-      return scm_undef;
+      return report_error(err, "exactness prefix #e not supported"), scm_undef;
     } else if (p == 'i') {
       inexact = true;
     } else {
-      err = true;
-      error_message = "invalid lexical syntax";
-      return scm_undef;
+      return report_error(err, "invalid lexical syntax"), scm_undef;
     }
   }
 
@@ -522,50 +538,45 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
 
 scm_obj_t reader_t::read_char(bool& err) {
   int c = get_char();
-  if (c == EOF) {
-    err = true;
-    error_message = "unexpected end-of-file while reading character";
-    return scm_eof;
-  }
-  if (!isalnum(c)) {
-    return make_char(c);
-  }
+  if (c == EOF) return report_error(err, "unexpected end-of-file while reading character"), scm_eof;
 
-  // Could be named char?
+  if (!(s_char_map[c & 0xff] & CHAR_SYMBOL)) return make_char(c);
+
   std::string buf;
   buf.push_back((char)c);
-  while (isalnum(peek_char())) {
-    buf.push_back((char)get_char());
+  while (true) {
+    int next = peek_char();
+    if (next != EOF && (s_char_map[next & 0xff] & CHAR_SYMBOL)) {
+      buf.push_back((char)get_char());
+    } else {
+      break;
+    }
   }
 
-  if (buf.length() == 1) return make_char(c);
-  if (buf == "space") return make_char(' ');
-  if (buf == "newline") return make_char('\n');
-  if (buf == "return") return make_char('\r');
-  if (buf == "tab") return make_char('\t');
-  if (buf == "alarm") return make_char('\a');
-  if (buf == "backspace") return make_char('\b');
-  if (buf == "escape") return make_char(0x1b);
-  if (buf == "delete") return make_char(0x7f);
-  if (buf == "null") return make_char(0);
+  if (buf.length() == 1) return make_char(buf[0]);
 
-  // Hex unicode #\xHHHH
-  if (buf[0] == 'x' && buf.length() > 1) {
-    // primitive hex check
+  static const struct {
+    const char* name;
+    int c;
+  } named_chars[] = {
+      {"alarm", '\a'}, {"backspace", '\b'}, {"delete", 0x7f}, {"escape", 0x1b}, {"newline", '\n'},
+      {"null", 0},     {"return", '\r'},    {"space", ' '},  {"tab", '\t'},
+  };
+
+  for (const auto& nc : named_chars) {
+    if (buf == nc.name) return make_char(nc.c);
+  }
+
+  if (buf[0] == 'x') {
     try {
-      unsigned long ucs4 = std::stoul(buf.substr(1), nullptr, 16);
-      return make_char(ucs4);
+      char* endptr;
+      unsigned long ucs4 = strtoul(buf.c_str() + 1, &endptr, 16);
+      if (*endptr == '\0') return make_char(ucs4);
     } catch (...) {
     }
   }
 
-  // Fallback, maybe it was just a sequence of letters "a" ?
-  // No, #\a is just 'a'. #\abc is invalid unless "abc" is named.
-  // if unknown named, maybe just return the first char? or error?
-  // R7RS says it's an error if not recognized.
-  err = true;
-  error_message = "invalid lexical syntax";
-  return scm_undef;
+  return report_error(err, "invalid lexical syntax"), scm_undef;
 }
 
 scm_obj_t reader_t::read_quote(bool& err) {

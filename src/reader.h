@@ -18,9 +18,9 @@ class reader_t {
   void skip_whitespace();
   void skip_line();
   void skip_block_comment();
-  scm_obj_t read_list(bool& err);
-  scm_obj_t read_vector(bool& err);
-  scm_obj_t read_u8vector(bool& err);
+  scm_obj_t read_list(bool& err, int close_char);
+  scm_obj_t read_vector(bool& err, int close_char);
+  scm_obj_t read_u8vector(bool& err, int close_char);
   scm_obj_t read_string(bool& err);
   scm_obj_t read_symbol(int c);
   scm_obj_t read_number(int c, bool& err);
@@ -33,9 +33,19 @@ class reader_t {
   std::string error_message;
 
  public:
+  static const uint8_t CHAR_INVALID = 0x01;
+  static const uint8_t CHAR_WHITESPACE = 0x02;
+  static const uint8_t CHAR_DELIMITER = 0x04;
+  static const uint8_t CHAR_SYMBOL = 0x08;
+  static const uint8_t CHAR_DIGIT = 0x10;
+  static const uint8_t CHAR_HEX_DIGIT = 0x20;
+
+  static uint8_t s_char_map[256];
+
   reader_t(std::istream& is);
   scm_obj_t read(bool& err);
   std::string get_error_message() const { return error_message; }
+  void report_error(bool& err, const char* fmt, ...);
 };
 
 #endif

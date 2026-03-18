@@ -188,6 +188,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   scm_obj_t literals = scm_nil;
   if (closure_literals.count(inst.opr1)) {
     literals = closure_literals[inst.opr1];
+    object_heap_t::current()->literals_add(literals);
   }
   llvm::Value* literals_val = createInt64Constant(CT, (uint64_t)literals);
 
@@ -309,6 +310,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
     // Symbol exists in JIT, just provide external declaration in this module
     auto f2 = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, main_module);
     f2->setDSOLocal(true);
+    f2->addFnAttr(llvm::Attribute::NoInline);
     return f2;
   } else {
     // Consume the error (symbol not found)
@@ -317,6 +319,7 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, main_module);
   f->setDSOLocal(true);
+  f->addFnAttr(llvm::Attribute::NoInline);
 
   llvm::BasicBlock* saved_block = BL.GetInsertBlock();
   llvm::BasicBlock* entry = llvm::BasicBlock::Create(CT, "entry", f);
@@ -410,13 +413,13 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
   return f;
 }
 
-void* codegen_t::get_call_closure_bridge_ptr() {
+codegen_t::bridge_func_t codegen_t::call_closure_bridge() {
   if (cached_call_closure_bridge) return cached_call_closure_bridge;
 
   const char* name = "__nanos_call_closure_bridge";
   auto sym = jit->lookup(name);
   if (sym) {
-    cached_call_closure_bridge = (void*)sym->getValue();
+    cached_call_closure_bridge = sym->toPtr<codegen_t::bridge_func_t>();
     return cached_call_closure_bridge;
   }
 
@@ -434,6 +437,7 @@ void* codegen_t::get_call_closure_bridge_ptr() {
 
     (void)get_or_create_call_closure_bridge();
 
+    optimize_module(*main_module);
     // Move context into ThreadSafeContext owned by the JIT.
     // CompileScope::~CompileScope will restore the previous context.
     llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
@@ -452,13 +456,13 @@ void* codegen_t::get_call_closure_bridge_ptr() {
   if (!sym) {
     fatal("%s:%u codegen: failed to look up closure bridge after compilation", __FILE__, __LINE__);
   }
-  cached_call_closure_bridge = (void*)sym->getValue();
+  cached_call_closure_bridge = sym->toPtr<codegen_t::bridge_func_t>();
   return cached_call_closure_bridge;
 }
 
 void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
   if (inst.argc < 2) {
-    throw std::runtime_error("error in codegen: wrong number of arguments");
+    throw std::runtime_error("error in codegen: wrong number of arguments to apply");
   }
   // Optimized apply
   // Signature: i64 c_apply_helper(i64 proc, i32 argc, i64* argv)
@@ -494,7 +498,7 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
 
 void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
   // Check if it is a global closure (known at compile time but not in this module's function_map)
-  if (inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) {
+  if (is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) {
     // Attempt to resolve it as a global closure
     if (closure_params.find(inst.closure_label) != closure_params.end()) {
       auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
@@ -532,7 +536,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
 
         if (has_rest) {
           if (inst.argc < fixed_argc) {
-            throw std::runtime_error("error in codegen: wrong number of arguments");
+            throw std::runtime_error("error in codegen: too few arguments to apply: " + scm_obj_to_string(inst.closure_label));
           }
           args.push_back(createInt64Constant(CT, inst.argc));
           llvm::Value* argv_array = nullptr;
@@ -549,7 +553,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           args.push_back(argv_array);
         } else {
           if (inst.argc != fixed_argc) {
-            throw std::runtime_error("error in codegen: wrong number of arguments");
+            throw std::runtime_error("error in codegen: wrong number of arguments to apply: " + scm_obj_to_string(inst.closure_label));
           }
           for (int i = 0; i < inst.argc; i++) {
             args.push_back(get_reg(i));
@@ -567,7 +571,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         if (cdecl == 0) {
           call->setCallingConv(CLOSURE_CALLING_CONV);
           if (is_tail) {
-            call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+            if (!has_rest) {
+              call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+            }
             BL.CreateRet(call);
           } else {
             set_reg(0, call);
@@ -591,7 +597,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
   }
 
-  if (inst.closure_label != scm_nil && function_map.count(inst.closure_label)) {
+  if (is_symbol(inst.closure_label) && function_map.count(inst.closure_label)) {
     llvm::Function* target_func = function_map[inst.closure_label];
 
     // Get closure parameters from compile-time info
@@ -652,7 +658,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     call->setCallingConv(CLOSURE_CALLING_CONV);
 
     if (is_tail) {
-      call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      if (!has_rest) {
+        call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+      }
       BL.CreateRet(call);
     } else {
       set_reg(0, call);
@@ -720,7 +728,6 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   llvm::CallInst* call_s = BL.CreateCall(funcType, func_ptr, args, "rest_call_s");
   call_s->setCallingConv(CLOSURE_CALLING_CONV);
   if (is_tail) {
-    call_s->setTailCallKind(llvm::CallInst::TCK_MustTail);
     BL.CreateRet(call_s);
   } else {
     BL.CreateBr(local_merge);
@@ -801,9 +808,11 @@ void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code
 void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail) {
   llvm::Type* i64 = this->getInt64Type();
   llvm::Type* i32 = this->getInt32Type();
-  llvm::FunctionType* test_ft = llvm::FunctionType::get(BL.getVoidTy(), {i64, i32}, false);
+  llvm::Type* i8_ptr = BL.getPtrTy();
+  llvm::FunctionType* test_ft = llvm::FunctionType::get(BL.getVoidTy(), {i64, i32, i8_ptr}, false);
   llvm::Function* test_func = get_or_create_external_function("c_test_application", test_ft, (void*)&c_test_application);
-  BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc)});
+  llvm::Value* proc_name_val = BL.CreateGlobalString(scm_obj_to_string(inst.closure_label), "proc_name");
+  BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc), proc_name_val});
 
   if (inst.argc <= BRIDGE_MAX_ARGS) {
     // Optimized generic call via bridge
@@ -919,8 +928,8 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
   }
 
   // Check if it's a known closure (global or local) call optimization
-  if ((inst.closure_label != scm_nil && function_map.find(inst.closure_label) == function_map.end()) ||
-      (inst.closure_label != scm_nil && function_map.count(inst.closure_label))) {
+  if ((is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) ||
+      (is_symbol(inst.closure_label) && function_map.count(inst.closure_label))) {
     emit_known_closure_call(inst, is_tail);
     return;
   }

@@ -67,6 +67,7 @@ endif()
 find_package(Boost CONFIG REQUIRED COMPONENTS context)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
+find_package(CLI11 CONFIG REQUIRED)
 
 # ==============================================================================
 # Compiler Configuration
@@ -110,6 +111,12 @@ target_compile_definitions(nanos_config INTERFACE
 # Define compile options
 target_compile_options(nanos_config INTERFACE
   -Werror
+  $<$<CONFIG:Release>:-fexceptions>
+  $<$<CONFIG:Release>:-funwind-tables>
+  $<$<CONFIG:Debug>:-fexceptions>
+  $<$<CONFIG:Debug>:-funwind-tables>
+  $<$<CONFIG:RelWithDebInfo>:-fexceptions>
+  $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
   $<$<CONFIG:Debug>:-fno-optimize-sibling-calls>
@@ -147,6 +154,7 @@ set(NANOS_CORE_SOURCES
   src/codegen_emit.cpp
   src/nanos_subr.cpp
   src/nanos_context.cpp
+  src/nanos_options.cpp
   src/arch_arm64.cpp
   src/equiv.cpp
 )
@@ -155,7 +163,7 @@ set(NANOS_CORE_SOURCES
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} Boost::context replxx::replxx Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context replxx::replxx Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets

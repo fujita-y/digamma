@@ -9,7 +9,7 @@
 #include <llvm/IR/IRBuilder.h>
 
 // Constants
-static constexpr int BRIDGE_MAX_ARGS = 10;
+static constexpr int BRIDGE_MAX_ARGS = 8;
 static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;  // Offset to untag heap objects
 static constexpr char CLOSURE_LABEL_PREFIX = 'C';
 

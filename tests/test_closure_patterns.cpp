@@ -110,9 +110,9 @@ int main(int argc, char** argv) {
 
   // 1. Direct Call (Optimization)
   run_test("DirectCallLocal", [](CodegenTest& env) -> bool {
-    // ((make-closure r0 C1 () #f 0 #f) (call r0 0) (ret) (label C1) (const r0 100) (ret))
+    // ((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (const r0 100) (ret))
     scm_obj_t code = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) "
+        "((make-closure r0 C1 () 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) (const r0 100) (ret))");
     intptr_t result = env.codegen->compile(code)();
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
   // 2. Global Direct Call (Optimization)
   run_test("DirectCallGlobal", [](CodegenTest& env) -> bool {
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 C1 () #f 0 #f) (global-set! f r0) (ret) "
+        "((make-closure r0 C1 () 0 #f) (global-set! f r0) (ret) "
         "(label C1) (const r0 200) (ret))");
     env.codegen->compile(setup)();
 
@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
     // Body: (const r1 10) (global-ref r2 +) (call r2 2)
     // call r2 2: args r0, r1. r0=n, r1=10.
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 C1 () #f 1 #f) (global-set! adder r0) (ret) "
+        "((make-closure r0 C1 () 1 #f) (global-set! adder r0) (ret) "
         "(label C1) "
         "(const r1 10) "
         "(global-ref r2 +) "
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
     // (mov r0 r1) ; r0 = arg
     // (call r2 1) ; call f using r0 as arg
     scm_obj_t apply_it = env.read_code(
-        "((make-closure r0 C2 () #f 2 #f) (global-set! apply-it r0) (ret) "
+        "((make-closure r0 C2 () 2 #f) (global-set! apply-it r0) (ret) "
         "(label C2) "
         "(mov r2 r0) "
         "(mov r0 r1) "
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
     // C1 args: r0 is list of args.
     // Body: return r0.
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 C1 () #f 0 #t) (global-set! list-it r0) (ret) "
+        "((make-closure r0 C1 () 0 #t) (global-set! list-it r0) (ret) "
         "(label C1) (ret))");
     env.codegen->compile(setup)();
 
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     // mov r1 r2 ; arg2
     // call r3 2
     scm_obj_t apply_it = env.read_code(
-        "((make-closure r0 C2 () #f 3 #f) (global-set! apply-it-2 r0) (ret) "
+        "((make-closure r0 C2 () 3 #f) (global-set! apply-it-2 r0) (ret) "
         "(label C2) "
         "(mov r3 r0) "
         "(mov r0 r1) "
@@ -238,7 +238,7 @@ int main(int argc, char** argv) {
     // CBig args: r0...r11.
     // Return r11.
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 CBig () #f 12 #f) (global-set! big-f r0) (ret) "
+        "((make-closure r0 CBig () 12 #f) (global-set! big-f r0) (ret) "
         "(label CBig) "
         "(mov r0 r11) (ret))");
     env.codegen->compile(setup)();
@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
     // Need r0=a, r1=b. Already there.
     // call r2 2.
     scm_obj_t setup = env.read_code(
-        "((make-closure r0 C1 () #f 2 #f) (global-set! my-cons r0) (ret) "
+        "((make-closure r0 C1 () 2 #f) (global-set! my-cons r0) (ret) "
         "(label C1) "
         "(global-ref r2 cons) "
         "(call r2 2) (ret))");
