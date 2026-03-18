@@ -553,7 +553,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           args.push_back(argv_array);
         } else {
           if (inst.argc != fixed_argc) {
-            throw std::runtime_error("error in codegen: too many arguments to apply: " + scm_obj_to_string(inst.closure_label));
+            throw std::runtime_error("error in codegen: wrong number of arguments to apply: " + scm_obj_to_string(inst.closure_label));
           }
           for (int i = 0; i < inst.argc; i++) {
             args.push_back(get_reg(i));
