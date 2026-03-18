@@ -1045,6 +1045,7 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
   func->setVisibility(llvm::GlobalValue::HiddenVisibility);
   func->setCallingConv(CLOSURE_CALLING_CONV);
   func->setDSOLocal(true);
+  func->addFnAttr(llvm::Attribute::NoInline);
 }
 
 // ============================================================================

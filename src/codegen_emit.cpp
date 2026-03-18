@@ -310,7 +310,6 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
     // Symbol exists in JIT, just provide external declaration in this module
     auto f2 = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, main_module);
     f2->setDSOLocal(true);
-    f2->removeFnAttr(llvm::Attribute::AlwaysInline);
     f2->addFnAttr(llvm::Attribute::NoInline);
     return f2;
   } else {
@@ -320,7 +319,6 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
 
   f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, main_module);
   f->setDSOLocal(true);
-  f->removeFnAttr(llvm::Attribute::AlwaysInline);
   f->addFnAttr(llvm::Attribute::NoInline);
 
   llvm::BasicBlock* saved_block = BL.GetInsertBlock();
