@@ -110,20 +110,20 @@ int main(int argc, char** argv) {
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
+  codegen_t* codegen = nullptr;
   {
     auto jit_expected = nanos_jit_t::Create();
     if (!jit_expected) exit(1);
     auto jit = std::move(*jit_expected);
     auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen_t* codegen = new codegen_t(std::move(ts_ctx), jit.get());
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
 
     test_return_normally();
     test_invoke_continuation();
     test_multishot();
-
-    codegen->destroy();
-    delete codegen;
   }
+  codegen->destroy();
+  delete codegen;
 
   heap->destroy();
   delete heap;

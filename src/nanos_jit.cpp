@@ -5,11 +5,10 @@
 #include "nanos_jit.h"
 #include <llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
+#include <llvm/ExecutionEngine/Orc/EHFrameRegistrationPlugin.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Process.h>
-#include "llvm/ExecutionEngine/Orc/EHFrameRegistrationPlugin.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 
 using namespace llvm;
 using namespace llvm::orc;

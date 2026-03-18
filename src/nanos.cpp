@@ -44,13 +44,14 @@ void nanos_t::init() {
 }
 
 void nanos_t::destroy() {
+  m_jit.reset();
   codegen_t* codegen = codegen_t::current();
   codegen->destroy();
   delete codegen;
   object_heap_t* heap = object_heap_t::current();
   heap->destroy();
   delete heap;
-  m_jit.reset();
+  //  m_jit.reset();
 }
 
 // ============================================================================
