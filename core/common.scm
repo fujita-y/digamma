@@ -108,15 +108,17 @@
 
 ;; Efficiently flatten nested 'begin' forms.
 (define (flatten-begins exprs)
-  (reverse
-   (let loop ((input exprs) (acc '()))
-     (cond ((null? input) acc)
-           ((pair? input)
-            (let ((head (car input)))
-              (if (and (pair? head) (eq? (car head) 'begin))
-                  (loop (cdr input) (loop (cdr head) acc))
-                  (loop (cdr input) (cons head acc)))))
-           (else (cons input acc))))))
+  (if (eq? (environment-macro-ref 'begin) 'builtin)
+      (reverse
+        (let loop ((input exprs) (acc '()))
+          (cond ((null? input) acc)
+                ((pair? input)
+                 (let ((head (car input)))
+                   (if (and (pair? head) (eq? (car head) 'begin))
+                       (loop (cdr input) (loop (cdr head) acc))
+                       (loop (cdr input) (cons head acc)))))
+                (else (cons input acc)))))
+      exprs))
 
 ;; Remove items from a list (uses memq for comparison).
 (define (remove-from-list lst remove-items)

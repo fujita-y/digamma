@@ -90,7 +90,8 @@
                   (if local-pair-resolved
                       (cdr local-pair-resolved)
                       (and (environment-macro-contains? resolved)
-                           (environment-macro-ref resolved))))))))))
+                           (let ((transformer (environment-macro-ref resolved)))
+                             (and (not (eq? transformer 'builtin)) transformer)))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
 (define (resolve-core-form sym shadowed-env)
@@ -307,7 +308,7 @@
                (if transformer 
                    (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
                    (let ((core-sym (resolve-core-form head s-env)))
-                     (let ((handler (and core-sym (lookup-handler core-sym))))
+                     (let ((handler (and core-sym (lookup-builtin-handler core-sym))))
                        (if handler 
                            (handler expr m-env s-env r-env) 
                            (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
@@ -497,54 +498,55 @@
         (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
         (append rt-bindings macro-b)))))
 
-(define (lookup-handler core-sym)
-  (case core-sym
-    ((define-syntax) expand-define-syntax) 
-    ((let-syntax) expand-let-syntax) 
-    ((letrec-syntax) expand-letrec-syntax)
-    ((let*-syntax) expand-let*-syntax)
-    ((lambda) expand-lambda) 
-    ((let) expand-let) 
-    ((let*) expand-let*)
-    ((letrec*) expand-letrec*)
-    ((letrec) expand-letrec*)
-    ((set!) expand-set!) 
-    ((if) expand-if) 
-    ((cond) expand-cond) 
-    ((and) expand-and) 
-    ((or) expand-or) 
-    ((case) expand-case)
-    ((define) expand-define) 
-    ((begin) expand-begin) 
-    ((quote) expand-quote) 
-    ((quasiquote) expand-quasiquote-form)
-    ((define-module) expand-define-module) 
-    ((import-module) expand-import-module)
-    (else #f)))
+(define (lookup-builtin-handler id)
+  (and (eq? (environment-macro-ref id) 'builtin)
+       (case id
+         ((define-syntax) expand-define-syntax) 
+         ((let-syntax) expand-let-syntax) 
+         ((letrec-syntax) expand-letrec-syntax)
+         ((let*-syntax) expand-let*-syntax)
+         ((lambda) expand-lambda) 
+         ((let) expand-let) 
+         ((let*) expand-let*)
+         ((letrec*) expand-letrec*)
+         ((letrec) expand-letrec*)
+         ((set!) expand-set!) 
+         ((if) expand-if) 
+         ((cond) expand-cond) 
+         ((and) expand-and) 
+         ((or) expand-or) 
+         ((case) expand-case)
+         ((define) expand-define) 
+         ((begin) expand-begin) 
+         ((quote) expand-quote) 
+         ((quasiquote) expand-quasiquote-form)
+         ((define-module) expand-define-module) 
+         ((import-module) expand-import-module)
+         (else #f))))
 
 (define (register-builtins)
-  (for-each (lambda (binding) (environment-macro-set! (car binding) (cdr binding)))
-           `((define-syntax . ,expand-define-syntax) 
-             (let-syntax . ,expand-let-syntax) 
-             (letrec-syntax . ,expand-letrec-syntax) 
-             (let*-syntax . ,expand-let*-syntax) 
-             (lambda . ,expand-lambda) 
-             (let . ,expand-let) 
-             (let* . ,expand-let*) 
-             (letrec* . ,expand-letrec*) 
-             (letrec . ,expand-letrec) 
-             (set! . ,expand-set!) 
-             (if . ,expand-if) 
-             (cond . ,expand-cond) 
-             (and . ,expand-and) 
-             (or . ,expand-or) 
-             (case . ,expand-case) 
-             (define . ,expand-define) 
-             (begin . ,expand-begin) 
-             (quote . ,expand-quote) 
-             (quasiquote . ,expand-quasiquote-form) 
-             (define-module . ,expand-define-module) 
-             (import-module . ,expand-import-module))))
+  (for-each (lambda (id) (environment-macro-set! id 'builtin))
+           '(define-syntax 
+             let-syntax 
+             letrec-syntax 
+             let*-syntax 
+             lambda 
+             let 
+             let* 
+             letrec* 
+             letrec 
+             set! 
+             if 
+             cond 
+             and 
+             or 
+             case 
+             define 
+             begin 
+             quote 
+             quasiquote 
+             define-module 
+             import-module)))
 
 ;;=============================================================================
 ;; SECTION 8: Cleanup & Entry Point
@@ -577,7 +579,7 @@
     (let loop ((x expr))
       (cond ((symbol? x)
              (let ((stripped (string->symbol (strip-suffix (symbol->string x)))))
-               (if (or (lookup-handler stripped)
+               (if (or (lookup-builtin-handler stripped)
                        (environment-macro-contains? stripped)
                        (environment-variable-contains? stripped))
                    (if (eq? (resolve-core-form x s-env) stripped)
@@ -595,3 +597,5 @@
 (define (macroexpand expr . opt)
   (set! *suffix-counter* 0) (set! *rename-env* '())
   (let ((res (expand expr '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
+
+(register-builtins)
