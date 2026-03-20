@@ -125,6 +125,22 @@ scm_obj_t reader_t::read(bool& err) {
     }
     case '#': {
       int next = peek_char();
+      if (next == '\'') {
+        get_char();
+        return read_syntax(err);
+      }
+      if (next == '`') {
+        get_char();
+        return read_quasisyntax(err);
+      }
+      if (next == ',') {
+        get_char();
+        if (peek_char() == '@') {
+          get_char();
+          return read_unsyntax_splicing(err);
+        }
+        return read_unsyntax(err);
+      }
       if (next == '(') {
         get_char();
         return read_vector(err, ')');
@@ -601,4 +617,28 @@ scm_obj_t reader_t::read_unquote_splicing(bool& err) {
   scm_obj_t obj = read(err);
   if (err) return scm_undef;
   return make_list2(make_symbol("unquote-splicing"), obj);
+}
+
+scm_obj_t reader_t::read_syntax(bool& err) {
+  scm_obj_t obj = read(err);
+  if (err) return scm_undef;
+  return make_list2(make_symbol("syntax"), obj);
+}
+
+scm_obj_t reader_t::read_quasisyntax(bool& err) {
+  scm_obj_t obj = read(err);
+  if (err) return scm_undef;
+  return make_list2(make_symbol("quasisyntax"), obj);
+}
+
+scm_obj_t reader_t::read_unsyntax(bool& err) {
+  scm_obj_t obj = read(err);
+  if (err) return scm_undef;
+  return make_list2(make_symbol("unsyntax"), obj);
+}
+
+scm_obj_t reader_t::read_unsyntax_splicing(bool& err) {
+  scm_obj_t obj = read(err);
+  if (err) return scm_undef;
+  return make_list2(make_symbol("unsyntax-splicing"), obj);
 }

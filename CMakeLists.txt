@@ -113,17 +113,16 @@ target_compile_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-fexceptions>
   $<$<CONFIG:Release>:-funwind-tables>
-  $<$<CONFIG:Debug>:-fexceptions>
-  $<$<CONFIG:Debug>:-funwind-tables>
+  # $<$<CONFIG:Release>:-flto> # TODO: lto cause binary crash
   $<$<CONFIG:RelWithDebInfo>:-fexceptions>
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
-  $<$<CONFIG:Release>:-flto>
+  $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
+  $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
+  $<$<CONFIG:Debug>:-fexceptions>
+  $<$<CONFIG:Debug>:-funwind-tables>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
   $<$<CONFIG:Debug>:-fno-optimize-sibling-calls>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
-  $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
-  $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
-  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
 )
 
 # Define link options

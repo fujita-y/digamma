@@ -58,8 +58,8 @@ void nanos_t::destroy() {
 // Execution & REPL
 // ============================================================================
 
-void nanos_t::load_script(const char* filename) {
-  if (strlen(filename) != 0) nanos_options::script_file = filename;
+void nanos_t::load_script(std::string filename) {
+  if (!filename.empty()) nanos_options::script_file = filename;
   std::ifstream ifs(nanos_options::script_file);
   if (!ifs) {
     puts("Error: failed to open file");
@@ -87,8 +87,8 @@ void nanos_t::load_script(const char* filename) {
   }
 }
 
-void nanos_t::load_ir(const char* filename) {
-  if (strlen(filename) != 0) nanos_options::boot_file = filename;
+void nanos_t::load_ir(std::string filename) {
+  if (!filename.empty()) nanos_options::boot_file = filename;
   std::ifstream ifs(nanos_options::boot_file);
   if (!ifs) {
     puts("Error: failed to open file");
@@ -159,6 +159,13 @@ void nanos_t::run() {
   printer_t printer(std::cout);
   auto rx = std::make_unique<replxx::Replxx>();
   rx->install_window_change_handler();
+
+  if (!nanos_options::boot_file.empty()) {
+    load_ir(nanos_options::boot_file);
+  }
+  if (!nanos_options::script_file.empty()) {
+    load_script(nanos_options::script_file);
+  }
 
   std::string input_buffer;
   while (repl(*rx, input_buffer, printer));
@@ -241,8 +248,10 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     puts("\n");
 #else
     scm_obj_t result = core_eval(obj);
-    printer.write(result);
-    puts("\n");
+    if (result != scm_unspecified) {
+      printer.write(result);
+      puts("\n");
+    }
 #endif
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;

@@ -237,7 +237,7 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
 
-// cadr, caddr, caar, cadar, cadddr, cddr, cdddr  - R6RS 11.9
+// cadr, caddr, caar, cadar, caddar, cadddr, cddr, cdddr, cdar, cddar, cdddar  - R6RS 11.9
 SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
 SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
@@ -246,6 +246,9 @@ SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
 SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
 SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
+SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cdddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
 
 // list  - R6RS 11.9
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -441,7 +444,8 @@ SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
     if (CAR(cur) == a1) return cur;
     cur = CDR(cur);
   }
-  if (cur != scm_nil) throw std::runtime_error("memq: second argument must be a proper list");
+  if (cur != scm_nil)
+    throw std::runtime_error("memq: second argument must be a proper list: (" + scm_obj_to_string(a1) + " " + scm_obj_to_string(a2) + ")");
   return scm_false;
 }
 
@@ -567,6 +571,9 @@ SUBR subr_infinite_p(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("infinite?: argument must be a real number");
 }
 
+// fixnum?  - Nanos extension
+SUBR subr_fixnum_p(scm_obj_t self, scm_obj_t a1) { return is_fixnum(a1) ? scm_true : scm_false; }
+
 // integer?  - R6RS 11.7.2
 SUBR subr_integer_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return scm_true;
@@ -639,6 +646,16 @@ SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_unspec
 // ============================================================================
 // Vectors  - R6RS 11.13
 // ============================================================================
+
+// make-vector  - R6RS 11.13
+SUBR subr_make_vector(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("make-vector: wrong number of arguments");
+  if (!is_fixnum(argv[0])) throw std::runtime_error("make-vector: first argument must be an exact integer");
+  intptr_t n = fixnum(argv[0]);
+  if (n < 0) throw std::runtime_error("make-vector: length must be non-negative");
+  scm_obj_t fill = (argc == 2) ? argv[1] : scm_unspecified;
+  return make_vector((int)n, fill);
+}
 
 // vector  - R6RS 11.13
 SUBR subr_vector(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -888,6 +905,26 @@ SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return result;
 }
 
+// min  - R6RS 11.7.3
+SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) throw std::runtime_error("min: too few arguments");
+  scm_obj_t result = argv[0];
+  bool inexact = is_short_flonum(result) || is_long_flonum(result);
+  double rval = is_fixnum(result) ? (double)fixnum(result) : flonum(result);
+  for (int i = 1; i < argc; i++) {
+    scm_obj_t cur = argv[i];
+    if (!is_fixnum(cur) && !is_short_flonum(cur) && !is_long_flonum(cur)) throw std::runtime_error("min: arguments must be real numbers");
+    if (is_short_flonum(cur) || is_long_flonum(cur)) inexact = true;
+    double cval = is_fixnum(cur) ? (double)fixnum(cur) : flonum(cur);
+    if (cval < rval) {
+      rval = cval;
+      result = cur;
+    }
+  }
+  if (inexact && is_fixnum(result)) return make_flonum(rval);
+  return result;
+}
+
 // ============================================================================
 // I/O  - R6RS 8
 // ============================================================================
@@ -957,6 +994,14 @@ SUBR subr_uuid(scm_obj_t self) {
   }
   buf[36] = '\0';
   return make_string(buf);
+}
+
+SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) exit(0);
+  scm_obj_t a1 = argv[0];
+  if (is_fixnum(a1)) exit((int)fixnum(a1));
+  if (a1 == scm_false) exit(1);
+  exit(0);
 }
 
 // ============================================================================
@@ -1265,10 +1310,13 @@ void nanos_t::init_subr() {
   reg("car", (void*)subr_car, 1, 0);
   reg("cdr", (void*)subr_cdr, 1, 0);
   reg("caar", (void*)subr_caar, 1, 0);
+  reg("cdar", (void*)subr_cdar, 1, 0);
   reg("cadr", (void*)subr_cadr, 1, 0);
   reg("cddr", (void*)subr_cddr, 1, 0);
   reg("cadar", (void*)subr_cadar, 1, 0);
+  reg("cddar", (void*)subr_cddar, 1, 0);
   reg("caddar", (void*)subr_caddar, 1, 0);
+  reg("cdddar", (void*)subr_cdddar, 1, 0);
   reg("caddr", (void*)subr_caddr, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
@@ -1301,6 +1349,7 @@ void nanos_t::init_subr() {
   reg("inexact?", (void*)subr_inexact_p, 1, 0);
   reg("infinite?", (void*)subr_infinite_p, 1, 0);
   reg("integer?", (void*)subr_integer_p, 1, 0);
+  reg("fixnum?", (void*)subr_fixnum_p, 1, 0);
   reg("list?", (void*)subr_list_p, 1, 0);
   reg("null?", (void*)subr_null_p, 1, 0);
   reg("number?", (void*)subr_number_p, 1, 0);
@@ -1318,6 +1367,7 @@ void nanos_t::init_subr() {
 
   // vectors
   reg("vector", (void*)subr_vector, 0, 1);
+  reg("make-vector", (void*)subr_make_vector, 1, 1);
   reg("vector-length", (void*)subr_vector_length, 1, 0);
   reg("vector-ref", (void*)subr_vector_ref, 2, 0);
   reg("vector-set!", (void*)subr_vector_set, 3, 0);
@@ -1340,6 +1390,7 @@ void nanos_t::init_subr() {
 
   // arithmetic extras
   reg("max", (void*)subr_max, 1, 1);
+  reg("min", (void*)subr_min, 1, 1);
 
   // I/O
   reg("write", (void*)subr_write, 1, 0);
@@ -1378,6 +1429,7 @@ void nanos_t::init_subr() {
   reg("safepoint", (void*)subr_safepoint, 0, 0);
   reg("gensym", (void*)subr_gensym, 0, 1);
   reg("uuid", (void*)subr_uuid, 0, 0);
+  reg("exit", (void*)subr_exit, 0, 1);
 
   // application & control
   reg("error", (void*)subr_error, 1, 1);

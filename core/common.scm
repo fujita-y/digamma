@@ -138,18 +138,17 @@
 
 ;; Union of multiple sets (lists treated as sets).
 (define (set-union . sets)
-  (let loop ((sets sets) (acc '()))
-    (if (null? sets)
-        (reverse acc)
-        (loop (cdr sets)
-              (let inner ((s (car sets)) (a acc))
-                (cond ((null? s) a)
-                      ((memq (car s) a) (inner (cdr s) a))
-                      (else (inner (cdr s) (cons (car s) a)))))))))
+  (let ((ht (make-eq-hashtable)))
+    (for-each (lambda (s)
+                (for-each (lambda (x) (hashtable-set! ht x #t)) s))
+              sets)
+    (map car (hashtable->alist ht))))
 
 ;; Set difference: s1 minus s2.
 (define (set-minus s1 s2)
-  (filter (lambda (x) (not (memq x s2))) s1))
+  (let ((ht (make-eq-hashtable)))
+    (for-each (lambda (x) (hashtable-set! ht x #t)) s2)
+    (filter (lambda (x) (not (hashtable-contains? ht x))) s1)))
 
 (define (generate-temporary-symbol prefix)
   (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))

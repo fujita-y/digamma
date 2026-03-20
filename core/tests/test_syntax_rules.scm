@@ -56,7 +56,7 @@
            ((_ a b)
             (let ((t a))
               (if t t b)))))
-      ''defined)
+      (unspecified))
 
 (test "Expand my-or" '(my-or #t #f) '(let ((t #t)) (if t t #f)))
 
@@ -358,7 +358,7 @@
 
 (test "jabberwocky expansion structure"
       '(jabberwocky mad-hatter)
-      '(begin (define march-hare 42) 'defined))
+      `(begin (define march-hare 42) ,(unspecified)))
 
 ;; 7. Literal priority over ellipsis
 (macroexpand '(define-syntax elli-lit-1

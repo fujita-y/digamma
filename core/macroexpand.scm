@@ -398,7 +398,7 @@
     (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env)) (cddr expr)))))
 
 (define (expand-define-syntax expr m-env s-env r-env)
-  (environment-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) ''defined)
+  (environment-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) (unspecified))
 
 (define (expand-define-module expr m-env s-env r-env)
   (let* ((mod-name (cadr expr)) (decls (cddr expr)))
@@ -408,7 +408,7 @@
                  (export-names (car export-info)) (rename-map (cdr export-info))
                  (imported-bindings (apply append (map process-import-set (reverse imports)))))
             (register-module! mod-name export-names rename-map (append (eval-module-body imported-bindings (reverse body-forms) m-env s-env r-env mod-name) imported-bindings))
-            ''defined)
+            (unspecified))
           (let ((decl (car decls)))
             (cond ((and (pair? decl) (eq? (car decl) 'export)) (loop (cdr decls) (append (reverse (cdr decl)) exports) imports body-forms))
                   ((and (pair? decl) (eq? (car decl) 'import)) (loop (cdr decls) exports (append (reverse (cdr decl)) imports) body-forms))
@@ -417,7 +417,7 @@
 
 (define (expand-import-module expr m-env s-env r-env)
   (for-each (lambda (b) (if (macro-binding? (cdr b)) (environment-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
-            (apply append (map process-import-set (cdr expr)))) ''imported)
+            (apply append (map process-import-set (cdr expr)))) (unspecified))
 
 (define (expand-set! expr m-env s-env r-env)
   (let* ((var (cadr expr)) (transformer (and (symbol? var) (not (memq var s-env)) (lookup-macro var m-env))))
@@ -488,12 +488,14 @@
          (def-ids (extract-module-defined-ids rt-forms))
          (internal-m (map (lambda (id) (cons id (mangle-name mod-name id))) def-ids))
          (inner-r (append internal-m r-env))
-         (macro-b (extract-macro-defs exp-forms inner-m s-env inner-r))
-         (imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
-         (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))
-    (let* ((proc (core-eval wrapper (interaction-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
-      (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
-      (append rt-bindings macro-b))))
+         (env-promise (list 'promise #f))
+         (macro-b (extract-macro-defs exp-forms env-promise s-env inner-r)))
+    (set-car! (cdr env-promise) (append (map (lambda (b) (cons (car b) (unwrap-macro-binding (cdr b)))) macro-b) inner-m))
+    (let* ((imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
+           (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))
+      (let* ((proc (core-eval wrapper (interaction-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
+        (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
+        (append rt-bindings macro-b)))))
 
 (define (lookup-handler core-sym)
   (case core-sym
@@ -545,6 +547,22 @@
           ((pair? expr) (cons (strip-renames (car expr)) (strip-renames (cdr expr))))
           ((vector? expr) (list->vector (map strip-renames (vector->list expr))))
           (else expr))))
+
+(define (unrename-core expr context)
+  (let ((s-env (if (and (pair? context) (pair? (cdr context))) (cadr context) '())))
+    (let loop ((x expr))
+      (cond ((symbol? x)
+             (let ((stripped (string->symbol (strip-suffix (symbol->string x)))))
+               (if (or (lookup-handler stripped)
+                       (environment-macro-contains? stripped)
+                       (environment-variable-contains? stripped))
+                   (if (eq? (resolve-core-form x s-env) stripped)
+                       stripped
+                       x)
+                   x)))
+            ((pair? x) (cons (loop (car x)) (loop (cdr x))))
+            ((vector? x) (list->vector (map loop (vector->list x))))
+            (else x)))))
 
 (define (macroexpand-1 expr)
   (cond ((pair? expr) (let* ((h (car expr)) (t (and (symbol? h) (lookup-macro h '())))) (if t (t expr) expr)))

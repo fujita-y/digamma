@@ -751,11 +751,6 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
     if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
       current_literals.push_back(inst.opr1);
     }
-  } else {
-    if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
-      puts("IMPORTANT: non closure literals found added to root to protect from GC");
-      object_heap_t::current()->add_root(inst.opr1);
-    }
   }
 }
 

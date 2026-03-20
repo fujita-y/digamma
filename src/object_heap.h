@@ -86,7 +86,10 @@ class object_heap_t {
   bool environment_variable_contains(scm_obj_t key);
 
   std::unordered_set<scm_obj_t> m_literals;
-  void literals_add(scm_obj_t obj) { m_literals.insert(obj); }
+  void literals_add(scm_obj_t obj) {
+    write_barrier(obj);
+    m_literals.insert(obj);
+  }
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {

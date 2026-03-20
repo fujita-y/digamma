@@ -23,8 +23,8 @@ class nanos_t {
   void init_subr();
   void init_codegen();
 
-  void load_ir(const char* filename);
-  void load_script(const char* filename);
+  void load_ir(std::string filename);
+  void load_script(std::string filename);
   scm_obj_t core_eval(scm_obj_t obj);
 
   bool repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer);

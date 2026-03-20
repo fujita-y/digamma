@@ -139,34 +139,28 @@
         (else
          (apply set-union (map analyze-mutated-vars-optimizer expr)))))
 
-(define (analyze-free-var-counts expr)
-  (let ((counts (make-eq-hashtable)))
-    (let walk ((e expr) (shadowed '()))
-      (cond ((symbol? e)
-             (unless (memq e shadowed)
-               (hashtable-set! counts e (+ (hashtable-ref counts e 0) 1))))
-
-            ((not (pair? e)) #f)
-
-            ((eq? (car e) 'quote) #f)
-
-            ((eq? (car e) 'lambda)
-             (let ((new-shadowed (let ((p (cadr e))) (if (list? p) (append p shadowed) (cons p shadowed)))))
-               (for-each (lambda (be) (walk be new-shadowed)) (cddr e))))
-
-            ((eq? (car e) 'let)
-             (let* ((bindings (cadr e))
-                    (vars (map car bindings))
-                    (inits (map cadr bindings)))
-               (for-each (lambda (init) (walk init shadowed)) inits)
-               (for-each (lambda (be) (walk be (append vars shadowed))) (cddr e))))
-
-            ((eq? (car e) 'set!)
-             (walk (caddr e) shadowed))
-
-            (else
-             (for-each (lambda (x) (walk x shadowed)) e))))
-    counts))
+(define (analyze-variable-usage expr shadowed)
+  (let ((info (make-eq-hashtable)))
+    (let walk ((e expr) (in-lambda? #f) (s shadowed))
+       (cond ((symbol? e)
+              (unless (memq e s)
+                (let ((curr (hashtable-ref info e '(0 . #f))))
+                  (hashtable-set! info e (cons (+ (car curr) 1) (or (cdr curr) in-lambda?))))))
+             ((not (pair? e)) #f)
+             ((eq? (car e) 'quote) #f)
+             ((eq? (car e) 'lambda)
+              (let ((new-s (let ((p (cadr e))) (if (list? p) (append p s) (cons p s)))))
+                (for-each (lambda (be) (walk be #t new-s)) (cddr e))))
+             ((eq? (car e) 'let)
+              (let* ((bindings (cadr e))
+                     (vars (map car bindings)))
+                (for-each (lambda (b) (walk (cadr b) in-lambda? s)) bindings)
+                (for-each (lambda (be) (walk be in-lambda? (append vars s))) (cddr e))))
+             ((eq? (car e) 'set!)
+              (walk (caddr e) in-lambda? s))
+             (else
+              (for-each (lambda (be) (walk be in-lambda? s)) e))))
+    info))
 
 (define (has-effects? expr)
   (cond ((symbol? expr) #f)
@@ -188,31 +182,11 @@
          (not (and (memq (car expr) pure-primitives)
                    (not (any has-effects? (cdr expr))))))))
 
-(define (used-in-lambda? expr var)
-  (let walk ((e expr) (in-lambda? #f))
-    (cond ((symbol? e) (and (eq? e var) in-lambda?))
-          ((not (pair? e)) #f)
-          ((eq? (car e) 'quote) #f)
-          ((eq? (car e) 'lambda)
-           (if (memq var (flatten-params-opt (cadr e)))
-               #f
-               (any (lambda (be) (walk be #t)) (cddr e))))
-          ((eq? (car e) 'let)
-           (let* ((bindings (cadr e))
-                  (vars (map car bindings))
-                  (inits (map cadr bindings))
-                  (body (cddr e)))
-             (or (any (lambda (init) (walk init in-lambda?)) inits)
-                 (if (memq var vars)
-                     #f
-                     (any (lambda (be) (walk be in-lambda?)) body)))))
-          (else (any (lambda (be) (walk be in-lambda?)) e)))))
-
-(define (safe-to-inline-val? var val body-expr bound-vars mutated-vars)
+(define (safe-to-inline-val? var val body-usage bound-vars mutated-vars)
   (let ((fvars (analyze-free-vars-optimizer val '())))
     (and (not (any (lambda (v) (memq v mutated-vars)) fvars))
          (or (every (lambda (v) (or (memq v bound-vars) (memq v pure-primitives))) fvars)
-             (not (used-in-lambda? body-expr var))))))
+             (not (cdr (hashtable-ref body-usage var '(0 . #f))))))))
 
 ;;=============================================================================
 ;; 3. Transformation Helpers
@@ -249,12 +223,32 @@
                (optimize-once new-expr)
                new-expr)))))
 
+(define (substitute-many expr mapping)
+  (if (null? mapping)
+      expr
+      (cond ((symbol? expr) (cond ((assq expr mapping) => cdr) (else expr)))
+            ((not (pair? expr)) expr)
+            ((eq? (car expr) 'quote) expr)
+            ((eq? (car expr) 'lambda)
+             (let* ((params (cadr expr))
+                    (param-list (flatten-params-opt params))
+                    (new-mapping (filter (lambda (p) (not (memq (car p) param-list))) mapping)))
+               `(lambda ,params ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
+            ((eq? (car expr) 'let)
+             (let* ((bindings (cadr expr))
+                    (vars (map car bindings))
+                    (new-mapping (filter (lambda (p) (not (memq (car p) vars))) mapping)))
+               `(let ,(map (lambda (b) (list (car b) (substitute-many (cadr b) mapping))) bindings)
+                  ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
+            (else
+             (map (lambda (e) (substitute-many e mapping)) expr)))))
+
 (define (perform-inlining var val body)
   (hashtable-set! *inlining-depth* var (+ (hashtable-ref *inlining-depth* var 0) 1))
   (map (lambda (e) (substitute-proc e var val)) body))
 
-(define (should-inline? var val body)
-  (let ((count (hashtable-ref (analyze-free-var-counts body) var 0)))
+(define (should-inline? var val body-usage)
+  (let ((count (car (hashtable-ref body-usage var '(0 . #f)))))
     (or (<= count 1)
         (and (small-procedure? val)
              (< (hashtable-ref *inlining-depth* var 0) 2)))))
@@ -297,52 +291,47 @@
           (optimize-inner `(let ,floated-bindings (let ,main-bindings ,@body)) bound-vars)
 
           ;; Substitution / Inlining Pipeline
-          (let ((used (analyze-used-vars (make-seq body)))
-                (mutated-vars (analyze-mutated-vars-optimizer (make-seq body)))
+          (let ((mutated-vars (analyze-mutated-vars-optimizer (make-seq body)))
                 (new-bindings '())
-                (var-counts #f)
-                (body-changed? #t))
+                (body-usage (analyze-variable-usage (make-seq body) '()))
+                (subst-mapping '()))
 
-            (define (get-use-count var current-body)
-              (when body-changed?
-                (set! var-counts (analyze-free-var-counts current-body))
-                (set! body-changed? #f))
-              (hashtable-ref var-counts var 0))
+            (for-each (lambda (b)
+                        (let ((var (car b)) (val (cadr b)))
+                          (cond
+                            ((and (not (memq var mutated-vars))
+                                  (safe-to-inline-val? var val body-usage bound-vars mutated-vars)
+                                  (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)
+                                    (and (not (has-effects? val)) (<= (car (hashtable-ref body-usage var '(0 . #f))) 1))))
+                             (set! subst-mapping (cons (cons var val) subst-mapping))
+                             (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
 
-              (define (process-binding! b)
-                (let ((var (car b)) (val (cadr b)))
-                  (cond
-                    ((and (not (memq var mutated-vars))
-                          (safe-to-inline-val? var val (make-seq body) bound-vars mutated-vars)
-                          (or (not (pair? val)) (and (pair? val) (eq? (car val) 'quote)) (symbol? val)
-                            (and (not (has-effects? val)) (<= (get-use-count var (make-seq body)) 1))))
-                   (set! body (map (lambda (e) (substitute e var val)) body))
-                   (set! body-changed? #t)
-                   (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
+                            ((and (not (memq var mutated-vars))
+                                  (pair? val)
+                                  (eq? (car val) 'lambda)
+                                  (should-inline? var val body-usage))
+                             (set! body (perform-inlining var val body))
+                             (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
 
-                    ((and (not (memq var mutated-vars))
-                          (pair? val)
-                          (eq? (car val) 'lambda)
-                          (should-inline? var val (make-seq body)))
-                   (set! body (perform-inlining var val body))
-                   (set! body-changed? #t)
-                   (if (has-effects? val) (set! new-bindings (cons b new-bindings))))
+                            ((and (not (memq var mutated-vars))
+                                  (pair? val)
+                                  (eq? (car val) 'lambda)
+                                  (and (pair? (car body)) (eq? (car (car body)) 'if)))
+                             (let ((res (try-drop-lambda var val (car body))))
+                               (if (car res)
+                                   (set! body (list (cdr res)))
+                                   (set! new-bindings (cons b new-bindings)))))
 
-                  ((and (not (memq var mutated-vars))
-                        (pair? val)
-                        (eq? (car val) 'lambda)
-                        (and (pair? (car body)) (eq? (car (car body)) 'if)))
-                   (let ((res (try-drop-lambda var val (car body))))
-                     (if (car res)
-                         (begin (set! body (list (cdr res))) (set! body-changed? #t))
-                         (set! new-bindings (cons b new-bindings)))))
+                            ((or (> (car (hashtable-ref body-usage var '(0 . #f))) 0)
+                                 (memq var mutated-vars)
+                                 (has-effects? val))
+                             (set! new-bindings (cons b new-bindings))))))
+                      main-bindings)
 
-                  ((or (memq var used) (memq var mutated-vars) (has-effects? val))
-                   (set! new-bindings (cons b new-bindings))))))
+            (unless (null? subst-mapping)
+              (set! body (map (lambda (e) (substitute-many e subst-mapping)) body)))
 
-            (for-each process-binding! main-bindings)
             (set! new-bindings (reverse new-bindings))
-
             (if (null? new-bindings)
                 (if (null? (cdr body)) (car body) `(begin ,@body))
                 `(let ,new-bindings ,@body))))))
@@ -462,10 +451,12 @@
   (optimize-inner expr '()))
 
 ;; Perform full optimization until fixed-point or iteration limit.
-(define (optimize expr)
+(define (optimize expr) expr) ;; disable optimizer temporarily
+#|
   (hashtable-clear! global-env)
   (hashtable-clear! *inlining-depth*)
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10))
         current
         (loop (optimize-inner current '()) current (+ iters 1)))))
+|#

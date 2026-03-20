@@ -42,7 +42,7 @@
            (define (add x y) (+ x y))
            (define (multiply x y) (* x y))
            (define (internal-helper x) (* x 2))))
-      ''defined)
+      (unspecified))
 
 ;; Test that module was registered
 (let ((module-info (lookup-module '(math utils))))
@@ -61,7 +61,7 @@
 
 (test "import-module expansion"
       '(import-module (math utils))
-      ''imported)
+      (unspecified))
 
 ;; Test imported functions
 (test-eval "Use imported add function"
@@ -82,7 +82,7 @@
          (export (rename double-val double))
          (begin
            (define (double-val x) (* x 2))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (ops)))
 
@@ -98,7 +98,7 @@
 ;; Test prefix modifier
 (test "import-module with prefix"
       '(import-module (prefix (math utils) m:))
-      ''imported)
+      (unspecified))
 
 (test-eval "Use prefixed import"
            '(m:add 10 20)
@@ -194,7 +194,7 @@
                      (car lst)))))
            (define (stack-empty? s)
              (null? (vector-ref s 0)))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (data stack)))
 
@@ -221,7 +221,7 @@
            (define make-point point)
            (define point-x car)
            (define point-y cdr)))
-      ''defined)
+      (unspecified))
 
 (test "Define geometry colors"
       '(define-module (geometry colors)
@@ -229,7 +229,7 @@
          (begin
            (define (color r g b) (vector r g b))
            (define make-color color)))
-      ''defined)
+      (unspecified))
 
 ;; The canvas library re-exports everything from primitives and colors,
 ;; plus adds its own 'draw' function.
@@ -246,7 +246,7 @@
              (cond ((pair? thing) "Draw Point")
                    ((vector? thing) "Draw Color")
                    (else "Unknown")))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (geometry canvas)))
 
@@ -273,7 +273,7 @@
            (define (calc-diff a b) (- a b))
            (define (calc-prod a b) (* a b))
            (define (calc-quot a b) (/ a b))))
-      ''defined)
+      (unspecified))
 
 (test "Define calculator API (renaming)"
       '(define-module (api math)
@@ -283,7 +283,7 @@
          (rename calc-quot div))
          (import (internal calc))
          (begin)) ;; Pure wrapper/renamer
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (prefix (api math) math:)))
 
@@ -306,7 +306,7 @@
                 (if test
                     (begin expr ...)
                     #f))))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (test macro-export)))
 
@@ -336,7 +336,7 @@
                  ((_ e1 e2 e3 ...)
                   (syntax (let ((t e1))
                             (if t t (my-or e2 e3 ...))))))))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (test syntax-case-export)))
 
@@ -357,7 +357,7 @@
                (syntax-case x ()
                  ((_ val)
                   (syntax (helper val))))))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (test helper-export)))
 
@@ -387,7 +387,7 @@
                     (syntax (begin
                               (define (make-name field ...) (list (quote name) field ...))
                               (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name)))))))))))))
-      ''defined)
+      (unspecified))
 
 (test "define-module with struct import (user)"
       '(define-module (struct-user)
@@ -395,7 +395,7 @@
          (import (struct-def))
          (begin
            (define-struct point (x y))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (struct-user)))
 
@@ -427,7 +427,7 @@
              (if (null? s1)
                  s2
                  (set-union (cdr s1) (set-add s2 (car s1)))))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (data set)))
 
@@ -459,7 +459,7 @@
              (let ((data (vector-ref g 2))
                    (cols (grid-cols g)))
                (vector-set! data (+ (* r cols) c) val)))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (data grid)))
 
@@ -482,7 +482,7 @@
              (reverse logs))
            (define (clear-log)
              (set! logs '()))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (system logger)))
 
@@ -511,7 +511,7 @@
                 (begin
                   (define (getter) (vector-ref container index))
                   (define (setter val) (vector-set! container index val))))))))
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (macro tools)))
 
@@ -535,7 +535,7 @@
                ((_ expr)
                 (let ((internal-val 99))
                   (list internal-val expr))))))) ;; Should return (99 <expr>)
-      ''defined)
+      (unspecified))
 
 (macroexpand '(import-module (macro hygiene)))
 

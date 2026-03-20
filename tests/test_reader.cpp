@@ -371,8 +371,34 @@ void test_reader_errors() {
   check_error("(1 . 2]", "more than one item following dot('.') while reading list or mismatched parentheses");
 }
 
+void test_r6rs_abbreviations() {
+  auto check_abbrev = [](const char* input, const char* expected_symbol) {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    std::stringstream ss(input);
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (err) fatal("read failed for %s: %s", input, reader.get_error_message().c_str());
+    assert(is_cons(obj));
+    scm_obj_t car = ((scm_cons_rec_t*)obj)->car;
+    assert(is_symbol(car));
+    assert(std::string((char*)symbol_name(car)) == expected_symbol);
+    std::cout << "Abbreviated " << input << " -> (" << expected_symbol << " ...) passed" << std::endl;
+    heap->destroy();
+    delete heap;
+  };
+
+  check_abbrev("#'x", "syntax");
+  check_abbrev("#`x", "quasisyntax");
+  check_abbrev("#,x", "unsyntax");
+  check_abbrev("#,@x", "unsyntax-splicing");
+  check_abbrev("#`(a #,b #,@c)", "quasisyntax");
+}
+
 int main() {
   test_reader();
   test_reader_errors();
+  test_r6rs_abbreviations();
   return 0;
 }

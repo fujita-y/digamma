@@ -29,6 +29,10 @@ class reader_t {
   scm_obj_t read_quasiquote(bool& err);
   scm_obj_t read_unquote(bool& err);
   scm_obj_t read_unquote_splicing(bool& err);
+  scm_obj_t read_syntax(bool& err);
+  scm_obj_t read_quasisyntax(bool& err);
+  scm_obj_t read_unsyntax(bool& err);
+  scm_obj_t read_unsyntax_splicing(bool& err);
 
   std::string error_message;
 

@@ -142,3 +142,25 @@ bool concurrent_pool_t::extend_pool(size_t extend_size) {
   if (m_pool_watermark > capacity) m_pool_watermark = capacity;
   return true;
 }
+
+bool concurrent_pool_t::in_slab(void* obj) {
+  assert(obj);
+  uint64_t addr = prune_memory_address((uint64_t)obj);
+  int64_t index = ((uint8_t*)addr - m_pool) >> SLAB_SIZE_SHIFT;
+  assert(index >= 0 && index < m_pool_watermark);
+  return (m_pool[index] & PTAG_SLAB) != 0;
+}
+
+bool concurrent_pool_t::in_pool(void* obj) {
+  uint64_t addr = prune_memory_address((uint64_t)obj);
+  int64_t index = ((uint8_t*)addr - m_pool) >> SLAB_SIZE_SHIFT;
+  return (index >= 0 && index < m_pool_watermark);
+}
+
+bool concurrent_pool_t::is_collectible(void* obj) {
+  assert(obj);
+  uint64_t addr = prune_memory_address((uint64_t)obj);
+  int64_t index = ((uint8_t*)addr - m_pool) >> SLAB_SIZE_SHIFT;
+  assert(index >= 0 && index < m_pool_watermark);
+  return (m_pool[index] & (PTAG_SLAB | PTAG_GC)) == (PTAG_SLAB | PTAG_GC);
+}
