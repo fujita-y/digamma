@@ -244,6 +244,7 @@ inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);
 uint8_t* symbol_name(scm_obj_t x);
 uint8_t* string_name(scm_obj_t x);
+uint8_t* environment_name(scm_obj_t x);
 
 inline int vector_nsize(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->nsize; }
 inline scm_obj_t* vector_elts(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->elts; }

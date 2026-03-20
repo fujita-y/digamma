@@ -198,6 +198,11 @@ scm_obj_t make_environment(scm_obj_t name) {
   return tc6_pointer(rec, tc6_environment);
 }
 
+uint8_t* environment_name(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return symbol_name(((scm_environment_rec_t*)to_address(x))->name);
+}
+
 scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders) {
   object_heap_t& heap = *object_heap_t::current();
   scm_escape_rec_t* rec = (scm_escape_rec_t*)heap.alloc_collectible(sizeof(scm_escape_rec_t));
