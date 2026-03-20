@@ -308,10 +308,10 @@
                                                              (lambda () ,(prepare-eval-expr fender new-lits meta-env bindings context))
                                                              (lambda () ,(prepare-eval-expr output new-lits meta-env bindings context)))))
                                                  (cdddr x)))))
-              `(expand-syntax-case ,input ',lits ,clauses-expr (interaction-environment))))
+              `(expand-syntax-case ,input ',lits ,clauses-expr (current-environment))))
            ((eq? (car x) 'with-syntax)
             (let ((b-specs (cadr x)) (body (cddr x)))
-              `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body)))) (interaction-environment))))
+              `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body)))) (current-environment))))
            ((eq? (car x) 'quote) x)
            (else
             (let ((head (car x)))
@@ -337,7 +337,7 @@
           #t
           (core-eval (
               prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
-              (if (null? env) (interaction-environment) env)))))
+              (if (null? env) (current-environment) env)))))
 
 ;; Main syntax-case expansion engine.
 (define (expand-syntax-case input literals clauses env)

@@ -187,7 +187,7 @@
 
 (define (inject-binding! name value)
   (set! *temp-value* value)
-  (core-eval `(define ,name *temp-value*) (interaction-environment)))
+  (core-eval `(define ,name *temp-value*) (current-environment)))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers & Helpers
@@ -239,7 +239,7 @@
        (lambda (expr)
          (let ((input (make-syntax-object expr context)))
            (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '() context)))
-             (syntax->datum (core-eval body (interaction-environment)))))))
+             (syntax->datum (core-eval body (current-environment)))))))
       ((and (pair? spec) (core-form? (car spec) 'make-variable-transformer (cadr context)))
        (make-variable-transformer (parse-transformer (cadr spec) context)))
       ((and (pair? spec) (core-form? (car spec) 'identifier-syntax (cadr context)))
@@ -493,7 +493,7 @@
     (set-car! (cdr env-promise) (append (map (lambda (b) (cons (car b) (unwrap-macro-binding (cdr b)))) macro-b) inner-m))
     (let* ((imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
            (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))
-      (let* ((proc (core-eval wrapper (interaction-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
+      (let* ((proc (core-eval wrapper (current-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
         (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
         (append rt-bindings macro-b)))))
 

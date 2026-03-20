@@ -25,14 +25,14 @@
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
        (result (expand-syntax-case input '()
                                    '(((name val ...) #t (syntax (name val ...))))
-                                   (interaction-environment))))
+                                   (current-environment))))
   (test "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
 
 ;; Test ellipsis expansion
 (let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
        (result (expand-syntax-case input '()
                                    '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
-                                   (interaction-environment))))
+                                   (current-environment))))
   (test "ellipsis-expansion" (strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
 
 ;; Test fenders
@@ -40,7 +40,7 @@
        (result (expand-syntax-case input '()
                                    '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
                                      ((name val ...) #t 'not-empty))
-                                   (interaction-environment))))
+                                   (current-environment))))
   (test "fender-false" result 'not-empty))
 
 ;; =============================================================================
@@ -378,7 +378,7 @@
 
 ;; Helper for eval tests (from test_syntax_rules.scm)
 (define (test-eval expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr) (interaction-environment))))
+  (let ((expanded (core-eval (macroexpand expr) (current-environment))))
     (if (equal? expected expanded)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -390,7 +390,7 @@
           (display "  Actual:   ") (display expanded) (newline)))))
 
 (define (test-eval-strip expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr 'strip) (interaction-environment))))
+  (let ((expanded (core-eval (macroexpand expr 'strip) (current-environment))))
     (if (equal? expected expanded)
         (begin 
           (set! *pass-count* (+ *pass-count* 1))

@@ -21,8 +21,8 @@
    (define hashtable-set! hash-table-put!)
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj))
-   (define (core-eval expr env) (eval expr env)))
-   (define (current-environment) (interaction-environment))
+   (define (core-eval expr env) (eval expr env))
+   (define (current-environment) (interaction-environment)))
   (ypsilon
    (define (uuid) (make-uuid))
    (define (make-equal-hashtable) (make-hashtable equal-hash equal?))

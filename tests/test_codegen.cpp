@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
 
   run_test("GlobalSet", [](CodegenTest& env) -> bool {
     // ((const r0 123) (global-set! foo r0) (ret))
-    // Check if interaction-environment has foo = 123
+    // Check if current-environment has foo = 123
     scm_obj_t code = env.read_code("((const r2 123) (global-set! foo r2) (ret))");
     env.codegen->compile(code)();
 

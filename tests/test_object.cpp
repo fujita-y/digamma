@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
   test_u8vector(97);
   test_u8vector(122);
 
-  test_environment("interaction-environment");
+  test_environment("test-environment");
 
   test_cell(100);
   test_cell(-50);

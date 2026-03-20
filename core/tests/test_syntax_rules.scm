@@ -19,7 +19,7 @@
           (display "  Actual:   ") (write result) (newline)))))
 
 (define (test-eval name expr expected)
-  (let ((result (core-eval (macroexpand expr) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr) (current-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -31,7 +31,7 @@
           (display "  Actual:   ") (write result) (newline)))))
 
 (define (test-eval-strip name expr expected)
-  (let ((result (core-eval (macroexpand expr 'strip) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr 'strip) (current-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
