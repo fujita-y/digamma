@@ -140,7 +140,7 @@ scm_obj_t nanos_t::lookup_system_environment(scm_obj_t symbol) {
   return cell_value(cell);
 }
 
-scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
+scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
   scm_obj_t core_eval = lookup_system_environment(make_symbol("core-eval"));
   if (!is_closure(core_eval)) {
     throw std::runtime_error("core-eval is not a closure");
@@ -252,7 +252,7 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     printer.write((scm_obj_t)result);
     puts("\n");
 #else
-    scm_obj_t result = core_eval(obj);
+    scm_obj_t result = call_core_eval(obj);
     if (result != scm_unspecified) {
       printer.write(result);
       puts("\n");

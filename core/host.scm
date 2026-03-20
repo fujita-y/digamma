@@ -22,6 +22,7 @@
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj))
    (define (core-eval expr env) (eval expr env)))
+   (define (current-environment) (interaction-environment))
   (ypsilon
    (define (uuid) (make-uuid))
    (define (make-equal-hashtable) (make-hashtable equal-hash equal?))
@@ -31,3 +32,27 @@
    (define (core-eval expr env) (eval expr env)))
 
   (else))
+
+(define *current-macro-environment* (make-eq-hashtable))
+(define *current-variable-environment* (make-eq-hashtable))
+
+(define (environment-macro-set! name transformer)
+  (hashtable-delete! *current-macro-environment* name)
+  (hashtable-set! *current-macro-environment* name transformer))
+
+(define (environment-macro-ref name)
+  (hashtable-ref *current-macro-environment* name #f))
+
+(define (environment-macro-contains? name)
+  (hashtable-contains? *current-macro-environment* name))
+
+(define (environment-variable-contains? name)
+  (hashtable-contains? *current-variable-environment* name))
+
+(define (environment-variable-set! name transformer)
+  (hashtable-delete! *current-variable-environment* name)
+  (hashtable-set! *current-variable-environment* name transformer))
+
+(define (environment-variable-ref name)
+  (or (environment-variable-contains? name) (error "environment-variable-ref: symbol not found" name))
+  (hashtable-ref *current-variable-environment* name #f))
