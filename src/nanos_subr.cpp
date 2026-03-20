@@ -1230,7 +1230,7 @@ SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
 }
 
 // interaction-environment - R6RS 11.16
-SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_environment; }
+SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_interaction_environment; }
 
 // ============================================================================
 // Multiple Return Values

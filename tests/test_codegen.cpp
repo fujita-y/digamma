@@ -49,7 +49,7 @@ static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_environment;
+  scm_obj_t env = heap->m_current_environment;
   scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
   hashtable_set(env_rec->variables, sym, make_cell(val));
 }
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
     env.codegen->compile(code)();
 
     object_heap_t* heap = object_heap_t::current();
-    scm_obj_t env_obj = heap->m_environment;
+    scm_obj_t env_obj = heap->m_current_environment;
     scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env_obj);
     scm_obj_t cell = hashtable_ref(env_rec->variables, make_symbol("foo"), scm_undef);
     scm_obj_t val = scm_undef;
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
     env.codegen->compile(code)();
 
     object_heap_t* heap = object_heap_t::current();
-    scm_obj_t env_obj = heap->m_environment;
+    scm_obj_t env_obj = heap->m_current_environment;
     scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env_obj);
     scm_obj_t cell = hashtable_ref(env_rec->variables, make_symbol("inner"), scm_undef);
     scm_obj_t val = scm_undef;

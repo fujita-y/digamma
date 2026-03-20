@@ -58,7 +58,7 @@ static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_environment;
+  scm_obj_t env = heap->m_current_environment;
   scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
   hashtable_set(env_rec->variables, sym, make_cell(val));
 }

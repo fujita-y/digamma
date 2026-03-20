@@ -145,7 +145,7 @@ __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void 
 __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   do_wind(rec->winders);
   object_heap_t::current()->write_barrier(val);
-  object_heap_t::s_captured_retval = val;
+  object_heap_t::s_continuation_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
   uintptr_t tmp_sp = (uintptr_t)s_restore_stack + sizeof(s_restore_stack) - 64;
@@ -183,7 +183,7 @@ SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[])
 
   do_wind(cont_rec->winders);
 
-  object_heap_t::s_captured_retval = retval;
+  object_heap_t::s_continuation_captured_retval = retval;
   s_restored = true;
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
@@ -235,7 +235,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
         s_restored_rec = nullptr;
       }
 #endif
-      return object_heap_t::s_captured_retval;
+      return object_heap_t::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");
@@ -276,7 +276,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
         return scm_undef;
       }
     } else {
-      return object_heap_t::s_captured_retval;
+      return object_heap_t::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");

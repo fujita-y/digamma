@@ -15,7 +15,7 @@
 
 class object_heap_t {
  public:
-  thread_local static scm_obj_t s_captured_retval;
+  thread_local static scm_obj_t s_continuation_captured_retval;
   thread_local static scm_obj_t s_current_winders;
 
  private:
@@ -76,7 +76,9 @@ class object_heap_t {
   std::mutex m_symbol_table_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
-  scm_obj_t m_environment;
+  scm_obj_t m_interaction_environment;
+  scm_obj_t m_system_environment;
+  scm_obj_t m_current_environment;
   void environment_macro_set(scm_obj_t key, scm_obj_t value);
   void environment_variable_set(scm_obj_t key, scm_obj_t value);
   scm_obj_t environment_macro_ref(scm_obj_t key);
