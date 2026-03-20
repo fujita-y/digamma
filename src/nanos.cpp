@@ -1,6 +1,7 @@
 #include "object.h"
 #include "nanos.h"
 #include "codegen.h"
+#include "hash.h"
 #include "nanos_jit.h"
 #include "nanos_options.h"
 #include "object_heap.h"
@@ -129,19 +130,23 @@ void nanos_t::load_ir(std::string filename) {
   }
 }
 
-scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
+scm_obj_t nanos_t::lookup_system_environment(scm_obj_t symbol) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t core_eval = heap->environment_variable_ref(make_symbol("core-eval"));
-  if (core_eval == scm_undef) {
-    throw std::runtime_error("core-eval not found in current environment");
+  scm_obj_t variables = environment_variables(heap->m_system_environment);
+  scm_obj_t cell = hashtable_ref(variables, symbol, scm_undef);
+  if (cell == scm_undef) {
+    throw std::runtime_error("core-eval not found in system environment");
   }
+  return cell_value(cell);
+}
+
+scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
+  scm_obj_t core_eval = lookup_system_environment(make_symbol("core-eval"));
   if (!is_closure(core_eval)) {
     throw std::runtime_error("core-eval is not a closure");
   }
-
   codegen_t* cg = codegen_t::current();
   auto bridge = cg->call_closure_bridge();
-
   scm_obj_t args[2] = {obj, scm_nil};
   return (scm_obj_t)bridge(core_eval, 2, args);
 }

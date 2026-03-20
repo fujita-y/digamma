@@ -198,6 +198,16 @@ scm_obj_t make_environment(scm_obj_t name) {
   return tc6_pointer(rec, tc6_environment);
 }
 
+scm_obj_t environment_variables(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return ((scm_environment_rec_t*)to_address(x))->variables;
+}
+
+scm_obj_t environment_macros(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return ((scm_environment_rec_t*)to_address(x))->macros;
+}
+
 uint8_t* environment_name(scm_obj_t x) {
   if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
   return symbol_name(((scm_environment_rec_t*)to_address(x))->name);

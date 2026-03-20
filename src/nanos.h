@@ -25,6 +25,7 @@ class nanos_t {
 
   void load_ir(std::string filename);
   void load_script(std::string filename);
+  scm_obj_t lookup_system_environment(scm_obj_t symbol);
   scm_obj_t core_eval(scm_obj_t obj);
 
   bool repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer);
