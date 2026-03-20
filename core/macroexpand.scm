@@ -522,6 +522,30 @@
     ((import-module) expand-import-module)
     (else #f)))
 
+(define (register-builtins)
+  (for-each (lambda (binding) (environment-macro-set! (car binding) (cdr binding)))
+           `((define-syntax . ,expand-define-syntax) 
+             (let-syntax . ,expand-let-syntax) 
+             (letrec-syntax . ,expand-letrec-syntax) 
+             (let*-syntax . ,expand-let*-syntax) 
+             (lambda . ,expand-lambda) 
+             (let . ,expand-let) 
+             (let* . ,expand-let*) 
+             (letrec* . ,expand-letrec*) 
+             (letrec . ,expand-letrec) 
+             (set! . ,expand-set!) 
+             (if . ,expand-if) 
+             (cond . ,expand-cond) 
+             (and . ,expand-and) 
+             (or . ,expand-or) 
+             (case . ,expand-case) 
+             (define . ,expand-define) 
+             (begin . ,expand-begin) 
+             (quote . ,expand-quote) 
+             (quasiquote . ,expand-quasiquote-form) 
+             (define-module . ,expand-define-module) 
+             (import-module . ,expand-import-module))))
+
 ;;=============================================================================
 ;; SECTION 8: Cleanup & Entry Point
 ;;=============================================================================
