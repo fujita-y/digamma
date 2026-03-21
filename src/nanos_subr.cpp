@@ -1204,7 +1204,11 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
     scm_obj_t cell = hashtable_ref(src->variables, key, scm_undef);
     if (cell != scm_undef) {
       scm_obj_t val = cell_value(cell);
-      hashtable_set(dst->variables, key, make_cell(val));
+      if (is_closure(val)) {
+        hashtable_set(dst->variables, key, make_cell(val));
+      } else {
+        hashtable_set(dst->variables, key, cell);
+      }
     }
     cur = CDR(cur);
   }
