@@ -250,23 +250,24 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 
 // Set global variable to value in register
 void codegen_t::emit_global_set(const Instruction& inst) {
-  // Get or create c_global_set external function
-  llvm::Type* voidTy = llvm::Type::getVoidTy((CT));
-  llvm::Type* intptrTy = this->getInt64Type();
-  std::vector<llvm::Type*> argTypes = {intptrTy, intptrTy};
-  llvm::FunctionType* ft = llvm::FunctionType::get(voidTy, argTypes, false);
-  llvm::Function* global_set_func = get_or_create_external_function("c_global_set", ft, (void*)&c_global_set);
+  scm_obj_t cell = object_heap_t::current()->environment_variable_cell_ref(inst.opr1);
+  scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
 
-  // Prepare arguments: symbol key and value from register
-  llvm::Value* key_v = createInt64Constant(CT, (uint64_t)inst.opr1);
+  // Create a constant for the value address
+  llvm::Value* value_address = createInt64Constant(CT, (uint64_t)&(rec->value));
 
   if (inst.rn1 < 0) {
     fatal("%s:%u codegen: global-set! missing register operand", __FILE__, __LINE__);
   }
-  llvm::Value* val_v = get_reg(inst.rn1);
+  llvm::Value* val = get_reg(inst.rn1);
 
-  std::vector<llvm::Value*> args = {key_v, val_v};
-  BL.CreateCall(global_set_func, args);
+  // Get pointer to cell's value
+  llvm::Value* val_ptr = BL.CreateIntToPtr(value_address, BL.getPtrTy());
+
+  // Store the value directly
+  BL.CreateStore(val, val_ptr);
+
+  emitWriteBarrier(val);
 }
 
 // Load global variable value into register
