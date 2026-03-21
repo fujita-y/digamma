@@ -1307,6 +1307,9 @@ SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
 // interaction-environment - R6RS 11.16
 SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_interaction_environment; }
 
+// system-environment
+SUBR subr_system_environment(scm_obj_t self) { return object_heap_t::current()->m_system_environment; }
+
 // ============================================================================
 // Multiple Return Values
 // ============================================================================
@@ -1500,6 +1503,7 @@ void nanos_t::init_subr() {
   reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, 0);
   reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, 0);
   reg("interaction-environment", (void*)subr_interaction_environment, 0, 0);
+  reg("system-environment", (void*)subr_system_environment, 0, 0);
 
   // multiple return values
   reg("values", (void*)subr_values, 0, 1);
