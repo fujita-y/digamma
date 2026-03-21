@@ -145,9 +145,10 @@ scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
   if (!is_closure(core_eval)) {
     throw std::runtime_error("core-eval is not a closure");
   }
+  object_heap_t* heap = object_heap_t::current();
   codegen_t* cg = codegen_t::current();
   auto bridge = cg->call_closure_bridge();
-  scm_obj_t args[2] = {obj, scm_nil};
+  scm_obj_t args[2] = {obj, heap->m_current_environment};
   return (scm_obj_t)bridge(core_eval, 2, args);
 }
 

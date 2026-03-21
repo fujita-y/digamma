@@ -4,6 +4,9 @@
 
 ;; copy core variables to interaction environment
 (copy-environment-variables! (interaction-environment) (current-environment)
+  (map car (hashtable->alist (environment-variables (current-environment)))))
+
+#;(copy-environment-variables! (interaction-environment) (current-environment)
   '(+ - * / = < > <= >=
     cons car cdr caar cdar cadr cddr cadar cddar caddar cdddar caddr cdddr cadddr
     set-car! set-cdr! length list cons*
@@ -36,6 +39,6 @@
     
     map for-each filter make-parameter every? any?
     
-    macroexpand))
+    macroexpand expand-syntax-case core-eval fresh-suffix lookup-module))
 
 ; (current-environment (interaction-environment))
