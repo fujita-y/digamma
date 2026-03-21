@@ -498,56 +498,6 @@
         (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
         (append rt-bindings macro-b)))))
 
-(define (lookup-builtin-handler id)
-  (and (eq? (environment-macro-ref id) 'builtin)
-       (case id
-         ((define-syntax) expand-define-syntax) 
-         ((let-syntax) expand-let-syntax) 
-         ((letrec-syntax) expand-letrec-syntax)
-         ((let*-syntax) expand-let*-syntax)
-         ((lambda) expand-lambda) 
-         ((let) expand-let) 
-         ((let*) expand-let*)
-         ((letrec*) expand-letrec*)
-         ((letrec) expand-letrec*)
-         ((set!) expand-set!) 
-         ((if) expand-if) 
-         ((cond) expand-cond) 
-         ((and) expand-and) 
-         ((or) expand-or) 
-         ((case) expand-case)
-         ((define) expand-define) 
-         ((begin) expand-begin) 
-         ((quote) expand-quote) 
-         ((quasiquote) expand-quasiquote-form)
-         ((define-module) expand-define-module) 
-         ((import-module) expand-import-module)
-         (else #f))))
-
-(define (register-builtins)
-  (for-each (lambda (id) (environment-macro-set! id 'builtin))
-           '(define-syntax 
-             let-syntax 
-             letrec-syntax 
-             let*-syntax 
-             lambda 
-             let 
-             let* 
-             letrec* 
-             letrec 
-             set! 
-             if 
-             cond 
-             and 
-             or 
-             case 
-             define 
-             begin 
-             quote 
-             quasiquote 
-             define-module 
-             import-module)))
-
 ;;=============================================================================
 ;; SECTION 8: Cleanup & Entry Point
 ;;=============================================================================
@@ -598,4 +548,53 @@
   (set! *suffix-counter* 0) (set! *rename-env* '())
   (let ((res (expand expr '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
 
-(register-builtins)
+(define (lookup-builtin-handler id)
+  (and (eq? (environment-macro-ref id) 'builtin)
+       (case id
+         ((define-syntax) expand-define-syntax) 
+         ((let-syntax) expand-let-syntax) 
+         ((letrec-syntax) expand-letrec-syntax)
+         ((let*-syntax) expand-let*-syntax)
+         ((lambda) expand-lambda) 
+         ((let) expand-let) 
+         ((let*) expand-let*)
+         ((letrec*) expand-letrec*)
+         ((letrec) expand-letrec*)
+         ((set!) expand-set!) 
+         ((if) expand-if) 
+         ((cond) expand-cond) 
+         ((and) expand-and) 
+         ((or) expand-or) 
+         ((case) expand-case)
+         ((define) expand-define) 
+         ((begin) expand-begin) 
+         ((quote) expand-quote) 
+         ((quasiquote) expand-quasiquote-form)
+         ((define-module) expand-define-module) 
+         ((import-module) expand-import-module)
+         (else #f))))
+
+;; register macro builtins in current environment (system environment)
+(for-each (lambda (id) (environment-macro-set! id 'builtin))
+  '(and 
+    begin 
+    case 
+    cond 
+    define 
+    define-module 
+    define-syntax 
+    if 
+    import-module
+    lambda 
+    let 
+    let* 
+    letrec 
+    letrec* 
+    letrec-syntax 
+    let*-syntax 
+    let-syntax 
+    or 
+    quasiquote 
+    quote 
+    set!))
+  

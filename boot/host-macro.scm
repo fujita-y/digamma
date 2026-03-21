@@ -1,3 +1,5 @@
+;;; macro used in host implementation to generate core IR
+
 (define-syntax parameterize-aux
   (syntax-rules ()
     ((_ () ((save new param value) ...) body ...)
