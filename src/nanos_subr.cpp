@@ -1365,8 +1365,9 @@ SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
 // ============================================================================
 
 void nanos_t::init_subr() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    c_global_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
+  object_heap_t* heap = object_heap_t::current();
+  auto reg = [heap](const char* name, void* func, int req, int opt) {
+    heap->environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
   };
   auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, scm_nil, 1); };
 
@@ -1524,6 +1525,6 @@ void nanos_t::init_subr() {
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
-  c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
-  c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
+  heap->environment_variable_set(make_symbol("call/cc"), scm_subr_call_cc);
+  heap->environment_variable_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
 }

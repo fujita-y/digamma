@@ -92,6 +92,12 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
   #endif
 #endif
 
+static void c_global_set(scm_obj_t key, scm_obj_t value) {
+  assert(is_symbol(key));
+  object_heap_t* heap = object_heap_t::current();
+  heap->environment_variable_set(key, value);
+}
+
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);

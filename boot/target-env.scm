@@ -36,6 +36,6 @@
     
     map for-each filter make-parameter every? any?
     
-    macroexpand core-eval))
+    macroexpand))
 
 ; (current-environment (interaction-environment))
