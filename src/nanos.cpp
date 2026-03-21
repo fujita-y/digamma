@@ -169,6 +169,17 @@ void nanos_t::run() {
   if (!nanos_options::boot_file.empty()) {
     load_ir(nanos_options::boot_file);
   }
+
+  object_heap_t* heap = object_heap_t::current();
+  if (nanos_options::env_name == "interaction") {
+    heap->m_current_environment = heap->m_interaction_environment;
+  } else if (nanos_options::env_name == "system") {
+    heap->m_current_environment = heap->m_system_environment;
+  } else {
+    throw std::runtime_error("Invalid environment name");
+  }
+  std::cout << ";; environment: " << std::string((char*)environment_name(heap->m_current_environment)) << std::endl;
+
   if (!nanos_options::script_file.empty()) {
     load_script(nanos_options::script_file);
   }
