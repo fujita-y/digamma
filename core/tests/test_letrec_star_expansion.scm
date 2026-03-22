@@ -1,14 +1,19 @@
 ;; test_letrec_star_expansion.scm
 (load "../core.scm")
 
+(define *pass-count* 0)
+(define *fail-count* 0)
+
 (define (test name output expected)
   (if (equal? output expected)
-      (begin (display "PASS: ") (display name) (newline))
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
       (begin
+        (set! *fail-count* (+ *fail-count* 1))
         (display "FAIL: ") (display name) (newline)
         (display "  Expected: ") (write expected) (newline)
-        (display "  Actual:   ") (write output) (newline)
-        (exit 1))))
+        (display "  Actual:   ") (write output) (newline))))
 
 (display "Testing letrec* expansion...\n")
 
@@ -33,3 +38,14 @@
              (f 5)))))
 
 (display "All letrec* expansion tests passed.\n")
+
+(if (= *fail-count* 0)
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
+    (begin
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
+(newline)

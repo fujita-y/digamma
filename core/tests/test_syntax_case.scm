@@ -1,9 +1,6 @@
 ;; test_syntax_case.scm
 ;; Test suite for syntax-case and related R6RS features.
-(cond-expand
-  (gauche (load "../core.scm"))
-  (else))
-
+(load "../core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -467,7 +464,12 @@
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)
