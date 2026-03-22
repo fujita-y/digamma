@@ -39,6 +39,6 @@
     
     map for-each filter make-parameter every? any?
     
-    macroexpand expand-syntax-case core-eval fresh-suffix lookup-module))
+    macroexpand core-eval expand-syntax-case))
 
 ; (current-environment (interaction-environment))
