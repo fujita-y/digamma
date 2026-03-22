@@ -110,11 +110,13 @@
 ;; Hygiene-aware identifier equality.
 (define (bound-identifier=? id1 id2)
   (let ((d1 (syntax-object-datum id1))
-        (d2 (syntax-object-datum id2)))
+        (d2 (syntax-object-datum id2))
+        (c1 (get-identifier-context id1))
+        (c2 (get-identifier-context id2)))
     (and (symbol? d1)
          (symbol? d2)
          (eq? d1 d2)
-         (equal? (get-identifier-context id1) (get-identifier-context id2)))))
+         (equal? c1 c2))))
 
 ;; Name-only identifier equality (for literals).
 (define (free-identifier=? id1 id2)
@@ -326,9 +328,11 @@
               (if (symbol? head)
                   (let* ((m-env (if (pair? context) (car context) '()))
                          (s-env (if (and (pair? context) (pair? (cdr context))) (cadr context) '()))
+                         (r-env (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context))) (caddr context) '()))
+                         (marks (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context)) (pair? (cdddr context))) (cadddr context) '()))
                          (transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
                     (if transformer
-                        (loop (unrename-core (call-transformer transformer x m-env s-env r-env) context))
+                        (loop (unrename-core (call-transformer transformer x m-env s-env r-env marks) context))
                         (cons (loop (car x)) (loop (cdr x)))))
                   (cons (loop (car x)) (loop (cdr x))))))))
         (else x)))))
