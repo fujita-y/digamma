@@ -60,6 +60,14 @@
 (define (syntax-object-context obj)
   (if (syntax-object? obj) (vector-ref obj 2) '()))
 
+(define (get-identifier-context id)
+  (cond
+    ((syntax-object? id) (vector-ref id 2))
+    ((symbol? id)
+     (let ((entry (assq id *rename-env*)))
+       (if entry (caddr entry) '())))
+    (else '())))
+
 ;; Convert a syntax object to a plain datum by stripping all context.
 (define (syntax->datum obj)
   (cond
@@ -70,7 +78,7 @@
 
 ;; Inheritance mechanism for context during transformation.
 (define (datum->syntax template-id datum)
-  (make-syntax-object datum (syntax-object-context template-id)))
+  (make-syntax-object datum (get-identifier-context template-id)))
 
 ;; Variable transformers for set! interception.
 (define (make-variable-transformer proc)
@@ -87,7 +95,7 @@
 ;; Convert syntax object containing a list into a list of syntax objects.
 (define (syntax->list obj)
   (let ((datum (syntax-object-datum obj))
-        (ctx (syntax-object-context obj)))
+        (ctx (get-identifier-context obj)))
     (cond
       ((null? datum) '())
       ((pair? datum)
@@ -101,20 +109,12 @@
 
 ;; Hygiene-aware identifier equality.
 (define (bound-identifier=? id1 id2)
-  (let* ((d1 (syntax-object-datum id1))
-         (d2 (syntax-object-datum id2))
-         (ctx1 (if (symbol? id1)
-                   (let ((entry (assq id1 *rename-env*)))
-                     (if entry (caddr entry) '()))
-                   (syntax-object-context id1)))
-         (ctx2 (if (symbol? id2)
-                   (let ((entry (assq id2 *rename-env*)))
-                     (if entry (caddr entry) '()))
-                   (syntax-object-context id2))))
+  (let ((d1 (syntax-object-datum id1))
+        (d2 (syntax-object-datum id2)))
     (and (symbol? d1)
          (symbol? d2)
          (eq? d1 d2)
-         (equal? ctx1 ctx2))))
+         (equal? (get-identifier-context id1) (get-identifier-context id2)))))
 
 ;; Name-only identifier equality (for literals).
 (define (free-identifier=? id1 id2)

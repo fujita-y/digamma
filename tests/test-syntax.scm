@@ -1,6 +1,4 @@
 ;; tests/test-syntax.scm
-;; Aggregated syntax macro tests from core/tests
-(load "../core/core.scm")
 
 (define *pass-count* 0)
 (define *fail-count* 0)
