@@ -116,8 +116,6 @@ target_compile_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-fexceptions>
   $<$<CONFIG:Release>:-funwind-tables>
-  $<$<CONFIG:Release>:-fno-omit-frame-pointer>
-  $<$<CONFIG:Release>:-fno-optimize-sibling-calls>
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:RelWithDebInfo>:-fexceptions>
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>

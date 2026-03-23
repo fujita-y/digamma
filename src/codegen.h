@@ -13,7 +13,8 @@
 #include <llvm/IR/Value.h>
 #include "nanos_jit.h"
 
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // ============================================================================
@@ -139,15 +140,16 @@ class codegen_t {
   std::vector<FunctionInfo> functions;
   FunctionInfo* current_function_info = nullptr;
 
-  std::vector<llvm::AllocaInst*> allocas;         // register index -> alloca
-  std::map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
+  std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca
+  std::unordered_map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
 
   // --------------------------------------------------------------------------
   //  Closure metadata
   // --------------------------------------------------------------------------
 
-  std::map<scm_obj_t, scm_obj_t> closure_literals;    // label symbol -> literals vector
-  std::map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
+  std::unordered_map<scm_obj_t, scm_obj_t> closure_literals;    // label symbol -> literals vector
+  std::unordered_set<scm_obj_t> top_level_literals;             // label symbol -> literals vector
+  std::unordered_map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
 
   // --------------------------------------------------------------------------
   //  Cached values
@@ -158,7 +160,7 @@ class codegen_t {
   scm_obj_t cached_symbol_safepoint;
   bridge_func_t cached_call_closure_bridge = nullptr;
 
-  std::map<scm_obj_t, Opcode> opcode_map;
+  std::unordered_map<scm_obj_t, Opcode> opcode_map;
 
   // --------------------------------------------------------------------------
   //  Compilation pipeline (phases)
@@ -299,7 +301,7 @@ class codegen_t {
   bridge_func_t call_closure_bridge();
 
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
-  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
+  std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
 
   void destroy() { s_current = nullptr; }
 

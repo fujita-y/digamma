@@ -161,6 +161,7 @@ void codegen_t::reset_compile_state() {
   labels.clear();
   function_map.clear();
   closure_literals.clear();
+  top_level_literals.clear();
   closure_params.clear();
 }
 
@@ -582,6 +583,7 @@ void codegen_t::init_opcode_map() {
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
   closure_literals.clear();
+  top_level_literals.clear();
   closure_params.clear();
 
   // Create main function info
@@ -770,6 +772,8 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
     if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
       current_literals.push_back(inst.opr1);
     }
+  } else {
+    top_level_literals.insert(inst.opr1);  // [TODO] protect from GC
   }
 }
 
