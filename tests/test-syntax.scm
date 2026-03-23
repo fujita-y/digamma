@@ -1283,7 +1283,7 @@
     (display "ALL TESTS PASSED.\n")
     (begin
       (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)\n
+(newline)
 ;; =============================================================================
 ;; Summary
 ;; =============================================================================

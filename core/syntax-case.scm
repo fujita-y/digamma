@@ -32,7 +32,7 @@
 ;;=============================================================================
 
 ;; Signal a syntax violation error.
-(define (syntax-violation who message form . subform)
+#;(define (syntax-violation who message form . subform)
   (let ((who-str (if who (format "~a: " who) "")))
     (if (null? subform)
         (error (format "~asyntax-violation: ~a in ~s" who-str message form))

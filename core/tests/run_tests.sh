@@ -25,9 +25,9 @@ for test_file in test_*.scm; do
     # Run the test and capture output
     # -I.. allows loading files from core/
     # -I. allows loading files from core/tests/
-    OUTPUT=$(gosh -I.. -I. "$test_file" 2>&1)
+    # OUTPUT=$(gosh -I.. -I. "$test_file" 2>&1)
     # OUTPUT=$(ypsilon --loadpath=.. "$test_file" 2>&1)
-    # OUTPUT=$(../../build/nanos --boot ../../boot/core.ir --script "$test_file" 2>&1)
+    OUTPUT=$(../../build/nanos --boot ../../boot/core.ir --script "$test_file" 2>&1)
     RETVAL=$?
     
     echo "$OUTPUT"
@@ -44,6 +44,13 @@ for test_file in test_*.scm; do
         exit 1
     fi
     
+    if echo "$OUTPUT" | grep -q "Error:"; then
+       echo ""
+    #    echo "--------------------------------------"
+    #    echo -e "${RED}ERROR: Error detected in $test_file${NC}"
+    #    exit 1
+    fi
+
     TOTAL=$((TOTAL + 1))
     echo "Done with $test_file"
     echo "--------------------------------------"
