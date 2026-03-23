@@ -6,417 +6,423 @@
 (copy-environment-variables! (interaction-environment) (current-environment)
   (map car (hashtable->alist (environment-variables (current-environment)))))
 
+;(newline)
+;(map (lambda (k) (write (car k)) (newline)) (hashtable->alist (environment-variables (current-environment))))
+;(newline)
+
 #;(copy-environment-variables! (interaction-environment) (current-environment)
-'(*
-  *cp0-effort-limit*
-  *cp0-score-limit*
-  *current-context*
-  *current-syntax-bindings*
-  *current-syntax-meta-env*
-  *inlining-depth*
-  *mark-counter*
-  *modules*
-  *rename-env*
-  *suffix-counter*
-  *syntax-temp-counter*
-  *temp-value*
-  +
-  -
-  /
-  <
-  <=
-  =
-  >
-  >=
-  analyze-free-vars-compiler
-  analyze-free-vars-optimizer
-  analyze-max-outgoing-args
-  analyze-mutated-vars-compiler
-  analyze-mutated-vars-optimizer
-  analyze-params
-  analyze-pattern
-  analyze-used-vars
-  analyze-variable-usage
-  any
-  any?
-  append
-  apply
-  apply-import-spec
-  apply-syntax-rules
-  assertion-violation
-  assoc
-  assq
-  assv
-  boolean?
-  bound-identifier=?
-  caaaaar
-  caaaadr
-  caaaar
-  caaadar
-  caaaddr
-  caaadr
-  caaar
-  caadaar
-  caadadr
-  caadar
-  caaddar
-  caadddr
-  caaddr
-  caadr
-  caar
-  cadaaar
-  cadaadr
-  cadaar
-  cadadar
-  cadaddr
-  cadadr
-  cadar
-  caddaar
-  caddadr
-  caddar
-  cadddar
-  caddddr
-  cadddr
-  caddr
-  cadr
-  call-transformer
-  call-with-current-continuation
-  call-with-values
-  call/cc
-  call/ec
-  car
-  cdaaaar
-  cdaaadr
-  cdaaar
-  cdaadar
-  cdaaddr
-  cdaadr
-  cdaar
-  cdadaar
-  cdadadr
-  cdadar
-  cdaddar
-  cdadddr
-  cdaddr
-  cdadr
-  cdar
-  cddaaar
-  cddaadr
-  cddaar
-  cddadar
-  cddaddr
-  cddadr
-  cddar
-  cdddaar
-  cdddadr
-  cdddar
-  cddddar
-  cdddddr
-  cddddr
-  cdddr
-  cddr
-  cdr
-  char-numeric?
-  char=?
-  char?
-  codegen
-  codegen-and-run
-  codegen-application
-  codegen-args
-  codegen-if
-  codegen-lambda
-  codegen-let
-  codegen-set!
-  codegen-symbol
-  collect
-  collect-pattern-vars
-  compile
-  compiler-ctx-add-closure!
-  compiler-ctx-all-closures
-  compiler-ctx-code
-  compiler-ctx-emit!
-  compiler-ctx-inc-closure-labels!
-  compiler-ctx-inc-labels!
-  compiler-ctx-mutated
-  compiler-ctx-set-code!
-  compute-score
-  cons
-  cons*
-  continuation?
-  copy-environment-macros!
-  copy-environment-variables!
-  core-eval
-  core-form?
-  count-pair
-  current-environment
-  datum->syntax
-  delete
-  display
-  drop
-  drop-elements
-  drop-last-cdr
-  drop-last-n-pair
-  drop-last-pair
-  dynamic-wind
-  environment-macro-contains?
-  environment-macro-ref
-  environment-macro-set!
-  environment-macros
-  environment-variable-contains?
-  environment-variable-ref
-  environment-variable-set!
-  environment-variables
-  eq?
-  equal-hash
-  equal?
-  eqv?
-  error
-  eval-module-body
-  eval-transformer-expr
-  every
-  every?
-  exact?
-  exit
-  expand
-  expand-and
-  expand-begin
-  expand-case
-  expand-cond
-  expand-define
-  expand-define-module
-  expand-define-syntax
-  expand-if
-  expand-import-module
-  expand-lambda
-  expand-let
-  expand-let*
-  expand-let*-syntax
-  expand-let-syntax
-  expand-letrec*
-  expand-letrec-syntax
-  expand-or
-  expand-qq-list-splicing.7_7977a76f-9022-4cac-894c-69694c305f04
-  expand-qq-list.8_4be3df6c-235e-4d4b-8957-b5977d4f28f5
-  expand-qq.9_0f7949d2-c658-4baf-aad5-9a8432eaa00c
-  expand-quasiquote
-  expand-quasiquote-form
-  expand-quote
-  expand-set!
-  expand-syntax
-  expand-syntax-case
-  expand-template
-  expand-with-syntax
-  extract-library-name
-  extract-macro-defs
-  extract-module-defined-ids
-  extract-quasisyntax
-  filter
-  filter-runtime-forms
-  fixnum?
-  flatten-begins
-  flatten-params
-  flatten-params-ll
-  flatten-params-opt
-  fold
-  for-each
-  for-each-1.4_8bbcb2db-4744-46e2-93fd-679a473d22f6
-  for-each-n.5_48cf2c30-3be4-4c96-943e-67da2f785b2f
-  free-identifier=?
-  fresh-mark
-  fresh-suffix
-  gen-label
-  generate-lifted-name
-  generate-temporaries
-  generate-temporary-symbol
-  gensym
-  get-identifier-context
-  get-param-names
-  global-env
-  has-effects?
-  hashtable->alist
-  hashtable-clear!
-  hashtable-contains?
-  hashtable-delete!
-  hashtable-entries
-  hashtable-ref
-  hashtable-set!
-  hashtable?
-  identifier?
-  inexact?
-  infinite?
-  inject-binding!
-  inst-arg1
-  inst-arg2
-  inst-op
-  integer?
-  interaction-environment
-  internal-define->binding
-  intersect-ll
-  iota
-  is-quasiquote?.4_304bd49a-0bd5-456f-94cd-9b32d50ebe40
-  is-unquote-splicing?.3_5e16d412-bcfa-402e-9581-250975eb9772
-  is-unquote?.2_3df5cb64-834a-40c7-81fd-bfa3f4759c87
-  lambda-lift
-  last-cdr
-  last-n-pair
-  last-pair
-  length
-  list
-  list->vector
-  list-head
-  list-ref
-  list-tail
-  list-transpose
-  list-transpose+
-  list?
-  lookup
-  lookup-builtin-handler
-  lookup-macro
-  lookup-module
-  loop.24_0cb28299-c22f-42f2-a4c7-ba3b91f7c182
-  loop.28_89018374-ec5e-4a97-b3d9-b78d475faa32
-  loop.29_3726dfae-3cb6-4a43-b494-37df7c3b98c2
-  loop.2_00eef52c-b21c-4584-81ba-bd02aaebc0a9
-  loop.2_2f813c6d-b12e-47ae-a2d1-a3e92fd3e8c5
-  loop.2_34fdcf5e-2fe0-45ce-a0e0-21263a2ebb62
-  loop.2_437c521c-f0f3-45fe-8e29-d4f03b3e843e
-  loop.2_5aebf644-97e0-462b-b750-676848007d6b
-  loop.2_5b0c7d99-de8b-4757-af48-9ff972a2ea78
-  loop.2_60c39238-c87d-4e65-8c9c-1ca8e8934856
-  loop.2_850c8e91-3fd8-4baa-8af5-c0eaec41b4a0
-  loop.2_8a5d59f7-e502-4250-afd3-c63ff7f47305
-  loop.2_a46177ee-5144-4c1f-8927-7a583a6e1e67
-  loop.3_2d2c74b8-d7bf-4e6d-9e6b-4dfc1894297f
-  loop.3_6d55c369-7026-4263-911d-5cf855c8da50
-  loop.3_7ad6c885-e1aa-4222-98b3-2cac6604d2b3
-  macro-binding?
-  macroexpand
-  macroexpand-1
-  make-compiler-context
-  make-environment
-  make-eq-hashtable
-  make-equal-hashtable
-  make-eqv-hashtable
-  make-macro-binding
-  make-parameter
-  make-reg
-  make-seq
-  make-syntax-object
-  make-syntax-rules-transformer
-  make-variable-transformer
-  make-vector
-  mangle-name
-  map
-  map-1.4_82031ebf-4be4-414e-b5a9-7a000ffd9745
-  map-improper
-  map-n.5_91e7eb0e-4ba6-4dff-be58-aa06219c6def
-  match-ellipsis
-  match-pattern
-  max
-  member
-  memq
-  memv
-  min
-  module-name->string
-  move-args
-  nan?
-  newline
-  no-splicing?.5_ddb2705f-af8c-4f4a-a972-34d71d993c42
-  not
-  null?
-  number->string
-  number?
-  ops-loads
-  ops-memory-pairs
-  opt-app
-  opt-begin
-  opt-if
-  opt-lambda
-  opt-let
-  opt-let-inner
-  optimize
-  optimize-inner
-  optimize-once
-  pair?
-  parameter-proc-0.3_4ea87ef3-e1b5-421d-89c5-0731ea3d2b41
-  parameter-proc-1.4_f8ca29af-2c35-45df-a562-73a521cec50f
-  parse-transformer
-  partition
-  perform-inlining
-  prepare-eval-expr
-  procedure?
-  process-export-specs
-  process-import-set
-  proper-list?
-  pure-primitives
-  real?
-  reconstruct-params
-  register-module!
-  register-renamed!
-  remove-from-list
-  rename-symbol
-  resolve-core-form
-  resolve-identifier
-  resolve-variable
-  reverse
-  safe-to-inline-val?
-  safepoint
-  set-car!
-  set-cdr!
-  set-minus
-  set-union
-  should-inline?
-  small-procedure?
-  split-internal-defines
-  string->number
-  string->symbol
-  string-append
-  string-join
-  string-length
-  string-ref
-  string=?
-  string?
-  strip-renames
-  strip-suffix
-  substitute
-  substitute-many
-  substitute-proc
-  substring
-  symbol->string
-  symbol?
-  syntax->datum
-  syntax->list
-  syntax-case-match
-  syntax-depth-map
-  syntax-object-context
-  syntax-object-datum
-  syntax-object?
-  syntax-violation
-  system-environment
-  take
-  take-elements
-  transpose-matches
-  try-drop-lambda
-  undefined
-  undefined?
-  unique
-  unquote-tail?.6_61d825d5-e7ae-46b3-9a49-68b1cf67ecf5
-  unrename-core
-  unspecified
-  unspecified?
-  unwrap-env
-  unwrap-macro-binding
-  uuid
-  values
-  variable-transformer-procedure
-  variable-transformer?
-  vector
-  vector->list
-  vector-length
-  vector-ref
-  vector-set!
-  vector?
-  write))
+'(
+*
++
+-
+/
+<
+<=
+=
+>
+>=
+analyze-free-vars-compiler
+analyze-free-vars-optimizer
+analyze-max-outgoing-args
+analyze-mutated-vars-compiler
+analyze-mutated-vars-optimizer
+analyze-params
+analyze-pattern
+analyze-used-vars
+analyze-variable-usage
+any
+any?
+append
+apply
+apply-import-spec
+apply-syntax-rules
+assertion-violation
+assoc
+assq
+assv
+boolean?
+bound-identifier=?
+caaaaar
+caaaadr
+caaaar
+caaadar
+caaaddr
+caaadr
+caaar
+caadaar
+caadadr
+caadar
+caaddar
+caadddr
+caaddr
+caadr
+caar
+cadaaar
+cadaadr
+cadaar
+cadadar
+cadaddr
+cadadr
+cadar
+caddaar
+caddadr
+caddar
+cadddar
+caddddr
+cadddr
+caddr
+cadr
+call/cc
+call/ec
+call-transformer
+call-with-current-continuation
+call-with-values
+car
+cdaaaar
+cdaaadr
+cdaaar
+cdaadar
+cdaaddr
+cdaadr
+cdaar
+cdadaar
+cdadadr
+cdadar
+cdaddar
+cdadddr
+cdaddr
+cdadr
+cdar
+cddaaar
+cddaadr
+cddaar
+cddadar
+cddaddr
+cddadr
+cddar
+cdddaar
+cdddadr
+cdddar
+cddddar
+cdddddr
+cddddr
+cdddr
+cddr
+cdr
+char=?
+char?
+char-numeric?
+codegen
+codegen-and-run
+codegen-application
+codegen-args
+codegen-if
+codegen-lambda
+codegen-let
+codegen-set!
+codegen-symbol
+collect
+collect-pattern-vars
+compile
+compiler-ctx-add-closure!
+compiler-ctx-all-closures
+compiler-ctx-code
+compiler-ctx-emit!
+compiler-ctx-inc-closure-labels!
+compiler-ctx-inc-labels!
+compiler-ctx-mutated
+compiler-ctx-set-code!
+compute-score
+cons
+cons*
+continuation?
+copy-environment-macros!
+copy-environment-variables!
+core-eval
+core-form?
+count-pair
+*cp0-effort-limit*
+*cp0-score-limit*
+*current-context*
+current-environment
+*current-syntax-bindings*
+*current-syntax-meta-env*
+datum->syntax
+delete
+display
+drop
+drop-elements
+drop-last-cdr
+drop-last-n-pair
+drop-last-pair
+dynamic-wind
+environment-macro-contains?
+environment-macro-ref
+environment-macros
+environment-macro-set!
+environment-variable-contains?
+environment-variable-ref
+environment-variables
+environment-variable-set!
+eq?
+equal?
+equal-hash
+eqv?
+error
+eval-module-body
+eval-transformer-expr
+every
+every?
+exact?
+exit
+expand
+expand-and
+expand-begin
+expand-case
+expand-cond
+expand-define
+expand-define-module
+expand-define-syntax
+expand-if
+expand-import-module
+expand-lambda
+expand-let
+expand-let*
+expand-letrec*
+expand-letrec-syntax
+expand-let*-syntax
+expand-let-syntax
+expand-or
+expand-qq.9_8a9c92f4-f170-485c-9c4d-ee263e949cd4
+expand-qq-list.8_759e4de2-26f7-46a8-8cfa-74034b585bf6
+expand-qq-list-splicing.7_d190dea9-900f-47ed-b5e2-e9700a9fd047
+expand-quasiquote
+expand-quasiquote-form
+expand-quote
+expand-set!
+expand-syntax
+expand-syntax-case
+expand-template
+expand-with-syntax
+extract-library-name
+extract-macro-defs
+extract-module-defined-ids
+extract-quasisyntax
+filter
+filter-runtime-forms
+fixnum?
+flatten-begins
+flatten-params
+flatten-params-ll
+flatten-params-opt
+fold
+for-each
+for-each-1.4_fabd2cdd-7ebf-4d01-b31e-409e34c97798
+for-each-n.5_c3776de9-a326-4063-b496-83465a34948a
+free-identifier=?
+fresh-mark
+fresh-suffix
+generate-lifted-name
+generate-temporaries
+generate-temporary-symbol
+gen-label
+gensym
+get-identifier-context
+get-param-names
+global-env
+has-effects?
+hashtable?
+hashtable->alist
+hashtable-clear!
+hashtable-contains?
+hashtable-delete!
+hashtable-entries
+hashtable-ref
+hashtable-set!
+identifier?
+inexact?
+infinite?
+inject-binding!
+*inlining-depth*
+inst-arg1
+inst-arg2
+inst-op
+integer?
+interaction-environment
+internal-define->binding
+intersect-ll
+iota
+is-quasiquote?.4_b80f6a08-f151-42f8-b91b-896b4f7f804b
+is-unquote?.2_9a4c0af6-d19b-41e9-ba0c-691a3ff06ad5
+is-unquote-splicing?.3_404a7d96-3381-4855-ab2f-0a581b6e2a52
+lambda-lift
+last-cdr
+last-n-pair
+last-pair
+length
+list
+list?
+list-head
+list-ref
+list-tail
+list-transpose
+list-transpose+
+list->vector
+lookup
+lookup-builtin-handler
+lookup-macro
+lookup-module
+loop.2_1b7d33f3-fdae-414a-baa4-93b5b77bf737
+loop.24_861555ad-83b8-4def-afe7-dcb4070f2217
+loop.2_4940f7b3-9138-47a8-965c-9613ea5b9e82
+loop.2_4df498b0-e2b8-4a3c-891c-df99b7268af2
+loop.28_38f3eafe-7fcf-4919-9583-c9cf2e5e6a27
+loop.29_0eaa168d-3c24-4d58-a897-e9c959e2414a
+loop.2_9621f358-d43e-4513-adb9-4174539f6149
+loop.2_99feadc9-eba0-4f97-b806-82ba28f21627
+loop.2_a4d184b4-30ae-427c-b533-58bc27f49afb
+loop.2_b4733f35-3b02-46ed-97a1-0c2e5575749d
+loop.2_bbf9e64b-842b-431c-bb57-e9b9f89c5eb8
+loop.2_e01dc948-02fb-4068-92d3-e781fe74298e
+loop.2_e72058f5-6087-4f27-b7cf-e05b1720e45d
+loop.3_213d099d-e558-47bd-a191-19a6af805ffd
+loop.3_3efe4658-632a-407f-92e9-b0fa927c237f
+loop.3_908a357f-edf4-48d5-944c-c7c99aaf8baa
+macro-binding?
+macroexpand
+macroexpand-1
+make-compiler-context
+make-environment
+make-eq-hashtable
+make-equal-hashtable
+make-eqv-hashtable
+make-macro-binding
+make-parameter
+make-reg
+make-seq
+make-syntax-object
+make-syntax-rules-transformer
+make-variable-transformer
+make-vector
+mangle-name
+map
+map-1.4_573f4ddf-a3e1-4179-b7ec-12a7b5e1d5ce
+map-improper
+map-n.5_7da8d397-6a22-48a4-9d60-46070c76962d
+*mark-counter*
+match-ellipsis
+match-pattern
+max
+member
+memq
+memv
+min
+module-name->string
+*modules*
+move-args
+nan?
+newline
+no-splicing?.5_c5f5ccbe-0683-4a90-89c5-7253f66a4435
+not
+null?
+number?
+number->string
+ops-loads
+ops-memory-pairs
+opt-app
+opt-begin
+opt-if
+optimize
+optimize-inner
+optimize-once
+opt-lambda
+opt-let
+opt-let-inner
+pair?
+parameter-proc-0.3_b3c28d56-0690-442e-9b97-44b1478934fe
+parameter-proc-1.4_d86cf76b-a8a9-407f-ad50-b011d4abaac1
+parse-transformer
+partition
+perform-inlining
+prepare-eval-expr
+procedure?
+process-export-specs
+process-import-set
+proper-list?
+pure-primitives
+real?
+reconstruct-params
+register-module!
+register-renamed!
+remove-from-list
+*rename-env*
+rename-symbol
+resolve-core-form
+resolve-identifier
+resolve-variable
+reverse
+safepoint
+safe-to-inline-val?
+set-car!
+set-cdr!
+set-minus
+set-union
+should-inline?
+small-procedure?
+split-internal-defines
+string=?
+string?
+string-append
+string-join
+string-length
+string->number
+string-ref
+string->symbol
+strip-renames
+strip-suffix
+substitute
+substitute-many
+substitute-proc
+substring
+*suffix-counter*
+symbol?
+symbol->string
+syntax-case-match
+syntax->datum
+syntax-depth-map
+syntax->list
+syntax-object?
+syntax-object-context
+syntax-object-datum
+*syntax-temp-counter*
+syntax-violation
+system-environment
+take
+take-elements
+*temp-value*
+transpose-matches
+try-drop-lambda
+undefined
+undefined?
+unique
+unquote-tail?.6_8d0c4794-a075-4525-b09d-4fadbf2be7e0
+unrename-core
+unspecified
+unspecified?
+unwrap-env
+unwrap-macro-binding
+uuid
+values
+variable-transformer?
+variable-transformer-procedure
+vector
+vector?
+vector-length
+vector->list
+vector-ref
+vector-set!
+write
+))
 
 #;(copy-environment-variables! (interaction-environment) (current-environment)
   '(+ - * / = < > <= >=

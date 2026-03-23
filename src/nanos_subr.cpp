@@ -1288,14 +1288,21 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
   while (is_cons(cur)) {
     scm_obj_t key = CAR(cur);
     if (!is_symbol(key)) throw std::runtime_error("copy-environment-variables!: list elements must be symbols");
+    if (!is_symbol_interned(key)) {
+      std::string msg = "copy-environment-variables!: symbol not interned: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
     scm_obj_t cell = hashtable_ref(src->variables, key, scm_undef);
     if (cell != scm_undef) {
+      assert(is_cell(cell));
       scm_obj_t val = cell_value(cell);
       if (is_closure(val)) {
         hashtable_set(dst->variables, key, make_cell(val));
       } else {
         hashtable_set(dst->variables, key, cell);
       }
+    } else {
+      std::string msg = "copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
     }
     cur = CDR(cur);
   }
@@ -1313,9 +1320,16 @@ SUBR subr_copy_environment_macros(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, sc
   while (is_cons(cur)) {
     scm_obj_t key = CAR(cur);
     if (!is_symbol(key)) throw std::runtime_error("copy-environment-macros!: list elements must be symbols");
+    if (!is_symbol_interned(key)) {
+      std::string msg = "copy-environment-macros!: symbol not interned: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
     scm_obj_t val = hashtable_ref(src->macros, key, scm_undef);
     if (val != scm_undef) {
       hashtable_set(dst->macros, key, val);
+    } else {
+      std::string msg = "copy-environment-macros!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
     }
     cur = CDR(cur);
   }
@@ -1666,7 +1680,6 @@ void nanos_t::init_subr() {
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
-  scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
-  heap->environment_variable_set(make_symbol("call/cc"), scm_subr_call_cc);
-  heap->environment_variable_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
+  reg("call/cc", (void*)subr_call_cc, 1, 0);
+  reg("call-with-current-continuation", (void*)subr_call_cc, 1, 0);
 }

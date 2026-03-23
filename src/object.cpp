@@ -100,6 +100,14 @@ scm_obj_t make_uninterned_symbol(const char* name) {
   return obj;
 }
 
+bool is_symbol_interned(scm_obj_t x) {
+  if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
+  object_heap_t& heap = *object_heap_t::current();
+  std::lock_guard<std::mutex> lock(heap.m_symbol_table_mutex);
+  auto it = heap.m_symbol_table.find((char*)symbol_name(x));
+  return it != heap.m_symbol_table.end();
+}
+
 uint8_t* symbol_name(scm_obj_t x) {
   if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
   return ((scm_symbol_rec_t*)to_address(x))->name;
