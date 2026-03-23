@@ -237,18 +237,67 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
 
-// cadr, caddr, caar, cadar, caddar, cadddr, cddr, cdddr, cdar, cddar, cdddar  - R6RS 11.9
-SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
-SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+// caar, cadr, etc. up to 5 levels - R6RS / SRFI 1 extensions
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
+SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
+SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
+SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
+SUBR subr_caaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, a1))); }
+SUBR subr_caadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, a1))); }
 SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_cdaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, a1))); }
+SUBR subr_cdadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, a1))); }
+SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_caaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_caaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
+SUBR subr_caadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_caaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_cadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
 SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
-SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
-SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
-SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cdaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cdaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
+SUBR subr_cdadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_cdaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_cddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
 SUBR subr_cdddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_cddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_caaaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caaaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_caaadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caaaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_caadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_caaddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cadaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cadaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cadadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cadaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_caddaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caddadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cadddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caddddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdaaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdaaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdadaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdadadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdadddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cddaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cddaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cddadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cddaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cddddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
 
 // list  - R6RS 11.9
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -1023,6 +1072,44 @@ SUBR subr_error(scm_obj_t self, int argc, scm_obj_t argv[]) {
   throw std::runtime_error(oss.str());
 }
 
+// assertion-violation  - R6RS 11.4
+// (assertion-violation who message irritant ...)
+SUBR subr_assertion_violation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("assertion-violation: wrong number of arguments");
+  std::ostringstream oss;
+  oss << "assertion-violation: ";
+  if (argv[0] != scm_false) {
+    printer_t(oss).display(argv[0]);
+    oss << ": ";
+  }
+  printer_t(oss).display(argv[1]);
+  for (int i = 2; i < argc; i++) {
+    oss << " ";
+    printer_t(oss).write(argv[i]);
+  }
+  throw std::runtime_error(oss.str());
+}
+
+// syntax-violation  - R6RS 11.4
+// (syntax-violation who message form [subform])
+SUBR subr_syntax_violation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 3 || argc > 4) throw std::runtime_error("syntax-violation: wrong number of arguments");
+  std::ostringstream oss;
+  oss << "syntax-violation: ";
+  if (argv[0] != scm_false) {
+    printer_t(oss).display(argv[0]);
+    oss << ": ";
+  }
+  printer_t(oss).display(argv[1]);
+  oss << " ";
+  printer_t(oss).write(argv[2]);
+  if (argc == 4) {
+    oss << " ";
+    printer_t(oss).write(argv[3]);
+  }
+  throw std::runtime_error(oss.str());
+}
+
 // ============================================================================
 // Application & Control
 // ============================================================================
@@ -1393,16 +1480,65 @@ void nanos_t::init_subr() {
   reg("car", (void*)subr_car, 1, 0);
   reg("cdr", (void*)subr_cdr, 1, 0);
   reg("caar", (void*)subr_caar, 1, 0);
-  reg("cdar", (void*)subr_cdar, 1, 0);
   reg("cadr", (void*)subr_cadr, 1, 0);
+  reg("cdar", (void*)subr_cdar, 1, 0);
   reg("cddr", (void*)subr_cddr, 1, 0);
+  reg("caaar", (void*)subr_caaar, 1, 0);
+  reg("caadr", (void*)subr_caadr, 1, 0);
   reg("cadar", (void*)subr_cadar, 1, 0);
-  reg("cddar", (void*)subr_cddar, 1, 0);
-  reg("caddar", (void*)subr_caddar, 1, 0);
-  reg("cdddar", (void*)subr_cdddar, 1, 0);
   reg("caddr", (void*)subr_caddr, 1, 0);
+  reg("cdaar", (void*)subr_cdaar, 1, 0);
+  reg("cdadr", (void*)subr_cdadr, 1, 0);
+  reg("cddar", (void*)subr_cddar, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
+  reg("caaaar", (void*)subr_caaaar, 1, 0);
+  reg("caaadr", (void*)subr_caaadr, 1, 0);
+  reg("caadar", (void*)subr_caadar, 1, 0);
+  reg("caaddr", (void*)subr_caaddr, 1, 0);
+  reg("cadaar", (void*)subr_cadaar, 1, 0);
+  reg("cadadr", (void*)subr_cadadr, 1, 0);
+  reg("caddar", (void*)subr_caddar, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
+  reg("cdaaar", (void*)subr_cdaaar, 1, 0);
+  reg("cdaadr", (void*)subr_cdaadr, 1, 0);
+  reg("cdadar", (void*)subr_cdadar, 1, 0);
+  reg("cdaddr", (void*)subr_cdaddr, 1, 0);
+  reg("cddaar", (void*)subr_cddaar, 1, 0);
+  reg("cddadr", (void*)subr_cddadr, 1, 0);
+  reg("cdddar", (void*)subr_cdddar, 1, 0);
+  reg("cddddr", (void*)subr_cddddr, 1, 0);
+  reg("caaaaar", (void*)subr_caaaaar, 1, 0);
+  reg("caaaadr", (void*)subr_caaaadr, 1, 0);
+  reg("caaadar", (void*)subr_caaadar, 1, 0);
+  reg("caaaddr", (void*)subr_caaaddr, 1, 0);
+  reg("caadaar", (void*)subr_caadaar, 1, 0);
+  reg("caadadr", (void*)subr_caadadr, 1, 0);
+  reg("caaddar", (void*)subr_caaddar, 1, 0);
+  reg("caadddr", (void*)subr_caadddr, 1, 0);
+  reg("cadaaar", (void*)subr_cadaaar, 1, 0);
+  reg("cadaadr", (void*)subr_cadaadr, 1, 0);
+  reg("cadadar", (void*)subr_cadadar, 1, 0);
+  reg("cadaddr", (void*)subr_cadaddr, 1, 0);
+  reg("caddaar", (void*)subr_caddaar, 1, 0);
+  reg("caddadr", (void*)subr_caddadr, 1, 0);
+  reg("cadddar", (void*)subr_cadddar, 1, 0);
+  reg("caddddr", (void*)subr_caddddr, 1, 0);
+  reg("cdaaaar", (void*)subr_cdaaaar, 1, 0);
+  reg("cdaaadr", (void*)subr_cdaaadr, 1, 0);
+  reg("cdaadar", (void*)subr_cdaadar, 1, 0);
+  reg("cdaaddr", (void*)subr_cdaaddr, 1, 0);
+  reg("cdadaar", (void*)subr_cdadaar, 1, 0);
+  reg("cdadadr", (void*)subr_cdadadr, 1, 0);
+  reg("cdaddar", (void*)subr_cdaddar, 1, 0);
+  reg("cdadddr", (void*)subr_cdadddr, 1, 0);
+  reg("cddaaar", (void*)subr_cddaaar, 1, 0);
+  reg("cddaadr", (void*)subr_cddaadr, 1, 0);
+  reg("cddadar", (void*)subr_cddadar, 1, 0);
+  reg("cddaddr", (void*)subr_cddaddr, 1, 0);
+  reg("cdddaar", (void*)subr_cdddaar, 1, 0);
+  reg("cdddadr", (void*)subr_cdddadr, 1, 0);
+  reg("cddddar", (void*)subr_cddddar, 1, 0);
+  reg("cdddddr", (void*)subr_cdddddr, 1, 0);
   reg("set-car!", (void*)subr_set_car, 2, 0);
   reg("set-cdr!", (void*)subr_set_cdr, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
@@ -1523,6 +1659,8 @@ void nanos_t::init_subr() {
 
   // application & control
   reg("error", (void*)subr_error, 1, 1);
+  reg("assertion-violation", (void*)subr_assertion_violation, 2, 1);
+  reg("syntax-violation", (void*)subr_syntax_violation, 3, 1);
   reg("apply", (void*)subr_apply, 0, 1);
   reg("call/ec", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
