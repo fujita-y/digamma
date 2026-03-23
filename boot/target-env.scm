@@ -838,9 +838,9 @@ analyze-free-vars-compiler
 +
 *
 ))
-
 (copy-environment-variables! (interaction-environment) (current-environment)
 core-variable-list)
+
 
 #;(copy-environment-variables! (interaction-environment) (current-environment)
   '(+ - * / = < > <= >=

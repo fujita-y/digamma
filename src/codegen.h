@@ -148,7 +148,6 @@ class codegen_t {
   // --------------------------------------------------------------------------
 
   std::unordered_map<scm_obj_t, scm_obj_t> closure_literals;    // label symbol -> literals vector
-  std::unordered_set<scm_obj_t> top_level_literals;             // label symbol -> literals vector
   std::unordered_map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
 
   // --------------------------------------------------------------------------

@@ -161,7 +161,6 @@ void codegen_t::reset_compile_state() {
   labels.clear();
   function_map.clear();
   closure_literals.clear();
-  top_level_literals.clear();
   closure_params.clear();
 }
 
@@ -442,7 +441,7 @@ static llvm::Function* getUserFunction(llvm::User* U) {
 }
 
 void codegen_t::prune_unused_closures() {
-  std::set<llvm::Function*> reachable;
+  std::unordered_set<llvm::Function*> reachable;
   std::vector<llvm::Function*> worklist;
 
   llvm::Module* main_mod = main_module_uptr.get();
@@ -462,7 +461,7 @@ void codegen_t::prune_unused_closures() {
 
   // 2. Build edges: for each function in closure_module, find which functions use it.
   // edge: user_func -> target_func
-  std::map<llvm::Function*, std::vector<llvm::Function*>> cg;
+  std::unordered_map<llvm::Function*, std::vector<llvm::Function*>> cg;
   for (llvm::Function& target_func : *clo_mod) {
     if (target_func.isDeclaration()) continue;
 
@@ -583,7 +582,6 @@ void codegen_t::init_opcode_map() {
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
   closure_literals.clear();
-  top_level_literals.clear();
   closure_params.clear();
 
   // Create main function info
@@ -773,7 +771,7 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
       current_literals.push_back(inst.opr1);
     }
   } else {
-    top_level_literals.insert(inst.opr1);  // [TODO] protect from GC
+    // [TODO] protect from GC
   }
 }
 
@@ -1071,11 +1069,11 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 // ============================================================================
 
 void codegen_t::analyze_closure_labels() {
-  std::map<scm_obj_t, scm_obj_t> global_closure_defs;
+  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
 
   struct State {
-    std::map<int, scm_obj_t> regs;
-    std::map<scm_obj_t, scm_obj_t> globals;
+    std::unordered_map<int, scm_obj_t> regs;
+    std::unordered_map<scm_obj_t, scm_obj_t> globals;
 
     bool merge(const State& other) {
       bool changed = false;
@@ -1106,7 +1104,7 @@ void codegen_t::analyze_closure_labels() {
   };
 
   for (auto& func : functions) {
-    std::map<scm_obj_t, State> block_entry_states;
+    std::unordered_map<scm_obj_t, State> block_entry_states;
     bool changed = true;
     while (changed) {
       changed = false;
