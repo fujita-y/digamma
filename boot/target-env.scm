@@ -3,14 +3,14 @@
   (map car (hashtable->alist (environment-macros (current-environment)))))
 
 ;; copy core variables to interaction environment
-(copy-environment-variables! (interaction-environment) (current-environment)
+#;(copy-environment-variables! (interaction-environment) (current-environment)
   (map car (hashtable->alist (environment-variables (current-environment)))))
 
 ;(newline)
 ;(map (lambda (k) (write (car k)) (newline)) (hashtable->alist (environment-variables (current-environment))))
 ;(newline)
 
-#;(copy-environment-variables! (interaction-environment) (current-environment)
+(copy-environment-variables! (interaction-environment) (current-environment)
 '(
 *
 +

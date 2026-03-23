@@ -106,6 +106,9 @@ target_compile_definitions(nanos_config INTERFACE
   SYSTEM_EXTENSION_PATH="${NANOS_EXTENSION_DIRECTORY}"
   $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>:DEFAULT_HEAP_LIMIT=512>
   $<$<NOT:$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>>:DEFAULT_HEAP_LIMIT=2048>
+  $<$<CONFIG:RelWithDebInfo>:IS_RELWITHDEBINFO_BUILD>
+  $<$<CONFIG:Debug>:IS_DEBUG_BUILD>
+  $<$<CONFIG:Release>:IS_RELEASE_BUILD>
 )
 
 # Define compile options
@@ -118,6 +121,7 @@ target_compile_options(nanos_config INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
+  # $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
@@ -130,7 +134,7 @@ target_compile_options(nanos_config INTERFACE
 target_link_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-flto>
-  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
+  # $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
 )
 
