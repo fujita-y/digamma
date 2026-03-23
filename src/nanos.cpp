@@ -116,7 +116,7 @@ void nanos_t::load_ir(std::string filename) {
 #endif
       try {
         auto func = codegen_t::current()->compile(obj);
-        intptr_t result = func();
+        intptr_t result = func.release_and_run();
 #if IR_VERBOSE
         printf("(0x%016lx)\n", result);
         printer.write((scm_obj_t)result);

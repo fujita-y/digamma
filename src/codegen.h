@@ -80,10 +80,7 @@ struct compiled_code_t {
   compiled_code_t(compiled_code_t&& other);
   compiled_code_t& operator=(compiled_code_t&& other);
 
-  intptr_t operator()() const {
-    if (func_ptr) return func_ptr();
-    return 0;
-  }
+  intptr_t release_and_run();
 
   operator bool() const { return func_ptr != nullptr; }
 };

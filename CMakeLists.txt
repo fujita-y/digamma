@@ -116,12 +116,14 @@ target_compile_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-fexceptions>
   $<$<CONFIG:Release>:-funwind-tables>
+  $<$<CONFIG:Release>:-fno-omit-frame-pointer>
+  $<$<CONFIG:Release>:-fno-optimize-sibling-calls>
   $<$<CONFIG:Release>:-flto>
   $<$<CONFIG:RelWithDebInfo>:-fexceptions>
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
-  # $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
+  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
@@ -134,7 +136,7 @@ target_compile_options(nanos_config INTERFACE
 target_link_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-flto>
-  # $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
+  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
 )
 

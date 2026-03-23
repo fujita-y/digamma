@@ -59,6 +59,25 @@ compiled_code_t& compiled_code_t::operator=(compiled_code_t&& other) {
   return *this;
 }
 
+intptr_t compiled_code_t::release_and_run() {
+  // Grab the function pointer locally before clearing it from the object.
+  auto f = func_ptr;
+  func_ptr = nullptr;
+  // Explicitly remove the LLVM tracker BEFORE running JIT code.
+  // Scheme continuations captured before subr_codegen_and_run can overwrite
+  // this function's stack frame (including 'tracker') during restoration.
+  // By releasing here, the destructor becomes a safe no-op even on a
+  // corrupted stack.
+  if (tracker) {
+    if (auto err = tracker->remove()) {
+      llvm::consumeError(std::move(err));
+    }
+    tracker = nullptr;
+  }
+  if (f) return f();
+  return 0;
+}
+
 // ============================================================================
 //  Static / thread-local state
 // ============================================================================

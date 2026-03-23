@@ -1457,9 +1457,8 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 // codegen-and-run - Nanos extension
 SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
   try {
-    auto func = codegen_t::current()->compile(coreform);
-    intptr_t result = func();
-    return (scm_obj_t)result;
+    compiled_code_t func = codegen_t::current()->compile(coreform);
+    return (scm_obj_t)func.release_and_run();
   } catch (std::exception& e) {
     throw std::runtime_error(e.what());
   }
