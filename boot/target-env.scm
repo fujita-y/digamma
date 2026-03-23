@@ -11,7 +11,7 @@
 ;(newline)
 
 ; [To agent] [Case 1] This causes error.
-#;(copy-environment-variables! (interaction-environment) (current-environment)
+(copy-environment-variables! (interaction-environment) (current-environment)
 '(
 *
 +
@@ -426,7 +426,7 @@ write
 ))
 
 ; [To agent] [Case 2] This do NOT cause error.
-(define core-variable-list '(
+#;(define core-variable-list '(
 write
 vector-set!
 vector-ref
@@ -838,7 +838,7 @@ analyze-free-vars-compiler
 +
 *
 ))
-(copy-environment-variables! (interaction-environment) (current-environment)
+#;(copy-environment-variables! (interaction-environment) (current-environment)
 core-variable-list)
 
 

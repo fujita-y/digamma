@@ -101,7 +101,12 @@ class object_heap_t {
     if (is_heap_object(obj)) m_concurrent_heap.write_barrier(to_address(obj));
   }
 
-  void add_root(scm_obj_t obj) { m_root_set.insert(obj); }
+  void add_root(scm_obj_t obj) {
+    if (is_cons(obj) || is_heap_object(obj)) {
+      write_barrier(obj);
+      m_root_set.insert(obj);
+    }
+  }
   void remove_root(scm_obj_t obj) { m_root_set.erase(obj); }
 
   uint64_t m_collect_trip_bytes;
@@ -118,4 +123,18 @@ class object_heap_t {
     return s_current;
   }
 };
+
+class scoped_gc_protect {
+  scoped_gc_protect(const scoped_gc_protect&) = delete;
+  scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
+  scm_obj_t m_obj;
+
+ public:
+  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { object_heap_t::current()->add_root(obj); }
+  ~scoped_gc_protect() {
+    object_heap_t::current()->remove_root(m_obj);
+    m_obj = (scm_obj_t) nullptr;
+  }
+};
+
 #endif

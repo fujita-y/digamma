@@ -770,8 +770,9 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
     if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
       current_literals.push_back(inst.opr1);
     }
-  } else {
-    // [TODO] protect from GC
+  }
+  if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
+    object_heap_t::current()->literals_add(inst.opr1);
   }
 }
 

@@ -71,6 +71,7 @@ void nanos_t::load_script(std::string filename) {
   bool err = false;
   while (true) {
     scm_obj_t obj = reader.read(err);
+    scoped_gc_protect protect(obj);
     if (err) {
       std::string msg = reader.get_error_message();
       std::cout << "read error: " << msg << std::endl;
@@ -100,6 +101,7 @@ void nanos_t::load_ir(std::string filename) {
   bool err = false;
   while (true) {
     scm_obj_t obj = reader.read(err);
+    scoped_gc_protect protect(obj);
     if (err) {
       std::string msg = reader.get_error_message();
       std::cout << "read error: " << msg << std::endl;
