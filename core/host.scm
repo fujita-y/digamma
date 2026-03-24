@@ -56,3 +56,14 @@
 (define (environment-variable-ref name)
   (or (environment-variable-contains? name) (error "environment-variable-ref: symbol not found" name))
   (hashtable-ref *current-variable-environment* name #f))
+
+(define-syntax with-parameter
+  (syntax-rules ()
+    ((_ ((param val) ...) body ...)
+     (let ((old-vals (list (param) ...))
+           (new-vals (list val ...)))
+       (for-each (lambda (p v) (p v)) (list param ...) new-vals)
+       (let ((results (let () body ...)))
+         (for-each (lambda (p v) (p v)) (list param ...) old-vals)
+         results)))))
+

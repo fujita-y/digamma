@@ -39,7 +39,7 @@ void nanos_t::init_codegen() {
 
 void nanos_t::init() {
   object_heap_t* heap = new object_heap_t();
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 64 * 1024 * 1024);
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 512 * 1024 * 1024);
   init_codegen();
   init_subr();
 }

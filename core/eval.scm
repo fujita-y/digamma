@@ -1,9 +1,17 @@
 (define (core-eval expr env)
-  (parameterize ((current-environment env))
-    (let* ((expanded (macroexpand expr))
-            (optimized (optimize expanded))
-            (lifted (lambda-lift optimized))
-            (coreform (compile lifted)))
+  (if (eq? (current-environment) env)
+      (let* ((expanded (macroexpand expr))
+             (optimized (optimize expanded))
+             (lifted (lambda-lift optimized))
+             (coreform (compile lifted)))
+        (codegen-and-run coreform))
+      (with-parameter ((current-environment env))
+        (let* ((expanded (macroexpand expr))
+               (optimized (optimize expanded))
+               (lifted (lambda-lift optimized))
+               (coreform (compile lifted)))
+          (codegen-and-run coreform)))))
+
     #|
         (newline)
         (display "macroexpanded form:\n")
@@ -23,4 +31,3 @@
         (newline)
         (newline)
     |#
-        (codegen-and-run coreform))))

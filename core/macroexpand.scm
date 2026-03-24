@@ -215,7 +215,7 @@
 
 ;; Invoke a macro transformer with current lexical context captured.
 (define (call-transformer transformer expr m-env s-env r-env marks)
-  (parameterize ((*current-context* (list m-env s-env r-env marks)))
+  (with-parameter ((*current-context* (list m-env s-env r-env marks)))
     (syntax->datum (if (variable-transformer? transformer)
                        ((variable-transformer-procedure transformer) expr)
                        (transformer expr)))))
@@ -311,12 +311,8 @@
 ;; SECTION 6: Expansion Handlers
 ;;=============================================================================
 
-(define (expand expr . args)
-  (let* ((m-env (if (null? args) '() (car args)))
-         (s-env (if (or (null? args) (null? (cdr args))) '() (cadr args)))
-         (r-env (if (or (null? args) (null? (cdr args)) (null? (cddr args))) '() (caddr args)))
-         (marks (if (or (null? args) (null? (cdr args)) (null? (cddr args)) (null? (cdddr args))) '() (cadddr args))))
-    (cond
+(define (expand expr m-env s-env r-env marks)
+  (cond
       ((pair? expr)
        (let ((head (car expr)))
          (if (symbol? head)
@@ -331,9 +327,10 @@
              (map-improper (lambda (x) (expand x m-env s-env r-env marks)) expr))))
       ((symbol? expr)
        (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
-         (if transformer (expand (call-transformer transformer expr m-env s-env r-env marks) m-env s-env r-env marks)
+         (if transformer
+             (expand (call-transformer transformer expr m-env s-env r-env marks) m-env s-env r-env marks)
              (resolve-variable expr m-env s-env r-env marks))))
-      (else expr))))
+      (else expr)))
 
 (define (expand-lambda expr m-env s-env r-env marks)
   (let* ((params (cadr expr)) (body (cddr expr))
