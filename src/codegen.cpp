@@ -160,7 +160,6 @@ void codegen_t::reset_compile_state() {
   allocas.clear();
   labels.clear();
   function_map.clear();
-  closure_literals.clear();
   closure_params.clear();
 }
 
@@ -516,7 +515,6 @@ void codegen_t::init_opcode_map() {
 
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
-  closure_literals.clear();
   closure_params.clear();
 
   // Create main function info
@@ -526,7 +524,6 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
 
   scm_obj_t curr = inst_list;
   scm_obj_t current_closure_label = scm_nil;
-  std::vector<scm_obj_t> current_literals;
 
   // Detect closure parameters to switch contexts.
   // Closures always start with a unique label which starts with 'C'.
@@ -539,9 +536,6 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
     if (is_cons(inst_obj) && CAR(inst_obj) == cached_symbol_label) {
       scm_obj_t label = operand(inst_obj, 1);
       if (is_closure_label(label)) {
-        // Finish previous closure literals
-        finish_closure_literals(current_closure_label, current_literals);
-
         // Start new function
         functions.emplace_back();
         current_func = &functions.back();
@@ -549,7 +543,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
         current_closure_label = label;
 
         // label instruction
-        parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+        parse_single_instruction(inst_obj, *current_func, current_closure_label);
 
         // Insert safepoint before the first instruction of the closure
         Instruction safepoint_inst;
@@ -561,11 +555,8 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
       }
     }
 
-    parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+    parse_single_instruction(inst_obj, *current_func, current_closure_label);
   }
-
-  // Finish any remaining closure literals
-  finish_closure_literals(current_closure_label, current_literals);
 
   // Post-process: Update max_reg for each function based on parameters
   // Main function (index 0) doesn't have parameters in registers initially (or rather, it's just entry)
@@ -586,8 +577,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   }
 }
 
-void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                                         std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label) {
   if (!is_cons(inst_obj)) return;
 
   Instruction inst;
@@ -609,7 +599,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
 
   switch (inst.op) {
     case Opcode::CONST:
-      parse_const(inst_obj, inst, func_info, current_closure_label, current_literals);
+      parse_const(inst_obj, inst, func_info, current_closure_label);
       break;
     case Opcode::MOV:
       parse_mov(inst_obj, inst, func_info);
@@ -621,7 +611,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
       parse_jump(inst_obj, inst);
       break;
     case Opcode::LABEL:
-      parse_label(inst_obj, inst, current_closure_label, current_literals);
+      parse_label(inst_obj, inst, current_closure_label);
       break;
     case Opcode::RET:
       parse_ret(inst_obj, inst, func_info);
@@ -676,36 +666,15 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
   func_info.instructions.push_back(inst);
 }
 
-void codegen_t::finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals) {
-  if (current_closure_label != scm_nil) {
-    if (!current_literals.empty()) {
-      scm_obj_t vec = make_vector(current_literals.size(), scm_false);
-      for (size_t i = 0; i < current_literals.size(); ++i) {
-        ((scm_vector_rec_t*)to_address(vec))->elts[i] = current_literals[i];
-      }
-      closure_literals[current_closure_label] = vec;
-    }
-    current_literals.clear();
-    current_closure_label = scm_nil;
-  }
-}
-
 // --------------------------------------------------------------------------
 //  Per-opcode parsers
 // --------------------------------------------------------------------------
 
-void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                            std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label) {
   inst.rn1 = parse_reg(operand(inst_obj, 1));
   inst.opr1 = operand(inst_obj, 2);  // val
   updateMaxRegister(inst.rn1, func_info.max_reg);
-
-  // Collect literals if in closure
-  if (current_closure_label != scm_nil) {
-    if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
-      current_literals.push_back(inst.opr1);
-    }
-  }
+  // Register literal
   if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
     object_heap_t::current()->literals_add(inst.opr1);
   }
@@ -726,12 +695,10 @@ void codegen_t::parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionI
 
 void codegen_t::parse_jump(const scm_obj_t& inst_obj, Instruction& inst) { inst.opr1 = operand(inst_obj, 1); }
 
-void codegen_t::parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label,
-                            std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label) {
   inst.opr1 = operand(inst_obj, 1);
   // Check if this is a closure label
   if (is_closure_label(inst.opr1)) {
-    finish_closure_literals(current_closure_label, current_literals);
     current_closure_label = inst.opr1;
   }
 }

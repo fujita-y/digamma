@@ -7,9 +7,8 @@
 #include "core.h"
 #include "object.h"
 
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals);
+extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[]);
 extern "C" scm_obj_t c_make_closure_s1(void* code, int argc);
-extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals);
 extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr);
 extern "C" scm_obj_t c_make_cell(scm_obj_t value);
 extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]);

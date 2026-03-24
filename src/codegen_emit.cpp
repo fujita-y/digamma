@@ -184,14 +184,6 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   // Count free variables
   int nenv = count_list_length(inst.free_indices);
 
-  // Get literals vector if available
-  scm_obj_t literals = scm_nil;
-  if (closure_literals.count(inst.opr1)) {
-    literals = closure_literals[inst.opr1];
-    object_heap_t::current()->literals_add(literals);
-  }
-  llvm::Value* literals_val = createInt64Constant(CT, (uint64_t)literals);
-
   // Common types
   llvm::Type* intptrTy = this->getInt64Type();
   llvm::Type* voidPtrTy = this->getVoidPtrType();
@@ -203,19 +195,11 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 
   llvm::Value* closure;
   if (!inst.has_rest && nenv == 0) {
-    if (literals == scm_nil) {
-      // Simple closure optimization (no literals)
-      std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
-      llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
-      llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s1", simpleFT, (void*)&c_make_closure_s1);
-      closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
-    } else {
-      // Simple closure optimization (with literals)
-      std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty, intptrTy};
-      llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
-      llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s2", simpleFT, (void*)&c_make_closure_s2);
-      closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc, literals_val}, "closure");
-    }
+    // Simple closure optimization
+    std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
+    llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
+    llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s1", simpleFT, (void*)&c_make_closure_s1);
+    closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
   } else {
     // General case: Prepare environment array
     llvm::Value* env_array = nullptr;
@@ -234,14 +218,14 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
       env_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
     }
 
-    llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, {voidPtrTy, int32Ty, int32Ty, int32Ty, voidPtrTy, intptrTy}, false);
+    llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, {voidPtrTy, int32Ty, int32Ty, int32Ty, voidPtrTy}, false);
     llvm::Function* make_closure_func = get_or_create_external_function("c_make_closure", ft, (void*)&c_make_closure);
 
     llvm::Value* rest = createInt32Constant(CT, inst.has_rest ? 1 : 0);
     llvm::Value* nenv_val = createInt32Constant(CT, nenv);
     llvm::Value* env_ptr = BL.CreateBitCast(env_array, voidPtrTy);
 
-    std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nenv_val, env_ptr, literals_val};
+    std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nenv_val, env_ptr};
     closure = BL.CreateCall(make_closure_func, callArgs, "closure");
   }
 
