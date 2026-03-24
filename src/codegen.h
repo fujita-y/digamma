@@ -180,7 +180,6 @@ class codegen_t {
   void phase3_generate_code();
   void phase4_optimize_and_verify();
   void optimize_module(llvm::Module& mod);
-  void prune_unused_closures();
   compiled_code_t phase5_finalize();
   void reset_compile_state();
 

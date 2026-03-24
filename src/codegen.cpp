@@ -408,8 +408,6 @@ void codegen_t::phase4_optimize_and_verify() {
 #endif
 
   if (functions.size() > 1) {
-    // No effects without named let optimization
-    // prune_unused_closures();
 #ifndef NDEBUG
     {
       std::error_code EC;
@@ -438,69 +436,6 @@ static llvm::Function* getUserFunction(llvm::User* U) {
     }
   }
   return nullptr;
-}
-
-void codegen_t::prune_unused_closures() {
-  std::unordered_set<llvm::Function*> reachable;
-  std::vector<llvm::Function*> worklist;
-
-  llvm::Module* main_mod = main_module_uptr.get();
-  llvm::Module* clo_mod = closure_module_uptr.get();
-
-  // 1. Establish the root set from main_module.
-  // Any function declaration in main_module that has uses is a root.
-  for (llvm::Function& f : *main_mod) {
-    if (f.isDeclaration() && !f.use_empty()) {
-      if (llvm::Function* target = clo_mod->getFunction(f.getName())) {
-        if (reachable.insert(target).second) {
-          worklist.push_back(target);
-        }
-      }
-    }
-  }
-
-  // 2. Build edges: for each function in closure_module, find which functions use it.
-  // edge: user_func -> target_func
-  std::unordered_map<llvm::Function*, std::vector<llvm::Function*>> cg;
-  for (llvm::Function& target_func : *clo_mod) {
-    if (target_func.isDeclaration()) continue;
-
-    for (llvm::User* U : target_func.users()) {
-      if (llvm::Function* user_func = getUserFunction(U)) {
-        // If the user is inside closure_module, record the edge.
-        if (user_func->getParent() == clo_mod) {
-          cg[user_func].push_back(&target_func);
-        }
-      }
-    }
-  }
-
-  // 3. Trace reachable functions in closure_module
-  while (!worklist.empty()) {
-    llvm::Function* curr = worklist.back();
-    worklist.pop_back();
-
-    for (llvm::Function* target : cg[curr]) {
-      if (reachable.insert(target).second) {
-        worklist.push_back(target);
-      }
-    }
-  }
-
-  // 4. Prune unreachable functions
-  std::vector<llvm::Function*> to_delete;
-  for (llvm::Function& f : *clo_mod) {
-    if (!f.isDeclaration() && reachable.find(&f) == reachable.end()) {
-      to_delete.push_back(&f);
-    }
-  }
-
-  for (llvm::Function* f : to_delete) {
-#ifndef NDEBUG
-    std::cout << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
-#endif
-    f->eraseFromParent();
-  }
 }
 
 // --------------------------------------------------------------------------
