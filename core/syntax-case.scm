@@ -64,8 +64,8 @@
   (cond
     ((syntax-object? id) (vector-ref id 2))
     ((symbol? id)
-     (let ((entry (assq id *rename-env*)))
-       (if entry (caddr entry) '())))
+     (let ((entry (hashtable-ref *rename-env* id #f)))
+       (if entry (cdr entry) '())))
     (else '())))
 
 ;; Convert a syntax object to a plain datum by stripping all context.

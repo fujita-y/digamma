@@ -15,8 +15,8 @@
 ;; SECTION 1: Globals & State
 ;;=============================================================================
 
-;; Tracks all renamed identifiers: ((alias original context) ...)
-(define *rename-env* '())
+;; Tracks all renamed identifiers: alias -> (original . context)
+(define *rename-env* (make-eq-hashtable))
 
 ;; Counter for generating unique suffixes to ensure hygiene during renaming
 (define *suffix-counter* 0)
@@ -50,7 +50,7 @@
 
 ;; Register a renamed identifier in the global rename environment.
 (define (register-renamed! alias original context)
-  (set! *rename-env* (cons (list alias original context) *rename-env*)))
+  (hashtable-set! *rename-env* alias (cons original context)))
 
 ;; Unwrap a lazy environment reference used by letrec-syntax.
 (define (unwrap-env env)
@@ -59,9 +59,9 @@
 ;; Resolve an identifier to its original symbol and context or just symbol.
 (define (resolve-identifier id)
   (if (symbol? id)
-      (let ((entry (assq id *rename-env*)))
+      (let ((entry (hashtable-ref *rename-env* id #f)))
         (if entry
-            (let ((original (cadr entry)) (context (caddr entry)))
+            (let ((original (car entry)) (context (cdr entry)))
               (if context (cons context original) (resolve-identifier original)))
             id))
       id))
@@ -71,9 +71,9 @@
   (let ((local (assq id r-env)))
     (if local
         (cdr local)
-        (let ((entry (assq id *rename-env*)))
+        (let ((entry (hashtable-ref *rename-env* id #f)))
           (if entry
-              (let ((original (cadr entry)) (context (caddr entry)))
+              (let ((original (car entry)) (context (cdr entry)))
                 (if context
                     (let ((c-m (car context)) (c-s (cadr context)) (c-r (caddr context)) (c-marks (cadddr context)))
                       (resolve-variable original c-m c-s c-r c-marks))
@@ -558,56 +558,37 @@
         ((symbol? expr) (let ((t (lookup-macro expr '()))) (if t (t expr) expr))) (else expr)))
 
 (define (macroexpand expr . opt)
-  (set! *suffix-counter* 0) (set! *mark-counter* 0) (set! *rename-env* '())
+  (set! *suffix-counter* 0) (set! *mark-counter* 0) (hashtable-clear! *rename-env*)
   (let ((res (expand expr '() '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
+
+(define *builtin-handlers* (make-eq-hashtable))
 
 (define (lookup-builtin-handler id)
   (and (eq? (environment-macro-ref id) 'builtin)
-       (case id
-         ((define-syntax) expand-define-syntax) 
-         ((let-syntax) expand-let-syntax) 
-         ((letrec-syntax) expand-letrec-syntax)
-         ((let*-syntax) expand-let*-syntax)
-         ((lambda) expand-lambda) 
-         ((let) expand-let) 
-         ((let*) expand-let*)
-         ((letrec*) expand-letrec*)
-         ((letrec) expand-letrec*)
-         ((set!) expand-set!) 
-         ((if) expand-if) 
-         ((cond) expand-cond) 
-         ((and) expand-and) 
-         ((or) expand-or) 
-         ((case) expand-case)
-         ((define) expand-define) 
-         ((begin) expand-begin) 
-         ((quote) expand-quote) 
-         ((quasiquote) expand-quasiquote-form)
-         ((define-module) expand-define-module) 
-         ((import-module) expand-import-module)
-         (else #f))))
+       (hashtable-ref *builtin-handlers* id #f)))
 
 ;; register macro builtins in current environment (system environment)
-(for-each (lambda (id) (environment-macro-set! id 'builtin))
-  '(and 
-    begin 
-    case 
-    cond 
-    define 
-    define-module 
-    define-syntax 
-    if 
-    import-module
-    lambda 
-    let 
-    let* 
-    letrec 
-    letrec* 
-    letrec-syntax 
-    let*-syntax 
-    let-syntax 
-    or 
-    quasiquote 
-    quote 
-    set!))
+(for-each (lambda (pair) (environment-macro-set! (car pair) 'builtin) (hashtable-set! *builtin-handlers* (car pair) (cdr pair)))
+  (list
+    (cons 'and expand-and)
+    (cons 'begin expand-begin)
+    (cons 'case expand-case)
+    (cons 'cond expand-cond)
+    (cons 'define expand-define)
+    (cons 'define-module expand-define-module)
+    (cons 'define-syntax expand-define-syntax)
+    (cons 'if expand-if)
+    (cons 'import-module expand-import-module)
+    (cons 'lambda expand-lambda)
+    (cons 'let expand-let)
+    (cons 'let* expand-let*)
+    (cons 'letrec expand-letrec*)
+    (cons 'letrec* expand-letrec*)
+    (cons 'letrec-syntax expand-letrec-syntax)
+    (cons 'let*-syntax expand-let*-syntax)
+    (cons 'let-syntax expand-let-syntax)
+    (cons 'or expand-or)
+    (cons 'quasiquote expand-quasiquote-form)
+    (cons 'quote expand-quote)
+    (cons 'set! expand-set!)))
   

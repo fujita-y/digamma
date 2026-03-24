@@ -180,9 +180,8 @@
         (let* ((rule (car rules))
                (pattern (car rule))
                (template (cadr rule))
+               (meta-env (analyze-pattern pattern literals ellipsis 0))
                (bindings (match-pattern literals pattern input ellipsis literal=?)))
           (if bindings
-               ;; If pattern matches, analyze it for ellipsis depths and expand template
-               (let ((meta-env (analyze-pattern pattern literals ellipsis 0)))
-                 (expand-template template bindings rename ellipsis meta-env 0))
+               (expand-template template bindings rename ellipsis meta-env 0)
                (loop (cdr rules)))))))
