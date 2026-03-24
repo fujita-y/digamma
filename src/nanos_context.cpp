@@ -222,7 +222,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
 #endif
 
       scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, object_heap_t::s_current_winders);
-      scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, scm_nil, 1);
+      scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, 1);
       scm_obj_t proc_argv[1] = {make_cons(clo, scm_nil)};
       return c_apply_helper(proc, 1, proc_argv);
     } else {
@@ -252,7 +252,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
       scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
 
       scm_obj_t env[1] = {cont_obj};
-      scm_obj_t clo = make_closure((void*)subr_invoke_escape_continuation, 0, 1, 1, env, scm_nil, 1);
+      scm_obj_t clo = make_closure((void*)subr_invoke_escape_continuation, 0, 1, 1, env, 1);
       scm_obj_t argv[1] = {make_cons(clo, scm_nil)};
       scm_obj_t ret = scm_undef;
       try {

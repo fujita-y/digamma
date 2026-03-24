@@ -149,7 +149,6 @@ struct scm_hashtable_rec_t {
 
 struct scm_closure_rec_t {
   scm_tc6_t tag;
-  scm_obj_t literals;
   void* code;
   int argc;
   int rest;
@@ -234,7 +233,7 @@ scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_values(int nsize);
 scm_obj_t make_u8vector(int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
-scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl);
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
 scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
 scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,

@@ -41,12 +41,12 @@ extern "C" void c_safepoint(void) {
 }
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[], scm_obj_t literals) {
-  return make_closure(code, argc, rest, nenv, env, literals, 0);
+  return make_closure(code, argc, rest, nenv, env, 0);
 }
 
-extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, scm_nil, 0); }
+extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, 0); }
 
-extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, literals, 0); }
+extern "C" scm_obj_t c_make_closure_s2(void* code, int argc, scm_obj_t literals) { return make_closure(code, argc, 0, 0, nullptr, 0); }
 
 extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr) { return make_cons(car, cdr); }
 

@@ -57,9 +57,9 @@ static bool test_basic_dynamic_wind() {
     return make_fixnum(42);
   };
 
-  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, scm_nil, 1);
-  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, scm_nil, 1);
-  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, 1);
+  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, 1);
+  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, 1);
 
   scm_obj_t result = subr_dynamic_wind(scm_undef, pre, value, post);
 
@@ -85,13 +85,13 @@ static bool test_dynamic_wind_with_call_cc() {
       object_heap_t::current()->add_root(captured_cont);
       return make_fixnum(100);
     };
-    scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, 1);
     return subr_call_cc(scm_undef, p);
   };
 
-  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, scm_nil, 1);
-  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, scm_nil, 1);
-  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, 1);
+  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, 1);
+  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, 1);
 
   scm_obj_t result = subr_dynamic_wind(scm_undef, pre, value, post);
 

@@ -109,16 +109,16 @@ int main(int argc, char** argv) {
   heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   // Define primitives
-  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("apply"), scm_subr_apply);
 
-  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
 
-  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("list"), scm_subr_list);
 
-  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, 1);
   c_global_set(make_symbol("cons"), scm_subr_cons);
 
   // 1. Tail Apply

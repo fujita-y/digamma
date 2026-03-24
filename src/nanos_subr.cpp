@@ -1471,9 +1471,9 @@ SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
 void nanos_t::init_subr() {
   object_heap_t* heap = object_heap_t::current();
   auto reg = [heap](const char* name, void* func, int req, int opt) {
-    heap->environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
+    heap->environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
   };
-  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, scm_nil, 1); };
+  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, 1); };
 
   // arithmetic
   reg("+", (void*)subr_num_add, 0, 1);

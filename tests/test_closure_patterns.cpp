@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
   // 3. Generic Call - Unknown Closure (Bridge)
   run_test("GenericCallBridge", [](CodegenTest& env) -> bool {
     // Define Global +
-    scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1);
     c_global_set(make_symbol("+"), scm_subr_num_add);
 
     // Adder: (lambda (n) (+ n 10))
@@ -261,10 +261,10 @@ int main(int argc, char** argv) {
 
   // 6. Apply with Closure
   run_test("ApplyClosure", [](CodegenTest& env) -> bool {
-    scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, 1);
     c_global_set(make_symbol("apply"), scm_subr_apply);
 
-    scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, 1);
     c_global_set(make_symbol("cons"), scm_subr_cons);
 
     // my-cons: (lambda (a b) (cons a b))

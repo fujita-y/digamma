@@ -202,25 +202,6 @@ int main(int argc, char** argv) {
     scm_obj_t result = (scm_obj_t)env.codegen->compile(code).release_and_run();
     if (!is_closure(result)) return false;
     scm_closure_rec_t* rec = (scm_closure_rec_t*)to_address(result);
-    // Check literals
-    scm_obj_t literals = rec->literals;
-    if (!is_vector(literals)) {
-      printf("Closure literals mismatch: expected vector, got %lx\n", literals);
-      return false;
-    }
-    if (vector_nsize(literals) != 1) {
-      printf("Closure literals size mismatch: expected 1, got %d\n", vector_nsize(literals));
-      return false;
-    }
-    scm_obj_t lit = vector_elts(literals)[0];
-    if (!is_cons(lit)) {
-      printf("Closure literal mismatch: expected cons, got %lx\n", lit);
-      return false;
-    }
-    if (((scm_cons_rec_t*)lit)->car != make_fixnum(1) || ((scm_cons_rec_t*)lit)->cdr != make_fixnum(2)) {
-      printf("Closure literal value mismatch: expected (1 . 2)\n");
-      return false;
-    }
     return true;
   });
 
@@ -721,13 +702,13 @@ int main(int argc, char** argv) {
   run_test("ApplyTest", [](CodegenTest& env) -> bool {
     // Register primitives
 
-    scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1);
     c_global_set(make_symbol("+"), scm_subr_num_add);
 
-    scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, 1);
     c_global_set(make_symbol("list"), scm_subr_list);
 
-    scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, 1);
     c_global_set(make_symbol("apply"), scm_subr_apply);
 
     // Test: (apply + '(1 2))
@@ -771,8 +752,8 @@ int main(int argc, char** argv) {
 
   run_test("CallWithValues_basic", [](CodegenTest& env) -> bool {
     // Register values and call-with-values as globals so Scheme code can call them
-    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, scm_nil, 1));
-    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, scm_nil, 1));
+    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, 1));
+    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, 1));
 
     // Producer closure: calls (values 10 20), returns a values object
     // Consumer closure: takes two args, returns their sum via + (fixnum add)
@@ -802,7 +783,7 @@ int main(int argc, char** argv) {
     if (!is_closure(producer)) return false;
 
     // Build consumer closure: (lambda (a b) (+ a b))
-    c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1));
+    c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1));
     scm_obj_t cons_code = env.read_code(
         "((make-closure r0 C2 () 2 #f) (ret)"
         " (label C2)"
@@ -824,8 +805,8 @@ int main(int argc, char** argv) {
   run_test("CallWithValues_single", [](CodegenTest& env) -> bool {
     // Producer returns a single (non-values) value 42.
     // Consumer takes one arg and returns it unchanged.
-    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, scm_nil, 1));
-    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, scm_nil, 1));
+    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, 1));
+    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, 1));
 
     // Producer: (lambda () 42)  — returns a plain fixnum, not a values object
     scm_obj_t prod_code = env.read_code(
@@ -852,9 +833,9 @@ int main(int argc, char** argv) {
   run_test("HashtableEntries_via_values", [](CodegenTest& env) -> bool {
     // Build an eq-hashtable, insert two entries, then use hashtable-entries
     // and call-with-values to extract them.
-    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, scm_nil, 1));
-    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, scm_nil, 1));
-    c_global_set(make_symbol("hashtable-entries"), make_closure((void*)subr_hashtable_entries, 1, 0, 0, nullptr, scm_nil, 1));
+    c_global_set(make_symbol("values"), make_closure((void*)subr_values, 0, 1, 0, nullptr, 1));
+    c_global_set(make_symbol("call-with-values"), make_closure((void*)subr_call_with_values, 2, 0, 0, nullptr, 1));
+    c_global_set(make_symbol("hashtable-entries"), make_closure((void*)subr_hashtable_entries, 1, 0, 0, nullptr, 1));
 
     // Create hashtable with two entries directly in C++
     scm_obj_t args0[] = {};
@@ -883,7 +864,7 @@ int main(int argc, char** argv) {
     // Consumer: (lambda (keys vals) (vector-length keys))  — we fake it: just sum values
     // For simplicity, use a consumer closure that adds the two values together.
     // The two values in the hashtable are 100 and 200; their sum is 300.
-    c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1));
+    c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1));
 
     // Producer: (lambda () entries)  where entries is the values object captured as a closure literal
     // We'll test call-with-values directly in C++, using the entries values object.

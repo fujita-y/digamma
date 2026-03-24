@@ -14,7 +14,6 @@ static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;  // Offset to untag heap object
 static constexpr char CLOSURE_LABEL_PREFIX = 'C';
 
 static constexpr int CELL_VALUE_FIELD_OFFSET = offsetof(scm_cell_rec_t, value);
-static constexpr int CLOSURE_LITERALS_FIELD_OFFSET = offsetof(scm_closure_rec_t, literals);
 static constexpr int CLOSURE_CODE_FIELD_OFFSET = offsetof(scm_closure_rec_t, code);
 static constexpr int CLOSURE_ARGC_FIELD_OFFSET = offsetof(scm_closure_rec_t, argc);
 static constexpr int CLOSURE_REST_FIELD_OFFSET = offsetof(scm_closure_rec_t, rest);

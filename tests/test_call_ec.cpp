@@ -35,7 +35,7 @@ static bool some_test_failed = false;
 static bool test_return_normally() {
   auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
 
-  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
   scm_obj_t result = subr_call_ec(scm_undef, proc);
 
   if (result != make_fixnum(42)) {
@@ -54,7 +54,7 @@ static bool test_invoke_continuation() {
     return c_apply_helper(cont, 1, args);
   };
 
-  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
   scm_obj_t result = subr_call_ec(scm_undef, proc);
 
   if (result != make_fixnum(100)) {
@@ -74,7 +74,7 @@ static bool test_double_invoke_fails() {
     return make_fixnum(999);
   };
 
-  scm_obj_t proc = make_closure((void*)*+(invoke_twice_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(invoke_twice_proc), 0, 1, 0, nullptr, 1);
   scm_obj_t result = subr_call_ec(scm_undef, proc);
 
   if (result != make_fixnum(100)) {
@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
 
     codegen_t cg(std::move(ts_ctx), jit.get());
 
-    scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, scm_nil, 1);
+    scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, 1);
     c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
 
     test_return_normally();

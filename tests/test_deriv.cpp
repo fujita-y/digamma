@@ -118,24 +118,24 @@ void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
 }
 
 void register_core_primitives() {
-  c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("-"), make_closure((void*)subr_num_sub, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("*"), make_closure((void*)subr_num_mul, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("/"), make_closure((void*)subr_num_div, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("list"), make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("car"), make_closure((void*)subr_car, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("cdr"), make_closure((void*)subr_cdr, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("cadr"), make_closure((void*)subr_cadr, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("caddr"), make_closure((void*)subr_caddr, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("cons"), make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("null?"), make_closure((void*)subr_null_p, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("pair?"), make_closure((void*)subr_pair_p, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("not"), make_closure((void*)subr_not, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("eq?"), make_closure((void*)subr_eq_p, 2, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("="), make_closure((void*)subr_num_eq, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("append"), make_closure((void*)subr_append, 0, 1, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("write"), make_closure((void*)subr_write, 1, 0, 0, nullptr, scm_nil, 1));
-  c_global_set(make_symbol("newline"), make_closure((void*)subr_newline, 0, 0, 0, nullptr, scm_nil, 1));
+  c_global_set(make_symbol("+"), make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("-"), make_closure((void*)subr_num_sub, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("*"), make_closure((void*)subr_num_mul, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("/"), make_closure((void*)subr_num_div, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("list"), make_closure((void*)subr_list, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("car"), make_closure((void*)subr_car, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("cdr"), make_closure((void*)subr_cdr, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("cadr"), make_closure((void*)subr_cadr, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("caddr"), make_closure((void*)subr_caddr, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("cons"), make_closure((void*)subr_cons, 2, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("null?"), make_closure((void*)subr_null_p, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("pair?"), make_closure((void*)subr_pair_p, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("not"), make_closure((void*)subr_not, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("eq?"), make_closure((void*)subr_eq_p, 2, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("="), make_closure((void*)subr_num_eq, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("append"), make_closure((void*)subr_append, 0, 1, 0, nullptr, 1));
+  c_global_set(make_symbol("write"), make_closure((void*)subr_write, 1, 0, 0, nullptr, 1));
+  c_global_set(make_symbol("newline"), make_closure((void*)subr_newline, 0, 0, 0, nullptr, 1));
 }
 
 int main(int argc, char** argv) {
