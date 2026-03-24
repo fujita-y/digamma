@@ -9,7 +9,7 @@
 // #define USE_TBI 0
 
 #ifndef USE_TBI
-  #if defined(IS_DEBUG_BUILD)
+  #if defined(IS_DEBUG_BUILD) || defined(IS_RELWITHDEBINFO_BUILD)
     #define USE_TBI 0
   #else
     #define USE_TBI 1
