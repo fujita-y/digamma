@@ -2,15 +2,15 @@
   (if (eq? (current-environment) env)
       (let* ((expanded (macroexpand expr))
              (optimized (optimize expanded))
-             (lifted (lambda-lift optimized))
-             (coreform (compile lifted)))
-        (codegen-and-run coreform))
+             (coreform (lambda-lift optimized))
+             (nanos-ir (compile coreform)))
+        (codegen-and-run nanos-ir))
       (with-parameter ((current-environment env))
         (let* ((expanded (macroexpand expr))
                (optimized (optimize expanded))
-               (lifted (lambda-lift optimized))
-               (coreform (compile lifted)))
-          (codegen-and-run coreform)))))
+               (coreform (lambda-lift optimized))
+               (nanos-ir (compile coreform)))
+          (codegen-and-run nanos-ir)))))
 
     #|
         (newline)
@@ -31,3 +31,16 @@
         (newline)
         (newline)
     |#
+
+(define (compile-to-coreform expr env)
+  (if (eq? (current-environment) env)
+      (let* ((expanded (macroexpand expr))
+             (optimized (optimize expanded))
+             (coreform (lambda-lift optimized)))
+        coreform)
+      (with-parameter ((current-environment env))
+        (let* ((expanded (macroexpand expr))
+               (optimized (optimize expanded))
+               (coreform (lambda-lift optimized))))
+          lifted)))
+

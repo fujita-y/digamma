@@ -125,6 +125,7 @@ codegen-symbol
 collect
 collect-pattern-vars
 compile
+compile-to-coreform
 compiler-ctx-add-closure!
 compiler-ctx-all-closures
 compiler-ctx-code
@@ -713,6 +714,7 @@ core-form?
 core-eval
 copy-environment-variables!
 copy-environment-macros!
+compile-to-coreform
 continuation?
 cons*
 cons
