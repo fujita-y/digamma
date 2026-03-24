@@ -271,6 +271,72 @@
 ;; 4. Core Handlers Helpers
 ;;=============================================================================
 
+;; Walk EXPR replacing (if VAR then else) => then, at arbitrary depth.
+;; Does not descend into lambdas that shadow VAR; handles let-shadowing.
+(define (simplify-known-true var expr)
+  (cond
+    ((not (pair? expr)) expr)
+    ((eq? (car expr) 'quote) expr)
+    ((eq? (car expr) 'lambda)
+     ;; Stop if VAR is shadowed by this lambda's params
+     (if (memq var (flatten-params-opt (cadr expr)))
+         expr
+         `(lambda ,(cadr expr) ,@(map (lambda (e) (simplify-known-true var e)) (cddr expr)))))
+    ((eq? (car expr) 'let)
+     (let* ((bindings (cadr expr))
+            (lvars    (map car bindings))
+            (new-bindings (map (lambda (b)
+                                 (list (car b) (simplify-known-true var (cadr b))))
+                               bindings)))
+       (if (memq var lvars)
+           `(let ,new-bindings ,@(cddr expr))  ; VAR shadowed in body
+           `(let ,new-bindings ,@(map (lambda (e) (simplify-known-true var e)) (cddr expr))))))
+    ((eq? (car expr) 'if)
+     (let ((test (cadr  expr))
+           (then (caddr expr))
+           (els  (if (null? (cdddr expr)) '(unspecified) (cadddr expr))))
+       (if (eq? test var)
+           (simplify-known-true var then)    ; (if VAR t e) => t
+           `(if ,(simplify-known-true var test)
+                ,(simplify-known-true var then)
+                ,(simplify-known-true var els)))))
+    ((eq? (car expr) 'begin)
+     `(begin ,@(map (lambda (e) (simplify-known-true var e)) (cdr expr))))
+    (else
+     (map (lambda (e) (simplify-known-true var e)) expr))))
+
+;; Walk EXPR replacing (if VAR then else) => else, at arbitrary depth.
+(define (simplify-known-false var expr)
+  (cond
+    ((not (pair? expr)) expr)
+    ((eq? (car expr) 'quote) expr)
+    ((eq? (car expr) 'lambda)
+     (if (memq var (flatten-params-opt (cadr expr)))
+         expr
+         `(lambda ,(cadr expr) ,@(map (lambda (e) (simplify-known-false var e)) (cddr expr)))))
+    ((eq? (car expr) 'let)
+     (let* ((bindings (cadr expr))
+            (lvars    (map car bindings))
+            (new-bindings (map (lambda (b)
+                                 (list (car b) (simplify-known-false var (cadr b))))
+                               bindings)))
+       (if (memq var lvars)
+           `(let ,new-bindings ,@(cddr expr))
+           `(let ,new-bindings ,@(map (lambda (e) (simplify-known-false var e)) (cddr expr))))))
+    ((eq? (car expr) 'if)
+     (let ((test (cadr  expr))
+           (then (caddr expr))
+           (els  (if (null? (cdddr expr)) '(unspecified) (cadddr expr))))
+       (if (eq? test var)
+           (simplify-known-false var els)    ; (if VAR t e) => e
+           `(if ,(simplify-known-false var test)
+                ,(simplify-known-false var then)
+                ,(simplify-known-false var els)))))
+    ((eq? (car expr) 'begin)
+     `(begin ,@(map (lambda (e) (simplify-known-false var e)) (cdr expr))))
+    (else
+     (map (lambda (e) (simplify-known-false var e)) expr))))
+
 (define (opt-let-inner bindings body bound-vars)
     ;; Let-floating
     (let ((floated-bindings '())
@@ -389,7 +455,18 @@
        (if test then els))
 
       (else
-       `(if ,test ,then ,els)))))
+       ;; Nested-if simplification: when TEST is a variable that is never
+       ;; mutated in the then/else branches, it is known-true in the then
+       ;; branch and known-false in the else branch.
+       ;; (if A (if B (if A C E) E) F) => (if A (if B C E) F)
+       ;; (if A (if B C (if A D E)) F) => (if A (if B C D) F)
+       ;; Supports arbitrary nesting depth.
+       (if (and (symbol? test)
+                (not (memq test (analyze-mutated-vars-optimizer (make-seq (list then els))))))
+           `(if ,test
+                ,(simplify-known-true  test then)
+                ,(simplify-known-false test els))
+           `(if ,test ,then ,els))))))
 
 (define (opt-begin expr bound-vars)
   (let* ((exprs (map (lambda (e) (optimize-inner e bound-vars)) (cdr expr)))
