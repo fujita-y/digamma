@@ -60,6 +60,7 @@ class object_heap_t {
   void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
+  mutex_t& collector_lock() { return m_concurrent_heap.m_collector_lock; }
   void* alloc_cons() { return alloc_object(m_cons); }
   void* alloc_cell() { return alloc_object(m_cells); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
