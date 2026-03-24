@@ -451,12 +451,10 @@
   (optimize-inner expr '()))
 
 ;; Perform full optimization until fixed-point or iteration limit.
-(define (optimize expr) expr) ;; disable optimizer temporarily
-#|
+(define (optimize expr)
   (hashtable-clear! global-env)
   (hashtable-clear! *inlining-depth*)
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10))
         current
         (loop (optimize-inner current '()) current (+ iters 1)))))
-|#
