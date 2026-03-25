@@ -1,7 +1,7 @@
 ;; test_common.scm
 ;; Test suite for common.scm utilities.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

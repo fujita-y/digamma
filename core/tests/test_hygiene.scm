@@ -1,7 +1,7 @@
 ;; test_hygiene.scm
 ;; Comprehensive hygiene tests for the macro expansion system.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 ;; --- Test Helper Functions ---
 

@@ -268,7 +268,7 @@ list->vector
 ;lookup
 ;lookup-builtin-handler
 ;lookup-macro
-lookup-module  ;;; ######
+;lookup-module
 ;loop.2_1b7d33f3-fdae-414a-baa4-93b5b77bf737
 ;loop.24_861555ad-83b8-4def-afe7-dcb4070f2217
 ;loop.2_4940f7b3-9138-47a8-965c-9613ea5b9e82

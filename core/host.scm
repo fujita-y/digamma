@@ -23,6 +23,7 @@
    (define (equal-hash obj) (hash obj))
    (define (core-eval expr env) (eval expr env))
    (define (current-environment) (interaction-environment))
+   (define (system-environment) (interaction-environment))
    (define (copy-environment-variables! . args) #t))
   (ypsilon
    (define (uuid) (make-uuid))

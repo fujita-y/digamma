@@ -1,7 +1,7 @@
 ;; test_macroexpand_1.scm
 ;; Basic macro expansion and identifier macro tests.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (copy-environment-variables! (current-environment) (system-environment) '(expand macroexpand-1))
 

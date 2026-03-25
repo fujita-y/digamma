@@ -1,3 +1,5 @@
+(copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
+
 (define *pass-count* 0)
 (define *fail-count* 0)
 

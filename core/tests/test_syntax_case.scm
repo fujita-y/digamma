@@ -1,6 +1,6 @@
 ;; test_syntax_case.scm
 ;; Test suite for syntax-case and related R6RS features.
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

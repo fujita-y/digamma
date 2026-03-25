@@ -46,9 +46,9 @@ for test_file in test_*.scm; do
     
     if echo "$OUTPUT" | grep -q "Error:"; then
        echo ""
-    #    echo "--------------------------------------"
-    #    echo -e "${RED}ERROR: Error detected in $test_file${NC}"
-    #    exit 1
+       echo "--------------------------------------"
+       echo -e "${RED}ERROR: Error detected in $test_file${NC}"
+       exit 1
     fi
 
     TOTAL=$((TOTAL + 1))

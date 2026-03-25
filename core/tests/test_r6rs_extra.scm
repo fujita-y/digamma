@@ -1,7 +1,7 @@
 ;; test_r6rs_extra.scm
 ;; Test suite for extra R6RS features like variable transformers.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

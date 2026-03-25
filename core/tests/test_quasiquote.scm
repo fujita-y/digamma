@@ -1,7 +1,7 @@
 ;; test_quasiquote.scm
 ;; Test suite for quasiquote expansion in macroexpand system.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 ;; --- Test Helper Functions ---
 

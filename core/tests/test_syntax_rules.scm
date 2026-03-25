@@ -1,7 +1,7 @@
 ;; test_syntax_rules.scm
 ;; Test suite for the R6RS/R7RS macro expansion system.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)
