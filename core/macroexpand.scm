@@ -127,7 +127,7 @@
   (string-join (map symbol->string name) "."))
 
 (define (mangle-name mod-name sym)
-  (string->symbol (string-append (module-name->string mod-name) "%" (symbol->string sym))))
+  (string->symbol (string-append (module-name->string mod-name) "::" (symbol->string sym))))
 
 (define (lookup-module name)
   (let ((entry (assoc name *modules*))) (and entry (cdr entry))))
