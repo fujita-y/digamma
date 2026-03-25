@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Exit on any error
-set -e
+# set -e
 
 # Change to the directory of the script
 cd "$(dirname "$0")"

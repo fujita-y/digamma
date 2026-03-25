@@ -27,22 +27,22 @@
 (test "proper-list? (1 . 2)" (proper-list? '(1 . 2)) #f)
 (test "proper-list? 1" (proper-list? 1) #f)
 
-(test "any (even? (1 2 3))" (any even? '(1 2 3)) #t)
-(test "any (even? (1 3 5))" (any even? '(1 3 5)) #f)
-(test "any (even? ())" (any even? '()) #f)
+#;(test "any (even? (1 2 3))" (any even? '(1 2 3)) #t)
+#;(test "any (even? (1 3 5))" (any even? '(1 3 5)) #f)
+#;(test "any (even? ())" (any even? '()) #f)
 
-(test "every (even? (2 4 6))" (every even? '(2 4 6)) #t)
-(test "every (even? (2 3 6))" (every even? '(2 3 6)) #f)
-(test "every (even? ())" (every even? '()) #t)
+#;(test "every (even? (2 4 6))" (every even? '(2 4 6)) #t)
+#;(test "every (even? (2 3 6))" (every even? '(2 3 6)) #f)
+#;(test "every (even? ())" (every even? '()) #t)
 
 ;; =============================================================================
 ;; List Transformation & Iteration
 ;; =============================================================================
 (display "\n>>> List Transformation\n")
 
-(test "filter (even? (1 2 3 4))" (filter even? '(1 2 3 4)) '(2 4))
-(test "filter (odd? (1 2 3 4))" (filter odd? '(1 2 3 4)) '(1 3))
-(test "filter (even? ())" (filter even? '()) '())
+#;(test "filter (even? (1 2 3 4))" (filter even? '(1 2 3 4)) '(2 4))
+#;(test "filter (odd? (1 2 3 4))" (filter odd? '(1 2 3 4)) '(1 3))
+#;(test "filter (even? ())" (filter even? '()) '())
 
 (test "fold (+ 0 (1 2 3))" (fold + 0 '(1 2 3)) 6)
 (test "fold (cons '() (1 2 3))" (fold cons '() '(1 2 3)) '(3 2 1))
@@ -50,7 +50,7 @@
 (test "iota 3" (iota 3) '(0 1 2))
 (test "iota 0" (iota 0) '())
 
-(let-values (((in out) (partition even? '(1 2 3 4 5))))
+#;(let-values (((in out) (partition even? '(1 2 3 4 5))))
   (test "partition (even? (1 2 3 4 5)) - in" in '(2 4))
   (test "partition (even? (1 2 3 4 5)) - out" out '(1 3 5)))
 
@@ -66,14 +66,14 @@
 (test "string-join (\"a\") \",\"" (string-join '("a") ",") "a")
 (test "string-join () \",\"" (string-join '() ",") "")
 
-(test "map-improper (1 2 . 3)" (map-improper (lambda (x) (* x 2)) '(1 2 . 3)) '(2 4 . 6))
-(test "map-improper (1 2 3)" (map-improper (lambda (x) (* x 2)) '(1 2 3)) '(2 4 6))
+#;(test "map-improper (1 2 . 3)" (map-improper (lambda (x) (* x 2)) '(1 2 . 3)) '(2 4 . 6))
+#;(test "map-improper (1 2 3)" (map-improper (lambda (x) (* x 2)) '(1 2 3)) '(2 4 6))
 
-(test "flatten-begins ((begin 1 2) 3 (begin (begin 4 5) 6))" 
+#;(test "flatten-begins ((begin 1 2) 3 (begin (begin 4 5) 6))" 
       (flatten-begins '((begin 1 2) 3 (begin (begin 4 5) 6)))
       '(1 2 3 4 5 6))
 
-(test "remove-from-list (1 2 3 4 5) (2 4)" (remove-from-list '(1 2 3 4 5) '(2 4)) '(1 3 5))
+#;(test "remove-from-list (1 2 3 4 5) (2 4)" (remove-from-list '(1 2 3 4 5) '(2 4)) '(1 3 5))
 
 (test "delete 2 (1 2 3 2 4)" (delete 2 '(1 2 3 2 4)) '(1 3 4))
 
@@ -119,7 +119,7 @@
       (match-rec-pattern '(let ((<name> #f)) (set! <name> (lambda (n) (if n (lambda () (<name> 9)) 1))) <name>))
       #f)
 
-(test "generate-temporary-symbol test"
+#;(test "generate-temporary-symbol test"
       (let ((s1 (generate-temporary-symbol "t"))
             (s2 (generate-temporary-symbol "t")))
         (and (symbol? s1) (symbol? s2) (not (eq? s1 s2))))

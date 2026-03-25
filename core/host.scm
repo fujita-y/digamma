@@ -22,15 +22,16 @@
    (define hashtable->alist hash-table->alist)
    (define (equal-hash obj) (hash obj))
    (define (core-eval expr env) (eval expr env))
-   (define (current-environment) (interaction-environment)))
+   (define (current-environment) (interaction-environment))
+   (define (copy-environment-variables! . args) #t))
   (ypsilon
    (define (uuid) (make-uuid))
    (define (make-equal-hashtable) (make-hashtable equal-hash equal?))
    (define (hashtable->alist ht)
      (let-values (((keys vals) (hashtable-entries ht)))
        (map cons (vector->list keys) (vector->list vals))))
-   (define (core-eval expr env) (eval expr env)))
-
+   (define (core-eval expr env) (eval expr env))
+   (define (copy-environment-variables! . args) #t))
   (else))
 
 (define *current-macro-environment* (make-eq-hashtable))
@@ -66,4 +67,14 @@
        (let ((results (let () body ...)))
          (for-each (lambda (p v) (p v)) (list param ...) old-vals)
          results)))))
+
+(define-syntax let-values
+  (syntax-rules ()
+    ((let-values () body1 body2 ...)
+     (let () body1 body2 ...))
+    ((let-values (((v ...) expr) rest ...) body1 body2 ...)
+     (call-with-values
+       (lambda () expr)
+       (lambda (v ...)
+         (let-values (rest ...) body1 body2 ...))))))
 

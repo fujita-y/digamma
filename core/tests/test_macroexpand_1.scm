@@ -3,6 +3,10 @@
 
 (load "../core.scm")
 
+(copy-environment-variables! (current-environment) (system-environment) '(expand macroexpand-1))
+
+(define (expand1 expr) (expand expr '() '() '() '()))
+
 (define *pass-count* 0)
 (define *fail-count* 0)
 
@@ -21,7 +25,7 @@
 ;; Section 1: Simple macro
 ;; =============================================================================
 (display "\n>>> Section 1: Simple macro\n")
-(expand '(define-syntax foo (syntax-rules ()
+(expand1 '(define-syntax foo (syntax-rules ()
                                ((foo x) (list 'foo x)))))
 
 (define test1 (macroexpand-1 '(foo 1)))
@@ -31,7 +35,7 @@
 ;; Section 2: Nested macro
 ;; =============================================================================
 (display "\n>>> Section 2: Nested macro\n")
-(expand '(define-syntax bar (syntax-rules ()
+(expand1 '(define-syntax bar (syntax-rules ()
                                ((bar x) (foo x)))))
 
 (define test2 (macroexpand-1 '(bar 2)))

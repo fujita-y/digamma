@@ -340,7 +340,7 @@
                      (if (null? in) (reverse acc)
                          (let ((x (optimize-inner (car in) bound-vars)))
                            (if (and (pair? x) (eq? (car x) 'begin))
-                               (loop (cdr in) (fold (lambda (i a) (cons i a)) acc (reverse (cdr x))))
+                               (loop (cdr in) (fold (lambda (i a) (cons i a)) acc (cdr x)))
                                (loop (cdr in) (cons x acc))))))))
     (if (null? flattened) '(unspecified)
         (let* ((last (car (reverse flattened))) (filtered (filter has-effects? (reverse (cdr (reverse flattened))))))

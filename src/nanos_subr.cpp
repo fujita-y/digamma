@@ -1303,6 +1303,7 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
       }
     } else {
       std::string msg = "copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
     }
     cur = CDR(cur);
   }
