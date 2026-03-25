@@ -303,14 +303,9 @@ void object_heap_t::trace(void* obj) {
   if (tc6 == tc6_continuation) {
     scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
     shade(rec->winders);
-    uint64_t captured_stack_bottom = rec->stack_bottom;
-    uint64_t captured_stack_top = captured_stack_bottom - rec->stack_size;
-    std::unordered_set<uint64_t> raw;
-    raw.reserve((captured_stack_bottom - captured_stack_top) / sizeof(uint64_t));
-    for (uint64_t addr = captured_stack_top; addr < captured_stack_bottom; addr += sizeof(uint64_t)) {
-      raw.insert(prune_memory_address(*(uint64_t*)addr));
-    }
-    for (const auto& addr : raw) {
+    uint8_t* stack_copy = (uint8_t*)prune_memory_address((uintptr_t)rec->stack_copy);
+    for (size_t i = 0; i < rec->stack_size; i += sizeof(uint64_t)) {
+      uint64_t addr = prune_memory_address(*(uint64_t*)(stack_copy + i));
       void* live = test_live_object(addr);
       if (live) shade((scm_obj_t)live);
     }
