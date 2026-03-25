@@ -16,6 +16,16 @@
     ((_ ((e1 e2) ...) body ...)
      (parameterize-aux ((e1 e2) ...) () body ...))))
 
+(define-syntax with-parameter
+  (syntax-rules ()
+    ((_ ((param val) ...) body ...)
+     (let ((old-vals (list (param) ...))
+           (new-vals (list val ...)))
+       (for-each (lambda (p v) (p v)) (list param ...) new-vals)
+       (let ((results (let () body ...)))
+         (for-each (lambda (p v) (p v)) (list param ...) old-vals)
+         results)))))
+
 (define-syntax let-values
   (syntax-rules ()
     ((let-values () body1 body2 ...)
@@ -45,14 +55,3 @@
     ((when test result1 result2 ...)
      (if test
          (begin result1 result2 ...)))))
-
-(define-syntax with-parameter
-  (syntax-rules ()
-    ((_ ((param val) ...) body ...)
-     (let ((old-vals (list (param) ...))
-           (new-vals (list val ...)))
-       (for-each (lambda (p v) (p v)) (list param ...) new-vals)
-       (let ((results (let () body ...)))
-         (for-each (lambda (p v) (p v)) (list param ...) old-vals)
-         results)))))
-
