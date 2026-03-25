@@ -155,7 +155,7 @@ scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
 }
 
 void nanos_t::run() {
-  puts(";; nanos - a small virtual machine for bootstrapping, compile nanos-ir to native code.");
+  puts(";; nanos - scheme-like lisp-2 interpreter for bootstrapping.");
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
