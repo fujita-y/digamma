@@ -205,13 +205,31 @@
              (syntax-depth-map (cdr pattern) literals ellipsis depth)))
     (else '())))
 
+(define (apply-syntax-object-context val suffix)
+  (let loop ((obj val) (ctx '()))
+    (cond ((syntax-object? obj)
+           (let ((c (syntax-object-context obj)))
+             (loop (syntax-object-datum obj) (if (null? c) ctx c))))
+          ((pair? obj)
+           (cons (loop (car obj) ctx) (loop (cdr obj) ctx)))
+          ((vector? obj)
+           (list->vector (map (lambda (x) (loop x ctx)) (vector->list obj))))
+          ((symbol? obj)
+           (cond ((null? ctx) obj)
+                 ((and (pair? (cdr ctx)) (pair? (cddr ctx)) (assq obj (caddr ctx)))
+                  (let ((new-sym (rename-symbol obj suffix)))
+                    (register-renamed! new-sym obj ctx)
+                    new-sym))
+                 (else obj)))
+          (else obj))))
+
 ;; Substitute bound pattern variables and replicate ellipsis patterns.
 (define (expand-syntax template bindings context meta-env depth ellipsis literals suffix)
   (cond
     ((symbol? template)
      (let ((b (assq template bindings)))
        (if (and b (= (or (cdr (assq template meta-env)) 0) depth))
-           (cdr b)
+           (apply-syntax-object-context (cdr b) suffix)
            (if (memq template literals)
                template
                (let ((new-sym (rename-symbol template suffix)))
@@ -240,6 +258,7 @@
          (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals suffix)
                (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals suffix))))
     (else template)))
+
 
 ;;=============================================================================
 ;; 6. Quasisyntax & Transformation Helpers
@@ -285,7 +304,7 @@
 
 ;; Compile fender and output expressions into runtime calls.
 (define (prepare-eval-expr expr literals meta-env bindings context)
-  (let ((r-env (if (and (pair? context) (pair? (cddr context))) (caddr context) '())))
+  (let ((r-env (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context))) (caddr context) '())))
     (let loop ((x expr))
       (cond
         ((symbol? x)
