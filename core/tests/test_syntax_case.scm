@@ -2,7 +2,7 @@
 ;; Test suite for syntax-case and related R6RS features.
 (if (not (undefined? load)) (load "../core.scm"))
 
-(copy-environment-variables! (current-environment) (system-environment) '(make-syntax-object strip-renames))
+(copy-environment-variables! (current-environment) (system-environment) '(expand-syntax-case make-syntax-object strip-renames))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

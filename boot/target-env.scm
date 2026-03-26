@@ -197,10 +197,13 @@ exit
 ;expand-quasiquote-form
 ;expand-quote
 ;expand-set!
-expand-syntax ;;; ###
-expand-syntax-case ;;; ###
+;expand-syntax ;;; ###
+_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+;expand-syntax-case ;;; ###
+_expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f
 ;expand-template
-expand-with-syntax ;;; ###
+;expand-with-syntax ;;; ###
+_expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
 ;extract-library-name
 ;extract-macro-defs
 ;extract-module-defined-ids
@@ -218,7 +221,8 @@ for-each
 ;for-each-n.5_c3776de9-a326-4063-b496-83465a34948a
 free-identifier=?
 ;fresh-mark
-fresh-suffix ;;; ####
+;fresh-suffix ;;; ####
+_fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f
 ;generate-lifted-name
 generate-temporaries
 ;generate-temporary-symbol

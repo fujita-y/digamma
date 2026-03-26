@@ -10,6 +10,22 @@
 ;; Counter for generating unique temporary symbol names
 (define *syntax-temp-counter* 0)
 
+;; Counter for generating unique suffixes to ensure hygiene during renaming
+(define *suffix-counter* 0)
+
+;; Counter for generating unique marks for macro transformations
+(define *mark-counter* 0)
+
+;; Generate a fresh unique suffix for identifier renaming.
+(define (fresh-suffix)
+  (set! *suffix-counter* (+ *suffix-counter* 1))
+  (number->string *suffix-counter*))
+
+;; Generate a fresh unique mark for macro transformations.
+(define (fresh-mark)
+  (set! *mark-counter* (+ *mark-counter* 1))
+  *mark-counter*)
+
 ;;=============================================================================
 ;; Predicates
 ;;=============================================================================

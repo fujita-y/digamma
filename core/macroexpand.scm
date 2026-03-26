@@ -18,18 +18,12 @@
 ;; Tracks all renamed identifiers: alias -> (original . context)
 (define *rename-env* (make-eq-hashtable))
 
-;; Counter for generating unique suffixes to ensure hygiene during renaming
-(define *suffix-counter* 0)
-
-;; Counter for generating unique marks for macro transformations
-(define *mark-counter* 0)
+;; Parameter holding the current expansion context (m-env s-env r-env marks)
+(define *current-context* (make-parameter #f))
 
 ;; Registry mapping module names to records: ((name . record) ...)
 ;; Record structure: ((exports . rename-map) . bindings)
 (define *modules* '())
-
-;; Parameter holding the current expansion context (m-env s-env r-env marks)
-(define *current-context* (make-parameter #f))
 
 ;; Temporary variable for passing values through eval during module processing
 (define *temp-value* #f)
@@ -37,16 +31,6 @@
 ;;=============================================================================
 ;; SECTION 2: Identifier & Environment Resolution
 ;;=============================================================================
-
-;; Generate a fresh unique suffix for identifier renaming.
-(define (fresh-suffix)
-  (set! *suffix-counter* (+ *suffix-counter* 1))
-  (number->string *suffix-counter*))
-
-;; Generate a fresh unique mark for macro transformations.
-(define (fresh-mark)
-  (set! *mark-counter* (+ *mark-counter* 1))
-  *mark-counter*)
 
 ;; Register a renamed identifier in the global rename environment.
 (define (register-renamed! alias original context)
