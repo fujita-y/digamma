@@ -26,7 +26,7 @@
 ;analyze-pattern
 ;analyze-used-vars
 ;analyze-variable-usage
-any
+;any
 any?
 append
 apply
@@ -135,23 +135,23 @@ cons*
 continuation?
 copy-environment-macros!
 copy-environment-variables!
-core-eval ;;; @
+core-eval ;;; ####
 ;core-form?
-count-pair ;;; @
+;count-pair
 ;*cp0-effort-limit*
 ;*cp0-score-limit*
 ;*current-context*
 current-environment
-*current-syntax-bindings* ;;; @
-*current-syntax-meta-env* ;;; @
+*current-syntax-bindings* ;;; ####
+*current-syntax-meta-env* ;;; ####
 datum->syntax
-delete
+;delete
 display
-drop ;;; @
-drop-elements ;;; @
-drop-last-cdr ;;; @
-drop-last-n-pair ;;; @
-drop-last-pair ;;; @
+;drop
+;drop-elements
+;drop-last-cdr
+;drop-last-n-pair
+;drop-last-pair
 dynamic-wind
 environment-macro-contains?
 environment-macro-ref
@@ -168,7 +168,7 @@ eqv?
 error
 ;eval-module-body
 ;eval-transformer-expr
-every
+;every
 every?
 exact?
 exit
@@ -197,10 +197,10 @@ exit
 ;expand-quasiquote-form
 ;expand-quote
 ;expand-set!
-expand-syntax ;;; @
-expand-syntax-case ;;; @
-;expand-template ;;; @
-expand-with-syntax ;;; @
+expand-syntax ;;; ###
+expand-syntax-case ;;; ###
+;expand-template
+expand-with-syntax ;;; ###
 ;extract-library-name
 ;extract-macro-defs
 ;extract-module-defined-ids
@@ -218,7 +218,7 @@ for-each
 ;for-each-n.5_c3776de9-a326-4063-b496-83465a34948a
 free-identifier=?
 ;fresh-mark
-fresh-suffix ;;; @
+fresh-suffix ;;; ####
 ;generate-lifted-name
 generate-temporaries
 ;generate-temporary-symbol
@@ -253,9 +253,9 @@ iota
 ;is-unquote?.2_9a4c0af6-d19b-41e9-ba0c-691a3ff06ad5
 ;is-unquote-splicing?.3_404a7d96-3381-4855-ab2f-0a581b6e2a52
 lambda-lift
-last-cdr
-last-n-pair
-last-pair
+;last-cdr
+;last-n-pair
+;last-pair
 length
 list
 list?
@@ -297,7 +297,7 @@ make-eqv-hashtable
 make-parameter
 ;make-reg
 ;make-seq
-make-syntax-object
+;make-syntax-object
 ;make-syntax-rules-transformer
 make-variable-transformer
 make-vector
@@ -375,7 +375,7 @@ string-length
 string->number
 string-ref
 string->symbol
-strip-renames ;;; @
+;strip-renames
 ;strip-suffix
 ;substitute
 ;substitute-many

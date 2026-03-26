@@ -3,6 +3,8 @@
 
 (if (not (undefined? load)) (load "../core.scm"))
 
+(copy-environment-variables! (current-environment) (system-environment) '(drop-elements delete every))
+
 (define *pass-count* 0)
 (define *fail-count* 0)
 
