@@ -22,10 +22,10 @@
 ;;=============================================================================
 
 ;; Current pattern variable bindings: ((var . value) ...)
-(define *current-syntax-bindings* '())
+(define current-syntax-bindings (make-parameter'()))
 
 ;; Current meta-environment tracking ellipsis depth: ((var . depth) ...)
-(define *current-syntax-meta-env* '())
+(define current-syntax-meta-env (make-parameter'()))
 
 ;;=============================================================================
 ;; 2. Utilities & Error Handling
@@ -318,13 +318,23 @@
          (cond
            ((eq? (car x) 'syntax)
             `(let ((suffix (_fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f)))
-               (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f ',(cadr x) *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix)))
+               (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                 ',(cadr x)
+                 (_current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                 ',context
+                 (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                 0 '... ',literals suffix)))
            ((eq? (car x) 'quasisyntax)
             (let ((res (extract-quasisyntax (cadr x) 0 literals)))
               (let ((new-tmpl (car res)) (bindings (cdr res)))
                 (if (null? bindings)
                     `(let ((suffix (_fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f)))
-                       (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f ',new-tmpl *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix))
+                       (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                         ',new-tmpl
+                         (_current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                         ',context
+                         (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                         0 '... ',literals suffix))
                     (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
            ((eq? (car x) 'syntax-case)
             (let ((input (loop (cadr x))) (lits (caddr x))
@@ -340,7 +350,9 @@
               `(_expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f ,input ',lits ,clauses-expr (current-environment))))
            ((eq? (car x) 'with-syntax)
             (let ((b-specs (cadr x)) (body (cddr x)))
-              `(_expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body)))) (current-environment))))
+              `(_expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                 (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body))))
+                 (current-environment))))
            ((eq? (car x) 'quote) x)
            (else
             (let ((head (car x)))
@@ -382,20 +394,20 @@
                  (output (caddr clause))
                  (m (syntax-case-match literals pattern input ellipsis)))
             (if m
-                (let ((old-bindings *current-syntax-bindings*)
-                      (old-meta *current-syntax-meta-env*)
+                (let ((old-bindings (current-syntax-bindings))
+                      (old-meta (current-syntax-meta-env))
                       (new-meta (syntax-depth-map pattern literals ellipsis 0)))
-                  (set! *current-syntax-bindings* (append m old-bindings))
-                  (set! *current-syntax-meta-env* (append new-meta old-meta))
-                  (let ((matched? (eval-transformer-expr fender literals pattern *current-syntax-bindings* env)))
+                  (current-syntax-bindings (append m old-bindings))
+                  (current-syntax-meta-env (append new-meta old-meta))
+                  (let ((matched? (eval-transformer-expr fender literals pattern (current-syntax-bindings) env)))
                     (if matched?
-                        (let ((res (eval-transformer-expr output literals pattern *current-syntax-bindings* env)))
-                          (set! *current-syntax-bindings* old-bindings)
-                          (set! *current-syntax-meta-env* old-meta)
+                        (let ((res (eval-transformer-expr output literals pattern (current-syntax-bindings) env)))
+                          (current-syntax-bindings old-bindings)
+                          (current-syntax-meta-env old-meta)
                           res)
                         (begin
-                          (set! *current-syntax-bindings* old-bindings)
-                          (set! *current-syntax-meta-env* old-meta)
+                          (current-syntax-bindings old-bindings)
+                          (current-syntax-meta-env old-meta)
                           (loop (cdr clauses))))))
                 (loop (cdr clauses))))))))
 
@@ -417,3 +429,5 @@
 (define _expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f expand-syntax)
 (define _expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f expand-with-syntax)
 (define _fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f fresh-suffix)
+(define _current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f current-syntax-bindings)
+(define _current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f current-syntax-meta-env)

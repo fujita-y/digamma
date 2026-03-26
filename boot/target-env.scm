@@ -142,8 +142,10 @@ core-eval ;;; ####
 ;*cp0-score-limit*
 ;*current-context*
 current-environment
-*current-syntax-bindings* ;;; ####
-*current-syntax-meta-env* ;;; ####
+;current-syntax-bindings
+_current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f
+;current-syntax-meta-env
+_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f
 datum->syntax
 ;delete
 display
