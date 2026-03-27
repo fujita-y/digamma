@@ -6,6 +6,7 @@
 #include "object_heap.h"
 #include "bit.h"
 #include "hash.h"
+#include "port.h"
 
 thread_local scm_obj_t object_heap_t::s_continuation_captured_retval = scm_undef;
 thread_local scm_obj_t object_heap_t::s_current_winders = scm_nil;
@@ -58,6 +59,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
   m_environments.init(&m_concurrent_heap, clp2(sizeof(scm_environment_rec_t)), true, false);
+  m_ports.init(&m_concurrent_heap, clp2(sizeof(scm_port_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
@@ -283,6 +285,11 @@ void object_heap_t::trace(void* obj) {
     shade(rec->macros);
     return;
   }
+  if (traits->owner == &m_ports) {
+    scm_port_rec_t* rec = (scm_port_rec_t*)obj;
+    shade(rec->name);
+    return;
+  }
 
   uintptr_t tag = *(uintptr_t*)obj;
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
@@ -320,6 +327,8 @@ void object_heap_t::trace(void* obj) {
 void object_heap_t::finalize(void* obj) {
   assert(m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
+  assert(traits->owner != &m_cons);
+
   if (traits->owner == &m_symbols) {
     scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
     delete_private(rec->name);
@@ -348,6 +357,11 @@ void object_heap_t::finalize(void* obj) {
   if (traits->owner == &m_values) {
     scm_values_rec_t* rec = (scm_values_rec_t*)obj;
     delete_private(rec->elts);
+    return;
+  }
+  if (traits->owner == &m_ports) {
+    scm_port_rec_t* rec = (scm_port_rec_t*)obj;
+    port_finalize(rec);
     return;
   }
 

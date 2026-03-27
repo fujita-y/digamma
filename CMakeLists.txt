@@ -143,25 +143,27 @@ target_link_options(nanos_config INTERFACE
 # ==============================================================================
 
 set(NANOS_CORE_SOURCES
+  src/arch_arm64.cpp
   src/bit.cpp
-  src/object_heap.cpp
-  src/object.cpp
+  src/codegen.cpp
+  src/codegen_aux.cpp
+  src/codegen_emit.cpp
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
-  src/utf8.cpp
-  src/hash.cpp
-  src/vector.cpp
-  src/codegen.cpp
-  src/nanos_jit.cpp
-  src/codegen_aux.cpp
-  src/codegen_emit.cpp
-  src/nanos_subr.cpp
-  src/nanos_context.cpp
-  src/nanos_options.cpp
-  src/arch_arm64.cpp
   src/equiv.cpp
-)
+  src/hash.cpp
+  src/nanos_context.cpp
+  src/nanos_jit.cpp
+  src/nanos_options.cpp
+  src/nanos_subr.cpp
+  src/object.cpp
+  src/object_heap.cpp
+  src/port.cpp
+  src/reader.cpp
+  src/printer.cpp
+  src/utf8.cpp
+  src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
@@ -178,14 +180,9 @@ set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context replxx::replxx
 add_library(nanos_core OBJECT ${NANOS_CORE_SOURCES})
 target_link_libraries(nanos_core PUBLIC nanos_config)
 
-# --- I/O Library ---
-# Object library for reader/printer sources used by multiple targets
-add_library(nanos_io OBJECT src/reader.cpp src/printer.cpp)
-target_link_libraries(nanos_io PUBLIC nanos_config)
-
 # --- Main Executable ---
 add_executable(nanos src/main.cpp src/nanos.cpp)
-target_link_libraries(nanos PRIVATE nanos_core nanos_io nanos_config ${NANOS_LINK_LIBRARIES})
+target_link_libraries(nanos PRIVATE nanos_core nanos_config ${NANOS_LINK_LIBRARIES})
 
 # ==============================================================================
 # Installation
@@ -207,7 +204,7 @@ macro(add_nanos_test test_name test_source)
     ${test_source}
     ${ARGN}  # Additional sources
   )
-  target_link_libraries(${test_name} PRIVATE nanos_core nanos_io nanos_config ${NANOS_LINK_LIBRARIES})
+  target_link_libraries(${test_name} PRIVATE nanos_core nanos_config ${NANOS_LINK_LIBRARIES})
   add_test(
     NAME ${test_name}
     COMMAND $<TARGET_FILE:${test_name}>

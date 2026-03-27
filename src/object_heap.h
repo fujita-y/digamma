@@ -32,6 +32,7 @@ class object_heap_t {
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
   concurrent_slab_t m_environments;
+  concurrent_slab_t m_ports;
   concurrent_slab_t m_collectibles[8];  // 16-32-64-128-256-512-1024-2048
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
@@ -71,6 +72,7 @@ class object_heap_t {
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_environment() { return alloc_object(m_environments); }
+  void* alloc_port() { return alloc_object(m_ports); }
   void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
 

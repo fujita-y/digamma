@@ -5,10 +5,11 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
-#include <sanitizer/hwasan_interface.h>
-#include <ucontext.h>
 #include "arch_arm64.h"
 
+#include <sanitizer/hwasan_interface.h>
+#include <ucontext.h>
+#include <variant>
 /*
 
 |<                                fixnum 63bit                                >1| fixnum
@@ -49,12 +50,12 @@ constexpr uintptr_t tc6_environment = 8;
 constexpr uintptr_t tc6_cell = 9;
 constexpr uintptr_t tc6_escape = 10;
 constexpr uintptr_t tc6_continuation = 11;
+constexpr uintptr_t tc6_port = 12;
 /*
 constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_continuation = ;
 constexpr uintptr_t tc6_bignum = ;
 constexpr uintptr_t tc6_subr = ;
-constexpr uintptr_t tc6_port = ;
 constexpr uintptr_t tc6_gloc = ;
 constexpr uintptr_t tc6_tuple = ;
 constexpr uintptr_t tc6_complex = ;
@@ -183,6 +184,18 @@ struct scm_continuation_rec_t {
   size_t stack_size;
 };
 
+struct port_aux_t {
+  std::variant<std::monostate, std::ostream*, std::istream*, std::iostream*, std::ofstream*, std::ifstream*, std::fstream*, std::stringstream*>
+      stream;
+  bool owned;
+};
+
+struct scm_port_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t name;
+  port_aux_t* aux;
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -217,6 +230,7 @@ inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
 inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
 inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
 inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
+inline bool is_port(scm_obj_t x) { return is_tc6(x, tc6_port); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
@@ -238,6 +252,7 @@ scm_obj_t make_environment(scm_obj_t name);
 scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
 scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,
                             scm_obj_t winders);
+scm_obj_t make_port(scm_obj_t name);
 
 inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
 double flonum(scm_obj_t x);

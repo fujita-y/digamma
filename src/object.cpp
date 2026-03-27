@@ -256,6 +256,17 @@ scm_obj_t make_cell(scm_obj_t value) {
   return tc6_pointer(rec, tc6_cell);
 }
 
+scm_obj_t make_port(scm_obj_t name) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_port_rec_t* rec = (scm_port_rec_t*)heap.alloc_port();
+  rec->name = name;
+  rec->aux = new port_aux_t;
+  rec->aux->stream = std::monostate{};
+  rec->aux->owned = false;
+  rec->tag = tc6_tag(tc6_port);
+  return tc6_pointer(rec, tc6_port);
+}
+
 void cell_value_set(scm_obj_t x, scm_obj_t v) {
   object_heap_t::current()->write_barrier(v);
   ((scm_cell_rec_t*)to_address(x))->value = v;
