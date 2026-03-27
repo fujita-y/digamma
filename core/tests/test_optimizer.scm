@@ -1,4 +1,4 @@
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 ;; --- Test Helper Functions ---
 
@@ -135,7 +135,12 @@
       '(let ((y (null? '(1 2 3)))) (set! y #t)))
 
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)

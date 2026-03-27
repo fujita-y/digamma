@@ -174,7 +174,7 @@ static bool some_test_failed = false;
 // ---------------------------------------------------------------------------
 
 // Dummy closure used for procedure? tests
-static scm_obj_t dummy_closure() { return make_closure(nullptr, 0, 0, 0, nullptr, scm_nil, 0); }
+static scm_obj_t dummy_closure() { return make_closure(nullptr, 0, 0, 0, nullptr, 0); }
 
 // Build a proper list (1 2 3)
 static scm_obj_t make_proper_list_123() {

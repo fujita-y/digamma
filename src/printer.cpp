@@ -112,7 +112,7 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
       return;
     }
     if (is_environment(obj)) {
-      out << std::format("#<environment {:#x}>", (uintptr_t)obj);
+      out << std::format("#<environment {:#x} name:{}>", (uintptr_t)obj, (char*)environment_name(obj));
       return;
     }
     if (is_cell(obj)) {
@@ -125,6 +125,10 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
     }
     if (is_continuation(obj)) {
       out << std::format("#<continuation {:#x}>", (uintptr_t)obj);
+      return;
+    }
+    if (is_hashtable(obj)) {
+      out << std::format("#<hashtable {:#x}>", (uintptr_t)obj);
       return;
     }
   }

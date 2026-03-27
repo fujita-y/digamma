@@ -43,7 +43,7 @@ static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_environment;
+  scm_obj_t env = heap->m_current_environment;
   scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
   hashtable_set(env_rec->variables, sym, make_cell(val));
 }
@@ -109,16 +109,16 @@ int main(int argc, char** argv) {
   heap->init(1024 * 1024 * 2, 1024 * 1024);
 
   // Define primitives
-  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_apply = make_closure((void*)subr_apply, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("apply"), scm_subr_apply);
 
-  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_num_add = make_closure((void*)subr_num_add, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("+"), scm_subr_num_add);
 
-  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_list = make_closure((void*)subr_list, 0, 1, 0, nullptr, 1);
   c_global_set(make_symbol("list"), scm_subr_list);
 
-  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, scm_nil, 1);
+  scm_obj_t scm_subr_cons = make_closure((void*)subr_cons, 2, 0, 0, nullptr, 1);
   c_global_set(make_symbol("cons"), scm_subr_cons);
 
   // 1. Tail Apply
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
         // call apply with 2 args: +, '(1 2)
         "(tail-call r3 2))");
 
-    intptr_t result = env.codegen->compile(correct_code)();
+    intptr_t result = env.codegen->compile(correct_code).release_and_run();
     return result == make_fixnum(3);
   });
 
@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
         "(global-ref r2 +) "
         "(call r2 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code)();
+    intptr_t result = env.codegen->compile(code).release_and_run();
     return result == make_fixnum(4);
   });
 
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code)();
+    intptr_t result = env.codegen->compile(code).release_and_run();
     return result == make_fixnum(3);
   });
 
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 4) (ret))");
 
-    intptr_t result = env.codegen->compile(code)();
+    intptr_t result = env.codegen->compile(code).release_and_run();
     return result == make_fixnum(10);
   });
 
@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "  // apply itself
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code)();
+    intptr_t result = env.codegen->compile(code).release_and_run();
     return result == make_fixnum(3);
   });
 
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
     scm_obj_t setup = env.read_code(
         "((make-closure r0 C1 () 1 #f) (global-set! f r0) (ret) "
         "(label C1) (const r1 1) (global-ref r2 +) (call r2 2) (ret))");
-    env.codegen->compile(setup)();
+    env.codegen->compile(setup).release_and_run();
 
     scm_obj_t code = env.read_code(
         "((global-ref r0 f) "
@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code)();
+    intptr_t result = env.codegen->compile(code).release_and_run();
     return result == make_fixnum(11);
   });
 

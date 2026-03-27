@@ -22,17 +22,17 @@
 ;;=============================================================================
 
 ;; Current pattern variable bindings: ((var . value) ...)
-(define *current-syntax-bindings* '())
+(define current-syntax-bindings (make-parameter'()))
 
 ;; Current meta-environment tracking ellipsis depth: ((var . depth) ...)
-(define *current-syntax-meta-env* '())
+(define current-syntax-meta-env (make-parameter'()))
 
 ;;=============================================================================
 ;; 2. Utilities & Error Handling
 ;;=============================================================================
 
 ;; Signal a syntax violation error.
-(define (syntax-violation who message form . subform)
+#;(define (syntax-violation who message form . subform)
   (let ((who-str (if who (format "~a: " who) "")))
     (if (null? subform)
         (error (format "~asyntax-violation: ~a in ~s" who-str message form))
@@ -60,6 +60,14 @@
 (define (syntax-object-context obj)
   (if (syntax-object? obj) (vector-ref obj 2) '()))
 
+(define (get-identifier-context id)
+  (cond
+    ((syntax-object? id) (vector-ref id 2))
+    ((symbol? id)
+     (let ((entry (hashtable-ref *rename-env* id #f)))
+       (if entry (cdr entry) '())))
+    (else '())))
+
 ;; Convert a syntax object to a plain datum by stripping all context.
 (define (syntax->datum obj)
   (cond
@@ -70,7 +78,7 @@
 
 ;; Inheritance mechanism for context during transformation.
 (define (datum->syntax template-id datum)
-  (make-syntax-object datum (syntax-object-context template-id)))
+  (make-syntax-object datum (get-identifier-context template-id)))
 
 ;; Variable transformers for set! interception.
 (define (make-variable-transformer proc)
@@ -87,7 +95,7 @@
 ;; Convert syntax object containing a list into a list of syntax objects.
 (define (syntax->list obj)
   (let ((datum (syntax-object-datum obj))
-        (ctx (syntax-object-context obj)))
+        (ctx (get-identifier-context obj)))
     (cond
       ((null? datum) '())
       ((pair? datum)
@@ -102,11 +110,13 @@
 ;; Hygiene-aware identifier equality.
 (define (bound-identifier=? id1 id2)
   (let ((d1 (syntax-object-datum id1))
-        (d2 (syntax-object-datum id2)))
+        (d2 (syntax-object-datum id2))
+        (c1 (get-identifier-context id1))
+        (c2 (get-identifier-context id2)))
     (and (symbol? d1)
          (symbol? d2)
          (eq? d1 d2)
-         (equal? (syntax-object-context id1) (syntax-object-context id2)))))
+         (equal? c1 c2))))
 
 ;; Name-only identifier equality (for literals).
 (define (free-identifier=? id1 id2)
@@ -195,13 +205,31 @@
              (syntax-depth-map (cdr pattern) literals ellipsis depth)))
     (else '())))
 
+(define (apply-syntax-object-context val suffix)
+  (let loop ((obj val) (ctx '()))
+    (cond ((syntax-object? obj)
+           (let ((c (syntax-object-context obj)))
+             (loop (syntax-object-datum obj) (if (null? c) ctx c))))
+          ((pair? obj)
+           (cons (loop (car obj) ctx) (loop (cdr obj) ctx)))
+          ((vector? obj)
+           (list->vector (map (lambda (x) (loop x ctx)) (vector->list obj))))
+          ((symbol? obj)
+           (cond ((null? ctx) obj)
+                 ((and (pair? (cdr ctx)) (pair? (cddr ctx)) (assq obj (caddr ctx)))
+                  (let ((new-sym (rename-symbol obj suffix)))
+                    (register-renamed! new-sym obj ctx)
+                    new-sym))
+                 (else obj)))
+          (else obj))))
+
 ;; Substitute bound pattern variables and replicate ellipsis patterns.
 (define (expand-syntax template bindings context meta-env depth ellipsis literals suffix)
   (cond
     ((symbol? template)
      (let ((b (assq template bindings)))
        (if (and b (= (or (cdr (assq template meta-env)) 0) depth))
-           (cdr b)
+           (apply-syntax-object-context (cdr b) suffix)
            (if (memq template literals)
                template
                (let ((new-sym (rename-symbol template suffix)))
@@ -231,6 +259,7 @@
                (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals suffix))))
     (else template)))
 
+
 ;;=============================================================================
 ;; 6. Quasisyntax & Transformation Helpers
 ;;=============================================================================
@@ -245,13 +274,13 @@
           (cons `(quasisyntax ,(car res)) (cdr res))))
        ((and (eq? (car x) 'unsyntax) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
-            (let ((tmp (generate-temporary-symbol "unsyntax.")))
+            (let ((tmp (gensym "unsyntax")))
               (cons (list '**splice-unsyntax** tmp) (list (list tmp (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax ,(car res)) (cdr res)))))
        ((and (eq? (car x) 'unsyntax-splicing) (pair? (cdr x)) (null? (cddr x)))
         (if (= depth 0)
-            (let ((tmp (generate-temporary-symbol "unsyntax-splicing.")))
+            (let ((tmp (gensym "unsyntax-splicing")))
               (cons (list '**splice-unsyntax-splicing** tmp) (list (list (list tmp '...) (cadr x)))))
             (let ((res (extract-quasisyntax (cadr x) (- depth 1) literals)))
               (cons `(unsyntax-splicing ,(car res)) (cdr res)))))
@@ -275,7 +304,7 @@
 
 ;; Compile fender and output expressions into runtime calls.
 (define (prepare-eval-expr expr literals meta-env bindings context)
-  (let ((r-env (if (and (pair? context) (pair? (cddr context))) (caddr context) '())))
+  (let ((r-env (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context))) (caddr context) '())))
     (let loop ((x expr))
       (cond
         ((symbol? x)
@@ -288,14 +317,24 @@
         ((pair? x)
          (cond
            ((eq? (car x) 'syntax)
-            `(let ((suffix (fresh-suffix)))
-               (expand-syntax ',(cadr x) *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix)))
+            `(let ((suffix (_fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f)))
+               (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                 ',(cadr x)
+                 (_current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                 ',context
+                 (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                 0 '... ',literals suffix)))
            ((eq? (car x) 'quasisyntax)
             (let ((res (extract-quasisyntax (cadr x) 0 literals)))
               (let ((new-tmpl (car res)) (bindings (cdr res)))
                 (if (null? bindings)
-                    `(let ((suffix (fresh-suffix)))
-                       (expand-syntax ',new-tmpl *current-syntax-bindings* ',context *current-syntax-meta-env* 0 '... ',literals suffix))
+                    `(let ((suffix (_fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f)))
+                       (_expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                         ',new-tmpl
+                         (_current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                         ',context
+                         (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
+                         0 '... ',literals suffix))
                     (loop `(with-syntax ,bindings (syntax ,new-tmpl)))))))
            ((eq? (car x) 'syntax-case)
             (let ((input (loop (cadr x))) (lits (caddr x))
@@ -308,19 +347,23 @@
                                                              (lambda () ,(prepare-eval-expr fender new-lits meta-env bindings context))
                                                              (lambda () ,(prepare-eval-expr output new-lits meta-env bindings context)))))
                                                  (cdddr x)))))
-              `(expand-syntax-case ,input ',lits ,clauses-expr (interaction-environment))))
+              `(_expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f ,input ',lits ,clauses-expr (current-environment))))
            ((eq? (car x) 'with-syntax)
             (let ((b-specs (cadr x)) (body (cddr x)))
-              `(expand-with-syntax (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body)))) (interaction-environment))))
+              `(_expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+                 (list 'with-syntax (list ,@(map (lambda (s) `(list ',(car s) ,(loop (cadr s)))) b-specs)) (lambda () ,(loop (cons 'begin body))))
+                 (current-environment))))
            ((eq? (car x) 'quote) x)
            (else
             (let ((head (car x)))
               (if (symbol? head)
                   (let* ((m-env (if (pair? context) (car context) '()))
                          (s-env (if (and (pair? context) (pair? (cdr context))) (cadr context) '()))
+                         (r-env (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context))) (caddr context) '()))
+                         (marks (if (and (pair? context) (pair? (cdr context)) (pair? (cddr context)) (pair? (cdddr context))) (cadddr context) '()))
                          (transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
                     (if transformer
-                        (loop (unrename-core (call-transformer transformer x m-env s-env r-env) context))
+                        (loop (unrename-core (call-transformer transformer x m-env s-env r-env marks) context))
                         (cons (loop (car x)) (loop (cdr x)))))
                   (cons (loop (car x)) (loop (cdr x))))))))
         (else x)))))
@@ -337,7 +380,7 @@
           #t
           (core-eval (
               prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
-              (if (null? env) (interaction-environment) env)))))
+              (if (null? env) (current-environment) env)))))
 
 ;; Main syntax-case expansion engine.
 (define (expand-syntax-case input literals clauses env)
@@ -351,20 +394,20 @@
                  (output (caddr clause))
                  (m (syntax-case-match literals pattern input ellipsis)))
             (if m
-                (let ((old-bindings *current-syntax-bindings*)
-                      (old-meta *current-syntax-meta-env*)
+                (let ((old-bindings (current-syntax-bindings))
+                      (old-meta (current-syntax-meta-env))
                       (new-meta (syntax-depth-map pattern literals ellipsis 0)))
-                  (set! *current-syntax-bindings* (append m old-bindings))
-                  (set! *current-syntax-meta-env* (append new-meta old-meta))
-                  (let ((matched? (eval-transformer-expr fender literals pattern *current-syntax-bindings* env)))
+                  (current-syntax-bindings (append m old-bindings))
+                  (current-syntax-meta-env (append new-meta old-meta))
+                  (let ((matched? (eval-transformer-expr fender literals pattern (current-syntax-bindings) env)))
                     (if matched?
-                        (let ((res (eval-transformer-expr output literals pattern *current-syntax-bindings* env)))
-                          (set! *current-syntax-bindings* old-bindings)
-                          (set! *current-syntax-meta-env* old-meta)
+                        (let ((res (eval-transformer-expr output literals pattern (current-syntax-bindings) env)))
+                          (current-syntax-bindings old-bindings)
+                          (current-syntax-meta-env old-meta)
                           res)
                         (begin
-                          (set! *current-syntax-bindings* old-bindings)
-                          (set! *current-syntax-meta-env* old-meta)
+                          (current-syntax-bindings old-bindings)
+                          (current-syntax-meta-env old-meta)
                           (loop (cdr clauses))))))
                 (loop (cdr clauses))))))))
 
@@ -381,3 +424,10 @@
 (define (generate-temporaries l)
   (let ((lst (syntax->list l)))
     (map (lambda (x) (make-syntax-object (generate-temporary-symbol "temp.") '())) lst)))
+
+(define _expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f expand-syntax-case)
+(define _expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f expand-syntax)
+(define _expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f expand-with-syntax)
+(define _fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f fresh-suffix)
+(define _current-syntax-bindings.145bed32-69c0-4df2-8c06-89f53ab9907f current-syntax-bindings)
+(define _current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f current-syntax-meta-env)

@@ -6,10 +6,14 @@
 
 #include "core.h"
 
-#if defined(NDEBUG)
-  #define USE_TBI 1
-#else
-  #define USE_TBI 0
+// #define USE_TBI 0
+
+#ifndef USE_TBI
+  #if defined(IS_DEBUG_BUILD) || defined(IS_RELWITHDEBINFO_BUILD)
+    #define USE_TBI 0
+  #else
+    #define USE_TBI 1
+  #endif
 #endif
 
 uint64_t capture_thread_stack_bottom();

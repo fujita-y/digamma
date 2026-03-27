@@ -11,6 +11,7 @@ class nanos_options {
  public:
   static void parse(int argc, char** argv);
   static std::string boot_file;
+  static std::string env_name;
   static std::string script_file;
 };
 

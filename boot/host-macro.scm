@@ -1,3 +1,5 @@
+;;; macro used in host implementation to generate core IR
+
 (define-syntax parameterize-aux
   (syntax-rules ()
     ((_ () ((save new param value) ...) body ...)
@@ -13,6 +15,16 @@
   (syntax-rules ()
     ((_ ((e1 e2) ...) body ...)
      (parameterize-aux ((e1 e2) ...) () body ...))))
+
+(define-syntax with-parameter
+  (syntax-rules ()
+    ((_ ((param val) ...) body ...)
+     (let ((old-vals (list (param) ...))
+           (new-vals (list val ...)))
+       (for-each (lambda (p v) (p v)) (list param ...) new-vals)
+       (let ((results (let () body ...)))
+         (for-each (lambda (p v) (p v)) (list param ...) old-vals)
+         results)))))
 
 (define-syntax let-values
   (syntax-rules ()

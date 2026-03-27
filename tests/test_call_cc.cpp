@@ -35,7 +35,7 @@ static bool some_test_failed = false;
 
 static bool test_return_normally() {
   auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
-  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
   scm_obj_t result = subr_call_cc(scm_undef, proc);
   if (result != make_fixnum(42)) {
     printf("\033[31m###### call/cc normal return failed\033[0m\n");
@@ -52,7 +52,7 @@ static bool test_invoke_continuation() {
     scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
     return c_apply_helper(cont, 1, args);
   };
-  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
   scm_obj_t result = subr_call_cc(scm_undef, proc);
   if (result != make_fixnum(100)) {
     printf("\033[31m###### call/cc invoke failed\033[0m\n");
@@ -73,7 +73,7 @@ static bool test_multishot() {
     return make_fixnum(count++);
   };
 
-  scm_obj_t proc = make_closure((void*)*+(multishot_proc), 0, 1, 0, nullptr, scm_nil, 1);
+  scm_obj_t proc = make_closure((void*)*+(multishot_proc), 0, 1, 0, nullptr, 1);
   printf("test_multishot: calling call/cc (initial)\n");
   fflush(stdout);
   scm_obj_t result = subr_call_cc(scm_undef, proc);

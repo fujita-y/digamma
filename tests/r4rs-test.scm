@@ -192,6 +192,7 @@
   (let ((name1 'x) (name2 'y)) `(a `(b ,,name1 ,',name2 d) e)))
 (test '(list 3 4) 'quasiquote (quasiquote (list (unquote (+ 1 2)) 4)))
 (test '`(list ,(+ 1 2) 4) 'quasiquote '(quasiquote (list (unquote (+ 1 2)) 4)))
+(test '(list . 1) 'quasiquote `(list . ,1))
 (SECTION 5 2 1)
 (define (tprint x) #t)
 (test #t 'tprint (tprint 56))

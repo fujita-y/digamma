@@ -7,7 +7,7 @@
 (define *fail-count* 0)
 
 (define (test name expr expected)
-  (let ((result (core-eval (macroexpand expr 'strip) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr 'strip) (current-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -17,6 +17,16 @@
           (display "FAIL: ") (display name) (newline)
           (display "  Expected: ") (write expected) (newline)
           (display "  Actual:   ") (write result) (newline)))))
+
+(define-syntax let-values
+  (syntax-rules ()
+    ((let-values () body1 body2 ...)
+    (let () body1 body2 ...))
+    ((let-values (((v ...) expr) rest ...) body1 body2 ...)
+    (call-with-values
+        (lambda () expr)
+        (lambda (v ...)
+          (let-values (rest ...) body1 body2 ...))))))
 
 (define generate-temporary-symbol (lambda () (gensym "tmp")))
 
@@ -266,7 +276,12 @@
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)

@@ -13,7 +13,8 @@
 #include <llvm/IR/Value.h>
 #include "nanos_jit.h"
 
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // ============================================================================
@@ -80,10 +81,7 @@ struct compiled_code_t {
   compiled_code_t(compiled_code_t&& other);
   compiled_code_t& operator=(compiled_code_t&& other);
 
-  intptr_t operator()() const {
-    if (func_ptr) return func_ptr();
-    return 0;
-  }
+  intptr_t release_and_run();
 
   operator bool() const { return func_ptr != nullptr; }
 };
@@ -142,15 +140,14 @@ class codegen_t {
   std::vector<FunctionInfo> functions;
   FunctionInfo* current_function_info = nullptr;
 
-  std::vector<llvm::AllocaInst*> allocas;         // register index -> alloca
-  std::map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
+  std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca
+  std::unordered_map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
 
   // --------------------------------------------------------------------------
   //  Closure metadata
   // --------------------------------------------------------------------------
 
-  std::map<scm_obj_t, scm_obj_t> closure_literals;    // label symbol -> literals vector
-  std::map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
+  std::unordered_map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
 
   // --------------------------------------------------------------------------
   //  Cached values
@@ -161,7 +158,7 @@ class codegen_t {
   scm_obj_t cached_symbol_safepoint;
   bridge_func_t cached_call_closure_bridge = nullptr;
 
-  std::map<scm_obj_t, Opcode> opcode_map;
+  std::unordered_map<scm_obj_t, Opcode> opcode_map;
 
   // --------------------------------------------------------------------------
   //  Compilation pipeline (phases)
@@ -182,7 +179,6 @@ class codegen_t {
   void phase3_generate_code();
   void phase4_optimize_and_verify();
   void optimize_module(llvm::Module& mod);
-  void prune_unused_closures();
   compiled_code_t phase5_finalize();
   void reset_compile_state();
 
@@ -196,16 +192,12 @@ class codegen_t {
 
   void init_opcode_map();
   void parse_instructions(scm_obj_t inst_list);
-  void parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                                std::vector<scm_obj_t>& current_literals);
-  void finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
-
-  void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                   std::vector<scm_obj_t>& current_literals);
+  void parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label);
+  void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label);
   void parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_jump(const scm_obj_t& inst_obj, Instruction& inst);
-  void parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals);
+  void parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label);
   void parse_ret(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_global_set(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
@@ -302,7 +294,7 @@ class codegen_t {
   bridge_func_t call_closure_bridge();
 
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
-  std::map<scm_obj_t, std::pair<int, bool>> closure_params;
+  std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
 
   void destroy() { s_current = nullptr; }
 

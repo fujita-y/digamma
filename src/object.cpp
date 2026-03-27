@@ -100,6 +100,14 @@ scm_obj_t make_uninterned_symbol(const char* name) {
   return obj;
 }
 
+bool is_symbol_interned(scm_obj_t x) {
+  if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
+  object_heap_t& heap = *object_heap_t::current();
+  std::lock_guard<std::mutex> lock(heap.m_symbol_table_mutex);
+  auto it = heap.m_symbol_table.find((char*)symbol_name(x));
+  return it != heap.m_symbol_table.end();
+}
+
 uint8_t* symbol_name(scm_obj_t x) {
   if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
   return ((scm_symbol_rec_t*)to_address(x))->name;
@@ -172,10 +180,9 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   return tc6_pointer(rec, tc6_hashtable);
 }
 
-scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], scm_obj_t literals, int cdecl) {
+scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl) {
   object_heap_t& heap = *object_heap_t::current();
   scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) + (nsize - 1) * sizeof(scm_obj_t));
-  rec->literals = literals;
   rec->code = code;
   rec->argc = argc;
   rec->rest = rest;
@@ -196,6 +203,21 @@ scm_obj_t make_environment(scm_obj_t name) {
   rec->macros = make_hashtable(symbol_hash, symbol_equiv, 16);
   rec->tag = tc6_tag(tc6_environment);
   return tc6_pointer(rec, tc6_environment);
+}
+
+scm_obj_t environment_variables(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return ((scm_environment_rec_t*)to_address(x))->variables;
+}
+
+scm_obj_t environment_macros(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return ((scm_environment_rec_t*)to_address(x))->macros;
+}
+
+uint8_t* environment_name(scm_obj_t x) {
+  if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
+  return symbol_name(((scm_environment_rec_t*)to_address(x))->name);
 }
 
 scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders) {

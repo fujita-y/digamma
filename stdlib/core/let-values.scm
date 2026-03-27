@@ -1,6 +1,6 @@
 (define-module (core let-values)
   (export let-values let*-values)
-  (begin
+  
   (define-syntax let-values
     (syntax-rules ()
       ((let-values () body1 body2 ...)
@@ -17,5 +17,5 @@
        (let () body1 body2 ...))
       ((let*-values (binding rest ...) body1 body2 ...)
        (let-values (binding)
-         (let*-values (rest ...) body1 body2 ...)))))))
+         (let*-values (rest ...) body1 body2 ...))))))
 

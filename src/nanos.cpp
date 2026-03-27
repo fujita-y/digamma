@@ -1,6 +1,7 @@
 #include "object.h"
 #include "nanos.h"
 #include "codegen.h"
+#include "hash.h"
 #include "nanos_jit.h"
 #include "nanos_options.h"
 #include "object_heap.h"
@@ -38,7 +39,7 @@ void nanos_t::init_codegen() {
 
 void nanos_t::init() {
   object_heap_t* heap = new object_heap_t();
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 64 * 1024 * 1024);
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 512 * 1024 * 1024);
   init_codegen();
   init_subr();
 }
@@ -70,6 +71,7 @@ void nanos_t::load_script(std::string filename) {
   bool err = false;
   while (true) {
     scm_obj_t obj = reader.read(err);
+    scoped_gc_protect protect(obj);
     if (err) {
       std::string msg = reader.get_error_message();
       std::cout << "read error: " << msg << std::endl;
@@ -99,6 +101,7 @@ void nanos_t::load_ir(std::string filename) {
   bool err = false;
   while (true) {
     scm_obj_t obj = reader.read(err);
+    scoped_gc_protect protect(obj);
     if (err) {
       std::string msg = reader.get_error_message();
       std::cout << "read error: " << msg << std::endl;
@@ -115,7 +118,7 @@ void nanos_t::load_ir(std::string filename) {
 #endif
       try {
         auto func = codegen_t::current()->compile(obj);
-        intptr_t result = func();
+        intptr_t result = func.release_and_run();
 #if IR_VERBOSE
         printf("(0x%016lx)\n", result);
         printer.write((scm_obj_t)result);
@@ -129,25 +132,30 @@ void nanos_t::load_ir(std::string filename) {
   }
 }
 
-scm_obj_t nanos_t::core_eval(scm_obj_t obj) {
+scm_obj_t nanos_t::lookup_system_environment(scm_obj_t symbol) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t core_eval = heap->environment_variable_ref(make_symbol("core-eval"));
-  if (core_eval == scm_undef) {
-    throw std::runtime_error("core-eval not found in current environment");
+  scm_obj_t variables = environment_variables(heap->m_system_environment);
+  scm_obj_t cell = hashtable_ref(variables, symbol, scm_undef);
+  if (cell == scm_undef) {
+    throw std::runtime_error("core-eval not found in system environment");
   }
+  return cell_value(cell);
+}
+
+scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
+  scm_obj_t core_eval = lookup_system_environment(make_symbol("core-eval"));
   if (!is_closure(core_eval)) {
     throw std::runtime_error("core-eval is not a closure");
   }
-
+  object_heap_t* heap = object_heap_t::current();
   codegen_t* cg = codegen_t::current();
   auto bridge = cg->call_closure_bridge();
-
-  scm_obj_t args[2] = {obj, scm_nil};
+  scm_obj_t args[2] = {obj, heap->m_current_environment};
   return (scm_obj_t)bridge(core_eval, 2, args);
 }
 
 void nanos_t::run() {
-  puts(";; nanos - a small virtual machine for bootstrapping, compile nanos-ir to native code.");
+  puts(";; nanos - scheme-like lisp-2 interpreter for bootstrapping.");
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
@@ -163,6 +171,17 @@ void nanos_t::run() {
   if (!nanos_options::boot_file.empty()) {
     load_ir(nanos_options::boot_file);
   }
+
+  object_heap_t* heap = object_heap_t::current();
+  if (nanos_options::env_name == "interaction") {
+    heap->m_current_environment = heap->m_interaction_environment;
+  } else if (nanos_options::env_name == "system") {
+    heap->m_current_environment = heap->m_system_environment;
+  } else {
+    throw std::runtime_error("Invalid environment name");
+  }
+  std::cout << ";; environment: " << std::string((char*)environment_name(heap->m_current_environment)) << std::endl;
+
   if (!nanos_options::script_file.empty()) {
     load_script(nanos_options::script_file);
   }
@@ -247,7 +266,7 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     printer.write((scm_obj_t)result);
     puts("\n");
 #else
-    scm_obj_t result = core_eval(obj);
+    scm_obj_t result = call_core_eval(obj);
     if (result != scm_unspecified) {
       printer.write(result);
       puts("\n");

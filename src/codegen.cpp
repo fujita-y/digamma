@@ -59,6 +59,25 @@ compiled_code_t& compiled_code_t::operator=(compiled_code_t&& other) {
   return *this;
 }
 
+intptr_t compiled_code_t::release_and_run() {
+  // Grab the function pointer locally before clearing it from the object.
+  auto f = func_ptr;
+  func_ptr = nullptr;
+  // Explicitly remove the LLVM tracker BEFORE running JIT code.
+  // Scheme continuations captured before subr_codegen_and_run can overwrite
+  // this function's stack frame (including 'tracker') during restoration.
+  // By releasing here, the destructor becomes a safe no-op even on a
+  // corrupted stack.
+  if (tracker) {
+    if (auto err = tracker->remove()) {
+      llvm::consumeError(std::move(err));
+    }
+    tracker = nullptr;
+  }
+  if (f) return f();
+  return 0;
+}
+
 // ============================================================================
 //  Static / thread-local state
 // ============================================================================
@@ -141,7 +160,6 @@ void codegen_t::reset_compile_state() {
   allocas.clear();
   labels.clear();
   function_map.clear();
-  closure_literals.clear();
   closure_params.clear();
 }
 
@@ -389,8 +407,6 @@ void codegen_t::phase4_optimize_and_verify() {
 #endif
 
   if (functions.size() > 1) {
-    // No effects without named let optimization
-    // prune_unused_closures();
 #ifndef NDEBUG
     {
       std::error_code EC;
@@ -419,69 +435,6 @@ static llvm::Function* getUserFunction(llvm::User* U) {
     }
   }
   return nullptr;
-}
-
-void codegen_t::prune_unused_closures() {
-  std::set<llvm::Function*> reachable;
-  std::vector<llvm::Function*> worklist;
-
-  llvm::Module* main_mod = main_module_uptr.get();
-  llvm::Module* clo_mod = closure_module_uptr.get();
-
-  // 1. Establish the root set from main_module.
-  // Any function declaration in main_module that has uses is a root.
-  for (llvm::Function& f : *main_mod) {
-    if (f.isDeclaration() && !f.use_empty()) {
-      if (llvm::Function* target = clo_mod->getFunction(f.getName())) {
-        if (reachable.insert(target).second) {
-          worklist.push_back(target);
-        }
-      }
-    }
-  }
-
-  // 2. Build edges: for each function in closure_module, find which functions use it.
-  // edge: user_func -> target_func
-  std::map<llvm::Function*, std::vector<llvm::Function*>> cg;
-  for (llvm::Function& target_func : *clo_mod) {
-    if (target_func.isDeclaration()) continue;
-
-    for (llvm::User* U : target_func.users()) {
-      if (llvm::Function* user_func = getUserFunction(U)) {
-        // If the user is inside closure_module, record the edge.
-        if (user_func->getParent() == clo_mod) {
-          cg[user_func].push_back(&target_func);
-        }
-      }
-    }
-  }
-
-  // 3. Trace reachable functions in closure_module
-  while (!worklist.empty()) {
-    llvm::Function* curr = worklist.back();
-    worklist.pop_back();
-
-    for (llvm::Function* target : cg[curr]) {
-      if (reachable.insert(target).second) {
-        worklist.push_back(target);
-      }
-    }
-  }
-
-  // 4. Prune unreachable functions
-  std::vector<llvm::Function*> to_delete;
-  for (llvm::Function& f : *clo_mod) {
-    if (!f.isDeclaration() && reachable.find(&f) == reachable.end()) {
-      to_delete.push_back(&f);
-    }
-  }
-
-  for (llvm::Function* f : to_delete) {
-#ifndef NDEBUG
-    std::cout << "[codegen_t::prune_unused_closures] deleting: " << f->getName().str() << "\n";
-#endif
-    f->eraseFromParent();
-  }
 }
 
 // --------------------------------------------------------------------------
@@ -562,7 +515,6 @@ void codegen_t::init_opcode_map() {
 
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
-  closure_literals.clear();
   closure_params.clear();
 
   // Create main function info
@@ -572,7 +524,6 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
 
   scm_obj_t curr = inst_list;
   scm_obj_t current_closure_label = scm_nil;
-  std::vector<scm_obj_t> current_literals;
 
   // Detect closure parameters to switch contexts.
   // Closures always start with a unique label which starts with 'C'.
@@ -585,9 +536,6 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
     if (is_cons(inst_obj) && CAR(inst_obj) == cached_symbol_label) {
       scm_obj_t label = operand(inst_obj, 1);
       if (is_closure_label(label)) {
-        // Finish previous closure literals
-        finish_closure_literals(current_closure_label, current_literals);
-
         // Start new function
         functions.emplace_back();
         current_func = &functions.back();
@@ -595,7 +543,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
         current_closure_label = label;
 
         // label instruction
-        parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+        parse_single_instruction(inst_obj, *current_func, current_closure_label);
 
         // Insert safepoint before the first instruction of the closure
         Instruction safepoint_inst;
@@ -607,11 +555,8 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
       }
     }
 
-    parse_single_instruction(inst_obj, *current_func, current_closure_label, current_literals);
+    parse_single_instruction(inst_obj, *current_func, current_closure_label);
   }
-
-  // Finish any remaining closure literals
-  finish_closure_literals(current_closure_label, current_literals);
 
   // Post-process: Update max_reg for each function based on parameters
   // Main function (index 0) doesn't have parameters in registers initially (or rather, it's just entry)
@@ -632,8 +577,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   }
 }
 
-void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                                         std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label) {
   if (!is_cons(inst_obj)) return;
 
   Instruction inst;
@@ -655,7 +599,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
 
   switch (inst.op) {
     case Opcode::CONST:
-      parse_const(inst_obj, inst, func_info, current_closure_label, current_literals);
+      parse_const(inst_obj, inst, func_info, current_closure_label);
       break;
     case Opcode::MOV:
       parse_mov(inst_obj, inst, func_info);
@@ -667,7 +611,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
       parse_jump(inst_obj, inst);
       break;
     case Opcode::LABEL:
-      parse_label(inst_obj, inst, current_closure_label, current_literals);
+      parse_label(inst_obj, inst, current_closure_label);
       break;
     case Opcode::RET:
       parse_ret(inst_obj, inst, func_info);
@@ -722,35 +666,17 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
   func_info.instructions.push_back(inst);
 }
 
-void codegen_t::finish_closure_literals(scm_obj_t& current_closure_label, std::vector<scm_obj_t>& current_literals) {
-  if (current_closure_label != scm_nil) {
-    if (!current_literals.empty()) {
-      scm_obj_t vec = make_vector(current_literals.size(), scm_false);
-      for (size_t i = 0; i < current_literals.size(); ++i) {
-        ((scm_vector_rec_t*)to_address(vec))->elts[i] = current_literals[i];
-      }
-      closure_literals[current_closure_label] = vec;
-    }
-    current_literals.clear();
-    current_closure_label = scm_nil;
-  }
-}
-
 // --------------------------------------------------------------------------
 //  Per-opcode parsers
 // --------------------------------------------------------------------------
 
-void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label,
-                            std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label) {
   inst.rn1 = parse_reg(operand(inst_obj, 1));
   inst.opr1 = operand(inst_obj, 2);  // val
   updateMaxRegister(inst.rn1, func_info.max_reg);
-
-  // Collect literals if in closure
-  if (current_closure_label != scm_nil) {
-    if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
-      current_literals.push_back(inst.opr1);
-    }
+  // Register literal
+  if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
+    object_heap_t::current()->literals_add(inst.opr1);
   }
 }
 
@@ -769,12 +695,10 @@ void codegen_t::parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionI
 
 void codegen_t::parse_jump(const scm_obj_t& inst_obj, Instruction& inst) { inst.opr1 = operand(inst_obj, 1); }
 
-void codegen_t::parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label,
-                            std::vector<scm_obj_t>& current_literals) {
+void codegen_t::parse_label(const scm_obj_t& inst_obj, Instruction& inst, scm_obj_t& current_closure_label) {
   inst.opr1 = operand(inst_obj, 1);
   // Check if this is a closure label
   if (is_closure_label(inst.opr1)) {
-    finish_closure_literals(current_closure_label, current_literals);
     current_closure_label = inst.opr1;
   }
 }
@@ -1048,11 +972,11 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 // ============================================================================
 
 void codegen_t::analyze_closure_labels() {
-  std::map<scm_obj_t, scm_obj_t> global_closure_defs;
+  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
 
   struct State {
-    std::map<int, scm_obj_t> regs;
-    std::map<scm_obj_t, scm_obj_t> globals;
+    std::unordered_map<int, scm_obj_t> regs;
+    std::unordered_map<scm_obj_t, scm_obj_t> globals;
 
     bool merge(const State& other) {
       bool changed = false;
@@ -1083,7 +1007,7 @@ void codegen_t::analyze_closure_labels() {
   };
 
   for (auto& func : functions) {
-    std::map<scm_obj_t, State> block_entry_states;
+    std::unordered_map<scm_obj_t, State> block_entry_states;
     bool changed = true;
     while (changed) {
       changed = false;

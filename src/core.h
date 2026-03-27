@@ -33,7 +33,7 @@
 #endif
 
 #ifdef NDEBUG
-  #define MTDEBUG 0
+  #define MTDEBUG 1
   #define GCDEBUG 0
   #define SCDEBUG 0
   #define STDEBUG 0

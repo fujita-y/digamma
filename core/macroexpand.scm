@@ -15,34 +15,26 @@
 ;; SECTION 1: Globals & State
 ;;=============================================================================
 
-;; Tracks all renamed identifiers: ((alias original context) ...)
-(define *rename-env* '())
+;; Tracks all renamed identifiers: alias -> (original . context)
+(define *rename-env* (make-eq-hashtable))
 
-;; Counter for generating unique suffixes to ensure hygiene during renaming
-(define *suffix-counter* 0)
-
-;; Registry mapping module names to records: ((name . record) ...)
-;; Record structure: ((exports . rename-map) . bindings)
-(define *modules* '())
-
-;; Parameter holding the current expansion context (m-env s-env r-env)
+;; Parameter holding the current expansion context (m-env s-env r-env marks)
 (define *current-context* (make-parameter #f))
 
 ;; Temporary variable for passing values through eval during module processing
 (define *temp-value* #f)
 
+;; Registry mapping module names to records: ((name . record) ...)
+;; Record structure: ((exports . rename-map) . bindings)
+(define current-module-registry (make-parameter'()))
+
 ;;=============================================================================
 ;; SECTION 2: Identifier & Environment Resolution
 ;;=============================================================================
 
-;; Generate a fresh unique suffix for identifier renaming.
-(define (fresh-suffix)
-  (set! *suffix-counter* (+ *suffix-counter* 1))
-  (number->string *suffix-counter*))
-
 ;; Register a renamed identifier in the global rename environment.
 (define (register-renamed! alias original context)
-  (set! *rename-env* (cons (list alias original context) *rename-env*)))
+  (hashtable-set! *rename-env* alias (cons original context)))
 
 ;; Unwrap a lazy environment reference used by letrec-syntax.
 (define (unwrap-env env)
@@ -51,24 +43,24 @@
 ;; Resolve an identifier to its original symbol and context or just symbol.
 (define (resolve-identifier id)
   (if (symbol? id)
-      (let ((entry (assq id *rename-env*)))
+      (let ((entry (hashtable-ref *rename-env* id #f)))
         (if entry
-            (let ((original (cadr entry)) (context (caddr entry)))
+            (let ((original (car entry)) (context (cdr entry)))
               (if context (cons context original) (resolve-identifier original)))
             id))
       id))
 
 ;; Resolve a variable reference for code generation.
-(define (resolve-variable id m-env s-env r-env)
+(define (resolve-variable id m-env s-env r-env marks)
   (let ((local (assq id r-env)))
     (if local
         (cdr local)
-        (let ((entry (assq id *rename-env*)))
+        (let ((entry (hashtable-ref *rename-env* id #f)))
           (if entry
-              (let ((original (cadr entry)) (context (caddr entry)))
+              (let ((original (car entry)) (context (cdr entry)))
                 (if context
-                    (let ((c-m (car context)) (c-s (cadr context)) (c-r (caddr context)))
-                      (resolve-variable original c-m c-s c-r))
+                    (let ((c-m (car context)) (c-s (cadr context)) (c-r (caddr context)) (c-marks (cadddr context)))
+                      (resolve-variable original c-m c-s c-r c-marks))
                     id))
               id)))))
 
@@ -90,7 +82,8 @@
                   (if local-pair-resolved
                       (cdr local-pair-resolved)
                       (and (environment-macro-contains? resolved)
-                           (environment-macro-ref resolved))))))))))
+                           (let ((transformer (environment-macro-ref resolved)))
+                             (and (not (eq? transformer 'builtin)) transformer)))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
 (define (resolve-core-form sym shadowed-env)
@@ -112,16 +105,16 @@
 
 ;; Register a module in the global registry.
 (define (register-module! name exports rename-map bindings)
-  (set! *modules* (cons (cons name (cons (cons exports rename-map) bindings)) *modules*)))
+  (current-module-registry (cons (cons name (cons (cons exports rename-map) bindings)) (current-module-registry))))
 
 (define (module-name->string name)
   (string-join (map symbol->string name) "."))
 
 (define (mangle-name mod-name sym)
-  (string->symbol (string-append (module-name->string mod-name) "%" (symbol->string sym))))
+  (string->symbol (string-append (module-name->string mod-name) "::" (symbol->string sym))))
 
 (define (lookup-module name)
-  (let ((entry (assoc name *modules*))) (and entry (cdr entry))))
+  (let ((entry (assoc name (current-module-registry)))) (and entry (cdr entry))))
 
 ;; Extract and process export specifications.
 (define (process-export-specs specs)
@@ -176,18 +169,18 @@
 (define (filter-runtime-forms forms)
   (filter (lambda (f) (not (and (pair? f) (eq? (car f) 'define-syntax)))) forms))
 
-(define (extract-macro-defs forms m-env s-env r-env)
+(define (extract-macro-defs forms m-env s-env r-env marks)
   (let loop ((forms forms) (defs '()))
     (if (null? forms)
         (reverse defs)
         (let ((form (car forms)))
           (loop (cdr forms) (if (and (pair? form) (eq? (car form) 'define-syntax))
-                                (cons (cons (cadr form) (make-macro-binding (parse-transformer (caddr form) (list m-env s-env r-env)))) defs)
+                                (cons (cons (cadr form) (make-macro-binding (parse-transformer (caddr form) (list m-env s-env r-env marks)))) defs)
                                 defs))))))
 
 (define (inject-binding! name value)
   (set! *temp-value* value)
-  (core-eval `(define ,name *temp-value*) (interaction-environment)))
+  (core-eval `(define ,name *temp-value*) (current-environment)))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers & Helpers
@@ -205,8 +198,8 @@
           (else `(begin ,@flat)))))
 
 ;; Invoke a macro transformer with current lexical context captured.
-(define (call-transformer transformer expr m-env s-env r-env)
-  (parameterize ((*current-context* (list m-env s-env r-env)))
+(define (call-transformer transformer expr m-env s-env r-env marks)
+  (with-parameter ((*current-context* (list m-env s-env r-env marks)))
     (syntax->datum (if (variable-transformer? transformer)
                        ((variable-transformer-procedure transformer) expr)
                        (transformer expr)))))
@@ -236,10 +229,12 @@
       ((and (pair? spec) (core-form? (car spec) 'syntax-rules (cadr context)))
        (make-syntax-rules-transformer (cdr spec) context))
       ((and (pair? spec) (core-form? (car spec) 'lambda (cadr context)))
-       (lambda (expr)
-         (let ((input (make-syntax-object expr context)))
-           (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '() context)))
-             (syntax->datum (core-eval body (interaction-environment)))))))
+       (let ((m-env (car context)) (s-env (cadr context)) (r-env (caddr context)) (marks (cadddr context)))
+         (let ((new-marks (cons (fresh-mark) marks)))
+           (lambda (expr)
+             (let ((input (make-syntax-object expr (list m-env s-env r-env marks))))
+               (let ((body (prepare-eval-expr `((lambda ,(cadr spec) ,@(cddr spec)) ',input) '() '() '() (list m-env s-env r-env new-marks))))
+                 (syntax->datum (core-eval body (current-environment)))))))))
       ((and (pair? spec) (core-form? (car spec) 'make-variable-transformer (cadr context)))
        (make-variable-transformer (parse-transformer (cadr spec) context)))
       ((and (pair? spec) (core-form? (car spec) 'identifier-syntax (cadr context)))
@@ -253,8 +248,13 @@
                                  ((_ . rest) (syntax (,t1 . rest)))
                                  (_ (syntax ,t1))))) context))
              (parse-transformer `(lambda (x) (syntax-case x () ((_ . rest) (syntax (,(car args) . rest))) (_ (syntax ,(car args))))) context))))
-      ((and head (symbol? head) (lookup-macro head (car context)))
-       (parse-transformer (call-transformer (lookup-macro head (car context)) spec (car context) (cadr context) (caddr context)) context))
+      ((and head (symbol? head) (let ((m-env (unwrap-env (car context)))) (lookup-macro head m-env)))
+       (let* ((m-env (unwrap-env (car context)))
+              (s-env (cadr context))
+              (r-env (caddr context))
+              (marks (cadddr context))
+              (transformer (lookup-macro head m-env)))
+         (parse-transformer (call-transformer transformer spec m-env s-env r-env marks) context)))
       (else (error "Unsupported macro transformer" spec)))))
 
 ;;=============================================================================
@@ -295,30 +295,28 @@
 ;; SECTION 6: Expansion Handlers
 ;;=============================================================================
 
-(define (expand expr . args)
-  (let* ((m-env (if (null? args) '() (car args)))
-         (s-env (if (or (null? args) (null? (cdr args))) '() (cadr args)))
-         (r-env (if (or (null? args) (null? (cdr args)) (null? (cddr args))) '() (caddr args))))
-    (cond
+(define (expand expr m-env s-env r-env marks)
+  (cond
       ((pair? expr)
        (let ((head (car expr)))
          (if (symbol? head)
              (let ((transformer (and (not (memq head s-env)) (lookup-macro head m-env))))
                (if transformer 
-                   (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+                   (expand (call-transformer transformer expr m-env s-env r-env marks) m-env s-env r-env marks)
                    (let ((core-sym (resolve-core-form head s-env)))
-                     (let ((handler (and core-sym (lookup-handler core-sym))))
+                     (let ((handler (and core-sym (lookup-builtin-handler core-sym))))
                        (if handler 
-                           (handler expr m-env s-env r-env) 
-                           (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))))
-             (map-improper (lambda (x) (expand x m-env s-env r-env)) expr))))
+                           (handler expr m-env s-env r-env marks) 
+                           (map-improper (lambda (x) (expand x m-env s-env r-env marks)) expr))))))
+             (map-improper (lambda (x) (expand x m-env s-env r-env marks)) expr))))
       ((symbol? expr)
        (let ((transformer (and (not (memq expr s-env)) (lookup-macro expr m-env))))
-         (if transformer (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
-             (resolve-variable expr m-env s-env r-env))))
-      (else expr))))
+         (if transformer
+             (expand (call-transformer transformer expr m-env s-env r-env marks) m-env s-env r-env marks)
+             (resolve-variable expr m-env s-env r-env marks))))
+      (else expr)))
 
-(define (expand-lambda expr m-env s-env r-env)
+(define (expand-lambda expr m-env s-env r-env marks)
   (let* ((params (cadr expr)) (body (cddr expr))
          (p-names (get-param-names params))
          (new-p-names (map (lambda (p) (rename-symbol p (fresh-suffix))) p-names))
@@ -327,33 +325,33 @@
          (new-params (reconstruct-params params new-p-names))
          (split (split-internal-defines body new-s-env))
          (i-defs (car split)) (r-body (cdr split)))
-    (for-each (lambda (p np) (register-renamed! np p (list m-env new-s-env new-r-env))) p-names new-p-names)
+    (for-each (lambda (p np) (register-renamed! np p (list m-env new-s-env new-r-env marks))) p-names new-p-names)
     (if (null? i-defs)
-        `(lambda ,new-params ,@(let ((body (flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) r-body))))
+        `(lambda ,new-params ,@(let ((body (flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env marks)) r-body))))
                                (if (null? body) '((begin)) body)))
-        `(lambda ,new-params ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env)))))
+        `(lambda ,new-params ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env marks)))))
 
-(define (expand-let expr m-env s-env r-env)
+(define (expand-let expr m-env s-env r-env marks)
   (if (symbol? (cadr expr))
       (let ((name (cadr expr)) (bindings (caddr expr)) (body (cdddr expr)))
         (let ((vars (map car bindings)) (vals (map cadr bindings)))
-          (expand `((letrec* ((,name (lambda ,vars ,@body))) ,name) ,@vals) m-env s-env r-env)))
+          (expand `((letrec* ((,name (lambda ,vars ,@body))) ,name) ,@vals) m-env s-env r-env marks)))
       (let* ((bindings (cadr expr)) (body (cddr expr))
              (vars (map car bindings)) (vals (map cadr bindings))
-             (expanded-vals (map (lambda (x) (expand x m-env s-env r-env)) vals))
+             (expanded-vals (map (lambda (x) (expand x m-env s-env r-env marks)) vals))
              (new-vars (map (lambda (v) (rename-symbol v (fresh-suffix))) vars))
              (new-r-env (append (reverse (map cons vars new-vars)) r-env))
              (new-s-env (append vars s-env))
              (new-bindings (map list new-vars expanded-vals))
              (split (split-internal-defines body new-s-env))
              (i-defs (car split)) (r-body (cdr split)))
-        (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
+        (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env marks))) vars new-vars)
         (if (null? i-defs)
-            `(let ,new-bindings ,@(let ((body (flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) r-body))))
+            `(let ,new-bindings ,@(let ((body (flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env marks)) r-body))))
                                    (if (null? body) '((begin)) body)))
-            `(let ,new-bindings ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env))))))
+            `(let ,new-bindings ,(expand `(letrec* ,i-defs ,@r-body) m-env new-s-env new-r-env marks))))))
 
-(define (expand-letrec* expr m-env s-env r-env)
+(define (expand-letrec* expr m-env s-env r-env marks)
   (let* ((bindings (cadr expr)) (body (cddr expr))
          (split (split-internal-defines body s-env))
          (i-defs (car split)) (r-body (cdr split))
@@ -362,52 +360,52 @@
          (new-vars (map (lambda (v) (rename-symbol v (fresh-suffix))) vars))
          (new-r-env (append (reverse (map cons vars new-vars)) r-env))
          (new-s-env (append vars s-env))
-         (expanded-vals (map (lambda (x) (expand x m-env new-s-env new-r-env)) vals))
+         (expanded-vals (map (lambda (x) (expand x m-env new-s-env new-r-env marks)) vals))
          (new-bindings (map list new-vars expanded-vals)))
-    (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env))) vars new-vars)
+    (for-each (lambda (v nv) (register-renamed! nv v (list m-env new-s-env new-r-env marks))) vars new-vars)
     `(let ,(map (lambda (v) (list v #f)) new-vars)
        ,@(map (lambda (v val) `(set! ,v ,val)) new-vars expanded-vals)
-       ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env)) r-body)))))
+       ,@(flatten-begins (map-improper (lambda (x) (expand x m-env new-s-env new-r-env marks)) r-body)))))
 
-(define (expand-let* expr m-env s-env r-env)
+(define (expand-let* expr m-env s-env r-env marks)
   (let ((bindings (cadr expr)) (body (cddr expr)))
-    (cond ((null? bindings) (expand `(let () ,@body) m-env s-env r-env))
-          ((null? (cdr bindings)) (expand `(let (,(car bindings)) ,@body) m-env s-env r-env))
-          (else (expand `(let (,(car bindings)) (let* ,(cdr bindings) ,@body)) m-env s-env r-env)))))
+    (cond ((null? bindings) (expand `(let () ,@body) m-env s-env r-env marks))
+          ((null? (cdr bindings)) (expand `(let (,(car bindings)) ,@body) m-env s-env r-env marks))
+          (else (expand `(let (,(car bindings)) (let* ,(cdr bindings) ,@body)) m-env s-env r-env marks)))))
 
-(define (expand-let*-syntax expr m-env s-env r-env)
+(define (expand-let*-syntax expr m-env s-env r-env marks)
   (let ((bindings (cadr expr)) (body (cddr expr)))
-    (cond ((null? bindings) (expand `(let-syntax () ,@body) m-env s-env r-env))
-          ((null? (cdr bindings)) (expand `(let-syntax (,(car bindings)) ,@body) m-env s-env r-env))
-          (else (expand `(let-syntax (,(car bindings)) (let*-syntax ,(cdr bindings) ,@body)) m-env s-env r-env)))))
+    (cond ((null? bindings) (expand `(let-syntax () ,@body) m-env s-env r-env marks))
+          ((null? (cdr bindings)) (expand `(let-syntax (,(car bindings)) ,@body) m-env s-env r-env marks))
+          (else (expand `(let-syntax (,(car bindings)) (let*-syntax ,(cdr bindings) ,@body)) m-env s-env r-env marks)))))
 
-(define (expand-let-syntax expr m-env s-env r-env)
-  (let* ((bindings (cadr expr)) (names (map car bindings)) (ctx (list m-env s-env r-env))
+(define (expand-let-syntax expr m-env s-env r-env marks)
+  (let* ((bindings (cadr expr)) (names (map car bindings)) (ctx (list m-env s-env r-env marks))
          (transformers (map (lambda (b) (parse-transformer (cadr b) ctx)) bindings))
          (new-m-env (append (map cons names transformers) m-env))
          (new-s-env (remove-from-list s-env names)))
-    (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env)) (cddr expr)))))
+    (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env marks)) (cddr expr)))))
 
-(define (expand-letrec-syntax expr m-env s-env r-env)
+(define (expand-letrec-syntax expr m-env s-env r-env marks)
   (let* ((bindings (cadr expr)) (names (map car bindings))
-         (env-promise (list 'promise #f)) (ctx (list env-promise s-env r-env))
+         (env-promise (list 'promise #f)) (ctx (list env-promise s-env r-env marks))
          (transformers (map (lambda (b) (parse-transformer (cadr b) ctx)) bindings))
          (new-m-env (append (map cons names transformers) m-env))
          (new-s-env (remove-from-list s-env names)))
     (set-car! (cdr env-promise) new-m-env)
-    (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env)) (cddr expr)))))
+    (make-seq (map-improper (lambda (x) (expand x new-m-env new-s-env r-env marks)) (cddr expr)))))
 
-(define (expand-define-syntax expr m-env s-env r-env)
-  (environment-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env))) (unspecified))
+(define (expand-define-syntax expr m-env s-env r-env marks)
+  (environment-macro-set! (cadr expr) (parse-transformer (caddr expr) (list m-env s-env r-env marks))) (unspecified))
 
-(define (expand-define-module expr m-env s-env r-env)
+(define (expand-define-module expr m-env s-env r-env marks)
   (let* ((mod-name (cadr expr)) (decls (cddr expr)))
     (let loop ((decls decls) (exports '()) (imports '()) (body-forms '()))
       (if (null? decls)
           (let* ((export-info (process-export-specs (reverse exports)))
                  (export-names (car export-info)) (rename-map (cdr export-info))
                  (imported-bindings (apply append (map process-import-set (reverse imports)))))
-            (register-module! mod-name export-names rename-map (append (eval-module-body imported-bindings (reverse body-forms) m-env s-env r-env mod-name) imported-bindings))
+            (register-module! mod-name export-names rename-map (append (eval-module-body imported-bindings (reverse body-forms) m-env s-env r-env marks mod-name) imported-bindings))
             (unspecified))
           (let ((decl (car decls)))
             (cond ((and (pair? decl) (eq? (car decl) 'export)) (loop (cdr decls) (append (reverse (cdr decl)) exports) imports body-forms))
@@ -415,112 +413,87 @@
                   ((and (pair? decl) (eq? (car decl) 'begin)) (loop (cdr decls) exports imports (append (reverse (cdr decl)) body-forms)))
                   (else (loop (cdr decls) exports imports (cons decl body-forms)))))))))
 
-(define (expand-import-module expr m-env s-env r-env)
+(define (expand-import-module expr m-env s-env r-env marks)
   (for-each (lambda (b) (if (macro-binding? (cdr b)) (environment-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
             (apply append (map process-import-set (cdr expr)))) (unspecified))
 
-(define (expand-set! expr m-env s-env r-env)
+(define (expand-set! expr m-env s-env r-env marks)
   (let* ((var (cadr expr)) (transformer (and (symbol? var) (not (memq var s-env)) (lookup-macro var m-env))))
     (if (and transformer (variable-transformer? transformer))
-        (expand (call-transformer transformer expr m-env s-env r-env) m-env s-env r-env)
+        (expand (call-transformer transformer expr m-env s-env r-env marks) m-env s-env r-env marks)
         (let* ((pair (assq var r-env)) (renamed (if pair (cdr pair) var)))
-          `(set! ,renamed ,(expand (caddr expr) m-env s-env r-env))))))
+          `(set! ,renamed ,(expand (caddr expr) m-env s-env r-env marks))))))
 
-(define (expand-define expr m-env s-env r-env)
+(define (expand-define expr m-env s-env r-env marks)
   (let ((head (cadr expr)))
     (if (pair? head)
-        (expand `(define ,(car head) (lambda ,(cdr head) ,@(cddr expr))) m-env s-env r-env)
-        `(define ,head ,@(flatten-begins (map-improper (lambda (x) (expand x m-env s-env r-env)) (cddr expr)))))))
+        (expand `(define ,(car head) (lambda ,(cdr head) ,@(cddr expr))) m-env s-env r-env marks)
+        `(define ,head ,@(flatten-begins (map-improper (lambda (x) (expand x m-env s-env r-env marks)) (cddr expr)))))))
 
-(define (expand-cond expr m-env s-env r-env)
+(define (expand-cond expr m-env s-env r-env marks)
   (let ((clauses (cdr expr)))
     (if (null? clauses) '(begin)
         (let ((clause (car clauses)) (rest (cdr clauses)))
           (cond ((core-form? (car clause) 'else s-env) 
-                 (expand (make-seq (cdr clause)) m-env s-env r-env))
+                 (expand (make-seq (cdr clause)) m-env s-env r-env marks))
                 ((and (pair? (cdr clause)) (core-form? (cadr clause) '=> s-env))
                  (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
-                   (expand `(let ((,tmp ,(car clause))) (if ,tmp (,(caddr clause) ,tmp) (cond ,@rest))) m-env s-env r-env)))
+                   (expand `(let ((,tmp ,(car clause))) (if ,tmp (,(caddr clause) ,tmp) (cond ,@rest))) m-env s-env r-env marks)))
                 (else 
-                 (expand `(if ,(car clause) ,(make-seq (cdr clause)) (cond ,@rest)) m-env s-env r-env)))))))
+                 (expand `(if ,(car clause) ,(make-seq (cdr clause)) (cond ,@rest)) m-env s-env r-env marks)))))))
 
-(define (expand-and expr m-env s-env r-env)
+(define (expand-and expr m-env s-env r-env marks)
   (let ((args (cdr expr)))
-    (cond ((null? args) #t) ((null? (cdr args)) (expand (car args) m-env s-env r-env))
-          (else (expand `(if ,(car args) (and ,@(cdr args)) #f) m-env s-env r-env)))))
+    (cond ((null? args) #t) ((null? (cdr args)) (expand (car args) m-env s-env r-env marks))
+          (else (expand `(if ,(car args) (and ,@(cdr args)) #f) m-env s-env r-env marks)))))
 
-(define (expand-or expr m-env s-env r-env)
+(define (expand-or expr m-env s-env r-env marks)
   (let ((args (cdr expr)))
-    (cond ((null? args) #f) ((null? (cdr args)) (expand (car args) m-env s-env r-env))
+    (cond ((null? args) #f) ((null? (cdr args)) (expand (car args) m-env s-env r-env marks))
           (else (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
-                  (expand `(let ((,tmp ,(car args))) (if ,tmp ,tmp (or ,@(cdr args)))) m-env s-env r-env))))))
+                  (expand `(let ((,tmp ,(car args))) (if ,tmp ,tmp (or ,@(cdr args)))) m-env s-env r-env marks))))))
 
-(define (expand-case expr m-env s-env r-env)
+(define (expand-case expr m-env s-env r-env marks)
   (let ((val (cadr expr)) (clauses (cddr expr)) (tmp (rename-symbol 'tmp (fresh-suffix))))
     (expand `(let ((,tmp ,val))
                ,(let recur ((cs clauses))
                   (if (null? cs) '(begin)
                       (let ((c (car cs)) (r (cdr cs)))
                         (if (core-form? (car c) 'else s-env) (make-seq (cdr c))
-                            `(if (memv ,tmp ',(car c)) ,(make-seq (cdr c)) ,(recur r))))))) m-env s-env r-env)))
+                            `(if (memv ,tmp ',(car c)) ,(make-seq (cdr c)) ,(recur r))))))) m-env s-env r-env marks)))
 
-(define (expand-if expr m-env s-env r-env)
-  `(if ,(expand (cadr expr) m-env s-env r-env) ,(expand (caddr expr) m-env s-env r-env)
-       ,@(map-improper (lambda (x) (expand x m-env s-env r-env)) (cdddr expr))))
+(define (expand-if expr m-env s-env r-env marks)
+  `(if ,(expand (cadr expr) m-env s-env r-env marks) ,(expand (caddr expr) m-env s-env r-env marks)
+       ,@(map-improper (lambda (x) (expand x m-env s-env r-env marks)) (cdddr expr))))
 
-(define (expand-begin expr m-env s-env r-env)
-  (make-seq (map-improper (lambda (x) (expand x m-env s-env r-env)) (cdr expr))))
+(define (expand-begin expr m-env s-env r-env marks)
+  (make-seq (map-improper (lambda (x) (expand x m-env s-env r-env marks)) (cdr expr))))
 
-(define (expand-quote expr m-env s-env r-env) `(quote ,(strip-renames (cadr expr))))
+(define (expand-quote expr m-env s-env r-env marks) `(quote ,(strip-renames (cadr expr))))
 
-(define (expand-quasiquote-form expr m-env s-env r-env) (expand (expand-quasiquote (cadr expr)) m-env s-env r-env))
+(define (expand-quasiquote-form expr m-env s-env r-env marks) (expand (expand-quasiquote (cadr expr)) m-env s-env r-env marks))
 
 ;;=============================================================================
 ;; SECTION 7: Expansion Engine
 ;;=============================================================================
 
-(define (eval-module-body imported-bindings body-forms m-env s-env r-env mod-name)
+(define (eval-module-body imported-bindings body-forms m-env s-env r-env marks mod-name)
   (let* ((macro-m (filter (lambda (b) (macro-binding? (cdr b))) imported-bindings))
          (runtime-i (filter (lambda (b) (not (macro-binding? (cdr b)))) imported-bindings))
          (inner-m (append (map (lambda (b) (cons (car b) (unwrap-macro-binding (cdr b)))) macro-m) m-env))
-         (exp-forms (flatten-begins (map (lambda (f) (if (and (pair? f) (eq? (car f) 'define-syntax)) f (expand f inner-m s-env r-env))) body-forms)))
+         (exp-forms (flatten-begins (map (lambda (f) (if (and (pair? f) (eq? (car f) 'define-syntax)) f (expand f inner-m s-env r-env marks))) body-forms)))
          (rt-forms (filter-runtime-forms exp-forms))
          (def-ids (extract-module-defined-ids rt-forms))
          (internal-m (map (lambda (id) (cons id (mangle-name mod-name id))) def-ids))
          (inner-r (append internal-m r-env))
          (env-promise (list 'promise #f))
-         (macro-b (extract-macro-defs exp-forms env-promise s-env inner-r)))
+         (macro-b (extract-macro-defs exp-forms env-promise s-env inner-r marks)))
     (set-car! (cdr env-promise) (append (map (lambda (b) (cons (car b) (unwrap-macro-binding (cdr b)))) macro-b) inner-m))
     (let* ((imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
            (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))
-      (let* ((proc (core-eval wrapper (interaction-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
+      (let* ((proc (core-eval wrapper (current-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))
         (for-each (lambda (p val) (inject-binding! (cdr p) val)) internal-m vals)
         (append rt-bindings macro-b)))))
-
-(define (lookup-handler core-sym)
-  (case core-sym
-    ((define-syntax) expand-define-syntax) 
-    ((let-syntax) expand-let-syntax) 
-    ((letrec-syntax) expand-letrec-syntax)
-    ((let*-syntax) expand-let*-syntax)
-    ((lambda) expand-lambda) 
-    ((let) expand-let) 
-    ((let*) expand-let*)
-    ((letrec*) expand-letrec*)
-    ((letrec) expand-letrec*)
-    ((set!) expand-set!) 
-    ((if) expand-if) 
-    ((cond) expand-cond) 
-    ((and) expand-and) 
-    ((or) expand-or) 
-    ((case) expand-case)
-    ((define) expand-define) 
-    ((begin) expand-begin) 
-    ((quote) expand-quote) 
-    ((quasiquote) expand-quasiquote-form)
-    ((define-module) expand-define-module) 
-    ((import-module) expand-import-module)
-    (else #f)))
 
 ;;=============================================================================
 ;; SECTION 8: Cleanup & Entry Point
@@ -553,7 +526,7 @@
     (let loop ((x expr))
       (cond ((symbol? x)
              (let ((stripped (string->symbol (strip-suffix (symbol->string x)))))
-               (if (or (lookup-handler stripped)
+               (if (or (lookup-builtin-handler stripped)
                        (environment-macro-contains? stripped)
                        (environment-variable-contains? stripped))
                    (if (eq? (resolve-core-form x s-env) stripped)
@@ -569,5 +542,37 @@
         ((symbol? expr) (let ((t (lookup-macro expr '()))) (if t (t expr) expr))) (else expr)))
 
 (define (macroexpand expr . opt)
-  (set! *suffix-counter* 0) (set! *rename-env* '())
-  (let ((res (expand expr '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
+  (set! *suffix-counter* 0) (set! *mark-counter* 0) (hashtable-clear! *rename-env*)
+  (let ((res (expand expr '() '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
+
+(define *builtin-handlers* (make-eq-hashtable))
+
+(define (lookup-builtin-handler id)
+  (and (eq? (environment-macro-ref id) 'builtin)
+       (hashtable-ref *builtin-handlers* id #f)))
+
+;; register macro builtins in current environment (system environment)
+(for-each (lambda (pair) (environment-macro-set! (car pair) 'builtin) (hashtable-set! *builtin-handlers* (car pair) (cdr pair)))
+  (list
+    (cons 'and expand-and)
+    (cons 'begin expand-begin)
+    (cons 'case expand-case)
+    (cons 'cond expand-cond)
+    (cons 'define expand-define)
+    (cons 'define-module expand-define-module)
+    (cons 'define-syntax expand-define-syntax)
+    (cons 'if expand-if)
+    (cons 'import-module expand-import-module)
+    (cons 'lambda expand-lambda)
+    (cons 'let expand-let)
+    (cons 'let* expand-let*)
+    (cons 'letrec expand-letrec*)
+    (cons 'letrec* expand-letrec*)
+    (cons 'letrec-syntax expand-letrec-syntax)
+    (cons 'let*-syntax expand-let*-syntax)
+    (cons 'let-syntax expand-let-syntax)
+    (cons 'or expand-or)
+    (cons 'quasiquote expand-quasiquote-form)
+    (cons 'quote expand-quote)
+    (cons 'set! expand-set!)))
+  

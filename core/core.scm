@@ -4,14 +4,11 @@
 ;; Core system loader
 ;; Loads components in topological order to minimize forward references
 
-;; Compatibility
+;; Host compatibility
 (load "host.scm")
 
 ;; Common utilities
 (load "common.scm")
-
-;; Module
-(load "env.scm")
 
 ;; Expander components
 (load "quasiquote.scm")

@@ -15,7 +15,7 @@
 
 class object_heap_t {
  public:
-  thread_local static scm_obj_t s_captured_retval;
+  thread_local static scm_obj_t s_continuation_captured_retval;
   thread_local static scm_obj_t s_current_winders;
 
  private:
@@ -60,6 +60,7 @@ class object_heap_t {
   void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
+  mutex_t& collector_lock() { return m_concurrent_heap.m_collector_lock; }
   void* alloc_cons() { return alloc_object(m_cons); }
   void* alloc_cell() { return alloc_object(m_cells); }
   void* alloc_flonum() { return alloc_object(m_flonums); }
@@ -76,7 +77,9 @@ class object_heap_t {
   std::mutex m_symbol_table_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
-  scm_obj_t m_environment;
+  scm_obj_t m_interaction_environment;
+  scm_obj_t m_system_environment;
+  scm_obj_t m_current_environment;
   void environment_macro_set(scm_obj_t key, scm_obj_t value);
   void environment_variable_set(scm_obj_t key, scm_obj_t value);
   scm_obj_t environment_macro_ref(scm_obj_t key);
@@ -99,7 +102,12 @@ class object_heap_t {
     if (is_heap_object(obj)) m_concurrent_heap.write_barrier(to_address(obj));
   }
 
-  void add_root(scm_obj_t obj) { m_root_set.insert(obj); }
+  void add_root(scm_obj_t obj) {
+    if (is_cons(obj) || is_heap_object(obj)) {
+      write_barrier(obj);
+      m_root_set.insert(obj);
+    }
+  }
   void remove_root(scm_obj_t obj) { m_root_set.erase(obj); }
 
   uint64_t m_collect_trip_bytes;
@@ -116,4 +124,18 @@ class object_heap_t {
     return s_current;
   }
 };
+
+class scoped_gc_protect {
+  scoped_gc_protect(const scoped_gc_protect&) = delete;
+  scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
+  scm_obj_t m_obj;
+
+ public:
+  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { object_heap_t::current()->add_root(obj); }
+  ~scoped_gc_protect() {
+    object_heap_t::current()->remove_root(m_obj);
+    m_obj = (scm_obj_t) nullptr;
+  }
+};
+
 #endif

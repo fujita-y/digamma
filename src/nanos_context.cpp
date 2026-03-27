@@ -145,9 +145,15 @@ __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void 
 __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   do_wind(rec->winders);
   object_heap_t::current()->write_barrier(val);
-  object_heap_t::s_captured_retval = val;
+  object_heap_t::s_continuation_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
+  // Acquire collector lock before switching to the temp stack. Once we switch SP
+  // to s_restore_stack the mutator cannot reach a safepoint, so we must prevent
+  // the GC from entering a stop-the-world phase during this window. The lock is
+  // implicitly released when setcontext() jumps back to the subr_call_cc capture
+  // site — see restore_trampoline_unlock which runs after the context switch.
+  object_heap_t::current()->collector_lock().lock();
   uintptr_t tmp_sp = (uintptr_t)s_restore_stack + sizeof(s_restore_stack) - 64;
   __asm__ volatile(
       "mov sp, %0\n"
@@ -161,6 +167,7 @@ __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continua
 SUBR subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
+  scoped_gc_protect gc_protect(cont_obj);
   scm_continuation_rec_t* cont_rec = (scm_continuation_rec_t*)to_address(cont_obj);
   if (argc > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
   scm_obj_t val = (argc == 0) ? scm_undef : argv[0];
@@ -171,6 +178,7 @@ SUBR subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
+  scoped_gc_protect gc_protect(cont_obj);
   scm_escape_rec_t* cont_rec = (scm_escape_rec_t*)to_address(cont_obj);
   if (argc > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
   if (cont_rec->invoked) throw std::runtime_error("apply: one-shot continuation already invoked");
@@ -183,7 +191,7 @@ SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[])
 
   do_wind(cont_rec->winders);
 
-  object_heap_t::s_captured_retval = retval;
+  object_heap_t::s_continuation_captured_retval = retval;
   s_restored = true;
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
@@ -222,10 +230,13 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
 #endif
 
       scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, object_heap_t::s_current_winders);
-      scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, scm_nil, 1);
+      scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, 1);
       scm_obj_t proc_argv[1] = {make_cons(clo, scm_nil)};
       return c_apply_helper(proc, 1, proc_argv);
     } else {
+      // Unlock the collector lock acquired in restore_continuation before the
+      // stack switch. We are now back on the real stack and can reach safepoints.
+      object_heap_t::current()->collector_lock().unlock();
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
       if (s_restored_rec) {
         uintptr_t stack_top = s_restored_rec->stack_bottom - s_restored_rec->stack_size;
@@ -235,7 +246,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
         s_restored_rec = nullptr;
       }
 #endif
-      return object_heap_t::s_captured_retval;
+      return object_heap_t::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");
@@ -252,7 +263,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
       scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
 
       scm_obj_t env[1] = {cont_obj};
-      scm_obj_t clo = make_closure((void*)subr_invoke_escape_continuation, 0, 1, 1, env, scm_nil, 1);
+      scm_obj_t clo = make_closure((void*)subr_invoke_escape_continuation, 0, 1, 1, env, 1);
       scm_obj_t argv[1] = {make_cons(clo, scm_nil)};
       scm_obj_t ret = scm_undef;
       try {
@@ -276,7 +287,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
         return scm_undef;
       }
     } else {
-      return object_heap_t::s_captured_retval;
+      return object_heap_t::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");

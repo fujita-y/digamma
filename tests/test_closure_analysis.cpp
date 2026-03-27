@@ -308,7 +308,7 @@ int main() {
   run_test("GlobalHeapClosure", [](ClosureAnalysisTest& env) -> bool {
     // Manually bind a closure to a global symbol in the heap
     scm_obj_t sym = make_symbol("heap-func");
-    scm_obj_t closure = make_closure(nullptr, 2, 0, 0, nullptr, scm_nil, 0);
+    scm_obj_t closure = make_closure(nullptr, 2, 0, 0, nullptr, 0);
     object_heap_t::current()->environment_variable_set(sym, closure);
 
     // Analyze code that references this heap closure
@@ -337,7 +337,7 @@ int main() {
     scm_obj_t sym = make_symbol("heap-func-rest");
     // make_closure(code, argc, rest, nsize, env, literals)
     // argc=1, rest=1
-    scm_obj_t closure = make_closure(nullptr, 1, 1, 0, nullptr, scm_nil, 0);
+    scm_obj_t closure = make_closure(nullptr, 1, 1, 0, nullptr, 0);
     object_heap_t::current()->environment_variable_set(sym, closure);
 
     // Analyze code that references this heap closure

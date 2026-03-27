@@ -26,7 +26,7 @@
             (loop (cons (process input) output) (read)))))))
 
 ;; macro dependency injection
-(with-input-from-file "boot/host_macro.scm"
+(with-input-from-file "boot/host-macro.scm"
   (lambda ()
         (let loop ((input (read)))
         (if (not (eof-object? input))
@@ -36,7 +36,7 @@
 
 ;; compile core to ir
 (define source-files
-  '("boot/prelude.scm"
+  '("boot/target-prelude.scm"
     "core/common.scm"
     "core/quasiquote.scm"
     "core/syntax-rules.scm"
@@ -45,7 +45,8 @@
     "core/optimizer.scm"
     "core/lambda-lift.scm"
     "core/compiler.scm"
-    "core/eval.scm"))
+    "core/eval.scm"
+    "boot/target-env.scm"))
 
 (with-output-to-file "boot/core.ir" 
   (lambda ()

@@ -1,8 +1,10 @@
+(copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
+
 (define *pass-count* 0)
 (define *fail-count* 0)
 
 (define (test name expr expected)
-  (let ((result (core-eval (macroexpand expr) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr) (current-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))

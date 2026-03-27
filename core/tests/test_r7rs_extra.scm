@@ -1,7 +1,7 @@
 ;; test_r7rs_extra.scm
 ;; Test suite for extra R7RS features in syntax-rules.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -68,7 +68,12 @@
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)

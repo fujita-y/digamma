@@ -1,7 +1,7 @@
 ;; test_hygiene.scm
 ;; Comprehensive hygiene tests for the macro expansion system.
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
 
 ;; --- Test Helper Functions ---
 
@@ -182,7 +182,12 @@
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)

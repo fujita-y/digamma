@@ -1,7 +1,9 @@
 ;; test_module_macroexpand.scm
 ;; Test suite for define-module and import-module in macroexpand.scm
 
-(load "../core.scm")
+(if (not (undefined? load)) (load "../core.scm"))
+
+(copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -19,7 +21,7 @@
           (display "  Actual:   ") (write result) (newline)))))
 
 (define (test-eval name expr expected)
-  (let ((result (core-eval (macroexpand expr) (interaction-environment))))
+  (let ((result (core-eval (macroexpand expr) (current-environment))))
     (if (equal? result expected)
         (begin
           (set! *pass-count* (+ *pass-count* 1))
@@ -557,7 +559,12 @@
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
+    (begin 
+      (display "ALL TESTS PASSED.\n") 
+      (exit 0))
     (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
+      (display "FAILED ")
+      (display *fail-count*) 
+      (display " TESTS.\n") 
+      (exit 1)))
 (newline)

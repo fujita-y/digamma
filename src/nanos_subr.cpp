@@ -237,18 +237,67 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
 
-// cadr, caddr, caar, cadar, caddar, cadddr, cddr, cdddr, cdar, cddar, cdddar  - R6RS 11.9
-SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
-SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+// caar, cadr, etc. up to 5 levels - R6RS / SRFI 1 extensions
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
+SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
+SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
+SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
+SUBR subr_caaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, a1))); }
+SUBR subr_caadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, a1))); }
 SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_cdaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, a1))); }
+SUBR subr_cdadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, a1))); }
+SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
+SUBR subr_caaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_caaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
+SUBR subr_caadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_caaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_cadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
 SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
-SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
-SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
-SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
+SUBR subr_cdaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cdaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
+SUBR subr_cdadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_cdaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_cddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
+SUBR subr_cddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
 SUBR subr_cdddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
+SUBR subr_cddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
+SUBR subr_caaaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caaaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_caaadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caaaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_caadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_caaddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cadaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cadaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cadadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cadaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_caddaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_caddadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cadddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_caddddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdaaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdaaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdadaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdadadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cdaddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdadddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cddaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cddaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cddadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cddaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
+SUBR subr_cdddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
+SUBR subr_cdddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
+SUBR subr_cddddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
+SUBR subr_cdddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
 
 // list  - R6RS 11.9
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -1023,6 +1072,44 @@ SUBR subr_error(scm_obj_t self, int argc, scm_obj_t argv[]) {
   throw std::runtime_error(oss.str());
 }
 
+// assertion-violation  - R6RS 11.4
+// (assertion-violation who message irritant ...)
+SUBR subr_assertion_violation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("assertion-violation: wrong number of arguments");
+  std::ostringstream oss;
+  oss << "assertion-violation: ";
+  if (argv[0] != scm_false) {
+    printer_t(oss).display(argv[0]);
+    oss << ": ";
+  }
+  printer_t(oss).display(argv[1]);
+  for (int i = 2; i < argc; i++) {
+    oss << " ";
+    printer_t(oss).write(argv[i]);
+  }
+  throw std::runtime_error(oss.str());
+}
+
+// syntax-violation  - R6RS 11.4
+// (syntax-violation who message form [subform])
+SUBR subr_syntax_violation(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 3 || argc > 4) throw std::runtime_error("syntax-violation: wrong number of arguments");
+  std::ostringstream oss;
+  oss << "syntax-violation: ";
+  if (argv[0] != scm_false) {
+    printer_t(oss).display(argv[0]);
+    oss << ": ";
+  }
+  printer_t(oss).display(argv[1]);
+  oss << " ";
+  printer_t(oss).write(argv[2]);
+  if (argc == 4) {
+    oss << " ";
+    printer_t(oss).write(argv[3]);
+  }
+  throw std::runtime_error(oss.str());
+}
+
 // ============================================================================
 // Application & Control
 // ============================================================================
@@ -1185,6 +1272,100 @@ SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
 // Environment Access
 // ============================================================================
 
+// make-environment
+SUBR subr_make_environment(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("make-environment: argument must be a symbol");
+  return make_environment(a1);
+}
+
+// copy-environment-variables!
+SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
+  if (!is_environment(a1)) throw std::runtime_error("copy-environment-variables!: first argument must be an environment");
+  if (!is_environment(a2)) throw std::runtime_error("copy-environment-variables!: second argument must be an environment");
+  scm_environment_rec_t* dst = (scm_environment_rec_t*)to_address(a1);
+  scm_environment_rec_t* src = (scm_environment_rec_t*)to_address(a2);
+  scm_obj_t cur = a3;
+  while (is_cons(cur)) {
+    scm_obj_t key = CAR(cur);
+    if (!is_symbol(key)) throw std::runtime_error("copy-environment-variables!: list elements must be symbols");
+    if (!is_symbol_interned(key)) {
+      std::string msg = "copy-environment-variables!: symbol not interned: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
+    scm_obj_t cell = hashtable_ref(src->variables, key, scm_undef);
+    if (cell != scm_undef) {
+      assert(is_cell(cell));
+      scm_obj_t val = cell_value(cell);
+      if (is_closure(val)) {
+        hashtable_set(dst->variables, key, make_cell(val));
+      } else {
+        hashtable_set(dst->variables, key, cell);
+      }
+    } else {
+      std::string msg = "copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
+    cur = CDR(cur);
+  }
+  if (cur != scm_nil) throw std::runtime_error("copy-environment-variables!: third argument must be a proper list");
+  return scm_unspecified;
+}
+
+// copy-environment-macros!
+SUBR subr_copy_environment_macros(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
+  if (!is_environment(a1)) throw std::runtime_error("copy-environment-macros!: first argument must be an environment");
+  if (!is_environment(a2)) throw std::runtime_error("copy-environment-macros!: second argument must be an environment");
+  scm_environment_rec_t* dst = (scm_environment_rec_t*)to_address(a1);
+  scm_environment_rec_t* src = (scm_environment_rec_t*)to_address(a2);
+  scm_obj_t cur = a3;
+  while (is_cons(cur)) {
+    scm_obj_t key = CAR(cur);
+    if (!is_symbol(key)) throw std::runtime_error("copy-environment-macros!: list elements must be symbols");
+    if (!is_symbol_interned(key)) {
+      std::string msg = "copy-environment-macros!: symbol not interned: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
+    scm_obj_t val = hashtable_ref(src->macros, key, scm_undef);
+    if (val != scm_undef) {
+      hashtable_set(dst->macros, key, val);
+    } else {
+      std::string msg = "copy-environment-macros!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
+      throw std::runtime_error(msg);
+    }
+    cur = CDR(cur);
+  }
+  if (cur != scm_nil) throw std::runtime_error("copy-environment-macros!: third argument must be a proper list");
+  return scm_unspecified;
+}
+
+// environment-macros
+SUBR subr_environment_macros(scm_obj_t self, scm_obj_t a1) {
+  if (!is_environment(a1)) throw std::runtime_error("environment-macros: argument must be an environment");
+  scm_environment_rec_t* env = (scm_environment_rec_t*)to_address(a1);
+  return env->macros;
+}
+
+// environment-variables
+SUBR subr_environment_variables(scm_obj_t self, scm_obj_t a1) {
+  if (!is_environment(a1)) throw std::runtime_error("environment-variables: argument must be an environment");
+  scm_environment_rec_t* env = (scm_environment_rec_t*)to_address(a1);
+  return env->variables;
+}
+
+// current-environment
+SUBR subr_current_environment(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) {
+    return object_heap_t::current()->m_current_environment;
+  } else if (argc == 1) {
+    if (!is_environment(argv[0])) throw std::runtime_error("current-environment: argument must be an environment");
+    object_heap_t::current()->write_barrier(argv[0]);
+    object_heap_t::current()->m_current_environment = argv[0];
+    return scm_unspecified;
+  } else {
+    throw std::runtime_error("current-environment: wrong number of arguments");
+  }
+}
+
 // environment-macro-set!  - digamma core
 // (environment-macro-set! name transformer)
 SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
@@ -1230,7 +1411,10 @@ SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
 }
 
 // interaction-environment - R6RS 11.16
-SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_environment; }
+SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_interaction_environment; }
+
+// system-environment
+SUBR subr_system_environment(scm_obj_t self) { return object_heap_t::current()->m_system_environment; }
 
 // ============================================================================
 // Multiple Return Values
@@ -1274,9 +1458,8 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 // codegen-and-run - Nanos extension
 SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
   try {
-    auto func = codegen_t::current()->compile(coreform);
-    intptr_t result = func();
-    return (scm_obj_t)result;
+    compiled_code_t func = codegen_t::current()->compile(coreform);
+    return (scm_obj_t)func.release_and_run();
   } catch (std::exception& e) {
     throw std::runtime_error(e.what());
   }
@@ -1287,10 +1470,11 @@ SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
 // ============================================================================
 
 void nanos_t::init_subr() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    c_global_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, scm_nil, 1));
+  object_heap_t* heap = object_heap_t::current();
+  auto reg = [heap](const char* name, void* func, int req, int opt) {
+    heap->environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
   };
-  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, scm_nil, 1); };
+  auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, 1); };
 
   // arithmetic
   reg("+", (void*)subr_num_add, 0, 1);
@@ -1310,16 +1494,65 @@ void nanos_t::init_subr() {
   reg("car", (void*)subr_car, 1, 0);
   reg("cdr", (void*)subr_cdr, 1, 0);
   reg("caar", (void*)subr_caar, 1, 0);
-  reg("cdar", (void*)subr_cdar, 1, 0);
   reg("cadr", (void*)subr_cadr, 1, 0);
+  reg("cdar", (void*)subr_cdar, 1, 0);
   reg("cddr", (void*)subr_cddr, 1, 0);
+  reg("caaar", (void*)subr_caaar, 1, 0);
+  reg("caadr", (void*)subr_caadr, 1, 0);
   reg("cadar", (void*)subr_cadar, 1, 0);
-  reg("cddar", (void*)subr_cddar, 1, 0);
-  reg("caddar", (void*)subr_caddar, 1, 0);
-  reg("cdddar", (void*)subr_cdddar, 1, 0);
   reg("caddr", (void*)subr_caddr, 1, 0);
+  reg("cdaar", (void*)subr_cdaar, 1, 0);
+  reg("cdadr", (void*)subr_cdadr, 1, 0);
+  reg("cddar", (void*)subr_cddar, 1, 0);
   reg("cdddr", (void*)subr_cdddr, 1, 0);
+  reg("caaaar", (void*)subr_caaaar, 1, 0);
+  reg("caaadr", (void*)subr_caaadr, 1, 0);
+  reg("caadar", (void*)subr_caadar, 1, 0);
+  reg("caaddr", (void*)subr_caaddr, 1, 0);
+  reg("cadaar", (void*)subr_cadaar, 1, 0);
+  reg("cadadr", (void*)subr_cadadr, 1, 0);
+  reg("caddar", (void*)subr_caddar, 1, 0);
   reg("cadddr", (void*)subr_cadddr, 1, 0);
+  reg("cdaaar", (void*)subr_cdaaar, 1, 0);
+  reg("cdaadr", (void*)subr_cdaadr, 1, 0);
+  reg("cdadar", (void*)subr_cdadar, 1, 0);
+  reg("cdaddr", (void*)subr_cdaddr, 1, 0);
+  reg("cddaar", (void*)subr_cddaar, 1, 0);
+  reg("cddadr", (void*)subr_cddadr, 1, 0);
+  reg("cdddar", (void*)subr_cdddar, 1, 0);
+  reg("cddddr", (void*)subr_cddddr, 1, 0);
+  reg("caaaaar", (void*)subr_caaaaar, 1, 0);
+  reg("caaaadr", (void*)subr_caaaadr, 1, 0);
+  reg("caaadar", (void*)subr_caaadar, 1, 0);
+  reg("caaaddr", (void*)subr_caaaddr, 1, 0);
+  reg("caadaar", (void*)subr_caadaar, 1, 0);
+  reg("caadadr", (void*)subr_caadadr, 1, 0);
+  reg("caaddar", (void*)subr_caaddar, 1, 0);
+  reg("caadddr", (void*)subr_caadddr, 1, 0);
+  reg("cadaaar", (void*)subr_cadaaar, 1, 0);
+  reg("cadaadr", (void*)subr_cadaadr, 1, 0);
+  reg("cadadar", (void*)subr_cadadar, 1, 0);
+  reg("cadaddr", (void*)subr_cadaddr, 1, 0);
+  reg("caddaar", (void*)subr_caddaar, 1, 0);
+  reg("caddadr", (void*)subr_caddadr, 1, 0);
+  reg("cadddar", (void*)subr_cadddar, 1, 0);
+  reg("caddddr", (void*)subr_caddddr, 1, 0);
+  reg("cdaaaar", (void*)subr_cdaaaar, 1, 0);
+  reg("cdaaadr", (void*)subr_cdaaadr, 1, 0);
+  reg("cdaadar", (void*)subr_cdaadar, 1, 0);
+  reg("cdaaddr", (void*)subr_cdaaddr, 1, 0);
+  reg("cdadaar", (void*)subr_cdadaar, 1, 0);
+  reg("cdadadr", (void*)subr_cdadadr, 1, 0);
+  reg("cdaddar", (void*)subr_cdaddar, 1, 0);
+  reg("cdadddr", (void*)subr_cdadddr, 1, 0);
+  reg("cddaaar", (void*)subr_cddaaar, 1, 0);
+  reg("cddaadr", (void*)subr_cddaadr, 1, 0);
+  reg("cddadar", (void*)subr_cddadar, 1, 0);
+  reg("cddaddr", (void*)subr_cddaddr, 1, 0);
+  reg("cdddaar", (void*)subr_cdddaar, 1, 0);
+  reg("cdddadr", (void*)subr_cdddadr, 1, 0);
+  reg("cddddar", (void*)subr_cddddar, 1, 0);
+  reg("cdddddr", (void*)subr_cdddddr, 1, 0);
   reg("set-car!", (void*)subr_set_car, 2, 0);
   reg("set-cdr!", (void*)subr_set_cdr, 2, 0);
   reg("length", (void*)subr_length, 1, 0);
@@ -1412,6 +1645,12 @@ void nanos_t::init_subr() {
   reg("hashtable->alist", (void*)subr_hashtable_alist, 1, 0);
 
   // environment access
+  reg("make-environment", (void*)subr_make_environment, 1, 0);
+  reg("copy-environment-variables!", (void*)subr_copy_environment_variables, 3, 0);
+  reg("copy-environment-macros!", (void*)subr_copy_environment_macros, 3, 0);
+  reg("environment-macros", (void*)subr_environment_macros, 1, 0);
+  reg("environment-variables", (void*)subr_environment_variables, 1, 0);
+  reg("current-environment", (void*)subr_current_environment, 0, 1);
   reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, 0);
   reg("environment-macro-ref", (void*)subr_environment_macro_ref, 1, 0);
   reg("environment-macro-contains?", (void*)subr_environment_macro_contains, 1, 0);
@@ -1419,6 +1658,7 @@ void nanos_t::init_subr() {
   reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, 0);
   reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, 0);
   reg("interaction-environment", (void*)subr_interaction_environment, 0, 0);
+  reg("system-environment", (void*)subr_system_environment, 0, 0);
 
   // multiple return values
   reg("values", (void*)subr_values, 0, 1);
@@ -1433,12 +1673,13 @@ void nanos_t::init_subr() {
 
   // application & control
   reg("error", (void*)subr_error, 1, 1);
+  reg("assertion-violation", (void*)subr_assertion_violation, 2, 1);
+  reg("syntax-violation", (void*)subr_syntax_violation, 3, 1);
   reg("apply", (void*)subr_apply, 0, 1);
   reg("call/ec", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
-  scm_obj_t scm_subr_call_cc = make_subr((void*)subr_call_cc, 1, 0);
-  c_global_set(make_symbol("call/cc"), scm_subr_call_cc);
-  c_global_set(make_symbol("call-with-current-continuation"), scm_subr_call_cc);
+  reg("call/cc", (void*)subr_call_cc, 1, 0);
+  reg("call-with-current-continuation", (void*)subr_call_cc, 1, 0);
 }
