@@ -18,6 +18,9 @@
 ;; Tracks all renamed identifiers: alias -> (original . context)
 (define *rename-env* (make-eq-hashtable))
 
+;; Memoization cache for resolve-core-form (cleared per macroexpand)
+(define *resolve-cache* (make-eq-hashtable))
+
 ;; Parameter holding the current expansion context (m-env s-env r-env marks)
 (define *current-context* (make-parameter #f))
 
@@ -41,12 +44,20 @@
   (if (and (pair? env) (eq? (car env) 'promise)) (or (cadr env) '()) env))
 
 ;; Resolve an identifier to its original symbol and context or just symbol.
+;; Uses path compression: when a rename has no context and chains to another
+;; rename, we flatten the chain so subsequent lookups are O(1).
 (define (resolve-identifier id)
   (if (symbol? id)
       (let ((entry (hashtable-ref *rename-env* id #f)))
         (if entry
             (let ((original (car entry)) (context (cdr entry)))
-              (if context (cons context original) (resolve-identifier original)))
+              (if context
+                  (cons context original)
+                  ;; No context — follow chain with path compression
+                  (let ((final (resolve-identifier original)))
+                    (when (not (eq? final original))
+                      (set-car! entry final))
+                    final)))
             id))
       id))
 
@@ -86,14 +97,24 @@
                              (and (not (eq? transformer 'builtin)) transformer)))))))))))
 
 ;; Resolve a symbol to its core form name, or #f if shadowed.
+;; Memoized: caches results for symbols with rename entries.
 (define (resolve-core-form sym shadowed-env)
   (if (not (symbol? sym))
       #f
-      (let ((resolved (resolve-identifier sym)))
-        (if (pair? resolved)
-            (let ((context (car resolved)) (original (cdr resolved)))
-              (resolve-core-form original (unwrap-env (cadr context))))
-            (if (memq resolved (unwrap-env shadowed-env)) #f resolved)))))
+      (let ((cached (hashtable-ref *resolve-cache* sym 'miss)))
+        (if (not (eq? cached 'miss))
+            cached
+            (let ((result (resolve-core-form-slow sym shadowed-env)))
+              (when (hashtable-ref *rename-env* sym #f)
+                (hashtable-set! *resolve-cache* sym result))
+              result)))))
+
+(define (resolve-core-form-slow sym shadowed-env)
+  (let ((resolved (resolve-identifier sym)))
+    (if (pair? resolved)
+        (let ((context (car resolved)) (original (cdr resolved)))
+          (resolve-core-form original (unwrap-env (cadr context))))
+        (if (memq resolved (unwrap-env shadowed-env)) #f resolved))))
 
 ;; Check if a symbol refers to a specific core form.
 (define (core-form? sym name shadowed-env)
@@ -210,7 +231,15 @@
          (ellipsis-in (if has-ellipsis? (car form) '...))
          (literals (if has-ellipsis? (cadr form) (car form)))
          (rules (if has-ellipsis? (cddr form) (cdr form)))
-         (ellipsis (if (memq ellipsis-in literals) (gensym "ellipsis") ellipsis-in)))
+         (ellipsis (if (memq ellipsis-in literals) (gensym "ellipsis") ellipsis-in))
+         ;; Pre-resolve all pattern literals to their core forms (done once at creation)
+         (def-s-env (cadr captured-context))
+         (resolved-literals (map (lambda (lit) (cons lit (resolve-core-form lit def-s-env))) literals))
+         ;; Pre-compute meta-env for each rule: (pattern template) -> (pattern template meta-env)
+         (rules-with-meta (map (lambda (rule)
+                                 (list (car rule) (cadr rule)
+                                       (analyze-pattern (car rule) literals ellipsis 0)))
+                               rules)))
     (lambda (expr)
       (let* ((suffix (fresh-suffix))
              (renamer (lambda (sym)
@@ -219,8 +248,11 @@
                               (register-renamed! new-sym sym captured-context)
                               new-sym))))
              (literal=? (lambda (p-lit input)
-                          (core-form? input p-lit (cadr (or (*current-context*) captured-context))))))
-        (apply-syntax-rules literals rules expr renamer ellipsis literal=?)))))
+                          (let* ((use-ctx (or (*current-context*) captured-context))
+                                 (resolved-p (let ((e (assq p-lit resolved-literals))) (and e (cdr e))))
+                                 (resolved-i (resolve-core-form input (cadr use-ctx))))
+                            (and resolved-p resolved-i (eq? resolved-p resolved-i))))))
+        (apply-syntax-rules literals rules-with-meta expr renamer ellipsis literal=?)))))
 
 ;; Parse a transformer specification (syntax-rules, lambda, etc.)
 (define (parse-transformer spec context)
@@ -542,7 +574,7 @@
         ((symbol? expr) (let ((t (lookup-macro expr '()))) (if t (t expr) expr))) (else expr)))
 
 (define (macroexpand expr . opt)
-  (set! *suffix-counter* 0) (set! *mark-counter* 0) (hashtable-clear! *rename-env*)
+  (set! *suffix-counter* 0) (set! *mark-counter* 0) (hashtable-clear! *rename-env*) (hashtable-clear! *resolve-cache*)
   (let ((res (expand expr '() '() '() '()))) (if (and (pair? opt) (eq? (car opt) 'strip)) (strip-renames res) res)))
 
 (define *builtin-handlers* (make-eq-hashtable))
