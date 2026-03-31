@@ -151,9 +151,9 @@ set(NANOS_CORE_SOURCES
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
+  src/continuation.cpp
   src/equiv.cpp
   src/hash.cpp
-  src/nanos_context.cpp
   src/nanos_jit.cpp
   src/nanos_options.cpp
   src/nanos_subr.cpp

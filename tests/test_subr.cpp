@@ -13,7 +13,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <vector>
-#include "nanos_context.h"
+#include "continuation.h"
 #include "object_heap.h"
 
 // ---------------------------------------------------------------------------

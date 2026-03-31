@@ -3,7 +3,7 @@
 
 #include "core.h"
 #include "object.h"
-#include "nanos_context.h"
+#include "continuation.h"
 #include <cstdio>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>

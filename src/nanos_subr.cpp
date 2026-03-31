@@ -5,10 +5,10 @@
 #include "object.h"
 #include "codegen.h"
 #include "codegen_aux.h"
+#include "continuation.h"
 #include "equiv.h"
 #include "hash.h"
 #include "nanos.h"
-#include "nanos_context.h"
 #include "object_heap.h"
 #include "printer.h"
 

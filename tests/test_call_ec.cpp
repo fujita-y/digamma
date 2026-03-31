@@ -2,7 +2,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
-#include "../src/nanos_context.h"
+#include "../src/continuation.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 

@@ -1,8 +1,8 @@
 // Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
-#ifndef NANOS_CONTEXT_H_INCLUDED
-#define NANOS_CONTEXT_H_INCLUDED
+#ifndef CONTINUATION_H_INCLUDED
+#define CONTINUATION_H_INCLUDED
 
 #include "core.h"
 #include "object.h"
