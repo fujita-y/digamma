@@ -306,11 +306,27 @@ void object_heap_t::trace(void* obj) {
       scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
       shade(rec->winders);
       shade(rec->retval);
+      if (rec->uctx) {
+        uint8_t* uctx_copy = (uint8_t*)prune_memory_address((uintptr_t)rec->uctx);
+        for (size_t i = 0; i < sizeof(ucontext_t); i += sizeof(uint64_t)) {
+          uint64_t addr = prune_memory_address(*(uint64_t*)(uctx_copy + i));
+          void* live = test_live_object(addr);
+          if (live) shade((scm_obj_t)live);
+        }
+      }
       return;
     }
     case tc6_continuation: {
       scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
       shade(rec->winders);
+      if (rec->uctx) {
+        uint8_t* uctx_copy = (uint8_t*)prune_memory_address((uintptr_t)rec->uctx);
+        for (size_t i = 0; i < sizeof(ucontext_t); i += sizeof(uint64_t)) {
+          uint64_t addr = prune_memory_address(*(uint64_t*)(uctx_copy + i));
+          void* live = test_live_object(addr);
+          if (live) shade((scm_obj_t)live);
+        }
+      }
       uint8_t* stack_copy = (uint8_t*)prune_memory_address((uintptr_t)rec->stack_copy);
       for (size_t i = 0; i < rec->stack_size; i += sizeof(uint64_t)) {
         uint64_t addr = prune_memory_address(*(uint64_t*)(stack_copy + i));
