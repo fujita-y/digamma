@@ -6,6 +6,7 @@
 #include "../src/continuation.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -125,6 +126,7 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 int main() {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
+  environment::init();
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -138,6 +140,7 @@ int main() {
   test_dynamic_wind_with_call_cc();
 
   delete cg;
+  environment::destroy();
   heap->destroy();
   delete heap;
 

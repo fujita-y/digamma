@@ -9,6 +9,7 @@
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
+#include "environment.h"
 #include "reader.h"
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
@@ -58,7 +59,7 @@ static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
+  scm_obj_t env = environment::s_current_environment;
   scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
   hashtable_set(env_rec->variables, sym, make_cell(val));
 }
@@ -143,6 +144,7 @@ int main(int argc, char** argv) {
   fflush(stdout);
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  environment::init();
 
   run_test("DerivTest", [](CodegenTest& env) -> bool {
     // Register Primitives
@@ -368,6 +370,7 @@ int main(int argc, char** argv) {
     return true;
   });
 
+  environment::destroy();
   heap->destroy();
   delete heap;
   return some_test_failed ? 1 : 0;

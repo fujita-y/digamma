@@ -6,6 +6,7 @@
 #include "codegen_aux.h"
 #include "codegen_common.h"
 #include "object_heap.h"
+#include "environment.h"
 #include "printer.h"
 
 #include <cstddef>
@@ -1046,7 +1047,7 @@ void codegen_t::analyze_closure_labels() {
               current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
             } else {
               // Try to look up in the global environment
-              scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.opr2);
+              scm_obj_t val = environment::environment_variable_ref(inst.opr2);
               if (val != scm_undef) {
                 current_state.regs[inst.rn1] = inst.opr2;
                 if (is_closure(val)) {

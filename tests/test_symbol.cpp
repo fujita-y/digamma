@@ -1,6 +1,7 @@
 #include "../src/core.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -43,6 +44,7 @@ static bool test_symbol_intern(const char* name) {
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  environment::init();
   heap->m_collect_trip_bytes = 1024 * 512;
 
   test_symbol_intern("foobar");
@@ -53,6 +55,7 @@ int main(int argc, char** argv) {
   test_symbol_intern("special-chars!@#$%^&*()");
   test_symbol_intern("12345");
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 

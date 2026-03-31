@@ -7,6 +7,7 @@
 #include <sstream>
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 #include "../src/printer.h"
 #include "../src/reader.h"
 
@@ -42,6 +43,7 @@ void trace(const char* fmt, ...) {
 void test_r7rs_comments() {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024, 64 * 1024);
+  environment::init();
 
   {
     // Block comment
@@ -117,6 +119,7 @@ void test_r7rs_comments() {
     std::cout << "Nested datum comment passed" << std::endl;
   }
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 }
@@ -124,6 +127,7 @@ void test_r7rs_comments() {
 void test_r7rs_strings() {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024, 64 * 1024);
+  environment::init();
 
   {
     // String escape input
@@ -147,6 +151,7 @@ void test_r7rs_strings() {
     std::cout << "String escape output passed" << std::endl;
   }
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 }
@@ -154,6 +159,7 @@ void test_r7rs_strings() {
 void test_r7rs_symbols() {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024, 64 * 1024);
+  environment::init();
 
   {
     // Symbol escape output
@@ -175,6 +181,7 @@ void test_r7rs_symbols() {
     std::cout << "Symbol pipe escape output passed" << std::endl;
   }
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 }

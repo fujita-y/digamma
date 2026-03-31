@@ -79,17 +79,6 @@ class object_heap_t {
   std::mutex m_symbol_table_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
-  scm_obj_t m_interaction_environment;
-  scm_obj_t m_system_environment;
-  scm_obj_t m_current_environment;
-  void environment_macro_set(scm_obj_t key, scm_obj_t value);
-  void environment_variable_set(scm_obj_t key, scm_obj_t value);
-  scm_obj_t environment_macro_ref(scm_obj_t key);
-  scm_obj_t environment_variable_ref(scm_obj_t key);
-  scm_obj_t environment_variable_cell_ref(scm_obj_t key);
-  bool environment_macro_contains(scm_obj_t key);
-  bool environment_variable_contains(scm_obj_t key);
-
   std::unordered_set<scm_obj_t> m_literals;
   void literals_add(scm_obj_t obj) {
     write_barrier(obj);

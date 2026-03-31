@@ -2,6 +2,7 @@
 #include "../src/hash.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -211,12 +212,14 @@ static bool test_regression() {
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  environment::init();
   heap->m_collect_trip_bytes = 1024 * 512;
 
   test_hashtable();
   test_equal_hash();
   test_regression();
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 

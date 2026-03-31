@@ -2,6 +2,7 @@
 #include "../src/hash.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -38,6 +39,7 @@ static bool test_gc_allocation(int num_loops) {
   object_heap_t* heap = new object_heap_t();
 
   heap->init(1024 * 1024, 1024 * 256);
+  environment::init();
 
   // Root structure:
   // (pair
@@ -128,6 +130,7 @@ static bool test_gc_allocation(int num_loops) {
 
   heap->remove_root(root);
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 
@@ -139,6 +142,7 @@ static bool test_root_survivability() {
   printf("running test_root_survivability...\n");
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 4, 1024 * 256);
+  environment::init();
 
   // 1. Root a list of various objects
   scm_obj_t s = make_string("survivor-string");
@@ -256,6 +260,7 @@ static bool test_root_survivability() {
   }
 
   heap->remove_root(list);
+  environment::destroy();
   heap->destroy();
   delete heap;
 

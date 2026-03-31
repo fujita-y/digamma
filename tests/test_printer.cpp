@@ -6,6 +6,7 @@
 #include <sstream>
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/environment.h"
 #include "../src/printer.h"
 
 void fatal(const char* fmt, ...) {
@@ -39,6 +40,7 @@ void test_printer() {
   // Initializing heap for object creation
   object_heap_t* heap = new object_heap_t();
   heap->init(4 * 1024 * 1024, 128 * 1024);
+  environment::init();
 
   // Test fixnum
   ss.str("");
@@ -98,6 +100,7 @@ void test_printer() {
   assert(ss.str() == "#(1 2)");
   std::cout << "Vector test passed" << std::endl;
 
+  environment::destroy();
   heap->destroy();
   delete heap;
 }
