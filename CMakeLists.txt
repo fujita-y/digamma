@@ -152,6 +152,7 @@ set(NANOS_CORE_SOURCES
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
   src/continuation.cpp
+  src/environment.cpp
   src/equiv.cpp
   src/hash.cpp
   src/nanos_jit.cpp

@@ -1,6 +1,7 @@
 #include "object.h"
 #include "nanos.h"
 #include "codegen.h"
+#include "environment.h"
 #include "hash.h"
 #include "nanos_jit.h"
 #include "nanos_options.h"
@@ -40,6 +41,7 @@ void nanos_t::init_codegen() {
 void nanos_t::init() {
   object_heap_t* heap = new object_heap_t();
   heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
+  environment::init();
   init_codegen();
   init_subr();
 }
@@ -49,6 +51,7 @@ void nanos_t::destroy() {
   codegen_t* codegen = codegen_t::current();
   codegen->destroy();
   delete codegen;
+  environment::destroy();
   object_heap_t* heap = object_heap_t::current();
   heap->destroy();
   delete heap;
