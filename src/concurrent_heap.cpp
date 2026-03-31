@@ -106,6 +106,19 @@ void concurrent_heap_t::snapshot_stack() {
 #endif
 }
 
+void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
+  assert((begin & 0x7) == 0);
+  assert((end & 0x7) == 0);
+  std::unordered_set<uint64_t> raw;
+  for (uint64_t addr = begin; addr < end; addr += sizeof(uint64_t)) {
+    raw.insert(prune_memory_address(*(uint64_t*)addr));
+  }
+  for (const auto& addr : raw) {
+    void* live = test_live_object(addr);
+    if (live) shade(live);
+  }
+}
+
 void concurrent_heap_t::safepoint() {
   while (m_stop_the_world) {
     switch (m_root_snapshot_mode) {
