@@ -118,13 +118,16 @@
          (eq? d1 d2)
          (equal? c1 c2))))
 
-;; Name-only identifier equality (for literals).
+;; Free-identifier equality (for literals in syntax-case).
+;; Two identifiers are free-identifier=? if they resolve to the same binding.
 (define (free-identifier=? id1 id2)
   (let ((d1 (syntax-object-datum id1))
         (d2 (syntax-object-datum id2)))
     (and (symbol? d1)
          (symbol? d2)
-         (eq? d1 d2))))
+         (let ((r1 (resolve-core-form d1 '()))
+               (r2 (resolve-core-form d2 '())))
+           (and r1 r2 (eq? r1 r2))))))
 
 ;;=============================================================================
 ;; 4. Pattern Matching Logic

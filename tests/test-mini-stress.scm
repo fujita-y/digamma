@@ -1,3 +1,17 @@
+(define *pass-count* 0)
+(define *fail-count* 0)
+
+(define (test-equal name output expected)
+  (if (equal? output expected)
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
+      (begin
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display name) (newline)
+        (display "  Expected: ") (write expected) (newline)
+        (display "  Actual:   ") (write output) (newline))))
+
 ;; Minimal stress test - just the ??!apply substitution with 2 vars
 (define-syntax ??!apply
   (syntax-rules (??!lambda)
@@ -47,5 +61,17 @@
 (define-syntax ?ifnull? (syntax-rules () ((_ () kt kf) (??!apply kt #t)) ((_ x kt kf) (??!apply kf #f))))
 
 ;; Simple test: build and test a pair
-(?cons hello world (??!lambda (x) (display (quote (??! x)))))
+(define ans #f)
+(?cons hello world (??!lambda (x) (set! ans (quote (??! x)))))
+
+(test-equal "check output pair" ans '(hello . world))
+
+;; =============================================================================
+;; Summary
+;; =============================================================================
 (newline)
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+(if (= *fail-count* 0)
+    (begin (display "ALL TESTS PASSED.\n") (exit 0))
+    (begin (display "FAILED ") (display *fail-count*) (display " TESTS.\n") (exit 1)))
