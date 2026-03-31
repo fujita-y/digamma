@@ -714,6 +714,112 @@
            '((lambda* (x . y) (list x y)) 1)
            '(1 ()))
 
+;; =============================================================================
+;; literal comparison across rename boundaries
+;; =============================================================================
+(display "\n>>> literal comparison (syntax-rules)\n")
+
+;; Test 1: CPS-style ??!apply — the core pattern that was broken.
+;; The ??!apply macro creates a letrec-syntax where inner syntax-rules macros
+;; use literals from the outer pattern. These literals get renamed in the
+;; template, but must still match unrenamed user code via free-identifier=?.
+(macroexpand '(define-syntax ??!apply
+  (syntax-rules (??!lambda)
+    ((_ (??!lambda (bound-var . other-bound-vars) body) oval . other-ovals)
+     (letrec-syntax ((subs
+                      (syntax-rules (??! bound-var ??!lambda)
+                        ((_ val k (??! bound-var)) (appl k val))
+                        ((_ val k (??!lambda bvars int-body))
+                         (subs-in-lambda val bvars (k bvars) int-body))
+                        ((_ val k (x)) (subs val (recon-pair val k ()) x))
+                        ((_ val k (x . y)) (subs val (subsed-cdr val k x) y))
+                        ((_ val k x) (appl k x))))
+                     (subsed-cdr
+                       (syntax-rules ()
+                         ((_ val k x new-y)
+                          (subs val (recon-pair val k new-y) x))))
+                     (recon-pair
+                       (syntax-rules ()
+                         ((_ val k new-y new-x) (appl k (new-x . new-y)))))
+                     (subs-in-lambda
+                       (syntax-rules (bound-var)
+                         ((_ val () kp int-body)
+                          (subs val (recon-l kp ()) int-body))
+                         ((_ val (bound-var . obvars) (k bvars) int-body)
+                          (appl k (??!lambda bvars int-body)))
+                         ((_ val (obvar . obvars) kp int-body)
+                          (subs-in-lambda val obvars kp int-body))))
+                     (recon-l
+                       (syntax-rules ()
+                         ((_ (k bvars) () result)
+                          (appl k (??!lambda bvars result)))))
+                     (appl
+                      (syntax-rules ()
+                        ((_ (a b c d) result) (a b c d result))
+                        ((_ (a b c) result) (a b c result))))
+                     (finish
+                       (syntax-rules ()
+                         ((_ () () exp) exp)
+                         ((_ rem-bvars rem-ovals exps)
+                          (??!apply (??!lambda rem-bvars exps) . rem-ovals)))))
+       (subs oval (finish other-bound-vars other-ovals) body))))))
+
+(macroexpand '(define-syntax ?cons (syntax-rules () ((_ x y k) (??!apply k (x . y))))))
+
+;; This test verifies that the ??! literal in the user's continuation body
+;; is matched correctly by the renamed ??!.N literal in the letrec-syntax subs macro.
+(test-eval "CPS literal substitution via ??!apply"
+  '(let ((result #f))
+     (?cons hello world (??!lambda (x) (set! result (quote (??! x)))))
+     result)
+  '(hello . world))
+
+;; Test 2: Nested CPS — two levels of ??!apply substitution
+(macroexpand '(define-syntax ?car (syntax-rules () ((_ (x . y) k) (??!apply k x)))))
+(macroexpand '(define-syntax ?cdr (syntax-rules () ((_ (x . y) k) (??!apply k y)))))
+
+(test-eval "CPS nested substitution (car of cons)"
+  '(let ((result #f))
+     (?cons a b (??!lambda (p) (?car (??! p) (??!lambda (x) (set! result (quote (??! x)))))))
+     result)
+  'a)
+
+(test-eval "CPS nested substitution (cdr of cons)"
+  '(let ((result #f))
+     (?cons a b (??!lambda (p) (?cdr (??! p) (??!lambda (x) (set! result (quote (??! x)))))))
+     result)
+  'b)
+
+;; Test 3: Literal matching in nested letrec-syntax definitions
+;; Inner syntax-rules with literals from outer template must match correctly.
+(test-eval "letrec-syntax literal match across rename boundary"
+  '(letrec-syntax
+     ((make-matcher
+       (syntax-rules ()
+         ((_ tag)
+          (letrec-syntax
+            ((m (syntax-rules (tag)
+                  ((_ tag) 'matched)
+                  ((_ other) 'no-match))))
+            (m tag))))))
+     (make-matcher foo))
+  'matched)
+
+;; Test 4: Verify that different literals do NOT spuriously match
+(test-eval "letrec-syntax literal non-match across rename boundary"
+  '(letrec-syntax
+     ((make-matcher
+       (syntax-rules ()
+         ((_ tag)
+          (letrec-syntax
+            ((m (syntax-rules (tag)
+                  ((_ tag) 'matched)
+                  ((_ other) 'no-match))))
+            (m bar))))))
+     (make-matcher foo))
+  'no-match)
+
+
 (newline)
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
