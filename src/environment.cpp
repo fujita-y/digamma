@@ -19,6 +19,9 @@ thread_local scm_obj_t environment::s_current_winders = scm_nil;
 
 std::unordered_set<scm_obj_t> environment::s_literals;
 
+std::mutex environment::s_symbols_mutex;
+std::unordered_map<std::string, scm_obj_t> environment::s_symbols;
+
 void environment::init() {
   if (object_heap_t::current() == nullptr) {
     fatal("%s:%u environment::init() called before object_heap_t::init()", __FILE__, __LINE__);

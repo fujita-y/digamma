@@ -134,9 +134,9 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::sweep_symbol_table() {
-  std::lock_guard<std::mutex> lock(m_symbol_table_mutex);
-  auto it = m_symbol_table.begin();
-  while (it != m_symbol_table.end()) {
+  std::lock_guard<std::mutex> lock(environment::s_symbols_mutex);
+  auto it = environment::s_symbols.begin();
+  while (it != environment::s_symbols.end()) {
     scm_obj_t value = it->second;
     assert(is_symbol(value));
     void* p = to_address(value);
@@ -144,7 +144,7 @@ void object_heap_t::sweep_symbol_table() {
     if (traits->owner->state(p)) {
       ++it;
     } else {
-      it = m_symbol_table.erase(it);
+      it = environment::s_symbols.erase(it);
     }
   }
 }

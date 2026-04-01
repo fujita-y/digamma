@@ -6,8 +6,6 @@
 
 #include "core.h"
 #include "object.h"
-#include <mutex>
-#include <unordered_map>
 #include <unordered_set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
@@ -73,9 +71,6 @@ class object_heap_t {
   void* alloc_port() { return alloc_object(m_ports); }
   void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
-
-  std::mutex m_symbol_table_mutex;
-  std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {

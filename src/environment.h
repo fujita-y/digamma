@@ -3,6 +3,9 @@
 
 #include "core.h"
 #include "object.h"
+#include <mutex>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 class environment {
@@ -20,11 +23,14 @@ class environment {
 
   static std::unordered_set<scm_obj_t> s_literals;
 
-  static void environment_macro_set(scm_obj_t key, scm_obj_t value);
-  static void environment_variable_set(scm_obj_t key, scm_obj_t value);
+  static std::mutex s_symbols_mutex;
+  static std::unordered_map<std::string, scm_obj_t> s_symbols;
+
   static scm_obj_t environment_macro_ref(scm_obj_t key);
   static scm_obj_t environment_variable_ref(scm_obj_t key);
   static scm_obj_t environment_variable_cell_ref(scm_obj_t key);
+  static void environment_macro_set(scm_obj_t key, scm_obj_t value);
+  static void environment_variable_set(scm_obj_t key, scm_obj_t value);
   static bool environment_macro_contains(scm_obj_t key);
   static bool environment_variable_contains(scm_obj_t key);
 
