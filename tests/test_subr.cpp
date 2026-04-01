@@ -15,7 +15,7 @@
 #include <vector>
 #include "continuation.h"
 #include "object_heap.h"
-#include "environment.h"
+#include "context.h"
 
 // ---------------------------------------------------------------------------
 // Subr declarations (extern "C" via SUBR macro)
@@ -1637,7 +1637,7 @@ int main(int argc, char** argv) {
 
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
-  environment::init();
+  context::init();
 
   test_boolean_p();
   test_char_p();
@@ -1680,7 +1680,7 @@ int main(int argc, char** argv) {
   test_undef_unspecified();
   test_uuid();
 
-  environment::destroy();
+  context::destroy();
   heap->destroy();
   delete heap;
 

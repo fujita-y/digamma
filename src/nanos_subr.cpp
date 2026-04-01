@@ -5,13 +5,13 @@
 #include "object.h"
 #include "codegen.h"
 #include "codegen_aux.h"
+#include "context.h"
 #include "continuation.h"
 #include "equiv.h"
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
 #include "printer.h"
-#include "environment.h"
 
 #include <cerrno>
 #include <cmath>
@@ -1047,6 +1047,7 @@ SUBR subr_uuid(scm_obj_t self) {
 }
 
 SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  nanos_t::current()->destroy();
   if (argc == 0) exit(0);
   scm_obj_t a1 = argv[0];
   if (is_fixnum(a1)) exit((int)fixnum(a1));
@@ -1356,11 +1357,11 @@ SUBR subr_environment_variables(scm_obj_t self, scm_obj_t a1) {
 // current-environment
 SUBR subr_current_environment(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) {
-    return environment::s_current_environment;
+    return context::s_current_environment;
   } else if (argc == 1) {
     if (!is_environment(argv[0])) throw std::runtime_error("current-environment: argument must be an environment");
     object_heap_t::current()->write_barrier(argv[0]);
-    environment::s_current_environment = argv[0];
+    context::s_current_environment = argv[0];
     return scm_unspecified;
   } else {
     throw std::runtime_error("current-environment: wrong number of arguments");
@@ -1371,7 +1372,7 @@ SUBR subr_current_environment(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // (environment-macro-set! name transformer)
 SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-set!: first argument must be a symbol");
-  environment::environment_macro_set(a1, a2);
+  context::environment_macro_set(a1, a2);
   return scm_unspecified;
 }
 
@@ -1379,14 +1380,14 @@ SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 // (environment-macro-ref name) => transformer or scm_undef
 SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-ref: argument must be a symbol");
-  return environment::environment_macro_ref(a1);
+  return context::environment_macro_ref(a1);
 }
 
 // environment-variable-set!  - digamma core
 // (environment-variable-set! name value)
 SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-set!: first argument must be a symbol");
-  environment::environment_variable_set(a1, a2);
+  context::environment_variable_set(a1, a2);
   return scm_unspecified;
 }
 
@@ -1394,28 +1395,28 @@ SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 // (environment-variable-ref name) => value or scm_undef
 SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-ref: argument must be a symbol");
-  return environment::environment_variable_ref(a1);
+  return context::environment_variable_ref(a1);
 }
 
 // environment-macro-contains?  - digamma core
 // (environment-macro-contains? name) => #t or #f
 SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-contains?: argument must be a symbol");
-  return environment::environment_macro_contains(a1) ? scm_true : scm_false;
+  return context::environment_macro_contains(a1) ? scm_true : scm_false;
 }
 
 // environment-variable-contains?  - digamma core
 // (environment-variable-contains? name) => #t or #f
 SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-contains?: argument must be a symbol");
-  return environment::environment_variable_contains(a1) ? scm_true : scm_false;
+  return context::environment_variable_contains(a1) ? scm_true : scm_false;
 }
 
 // interaction-environment - R6RS 11.16
-SUBR subr_interaction_environment(scm_obj_t self) { return environment::s_interaction_environment; }
+SUBR subr_interaction_environment(scm_obj_t self) { return context::s_interaction_environment; }
 
 // system-environment
-SUBR subr_system_environment(scm_obj_t self) { return environment::s_system_environment; }
+SUBR subr_system_environment(scm_obj_t self) { return context::s_system_environment; }
 
 // ============================================================================
 // Multiple Return Values
@@ -1472,7 +1473,7 @@ SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
 
 void nanos_t::init_subr() {
   auto reg = [](const char* name, void* func, int req, int opt) {
-    environment::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
   };
   auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, 1); };
 

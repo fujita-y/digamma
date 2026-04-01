@@ -8,7 +8,7 @@
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include "codegen_aux.h"
-#include "environment.h"
+#include "context.h"
 #include "object_heap.h"
 
 thread_local static bool s_restored = false;
@@ -24,15 +24,15 @@ extern "C" {
 // State Handling & Winders
 // ============================================================================
 
-scm_obj_t get_current_winders() { return environment::s_current_winders; }
+scm_obj_t get_current_winders() { return context::s_current_winders; }
 
 void set_current_winders(scm_obj_t winders) {
   object_heap_t::current()->write_barrier(winders);
-  environment::s_current_winders = winders;
+  context::s_current_winders = winders;
 }
 
 static void do_wind(scm_obj_t target_winders) {
-  scm_obj_t current = environment::s_current_winders;
+  scm_obj_t current = context::s_current_winders;
   scm_obj_t target = target_winders;
 
   if (current == target) return;
@@ -146,7 +146,7 @@ __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void 
 __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   do_wind(rec->winders);
   object_heap_t::current()->write_barrier(val);
-  environment::s_continuation_captured_retval = val;
+  context::s_continuation_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
   // Acquire collector lock before switching to the temp stack. Once we switch SP
@@ -192,7 +192,7 @@ SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[])
 
   do_wind(cont_rec->winders);
 
-  environment::s_continuation_captured_retval = retval;
+  context::s_continuation_captured_retval = retval;
   s_restored = true;
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
@@ -230,7 +230,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
       uint8_t* shadow_copy = nullptr;
 #endif
 
-      scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, environment::s_current_winders);
+      scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, context::s_current_winders);
       scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, 1);
       scm_obj_t proc_argv[1] = {make_cons(clo, scm_nil)};
       return c_apply_helper(proc, 1, proc_argv);
@@ -247,7 +247,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
         s_restored_rec = nullptr;
       }
 #endif
-      return environment::s_continuation_captured_retval;
+      return context::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");
@@ -260,7 +260,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
     if (!s_restored) {
       void* sp;
       __asm__ volatile("mov %0, sp" : "=r"(sp));
-      scm_obj_t cont_obj = make_escape(&uctx, (uintptr_t)sp, environment::s_current_winders);
+      scm_obj_t cont_obj = make_escape(&uctx, (uintptr_t)sp, context::s_current_winders);
       scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
 
       scm_obj_t env[1] = {cont_obj};
@@ -288,7 +288,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
         return scm_undef;
       }
     } else {
-      return environment::s_continuation_captured_retval;
+      return context::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");

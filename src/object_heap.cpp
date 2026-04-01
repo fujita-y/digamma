@@ -5,7 +5,7 @@
 #include "object.h"
 #include "object_heap.h"
 #include "bit.h"
-#include "environment.h"
+#include "context.h"
 #include "port.h"
 
 thread_local object_heap_t* object_heap_t::s_current;
@@ -134,9 +134,9 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::sweep_symbol_table() {
-  std::lock_guard<std::mutex> lock(environment::s_symbols_mutex);
-  auto it = environment::s_symbols.begin();
-  while (it != environment::s_symbols.end()) {
+  std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
+  auto it = context::s_symbols.begin();
+  while (it != context::s_symbols.end()) {
     scm_obj_t value = it->second;
     assert(is_symbol(value));
     void* p = to_address(value);
@@ -144,7 +144,7 @@ void object_heap_t::sweep_symbol_table() {
     if (traits->owner->state(p)) {
       ++it;
     } else {
-      it = environment::s_symbols.erase(it);
+      it = context::s_symbols.erase(it);
     }
   }
 }
@@ -319,13 +319,19 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 }
 
 void object_heap_t::snapshot_root() {
-  for (auto it = environment::s_gc_protect_set.begin(); it != environment::s_gc_protect_set.end(); it++) enqueue_root(*it);
-  for (auto it = environment::s_literals.begin(); it != environment::s_literals.end(); it++) enqueue_root(*it);
-  enqueue_root(environment::s_interaction_environment);
-  enqueue_root(environment::s_system_environment);
-  enqueue_root(environment::s_current_environment);
-  enqueue_root(environment::s_current_winders);
-  enqueue_root(environment::s_continuation_captured_retval);
+  for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
+  for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
+  enqueue_root(context::s_interaction_environment);
+  enqueue_root(context::s_system_environment);
+  enqueue_root(context::s_current_environment);
+  enqueue_root(context::s_current_winders);
+  enqueue_root(context::s_continuation_captured_retval);
+  enqueue_root(context::s_standard_input_port);
+  enqueue_root(context::s_standard_output_port);
+  enqueue_root(context::s_standard_error_port);
+  enqueue_root(context::s_current_input_port);
+  enqueue_root(context::s_current_output_port);
+  enqueue_root(context::s_current_error_port);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

@@ -5,7 +5,7 @@
 #include "../src/continuation.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
-#include "../src/environment.h"
+#include "../src/context.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -95,13 +95,13 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 
 static void c_global_set(scm_obj_t key, scm_obj_t value) {
   assert(is_symbol(key));
-  environment::environment_variable_set(key, value);
+  context::environment_variable_set(key, value);
 }
 
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
-  environment::init();
+  context::init();
   heap->m_collect_trip_bytes = 1024 * 512;
 
   llvm::InitializeNativeTarget();
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
     test_double_invoke_fails();
   }
 
-  environment::destroy();
+  context::destroy();
   heap->destroy();
   delete heap;
 

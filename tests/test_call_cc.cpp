@@ -4,7 +4,7 @@
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
 #include "../src/continuation.h"
-#include "../src/environment.h"
+#include "../src/context.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 
@@ -70,7 +70,7 @@ static bool test_multishot() {
 
   auto multishot_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
     global_cont = argv[0];
-    environment::gc_protect(global_cont);
+    context::gc_protect(global_cont);
     return make_fixnum(count++);
   };
 
@@ -108,7 +108,7 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
-  environment::init();
+  context::init();
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
   codegen->destroy();
   delete codegen;
 
-  environment::destroy();
+  context::destroy();
   heap->destroy();
   delete heap;
   puts("all test done");

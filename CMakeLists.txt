@@ -152,9 +152,10 @@ set(NANOS_CORE_SOURCES
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp
   src/continuation.cpp
-  src/environment.cpp
+  src/context.cpp
   src/equiv.cpp
   src/hash.cpp
+  src/nanos.cpp
   src/nanos_jit.cpp
   src/nanos_options.cpp
   src/nanos_subr.cpp
@@ -182,7 +183,7 @@ add_library(nanos_core OBJECT ${NANOS_CORE_SOURCES})
 target_link_libraries(nanos_core PUBLIC nanos_config)
 
 # --- Main Executable ---
-add_executable(nanos src/main.cpp src/nanos.cpp)
+add_executable(nanos src/main.cpp)
 target_link_libraries(nanos PRIVATE nanos_core nanos_config ${NANOS_LINK_LIBRARIES})
 
 # ==============================================================================

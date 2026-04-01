@@ -4,7 +4,7 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "codegen_common.h"
-#include "environment.h"
+#include "context.h"
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
@@ -234,7 +234,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 
 // Set global variable to value in register
 void codegen_t::emit_global_set(const Instruction& inst) {
-  scm_obj_t cell = environment::environment_variable_cell_ref(inst.opr1);
+  scm_obj_t cell = context::environment_variable_cell_ref(inst.opr1);
   scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
 
   // Create a constant for the value address
@@ -257,7 +257,7 @@ void codegen_t::emit_global_set(const Instruction& inst) {
 // Load global variable value into register
 void codegen_t::emit_global_ref(const Instruction& inst) {
   // Resolve the address of the global variable's value slot at compile time
-  scm_obj_t cell = environment::environment_variable_cell_ref(inst.opr2);
+  scm_obj_t cell = context::environment_variable_cell_ref(inst.opr2);
   scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
 
   // Create a constant for the value address
@@ -489,7 +489,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
 
       // Retrieve the actual closure object to get code pointer and cdecl
-      scm_obj_t val = environment::environment_variable_ref(inst.closure_label);
+      scm_obj_t val = context::environment_variable_ref(inst.closure_label);
       if (is_closure(val)) {
         scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
         void* code_ptr = closure_rec->code;
@@ -575,7 +575,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         return;
       }
     } else {
-      scm_obj_t val = environment::environment_variable_ref(inst.closure_label);
+      scm_obj_t val = context::environment_variable_ref(inst.closure_label);
       if (val != scm_undef && !is_closure(val)) {
         throw std::runtime_error("error in codegen: attempt to call a non-procedure");
       }
