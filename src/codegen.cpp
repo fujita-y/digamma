@@ -5,6 +5,7 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "codegen_common.h"
+#include "context.h"
 #include "object_heap.h"
 #include "printer.h"
 
@@ -93,9 +94,9 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
-  object_heap_t::current()->add_root(cached_symbol_label);
-  object_heap_t::current()->add_root(cached_symbol_apply);
-  object_heap_t::current()->add_root(cached_symbol_safepoint);
+  context::gc_protect(cached_symbol_label);
+  context::gc_protect(cached_symbol_apply);
+  context::gc_protect(cached_symbol_safepoint);
   init_opcode_map();
   s_current = this;
 }
@@ -509,7 +510,7 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
   object_heap_t* heap = object_heap_t::current();
   for (const auto& pair : opcode_map) {
-    heap->add_root(pair.first);
+    context::gc_protect(pair.first);
   }
 }
 
@@ -676,7 +677,7 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
   updateMaxRegister(inst.rn1, func_info.max_reg);
   // Register literal
   if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
-    object_heap_t::current()->literals_add(inst.opr1);
+    context::add_literal(inst.opr1);
   }
 }
 
@@ -1046,7 +1047,7 @@ void codegen_t::analyze_closure_labels() {
               current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
             } else {
               // Try to look up in the global environment
-              scm_obj_t val = object_heap_t::current()->environment_variable_ref(inst.opr2);
+              scm_obj_t val = context::environment_variable_ref(inst.opr2);
               if (val != scm_undef) {
                 current_state.regs[inst.rn1] = inst.opr2;
                 if (is_closure(val)) {

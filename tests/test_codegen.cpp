@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
+#include "context.h"
 #include "reader.h"
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
@@ -49,7 +50,7 @@ static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
+  scm_obj_t env = context::s_current_environment;
   scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
   hashtable_set(env_rec->variables, sym, make_cell(val));
 }
@@ -119,6 +120,7 @@ int main(int argc, char** argv) {
   fflush(stdout);
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
 
   run_test("ConstantReturn", [](CodegenTest& env) -> bool {
     // ((const r0 3) (ret)) ;=> 3
@@ -225,12 +227,12 @@ int main(int argc, char** argv) {
 
   run_test("GlobalSet", [](CodegenTest& env) -> bool {
     // ((const r0 123) (global-set! foo r0) (ret))
-    // Check if current-environment has foo = 123
+    // Check if current-context.has foo = 123
     scm_obj_t code = env.read_code("((const r2 123) (global-set! foo r2) (ret))");
     env.codegen->compile(code).release_and_run();
 
     object_heap_t* heap = object_heap_t::current();
-    scm_obj_t env_obj = heap->m_current_environment;
+    scm_obj_t env_obj = context::s_current_environment;
     scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env_obj);
     scm_obj_t cell = hashtable_ref(env_rec->variables, make_symbol("foo"), scm_undef);
     scm_obj_t val = scm_undef;
@@ -302,7 +304,7 @@ int main(int argc, char** argv) {
     env.codegen->compile(code).release_and_run();
 
     object_heap_t* heap = object_heap_t::current();
-    scm_obj_t env_obj = heap->m_current_environment;
+    scm_obj_t env_obj = context::s_current_environment;
     scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env_obj);
     scm_obj_t cell = hashtable_ref(env_rec->variables, make_symbol("inner"), scm_undef);
     scm_obj_t val = scm_undef;
@@ -902,6 +904,7 @@ int main(int argc, char** argv) {
     return result == make_fixnum(123);
   });
 
+  context::destroy();
   heap->destroy();
   delete heap;
   return some_test_failed ? 1 : 0;

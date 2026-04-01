@@ -1,4 +1,5 @@
 #include "../src/core.h"
+#include "../src/context.h"
 #include "../src/hash.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
@@ -38,6 +39,7 @@ static bool test_gc_allocation(int num_loops) {
   object_heap_t* heap = new object_heap_t();
 
   heap->init(1024 * 1024, 1024 * 256);
+  context::init();
 
   // Root structure:
   // (pair
@@ -80,7 +82,7 @@ static bool test_gc_allocation(int num_loops) {
 
   scm_obj_t root = make_cons(make_symbol("foo"), root_list);
 
-  heap->add_root(root);
+  context::gc_protect(root);
 
   // Allocate enough objects to potentially trigger GC or just verify allocation works
   for (int i = 0; i < num_loops; i++) {
@@ -126,8 +128,9 @@ static bool test_gc_allocation(int num_loops) {
     }
   }
 
-  heap->remove_root(root);
+  context::gc_unprotect(root);
 
+  context::destroy();
   heap->destroy();
   delete heap;
 
@@ -139,6 +142,7 @@ static bool test_root_survivability() {
   printf("running test_root_survivability...\n");
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 4, 1024 * 256);
+  context::init();
 
   // 1. Root a list of various objects
   scm_obj_t s = make_string("survivor-string");
@@ -160,7 +164,7 @@ static bool test_root_survivability() {
 
   scm_obj_t list = make_list(4, c, make_symbol("survivor-symbol"), vals, ht);
 
-  heap->add_root(list);
+  context::gc_protect(list);
 
   // 2. Allocate lots of garbage to trigger multiple GCs
   for (int i = 0; i < 50000; i++) {
@@ -255,7 +259,8 @@ static bool test_root_survivability() {
     return false;
   }
 
-  heap->remove_root(list);
+  context::gc_unprotect(list);
+  context::destroy();
   heap->destroy();
   delete heap;
 

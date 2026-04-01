@@ -5,11 +5,13 @@
 #include "object.h"
 #include "codegen.h"
 #include "codegen_aux.h"
+#include "context.h"
+#include "continuation.h"
 #include "equiv.h"
 #include "hash.h"
 #include "nanos.h"
-#include "nanos_context.h"
 #include "object_heap.h"
+#include "port.h"
 #include "printer.h"
 
 #include <cerrno>
@@ -236,68 +238,6 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
   }
   throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
 }
-
-// caar, cadr, etc. up to 5 levels - R6RS / SRFI 1 extensions
-SUBR subr_caar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, a1)); }
-SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, a1)); }
-SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, a1)); }
-SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, a1)); }
-SUBR subr_caaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, a1))); }
-SUBR subr_caadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, a1))); }
-SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, a1))); }
-SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, a1))); }
-SUBR subr_cdaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, a1))); }
-SUBR subr_cdadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, a1))); }
-SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, a1))); }
-SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))); }
-SUBR subr_caaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
-SUBR subr_caaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
-SUBR subr_caadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
-SUBR subr_caaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
-SUBR subr_cadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
-SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
-SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cdaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1)))); }
-SUBR subr_cdaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1)))); }
-SUBR subr_cdadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1)))); }
-SUBR subr_cdaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_cddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1)))); }
-SUBR subr_cddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1)))); }
-SUBR subr_cdddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1)))); }
-SUBR subr_cddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1)))); }
-SUBR subr_caaaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_caaaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_caaadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_caaaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_caadaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_caadadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_caaddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_caadddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_cadaaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_cadaadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cadadar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_cadaddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_caddaar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_caddadr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cadddar(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_caddddr(scm_obj_t self, scm_obj_t a1) { return subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_cdaaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_cdaaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cdaadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_cdaaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_cdadaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_cdadadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cdaddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_cdadddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_cddaaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_cddaadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cddadar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_cddaddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, subr_cdr(self, a1))))); }
-SUBR subr_cdddaar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_car(self, a1))))); }
-SUBR subr_cdddadr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, subr_cdr(self, a1))))); }
-SUBR subr_cddddar(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_car(self, a1))))); }
-SUBR subr_cdddddr(scm_obj_t self, scm_obj_t a1) { return subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, subr_cdr(self, a1))))); }
 
 // list  - R6RS 11.9
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]) {
@@ -975,25 +915,87 @@ SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
+// Ports
+// ============================================================================
+
+// current-input-port
+SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_input_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_input_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-input-port: argument must be a port");
+}
+
+// current-output-port
+SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_output_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_output_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-output-port: argument must be a port");
+}
+
+// current-error-port
+SUBR subr_current_error_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_error_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_error_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-error-port: argument must be a port");
+}
+
+// standard-input-port
+SUBR subr_standard_input_port(scm_obj_t self) { return context::s_standard_input_port; }
+
+// standard-output-port
+SUBR subr_standard_output_port(scm_obj_t self) { return context::s_standard_output_port; }
+
+// standard-error-port
+SUBR subr_standard_error_port(scm_obj_t self) { return context::s_standard_error_port; }
+
+// ============================================================================
 // I/O  - R6RS 8
 // ============================================================================
 
 // write  - R6RS 8.3
 SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).write(a1);
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  if (os) printer_t(*os).write(a1);
   return scm_unspecified;
 }
 
 // display  - R6RS 8.3
 SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).display(a1);
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  printer_t(*os).display(a1);
   return scm_unspecified;
 }
 
 // newline  - R6RS 8.3
 SUBR subr_newline(scm_obj_t self) {
-  std::cout << std::endl;
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  if (os) *os << std::endl;
   return scm_unspecified;
+}
+
+// flush-output-port  - R6RS 8.2.11
+SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return port_flush_output(context::s_current_output_port);
+  if (argc == 1) {
+    if (!is_port(argv[0])) throw std::runtime_error("flush-output-port: argument must be a port");
+    return port_flush_output(argv[0]);
+  }
+  throw std::runtime_error("flush-output-port: wrong number of arguments");
 }
 
 // ============================================================================
@@ -1046,6 +1048,7 @@ SUBR subr_uuid(scm_obj_t self) {
 }
 
 SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  nanos_t::current()->destroy();
   if (argc == 0) exit(0);
   scm_obj_t a1 = argv[0];
   if (is_fixnum(a1)) exit((int)fixnum(a1));
@@ -1355,11 +1358,11 @@ SUBR subr_environment_variables(scm_obj_t self, scm_obj_t a1) {
 // current-environment
 SUBR subr_current_environment(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) {
-    return object_heap_t::current()->m_current_environment;
+    return context::s_current_environment;
   } else if (argc == 1) {
     if (!is_environment(argv[0])) throw std::runtime_error("current-environment: argument must be an environment");
     object_heap_t::current()->write_barrier(argv[0]);
-    object_heap_t::current()->m_current_environment = argv[0];
+    context::s_current_environment = argv[0];
     return scm_unspecified;
   } else {
     throw std::runtime_error("current-environment: wrong number of arguments");
@@ -1370,7 +1373,7 @@ SUBR subr_current_environment(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // (environment-macro-set! name transformer)
 SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-set!: first argument must be a symbol");
-  object_heap_t::current()->environment_macro_set(a1, a2);
+  context::environment_macro_set(a1, a2);
   return scm_unspecified;
 }
 
@@ -1378,14 +1381,14 @@ SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 // (environment-macro-ref name) => transformer or scm_undef
 SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-ref: argument must be a symbol");
-  return object_heap_t::current()->environment_macro_ref(a1);
+  return context::environment_macro_ref(a1);
 }
 
 // environment-variable-set!  - digamma core
 // (environment-variable-set! name value)
 SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-set!: first argument must be a symbol");
-  object_heap_t::current()->environment_variable_set(a1, a2);
+  context::environment_variable_set(a1, a2);
   return scm_unspecified;
 }
 
@@ -1393,28 +1396,28 @@ SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 // (environment-variable-ref name) => value or scm_undef
 SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-ref: argument must be a symbol");
-  return object_heap_t::current()->environment_variable_ref(a1);
+  return context::environment_variable_ref(a1);
 }
 
 // environment-macro-contains?  - digamma core
 // (environment-macro-contains? name) => #t or #f
 SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-macro-contains?: argument must be a symbol");
-  return object_heap_t::current()->environment_macro_contains(a1) ? scm_true : scm_false;
+  return context::environment_macro_contains(a1) ? scm_true : scm_false;
 }
 
 // environment-variable-contains?  - digamma core
 // (environment-variable-contains? name) => #t or #f
 SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
   if (!is_symbol(a1)) throw std::runtime_error("environment-variable-contains?: argument must be a symbol");
-  return object_heap_t::current()->environment_variable_contains(a1) ? scm_true : scm_false;
+  return context::environment_variable_contains(a1) ? scm_true : scm_false;
 }
 
 // interaction-environment - R6RS 11.16
-SUBR subr_interaction_environment(scm_obj_t self) { return object_heap_t::current()->m_interaction_environment; }
+SUBR subr_interaction_environment(scm_obj_t self) { return context::s_interaction_environment; }
 
 // system-environment
-SUBR subr_system_environment(scm_obj_t self) { return object_heap_t::current()->m_system_environment; }
+SUBR subr_system_environment(scm_obj_t self) { return context::s_system_environment; }
 
 // ============================================================================
 // Multiple Return Values
@@ -1456,13 +1459,460 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 }
 
 // codegen-and-run - Nanos extension
-SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
+SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t inst_list) {
   try {
-    compiled_code_t func = codegen_t::current()->compile(coreform);
-    return (scm_obj_t)func.release_and_run();
+    scoped_gc_protect p(inst_list);
+    compiled_code_t func = codegen_t::current()->compile(inst_list);
+    scm_obj_t result = (scm_obj_t)func.release_and_run();
+    return result;
   } catch (std::exception& e) {
     throw std::runtime_error(e.what());
   }
+}
+
+// caar, cadr, etc. up to 5 levels - R6RS / SRFI 1 extensions
+
+static inline scm_obj_t _car(scm_obj_t self, scm_obj_t a1) {
+  if (a1 == (scm_obj_t) nullptr) [[unlikely]] {
+    return (scm_obj_t) nullptr;
+  }
+  if (!is_cons(a1)) [[unlikely]] {
+    return (scm_obj_t) nullptr;
+  }
+  scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+  return cons->car;
+}
+
+static inline scm_obj_t _cdr(scm_obj_t self, scm_obj_t a1) {
+  if (a1 == (scm_obj_t) nullptr) [[unlikely]] {
+    return (scm_obj_t) nullptr;
+  }
+  if (!is_cons(a1)) [[unlikely]] {
+    return (scm_obj_t) nullptr;
+  }
+  scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+  return cons->cdr;
+}
+
+SUBR subr_caar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, a1));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, a1));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, a1));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, a1));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, a1)));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _car(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _cdr(self, a1))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _car(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caadaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caadaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caadadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caadadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caaddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caaddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caadddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _car(self, _cdr(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caadddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _car(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caddaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caddaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caddadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caddadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cadddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cadddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_caddddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _car(self, _cdr(self, _cdr(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("caddddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _car(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdadaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdadaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdadadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdadadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdaddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdaddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdadddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _car(self, _cdr(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdadddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddaaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddaaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddaadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddaadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddadar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddadar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddaddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _car(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddaddr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdddaar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _car(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdddaar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdddadr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _car(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdddadr: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cddddar(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _cdr(self, _car(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cddddar: expected appropriate list structure");
+  }
+  return result;
+}
+SUBR subr_cdddddr(scm_obj_t self, scm_obj_t a1) {
+  scm_obj_t result = _cdr(self, _cdr(self, _cdr(self, _cdr(self, _cdr(self, a1)))));
+  if (result == (scm_obj_t) nullptr) [[unlikely]] {
+    throw std::runtime_error("cdddddr: expected appropriate list structure");
+  }
+  return result;
 }
 
 // ============================================================================
@@ -1470,9 +1920,8 @@ SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
 // ============================================================================
 
 void nanos_t::init_subr() {
-  object_heap_t* heap = object_heap_t::current();
-  auto reg = [heap](const char* name, void* func, int req, int opt) {
-    heap->environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, int opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
   };
   auto make_subr = [](void* func, int req, int opt) { return make_closure(func, req, opt, 0, nullptr, 1); };
 
@@ -1629,6 +2078,13 @@ void nanos_t::init_subr() {
   reg("write", (void*)subr_write, 1, 0);
   reg("display", (void*)subr_display, 1, 0);
   reg("newline", (void*)subr_newline, 0, 0);
+  reg("flush-output-port", (void*)subr_flush_output_port, 0, 1);
+  reg("current-input-port", (void*)subr_current_input_port, 0, 1);
+  reg("current-output-port", (void*)subr_current_output_port, 0, 1);
+  reg("current-error-port", (void*)subr_current_error_port, 0, 1);
+  reg("standard-input-port", (void*)subr_standard_input_port, 0, 0);
+  reg("standard-output-port", (void*)subr_standard_output_port, 0, 0);
+  reg("standard-error-port", (void*)subr_standard_error_port, 0, 0);
 
   // hashtables
   reg("hashtable?", (void*)subr_hashtable_p, 1, 0);

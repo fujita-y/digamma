@@ -7,6 +7,7 @@
 #include "codegen.h"
 #include "hash.h"
 #include "object_heap.h"
+#include "context.h"
 #include "reader.h"
 
 void fatal(const char* fmt, ...) {
@@ -135,6 +136,7 @@ int main() {
   printf("Starting test_closure_analysis\n");
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
 
   run_test("SimpleLocalClosure", [](ClosureAnalysisTest& env) -> bool {
     // ((make-closure r0 C1 () 0 #f) (call r0 0) (ret) (label C1) (ret))
@@ -309,7 +311,7 @@ int main() {
     // Manually bind a closure to a global symbol in the heap
     scm_obj_t sym = make_symbol("heap-func");
     scm_obj_t closure = make_closure(nullptr, 2, 0, 0, nullptr, 0);
-    object_heap_t::current()->environment_variable_set(sym, closure);
+    context::environment_variable_set(sym, closure);
 
     // Analyze code that references this heap closure
     // ((global-ref r0 heap-func) (call r0 2) (ret))
@@ -338,7 +340,7 @@ int main() {
     // make_closure(code, argc, rest, nsize, env, literals)
     // argc=1, rest=1
     scm_obj_t closure = make_closure(nullptr, 1, 1, 0, nullptr, 0);
-    object_heap_t::current()->environment_variable_set(sym, closure);
+    context::environment_variable_set(sym, closure);
 
     // Analyze code that references this heap closure
     // ((global-ref r0 heap-func-rest) (call r0 3) (ret))
@@ -406,6 +408,7 @@ int main() {
     return true;
   });
 
+  context::destroy();
   heap->destroy();
   delete heap;
   return some_test_failed ? 1 : 0;

@@ -2,6 +2,7 @@
 #include "../src/core.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/context.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -210,6 +211,7 @@ static bool test_cell(int64_t val) {
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
   heap->m_collect_trip_bytes = 1024 * 512;
 
   test_fixnum_in_range(-1);
@@ -248,6 +250,7 @@ int main(int argc, char** argv) {
   test_cell(-50);
   test_cell_heap("hello world");
 
+  context::destroy();
   heap->destroy();
   delete heap;
 

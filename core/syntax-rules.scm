@@ -42,25 +42,25 @@
 ;; This helper handles the greedy matching of the repeated part (P ...)
 ;; and ensures the tail matches correctly.
 (define (match-ellipsis literals P tail input ellipsis literal=?)
-  (letrec ((try-tail
-            (lambda (xs head-bindings)
-              (let ((m-tail (match-pattern literals tail xs ellipsis literal=?)))
-                (if m-tail
-                    (let* ((p-vars (map car (analyze-pattern P literals ellipsis 0)))
-                           ;; Transpose bindings: group values for each pattern variable
-                           (transposed (map (lambda (v)
-                                              (cons v (map (lambda (b) (cdr (assq v b))) (reverse head-bindings))))
-                                            p-vars)))
-                      (append transposed m-tail))
-                    #f))))
-           (loop (lambda (xs head-bindings)
-                   (let ((m-p (if (pair? xs) (match-pattern literals P (car xs) ellipsis literal=?) #f)))
-                     (if m-p
-                         ;; Greedily consume P, then try to match tail if subsequent matches fail
-                         (let ((res (loop (cdr xs) (cons m-p head-bindings))))
-                           (if res res (try-tail xs head-bindings)))
-                         (try-tail xs head-bindings))))))
-    (loop input '())))
+  (let ((p-vars (map car (analyze-pattern P literals ellipsis 0))))
+    (letrec ((try-tail
+              (lambda (xs head-bindings)
+                (let ((m-tail (match-pattern literals tail xs ellipsis literal=?)))
+                  (if m-tail
+                      (let* (;; Transpose bindings: group values for each pattern variable
+                             (transposed (map (lambda (v)
+                                                (cons v (map (lambda (b) (cdr (assq v b))) (reverse head-bindings))))
+                                              p-vars)))
+                        (append transposed m-tail))
+                      #f))))
+             (loop (lambda (xs head-bindings)
+                     (let ((m-p (if (pair? xs) (match-pattern literals P (car xs) ellipsis literal=?) #f)))
+                       (if m-p
+                           ;; Greedily consume P, then try to match tail if subsequent matches fail
+                           (let ((res (loop (cdr xs) (cons m-p head-bindings))))
+                             (if res res (try-tail xs head-bindings)))
+                           (try-tail xs head-bindings))))))
+      (loop input '()))))
 
 ;; Matches input against pattern.
 ;; literals: list of identifiers that must match exactly
@@ -106,6 +106,22 @@
 ;; Template Expansion
 ;;=============================================================================
 
+;; Collect all symbol names from a template (lightweight, no depth tracking).
+;; Used to find ellipsis driver variables during template expansion.
+(define (collect-template-vars tmpl ellipsis)
+  (cond
+    ((symbol? tmpl) (list tmpl))
+    ((and (pair? tmpl) (eq? (car tmpl) ellipsis)) '())
+    ((and (pair? tmpl) (pair? (cdr tmpl)) (eq? (cadr tmpl) ellipsis))
+     (append (collect-template-vars (car tmpl) ellipsis)
+             (collect-template-vars (cddr tmpl) ellipsis)))
+    ((pair? tmpl)
+     (append (collect-template-vars (car tmpl) ellipsis)
+             (collect-template-vars (cdr tmpl) ellipsis)))
+    ((vector? tmpl)
+     (collect-template-vars (vector->list tmpl) ellipsis))
+    (else '())))
+
 ;; Expands a template based on bindings from a successful match.
 ;; template: the template to expand
 ;; bindings: alist from match-pattern
@@ -134,11 +150,11 @@
      (let* ((sub-tmpl (car template))
             (tail-tmpl (cddr template))
             ;; Find pattern variables in sub-tmpl that are drivers for this ellipsis
-            (p-vars (map car (analyze-pattern sub-tmpl '() ellipsis 0)))
+            (t-vars (collect-template-vars sub-tmpl ellipsis))
             (drivers (filter (lambda (v)
                                   (let ((entry (assq v meta-env)))
                                     (and entry (>= (cdr entry) (+ depth 1)))))
-                                p-vars))
+                                t-vars))
             ;; Determine how many times to repeat based on driver lengths
             (len (if (null? drivers)
                      0 
@@ -173,6 +189,7 @@
 ;;=============================================================================
 
 ;; Primary entry point for syntax-rules application.
+;; Each rule is (pattern template meta-env) where meta-env is pre-computed.
 (define (apply-syntax-rules literals rules input rename ellipsis literal=?)
   (let loop ((rules rules))
     (if (null? rules)
@@ -180,7 +197,7 @@
         (let* ((rule (car rules))
                (pattern (car rule))
                (template (cadr rule))
-               (meta-env (analyze-pattern pattern literals ellipsis 0))
+               (meta-env (caddr rule))
                (bindings (match-pattern literals pattern input ellipsis literal=?)))
           (if bindings
                (expand-template template bindings rename ellipsis meta-env 0)

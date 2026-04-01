@@ -6,6 +6,7 @@
 #include <sstream>
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/context.h"
 #include "../src/printer.h"
 
 void fatal(const char* fmt, ...) {
@@ -74,6 +75,7 @@ void test_printf_with_scheme_objects() {
   // Initializing heap for object creation
   object_heap_t* heap = new object_heap_t();
   heap->init(4 * 1024 * 1024, 128 * 1024);
+  context::init();
 
   // Test %w with fixnum
   ss.str("");
@@ -118,6 +120,7 @@ void test_printf_with_scheme_objects() {
   assert(ss.str() == "The answer is 42 which is 42 in decimal");
   std::cout << "Mixed directives test passed" << std::endl;
 
+  context::destroy();
   heap->destroy();
   delete heap;
 }

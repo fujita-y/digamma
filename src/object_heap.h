@@ -6,18 +6,12 @@
 
 #include "core.h"
 #include "object.h"
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
 class object_heap_t {
  public:
-  thread_local static scm_obj_t s_continuation_captured_retval;
-  thread_local static scm_obj_t s_current_winders;
-
  private:
   thread_local static object_heap_t* s_current;
   concurrent_pool_t m_concurrent_pool;
@@ -32,11 +26,11 @@ class object_heap_t {
   concurrent_slab_t m_u8vectors;
   concurrent_slab_t m_hashtables;
   concurrent_slab_t m_environments;
+  concurrent_slab_t m_ports;
   concurrent_slab_t m_collectibles[8];  // 16-32-64-128-256-512-1024-2048
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
   uint64_t m_trip_bytes;
-  std::unordered_set<scm_obj_t> m_root_set;
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
@@ -57,7 +51,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
-  void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
+  void* is_live_object(uint64_t addr) { return m_concurrent_heap.is_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
   mutex_t& collector_lock() { return m_concurrent_heap.m_collector_lock; }
@@ -71,28 +65,9 @@ class object_heap_t {
   void* alloc_u8vector(int nsize) { return alloc_object(m_u8vectors); }
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_environment() { return alloc_object(m_environments); }
+  void* alloc_port() { return alloc_object(m_ports); }
   void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
-
-  std::mutex m_symbol_table_mutex;
-  std::unordered_map<std::string, scm_obj_t> m_symbol_table;
-
-  scm_obj_t m_interaction_environment;
-  scm_obj_t m_system_environment;
-  scm_obj_t m_current_environment;
-  void environment_macro_set(scm_obj_t key, scm_obj_t value);
-  void environment_variable_set(scm_obj_t key, scm_obj_t value);
-  scm_obj_t environment_macro_ref(scm_obj_t key);
-  scm_obj_t environment_variable_ref(scm_obj_t key);
-  scm_obj_t environment_variable_cell_ref(scm_obj_t key);
-  bool environment_macro_contains(scm_obj_t key);
-  bool environment_variable_contains(scm_obj_t key);
-
-  std::unordered_set<scm_obj_t> m_literals;
-  void literals_add(scm_obj_t obj) {
-    write_barrier(obj);
-    m_literals.insert(obj);
-  }
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {
@@ -101,14 +76,6 @@ class object_heap_t {
     }
     if (is_heap_object(obj)) m_concurrent_heap.write_barrier(to_address(obj));
   }
-
-  void add_root(scm_obj_t obj) {
-    if (is_cons(obj) || is_heap_object(obj)) {
-      write_barrier(obj);
-      m_root_set.insert(obj);
-    }
-  }
-  void remove_root(scm_obj_t obj) { m_root_set.erase(obj); }
 
   uint64_t m_collect_trip_bytes;
 
@@ -122,19 +89,6 @@ class object_heap_t {
   static object_heap_t* current() {
     assert(s_current);
     return s_current;
-  }
-};
-
-class scoped_gc_protect {
-  scoped_gc_protect(const scoped_gc_protect&) = delete;
-  scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
-  scm_obj_t m_obj;
-
- public:
-  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { object_heap_t::current()->add_root(obj); }
-  ~scoped_gc_protect() {
-    object_heap_t::current()->remove_root(m_obj);
-    m_obj = (scm_obj_t) nullptr;
   }
 };
 

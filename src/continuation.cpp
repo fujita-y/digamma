@@ -3,16 +3,17 @@
 
 #include "core.h"
 #include "object.h"
-#include "nanos_context.h"
+#include "continuation.h"
 #include <cstdio>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include "codegen_aux.h"
+#include "context.h"
 #include "object_heap.h"
 
-static thread_local bool s_restored = false;
-static thread_local scm_continuation_rec_t* s_restored_rec = nullptr;
-__attribute__((aligned(16))) static thread_local uint8_t s_restore_stack[8192];
+thread_local static bool s_restored = false;
+thread_local static scm_continuation_rec_t* s_restored_rec = nullptr;
+__attribute__((aligned(16))) thread_local static uint8_t s_restore_stack[8192];
 
 extern "C" {
   static scm_obj_t subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]);
@@ -23,15 +24,15 @@ extern "C" {
 // State Handling & Winders
 // ============================================================================
 
-scm_obj_t get_current_winders() { return object_heap_t::s_current_winders; }
+scm_obj_t get_current_winders() { return context::s_current_winders; }
 
 void set_current_winders(scm_obj_t winders) {
   object_heap_t::current()->write_barrier(winders);
-  object_heap_t::s_current_winders = winders;
+  context::s_current_winders = winders;
 }
 
 static void do_wind(scm_obj_t target_winders) {
-  scm_obj_t current = object_heap_t::s_current_winders;
+  scm_obj_t current = context::s_current_winders;
   scm_obj_t target = target_winders;
 
   if (current == target) return;
@@ -145,7 +146,7 @@ __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void 
 __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
   do_wind(rec->winders);
   object_heap_t::current()->write_barrier(val);
-  object_heap_t::s_continuation_captured_retval = val;
+  context::s_continuation_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
   // Acquire collector lock before switching to the temp stack. Once we switch SP
@@ -191,7 +192,7 @@ SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[])
 
   do_wind(cont_rec->winders);
 
-  object_heap_t::s_continuation_captured_retval = retval;
+  context::s_continuation_captured_retval = retval;
   s_restored = true;
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
@@ -229,7 +230,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
       uint8_t* shadow_copy = nullptr;
 #endif
 
-      scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, object_heap_t::s_current_winders);
+      scm_obj_t cont_obj = make_continuation(&uctx, stack_size, stack_copy, shadow_copy, stack_bottom, context::s_current_winders);
       scm_obj_t clo = make_closure((void*)subr_invoke_continuation, 0, 1, 1, &cont_obj, 1);
       scm_obj_t proc_argv[1] = {make_cons(clo, scm_nil)};
       return c_apply_helper(proc, 1, proc_argv);
@@ -246,7 +247,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_cc(scm_obj_t self, scm_
         s_restored_rec = nullptr;
       }
 #endif
-      return object_heap_t::s_continuation_captured_retval;
+      return context::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");
@@ -259,7 +260,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
     if (!s_restored) {
       void* sp;
       __asm__ volatile("mov %0, sp" : "=r"(sp));
-      scm_obj_t cont_obj = make_escape(&uctx, (uintptr_t)sp, object_heap_t::s_current_winders);
+      scm_obj_t cont_obj = make_escape(&uctx, (uintptr_t)sp, context::s_current_winders);
       scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
 
       scm_obj_t env[1] = {cont_obj};
@@ -287,7 +288,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
         return scm_undef;
       }
     } else {
-      return object_heap_t::s_continuation_captured_retval;
+      return context::s_continuation_captured_retval;
     }
   }
   fatal("getcontext failed");

@@ -3,7 +3,8 @@
 #include <sanitizer/hwasan_interface.h>
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
-#include "../src/nanos_context.h"
+#include "../src/continuation.h"
+#include "../src/context.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
 
@@ -82,7 +83,7 @@ static bool test_dynamic_wind_with_call_cc() {
     value_count++;
     auto callcc_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
       captured_cont = argv[0];
-      object_heap_t::current()->add_root(captured_cont);
+      context::gc_protect(captured_cont);
       return make_fixnum(100);
     };
     scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, 1);
@@ -125,6 +126,7 @@ extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0
 int main() {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
+  context::init();
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -138,6 +140,7 @@ int main() {
   test_dynamic_wind_with_call_cc();
 
   delete cg;
+  context::destroy();
   heap->destroy();
   delete heap;
 

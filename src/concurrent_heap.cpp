@@ -64,7 +64,7 @@ void concurrent_heap_t::terminate() {
   GCTRACE(";; [collector: terminated]\n");
 }
 
-void* concurrent_heap_t::test_live_object(uint64_t addr) {
+void* concurrent_heap_t::is_live_object(uint64_t addr) {
   if (!m_concurrent_pool->in_pool((void*)addr)) return NULL;
   if (!m_concurrent_pool->is_collectible((void*)addr)) return NULL;
   slab_traits_t* traits = SLAB_TRAITS_OF((void*)addr);
@@ -90,7 +90,7 @@ void concurrent_heap_t::snapshot_stack() {
     raw.insert(prune_memory_address(*(uint64_t*)addr));
   }
   for (const auto& addr : raw) {
-    void* live = test_live_object(addr);
+    void* live = is_live_object(addr);
     if (live) enqueue_root(live);
   }
 
@@ -104,6 +104,19 @@ void concurrent_heap_t::snapshot_stack() {
   printf("]\n");
   printf(";; raw size: %ld\n", raw.size());
 #endif
+}
+
+void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
+  assert((begin & 0x7) == 0);
+  assert((end & 0x7) == 0);
+  std::unordered_set<uint64_t> raw;
+  for (uint64_t addr = begin; addr < end; addr += sizeof(uint64_t)) {
+    raw.insert(prune_memory_address(*(uint64_t*)addr));
+  }
+  for (const auto& addr : raw) {
+    void* live = is_live_object(addr);
+    if (live) shade(live);
+  }
 }
 
 void concurrent_heap_t::safepoint() {

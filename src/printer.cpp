@@ -131,6 +131,10 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
       out << std::format("#<hashtable {:#x}>", (uintptr_t)obj);
       return;
     }
+    if (is_port(obj)) {
+      out << std::format("#<port {:#x}>", (uintptr_t)obj);
+      return;
+    }
   }
 
   if (is_cons(obj)) {

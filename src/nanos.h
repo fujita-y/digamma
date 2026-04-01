@@ -19,6 +19,7 @@ class printer_t;
 
 class nanos_t {
   std::unique_ptr<nanos_jit_t> m_jit;
+  static nanos_t* s_current;
 
   void init_subr();
   void init_codegen();
@@ -35,6 +36,8 @@ class nanos_t {
   void init();
   void destroy();
   void run();
+
+  static nanos_t* current() { return s_current; }
 };
 
 #endif  // NANOS_H_INCLUDED

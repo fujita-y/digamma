@@ -5,13 +5,10 @@
 #include "object.h"
 #include "object_heap.h"
 #include "bit.h"
-#include "hash.h"
+#include "context.h"
+#include "port.h"
 
-thread_local scm_obj_t object_heap_t::s_continuation_captured_retval = scm_undef;
-thread_local scm_obj_t object_heap_t::s_current_winders = scm_nil;
 thread_local object_heap_t* object_heap_t::s_current;
-
-static constexpr int symbol_table_reserve_size = 4096;
 
 inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
 {
@@ -36,7 +33,6 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
 
   m_trip_bytes = 0;
   m_collect_trip_bytes = init_size / 8;
-  m_symbol_table.reserve(symbol_table_reserve_size);
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });
@@ -58,14 +54,11 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_u8vectors.init(&m_concurrent_heap, clp2(sizeof(scm_u8vector_rec_t)), true, true);
   m_hashtables.init(&m_concurrent_heap, clp2(sizeof(scm_hashtable_rec_t)), true, true);
   m_environments.init(&m_concurrent_heap, clp2(sizeof(scm_environment_rec_t)), true, false);
+  m_ports.init(&m_concurrent_heap, clp2(sizeof(scm_port_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
   s_current = this;
-
-  m_interaction_environment = make_environment(make_symbol("interaction-environment"));
-  m_system_environment = make_environment(make_symbol("system-environment"));
-  m_current_environment = m_system_environment;
 }
 
 void object_heap_t::destroy() {
@@ -141,9 +134,9 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::sweep_symbol_table() {
-  std::lock_guard<std::mutex> lock(m_symbol_table_mutex);
-  auto it = m_symbol_table.begin();
-  while (it != m_symbol_table.end()) {
+  std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
+  auto it = context::s_symbols.begin();
+  while (it != context::s_symbols.end()) {
     scm_obj_t value = it->second;
     assert(is_symbol(value));
     void* p = to_address(value);
@@ -151,83 +144,9 @@ void object_heap_t::sweep_symbol_table() {
     if (traits->owner->state(p)) {
       ++it;
     } else {
-      it = m_symbol_table.erase(it);
+      it = context::s_symbols.erase(it);
     }
   }
-}
-
-void object_heap_t::environment_macro_set(scm_obj_t key, scm_obj_t value) {
-  assert(is_symbol(key));
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
-  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
-  hashtable_delete(env_rec->variables, key);
-  hashtable_set(env_rec->macros, key, value);
-}
-
-scm_obj_t object_heap_t::environment_macro_ref(scm_obj_t key) {
-  assert(is_symbol(key));
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
-  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
-  scm_obj_t value = hashtable_ref(env_rec->macros, key, scm_undef);
-  return value;
-}
-
-void object_heap_t::environment_variable_set(scm_obj_t key, scm_obj_t value) {
-  assert(is_symbol(key));
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
-  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
-  hashtable_delete(env_rec->macros, key);
-  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
-  if (cell == scm_undef) {
-    scm_obj_t new_cell = make_cell(value);
-    hashtable_set(env_rec->variables, key, new_cell);
-    return;
-  }
-  scm_cell_rec_t* cell_rec = (scm_cell_rec_t*)to_address(cell);
-  write_barrier(value);
-  cell_rec->value = value;
-}
-
-scm_obj_t object_heap_t::environment_variable_ref(scm_obj_t key) {
-  assert(is_symbol(key));
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
-  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
-  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
-  if (cell == scm_undef) {
-    scm_obj_t new_cell = make_cell(scm_undef);
-    hashtable_set(env_rec->variables, key, new_cell);
-    return scm_undef;
-  }
-  scm_cell_rec_t* cell_rec = (scm_cell_rec_t*)to_address(cell);
-  return cell_rec->value;
-}
-
-scm_obj_t object_heap_t::environment_variable_cell_ref(scm_obj_t key) {
-  assert(is_symbol(key));
-  object_heap_t* heap = object_heap_t::current();
-  scm_obj_t env = heap->m_current_environment;
-  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
-  scm_obj_t cell = hashtable_ref(env_rec->variables, key, scm_undef);
-  if (cell == scm_undef) {
-    scm_obj_t new_cell = make_cell(scm_undef);
-    hashtable_set(env_rec->variables, key, new_cell);
-    return new_cell;
-  }
-  return cell;
-}
-
-bool object_heap_t::environment_macro_contains(scm_obj_t key) {
-  assert(is_symbol(key));
-  return environment_macro_ref(key) != scm_undef;
-}
-
-bool object_heap_t::environment_variable_contains(scm_obj_t key) {
-  assert(is_symbol(key));
-  return environment_variable_ref(key) != scm_undef;
 }
 
 void object_heap_t::shade(scm_obj_t obj) {
@@ -249,70 +168,75 @@ void object_heap_t::trace(void* obj) {
     shade(rec->cdr);
     return;
   }
-  if (traits->owner == &m_cells) {
-    scm_cell_rec_t* rec = (scm_cell_rec_t*)obj;
-    shade(rec->value);
-    return;
-  }
-  if (traits->owner == &m_vectors) {
-    scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
-    for (int i = 0; i < rec->nsize; i++) {
-      shade(rec->elts[i]);
-    }
-    return;
-  }
-  if (traits->owner == &m_values) {
-    scm_values_rec_t* rec = (scm_values_rec_t*)obj;
-    for (int i = 0; i < rec->nsize; i++) {
-      shade(rec->elts[i]);
-    }
-    return;
-  }
-  if (traits->owner == &m_hashtables) {
-    scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
-    hashtable_aux_t* aux = rec->aux;
-    for (int i = 0; i < aux->capacity * 2; i++) {
-      shade(aux->elts[i]);
-    }
-    return;
-  }
-  if (traits->owner == &m_environments) {
-    scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
-    shade(rec->name);
-    shade(rec->variables);
-    shade(rec->macros);
-    return;
-  }
 
   uintptr_t tag = *(uintptr_t*)obj;
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
 
-  if (tc6 == tc6_closure) {
-    scm_closure_rec_t* rec = (scm_closure_rec_t*)obj;
-    for (int i = 0; i < rec->nenv; i++) {
-      shade(rec->env[i]);
+  switch (tc6) {
+    case tc6_cell: {
+      scm_cell_rec_t* rec = (scm_cell_rec_t*)obj;
+      shade(rec->value);
+      return;
     }
-    return;
-  }
-  if (tc6 == tc6_escape) {
-    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-    shade(rec->winders);
-    shade(rec->retval);
-    return;
-  }
-  if (tc6 == tc6_continuation) {
-    scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-    shade(rec->winders);
-    uint8_t* stack_copy = (uint8_t*)prune_memory_address((uintptr_t)rec->stack_copy);
-    for (size_t i = 0; i < rec->stack_size; i += sizeof(uint64_t)) {
-      uint64_t addr = prune_memory_address(*(uint64_t*)(stack_copy + i));
-      void* live = test_live_object(addr);
-      if (live) shade((scm_obj_t)live);
+    case tc6_vector: {
+      scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
+      for (int i = 0; i < rec->nsize; i++) {
+        shade(rec->elts[i]);
+      }
+      return;
     }
-    return;
-  }
-  if (tc6 == tc6_long_flonum || tc6 == tc6_symbol || tc6 == tc6_string || tc6 == tc6_u8vector) {
-    return;
+    case tc6_values: {
+      scm_values_rec_t* rec = (scm_values_rec_t*)obj;
+      for (int i = 0; i < rec->nsize; i++) {
+        shade(rec->elts[i]);
+      }
+      return;
+    }
+    case tc6_hashtable: {
+      scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
+      hashtable_aux_t* aux = rec->aux;
+      for (int i = 0; i < aux->capacity * 2; i++) {
+        shade(aux->elts[i]);
+      }
+      return;
+    }
+    case tc6_environment: {
+      scm_environment_rec_t* rec = (scm_environment_rec_t*)obj;
+      shade(rec->name);
+      shade(rec->variables);
+      shade(rec->macros);
+      return;
+    }
+    case tc6_port: {
+      scm_port_rec_t* rec = (scm_port_rec_t*)obj;
+      shade(rec->name);
+      return;
+    }
+    case tc6_closure: {
+      scm_closure_rec_t* rec = (scm_closure_rec_t*)obj;
+      for (int i = 0; i < rec->nenv; i++) {
+        shade(rec->env[i]);
+      }
+      return;
+    }
+    case tc6_escape: {
+      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+      shade(rec->winders);
+      shade(rec->retval);
+      return;
+    }
+    case tc6_continuation: {
+      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+      shade(rec->winders);
+      m_concurrent_heap.trace_memory_range((uint64_t)rec->uctx, (uint64_t)rec->uctx + sizeof(ucontext_t));
+      m_concurrent_heap.trace_memory_range((uint64_t)rec->stack_copy, (uint64_t)rec->stack_copy + rec->stack_size);
+      return;
+    }
+    case tc6_long_flonum:
+    case tc6_symbol:
+    case tc6_string:
+    case tc6_u8vector:
+      return;
   }
   assert(false);
 }
@@ -320,58 +244,68 @@ void object_heap_t::trace(void* obj) {
 void object_heap_t::finalize(void* obj) {
   assert(m_concurrent_pool.is_collectible(obj));
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
-  if (traits->owner == &m_symbols) {
-    scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
-    delete_private(rec->name);
-    return;
-  }
-  if (traits->owner == &m_strings) {
-    scm_string_rec_t* rec = (scm_string_rec_t*)obj;
-    delete_private(rec->name);
-    return;
-  }
-  if (traits->owner == &m_u8vectors) {
-    scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
-    delete_private(rec->elts);
-    return;
-  }
-  if (traits->owner == &m_hashtables) {
-    scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
-    delete_private(rec->aux);
-    return;
-  }
-  if (traits->owner == &m_vectors) {
-    scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
-    delete_private(rec->elts);
-    return;
-  }
-  if (traits->owner == &m_values) {
-    scm_values_rec_t* rec = (scm_values_rec_t*)obj;
-    delete_private(rec->elts);
-    return;
-  }
+  assert(traits->owner != &m_cons);
 
   uintptr_t tag = *(uintptr_t*)obj;
   uintptr_t tc6 = (tag & 0x3f00) >> 8;
 
-  if (tc6 == tc6_closure) {
-    return;
-  }
-  if (tc6 == tc6_escape) {
-    scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-    if (rec->uctx) free(rec->uctx);
-    rec->uctx = nullptr;
-    return;
-  }
-  if (tc6 == tc6_continuation) {
-    scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-    if (rec->uctx) free(rec->uctx);
-    if (rec->stack_copy) free(rec->stack_copy);
-    if (rec->shadow_copy) free(rec->shadow_copy);
-    rec->uctx = nullptr;
-    rec->stack_copy = nullptr;
-    rec->shadow_copy = nullptr;
-    return;
+  switch (tc6) {
+    case tc6_symbol: {
+      scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
+      delete_private(rec->name);
+      return;
+    }
+    case tc6_string: {
+      scm_string_rec_t* rec = (scm_string_rec_t*)obj;
+      delete_private(rec->name);
+      return;
+    }
+    case tc6_u8vector: {
+      scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
+      delete_private(rec->elts);
+      return;
+    }
+    case tc6_hashtable: {
+      scm_hashtable_rec_t* rec = (scm_hashtable_rec_t*)obj;
+      delete_private(rec->aux);
+      return;
+    }
+    case tc6_vector: {
+      scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
+      delete_private(rec->elts);
+      return;
+    }
+    case tc6_values: {
+      scm_values_rec_t* rec = (scm_values_rec_t*)obj;
+      delete_private(rec->elts);
+      return;
+    }
+    case tc6_port: {
+      scm_port_rec_t* rec = (scm_port_rec_t*)obj;
+      port_finalize(rec);
+      return;
+    }
+    case tc6_escape: {
+      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+      if (rec->uctx) free(rec->uctx);
+      rec->uctx = nullptr;
+      return;
+    }
+    case tc6_continuation: {
+      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+      if (rec->uctx) free(rec->uctx);
+      if (rec->stack_copy) free(rec->stack_copy);
+      if (rec->shadow_copy) free(rec->shadow_copy);
+      rec->uctx = nullptr;
+      rec->stack_copy = nullptr;
+      rec->shadow_copy = nullptr;
+      return;
+    }
+    case tc6_closure:
+    case tc6_long_flonum:
+    case tc6_environment:
+    case tc6_cell:
+      return;
   }
   assert(false);
 }
@@ -385,13 +319,19 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 }
 
 void object_heap_t::snapshot_root() {
-  for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) enqueue_root(*it);
-  for (auto it = m_literals.begin(); it != m_literals.end(); it++) enqueue_root(*it);
-  enqueue_root(m_interaction_environment);
-  enqueue_root(m_system_environment);
-  enqueue_root(m_current_environment);
-  enqueue_root(s_current_winders);
-  enqueue_root(s_continuation_captured_retval);
+  for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
+  for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
+  enqueue_root(context::s_interaction_environment);
+  enqueue_root(context::s_system_environment);
+  enqueue_root(context::s_current_environment);
+  enqueue_root(context::s_current_winders);
+  enqueue_root(context::s_continuation_captured_retval);
+  enqueue_root(context::s_standard_input_port);
+  enqueue_root(context::s_standard_output_port);
+  enqueue_root(context::s_standard_error_port);
+  enqueue_root(context::s_current_input_port);
+  enqueue_root(context::s_current_output_port);
+  enqueue_root(context::s_current_error_port);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

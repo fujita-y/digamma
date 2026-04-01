@@ -9,6 +9,7 @@
 #include "../src/equiv.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/context.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -153,6 +154,7 @@ void test_equal_circular(object_heap_t* heap) {
 int main(int argc, char** argv) {
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
 
   test_eqv_simple();
   test_eqv_flonum();
@@ -162,6 +164,7 @@ int main(int argc, char** argv) {
   test_equal_string(heap);
   test_equal_circular(heap);
 
+  context::destroy();
   heap->destroy();
   delete heap;
   return some_test_failed ? 1 : 0;

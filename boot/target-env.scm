@@ -8,6 +8,13 @@
 
 (copy-environment-variables! (interaction-environment) (current-environment)
 '(
+current-input-port
+current-output-port
+current-error-port
+standard-input-port
+standard-output-port
+standard-error-port
+flush-output-port
 *
 +
 -
