@@ -15,8 +15,6 @@
 
 class object_heap_t {
  public:
-  thread_local static scm_obj_t s_continuation_captured_retval;
-  thread_local static scm_obj_t s_current_winders;
 
  private:
   thread_local static object_heap_t* s_current;

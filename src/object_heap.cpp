@@ -8,11 +8,7 @@
 #include "environment.h"
 #include "port.h"
 
-thread_local scm_obj_t object_heap_t::s_continuation_captured_retval = scm_undef;
-thread_local scm_obj_t object_heap_t::s_current_winders = scm_nil;
 thread_local object_heap_t* object_heap_t::s_current;
-
-static constexpr int symbol_table_reserve_size = 4096;
 
 inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
 {
@@ -37,7 +33,6 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
 
   m_trip_bytes = 0;
   m_collect_trip_bytes = init_size / 8;
-  m_symbol_table.reserve(symbol_table_reserve_size);
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });
@@ -329,8 +324,8 @@ void object_heap_t::snapshot_root() {
   enqueue_root(environment::s_interaction_environment);
   enqueue_root(environment::s_system_environment);
   enqueue_root(environment::s_current_environment);
-  enqueue_root(s_current_winders);
-  enqueue_root(s_continuation_captured_retval);
+  enqueue_root(environment::s_current_winders);
+  enqueue_root(environment::s_continuation_captured_retval);
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

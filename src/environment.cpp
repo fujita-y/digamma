@@ -13,6 +13,10 @@ scm_obj_t environment::s_standard_error_port;
 scm_obj_t environment::s_interaction_environment;
 scm_obj_t environment::s_system_environment;
 scm_obj_t environment::s_current_environment;
+
+thread_local scm_obj_t environment::s_continuation_captured_retval = scm_undef;
+thread_local scm_obj_t environment::s_current_winders = scm_nil;
+
 std::unordered_set<scm_obj_t> environment::s_literals;
 
 void environment::init() {

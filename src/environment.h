@@ -15,6 +15,9 @@ class environment {
   static scm_obj_t s_system_environment;
   static scm_obj_t s_current_environment;
 
+  thread_local static scm_obj_t s_continuation_captured_retval;
+  thread_local static scm_obj_t s_current_winders;
+
   static std::unordered_set<scm_obj_t> s_literals;
 
   static void environment_macro_set(scm_obj_t key, scm_obj_t value);
