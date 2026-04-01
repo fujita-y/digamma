@@ -1,6 +1,9 @@
 // Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
+#ifndef ENVIRONMENT_H_INCLUDED
+#define ENVIRONMENT_H_INCLUDED
+
 #include "core.h"
 #include "object.h"
 #include <mutex>
@@ -26,6 +29,10 @@ class environment {
   static std::mutex s_symbols_mutex;
   static std::unordered_map<std::string, scm_obj_t> s_symbols;
 
+  static std::unordered_set<scm_obj_t> s_gc_protect_set;
+  static void gc_protect(scm_obj_t obj);
+  static void gc_unprotect(scm_obj_t obj);
+
   static scm_obj_t environment_macro_ref(scm_obj_t key);
   static scm_obj_t environment_variable_ref(scm_obj_t key);
   static scm_obj_t environment_variable_cell_ref(scm_obj_t key);
@@ -38,3 +45,17 @@ class environment {
   static void destroy();
   static void add_literal(scm_obj_t obj);
 };
+
+class scoped_gc_protect {
+  scoped_gc_protect(const scoped_gc_protect&) = delete;
+  scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
+  scm_obj_t m_obj;
+
+ public:
+  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { environment::gc_protect(obj); }
+  ~scoped_gc_protect() {
+    environment::gc_unprotect(m_obj);
+    m_obj = (scm_obj_t) nullptr;
+  }
+};
+#endif

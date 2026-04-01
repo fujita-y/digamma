@@ -4,9 +4,9 @@
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
 #include "../src/continuation.h"
+#include "../src/environment.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
-#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -70,7 +70,7 @@ static bool test_multishot() {
 
   auto multishot_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
     global_cont = argv[0];
-    object_heap_t::current()->add_root(global_cont);
+    environment::gc_protect(global_cont);
     return make_fixnum(count++);
   };
 

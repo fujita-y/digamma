@@ -1,8 +1,8 @@
 #include "../src/core.h"
+#include "../src/environment.h"
 #include "../src/hash.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
-#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -82,7 +82,7 @@ static bool test_gc_allocation(int num_loops) {
 
   scm_obj_t root = make_cons(make_symbol("foo"), root_list);
 
-  heap->add_root(root);
+  environment::gc_protect(root);
 
   // Allocate enough objects to potentially trigger GC or just verify allocation works
   for (int i = 0; i < num_loops; i++) {
@@ -128,7 +128,7 @@ static bool test_gc_allocation(int num_loops) {
     }
   }
 
-  heap->remove_root(root);
+  environment::gc_unprotect(root);
 
   environment::destroy();
   heap->destroy();
@@ -164,7 +164,7 @@ static bool test_root_survivability() {
 
   scm_obj_t list = make_list(4, c, make_symbol("survivor-symbol"), vals, ht);
 
-  heap->add_root(list);
+  environment::gc_protect(list);
 
   // 2. Allocate lots of garbage to trigger multiple GCs
   for (int i = 0; i < 50000; i++) {
@@ -259,7 +259,7 @@ static bool test_root_survivability() {
     return false;
   }
 
-  heap->remove_root(list);
+  environment::gc_unprotect(list);
   environment::destroy();
   heap->destroy();
   delete heap;

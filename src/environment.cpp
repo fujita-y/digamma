@@ -22,6 +22,8 @@ std::unordered_set<scm_obj_t> environment::s_literals;
 std::mutex environment::s_symbols_mutex;
 std::unordered_map<std::string, scm_obj_t> environment::s_symbols;
 
+std::unordered_set<scm_obj_t> environment::s_gc_protect_set;
+
 void environment::init() {
   if (object_heap_t::current() == nullptr) {
     fatal("%s:%u environment::init() called before object_heap_t::init()", __FILE__, __LINE__);
@@ -113,3 +115,12 @@ void environment::add_literal(scm_obj_t obj) {
   object_heap_t::current()->write_barrier(obj);
   s_literals.insert(obj);
 }
+
+void environment::gc_protect(scm_obj_t obj) {
+  if (is_cons(obj) || is_heap_object(obj)) {
+    object_heap_t::current()->write_barrier(obj);
+    s_gc_protect_set.insert(obj);
+  }
+}
+
+void environment::gc_unprotect(scm_obj_t obj) { s_gc_protect_set.erase(obj); }

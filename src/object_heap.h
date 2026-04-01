@@ -6,14 +6,12 @@
 
 #include "core.h"
 #include "object.h"
-#include <unordered_set>
 #include "concurrent_heap.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
 class object_heap_t {
  public:
-
  private:
   thread_local static object_heap_t* s_current;
   concurrent_pool_t m_concurrent_pool;
@@ -33,7 +31,6 @@ class object_heap_t {
   concurrent_slab_t m_privates[8];      // 16-32-64-128-256-512-1024-2048
 
   uint64_t m_trip_bytes;
-  std::unordered_set<scm_obj_t> m_root_set;
 
   void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
@@ -54,7 +51,7 @@ class object_heap_t {
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
-  void* test_live_object(uint64_t addr) { return m_concurrent_heap.test_live_object(addr); }
+  void* is_live_object(uint64_t addr) { return m_concurrent_heap.is_live_object(addr); }
   bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
   mutex_t& collector_lock() { return m_concurrent_heap.m_collector_lock; }
@@ -80,14 +77,6 @@ class object_heap_t {
     if (is_heap_object(obj)) m_concurrent_heap.write_barrier(to_address(obj));
   }
 
-  void add_root(scm_obj_t obj) {
-    if (is_cons(obj) || is_heap_object(obj)) {
-      write_barrier(obj);
-      m_root_set.insert(obj);
-    }
-  }
-  void remove_root(scm_obj_t obj) { m_root_set.erase(obj); }
-
   uint64_t m_collect_trip_bytes;
 
   object_heap_t() = default;
@@ -100,19 +89,6 @@ class object_heap_t {
   static object_heap_t* current() {
     assert(s_current);
     return s_current;
-  }
-};
-
-class scoped_gc_protect {
-  scoped_gc_protect(const scoped_gc_protect&) = delete;
-  scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
-  scm_obj_t m_obj;
-
- public:
-  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { object_heap_t::current()->add_root(obj); }
-  ~scoped_gc_protect() {
-    object_heap_t::current()->remove_root(m_obj);
-    m_obj = (scm_obj_t) nullptr;
   }
 };
 

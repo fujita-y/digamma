@@ -4,9 +4,9 @@
 #include "../src/codegen.h"
 #include "../src/codegen_aux.h"
 #include "../src/continuation.h"
+#include "../src/environment.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
-#include "../src/environment.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -83,7 +83,7 @@ static bool test_dynamic_wind_with_call_cc() {
     value_count++;
     auto callcc_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
       captured_cont = argv[0];
-      object_heap_t::current()->add_root(captured_cont);
+      environment::gc_protect(captured_cont);
       return make_fixnum(100);
     };
     scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, 1);

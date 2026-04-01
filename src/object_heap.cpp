@@ -319,7 +319,7 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 }
 
 void object_heap_t::snapshot_root() {
-  for (auto it = m_root_set.begin(); it != m_root_set.end(); it++) enqueue_root(*it);
+  for (auto it = environment::s_gc_protect_set.begin(); it != environment::s_gc_protect_set.end(); it++) enqueue_root(*it);
   for (auto it = environment::s_literals.begin(); it != environment::s_literals.end(); it++) enqueue_root(*it);
   enqueue_root(environment::s_interaction_environment);
   enqueue_root(environment::s_system_environment);

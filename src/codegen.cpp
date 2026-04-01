@@ -94,9 +94,9 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
-  object_heap_t::current()->add_root(cached_symbol_label);
-  object_heap_t::current()->add_root(cached_symbol_apply);
-  object_heap_t::current()->add_root(cached_symbol_safepoint);
+  environment::gc_protect(cached_symbol_label);
+  environment::gc_protect(cached_symbol_apply);
+  environment::gc_protect(cached_symbol_safepoint);
   init_opcode_map();
   s_current = this;
 }
@@ -510,7 +510,7 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
   object_heap_t* heap = object_heap_t::current();
   for (const auto& pair : opcode_map) {
-    heap->add_root(pair.first);
+    environment::gc_protect(pair.first);
   }
 }
 
