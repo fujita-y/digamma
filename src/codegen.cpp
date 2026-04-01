@@ -5,8 +5,8 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "codegen_common.h"
-#include "object_heap.h"
 #include "environment.h"
+#include "object_heap.h"
 #include "printer.h"
 
 #include <cstddef>
@@ -677,7 +677,7 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
   updateMaxRegister(inst.rn1, func_info.max_reg);
   // Register literal
   if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
-    object_heap_t::current()->literals_add(inst.opr1);
+    environment::add_literal(inst.opr1);
   }
 }
 

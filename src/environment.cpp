@@ -13,6 +13,7 @@ scm_obj_t environment::s_standard_error_port;
 scm_obj_t environment::s_interaction_environment;
 scm_obj_t environment::s_system_environment;
 scm_obj_t environment::s_current_environment;
+std::unordered_set<scm_obj_t> environment::s_literals;
 
 void environment::init() {
   if (object_heap_t::current() == nullptr) {
@@ -99,4 +100,9 @@ bool environment::environment_macro_contains(scm_obj_t key) {
 bool environment::environment_variable_contains(scm_obj_t key) {
   assert(is_symbol(key));
   return environment_variable_ref(key) != scm_undef;
+}
+
+void environment::add_literal(scm_obj_t obj) {
+  object_heap_t::current()->write_barrier(obj);
+  s_literals.insert(obj);
 }

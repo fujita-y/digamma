@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "object.h"
+#include <unordered_set>
 
 class environment {
  public:
@@ -14,6 +15,8 @@ class environment {
   static scm_obj_t s_system_environment;
   static scm_obj_t s_current_environment;
 
+  static std::unordered_set<scm_obj_t> s_literals;
+
   static void environment_macro_set(scm_obj_t key, scm_obj_t value);
   static void environment_variable_set(scm_obj_t key, scm_obj_t value);
   static scm_obj_t environment_macro_ref(scm_obj_t key);
@@ -24,4 +27,5 @@ class environment {
 
   static void init();
   static void destroy();
+  static void add_literal(scm_obj_t obj);
 };

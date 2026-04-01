@@ -79,12 +79,6 @@ class object_heap_t {
   std::mutex m_symbol_table_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_table;
 
-  std::unordered_set<scm_obj_t> m_literals;
-  void literals_add(scm_obj_t obj) {
-    write_barrier(obj);
-    m_literals.insert(obj);
-  }
-
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {
       m_concurrent_heap.write_barrier((void*)obj);
