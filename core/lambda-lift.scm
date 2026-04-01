@@ -85,6 +85,50 @@
                                                 (if (= (length residual-body) 1) (car residual-body) `(begin ,@residual-body))
                                                 `(let ,residual-bindings ,@residual-sets ,@residual-body)))))))))))))
 
+                (define (process-letrec* e)
+                  (let* ((bindings (cadr e))
+                         (vars (map car bindings))
+                         (body (cddr e))
+                         (new-env (append vars env))
+                         ;; Identify lambda bindings as lift candidates
+                         (candidates (filter (lambda (c) c)
+                                      (map (lambda (b)
+                                             (let ((var (car b)) (val (cadr b)))
+                                               (if (and (pair? val) (eq? (car val) 'lambda))
+                                                   (list var val (analyze-free-vars-optimizer val '()))
+                                                   #f)))
+                                           bindings))))
+                    ;; Fixpoint: remove candidates whose free vars reference forbidden (env-external) symbols
+                    (let fixpoint ((forbidden (append env (set-minus vars (map car candidates))))
+                                   (current-candidates candidates))
+                      (let loop-cand ((rest current-candidates) (new-candidates '()) (new-forbidden forbidden) (changed #f))
+                        (if (pair? rest)
+                            (let* ((c (car rest)) (var (car c)) (lam (cadr c)) (fv (caddr c)))
+                              (if (null? (intersect-ll fv forbidden))
+                                  (loop-cand (cdr rest) (cons c new-candidates) new-forbidden changed)
+                                  (loop-cand (cdr rest) new-candidates (cons var new-forbidden) #t)))
+                            (if changed
+                                (fixpoint new-forbidden (reverse new-candidates))
+                                (let* ((final-liftable (reverse new-candidates))
+                                       (liftable-vars (map car final-liftable))
+                                       (new-renames (append (map (lambda (var) (cons var (generate-lifted-name var))) liftable-vars) renames)))
+
+                                  ;; Emit lifted definitions
+                                  (for-each (lambda (c)
+                                              (let* ((var (car c))
+                                                     (new-var (cdr (assq var new-renames)))
+                                                     (walked-lam (walk (cadr c) '() new-renames)))
+                                                (set! lifted-defs (cons `(define ,new-var ,walked-lam) lifted-defs))))
+                                            final-liftable)
+
+                                  ;; Build residual bindings (non-lifted) and body
+                                  (let* ((residual-bindings (filter (lambda (b) (not (memq (car b) liftable-vars)))
+                                                                    (map (lambda (b) (list (car b) (walk (cadr b) new-env new-renames))) bindings)))
+                                         (residual-body (map (lambda (x) (walk x new-env new-renames)) body)))
+                                    (if (null? residual-bindings)
+                                        (if (= (length residual-body) 1) (car residual-body) `(begin ,@residual-body))
+                                        `(letrec* ,residual-bindings ,@residual-body))))))))))
+
                 (cond ((symbol? e) (lookup e))
                       ((not (pair? e)) e)
                       ((eq? (car e) 'quote) e)
@@ -99,6 +143,7 @@
                       ((eq? (car e) 'define) (process-define e))
                       ((eq? (car e) 'lambda) (process-lambda e))
                       ((eq? (car e) 'let) (process-let e))
+                      ((eq? (car e) 'letrec*) (process-letrec* e))
                       (else (map (lambda (x) (walk x env renames)) e))))))
       (let ((new-expr (walk expr '() '())))
         (if (null? lifted-defs)

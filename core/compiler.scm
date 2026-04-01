@@ -73,6 +73,12 @@
                                (vals (map cadr bindings)))
                           (for-each (lambda (v) (walk v s)) vals)
                           (for-each (lambda (x) (walk x (append vars s))) (cddr e))))
+                       ((eq? (car e) 'letrec*)
+                        (let* ((bindings (cadr e))
+                               (vars (map car bindings))
+                               (new-s (append vars s)))
+                          (for-each (lambda (b) (walk (cadr b) new-s)) bindings)
+                          (for-each (lambda (x) (walk x new-s)) (cddr e))))
                        (else (for-each (lambda (x) (walk x s)) e)))
                  (for-each (lambda (x) (walk x s)) e)))))
     (map car (hashtable->alist ht))))
@@ -86,6 +92,9 @@
                ((quote) #f)
                ((set!) (hashtable-set! ht (cadr e) #t) (walk (caddr e)))
                ((lambda) (for-each walk (cddr e)))
+               ((letrec*)
+                (for-each (lambda (b) (walk (cadr b))) (cadr e))
+                (for-each walk (cddr e)))
                (else (for-each walk e))))
             (else #f)))
     (map car (hashtable->alist ht))))
@@ -109,6 +118,11 @@
             (analyze-max-outgoing-args (caddr expr)))
            ((lambda) 0)
            ((let)
+            (let ((bindings (cadr expr))
+                  (body (cddr expr)))
+              (max (fold (lambda (b acc) (max acc (analyze-max-outgoing-args (cadr b)))) 0 bindings)
+                   (fold (lambda (e acc) (max acc (analyze-max-outgoing-args e))) 0 body))))
+           ((letrec*)
             (let ((bindings (cadr expr))
                   (body (cddr expr)))
               (max (fold (lambda (b acc) (max acc (analyze-max-outgoing-args (cadr b)))) 0 bindings)
@@ -190,6 +204,7 @@
                     ((eq? (car expr) 'set!) (codegen-set! expr env next-reg tail? ctx))
                     ((eq? (car expr) 'lambda) (codegen-lambda expr env next-reg tail? ctx))
                     ((eq? (car expr) 'let) (codegen-let expr env next-reg tail? ctx))
+                    ((eq? (car expr) 'letrec*) (codegen-letrec* expr env next-reg tail? ctx))
                     (else (codegen-application expr env next-reg tail? ctx)))
                 (codegen-application expr env next-reg tail? ctx)))))
 
@@ -296,7 +311,8 @@
          (compiler-ctx-set-code! ctx prev-code)
          (let loop ((fs free) (regs '()) (r next-reg))
            (if (null? fs)
-               (begin (compiler-ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,n-fixed ,has-rest?)) (if tail? (compiler-ctx-emit! ctx `(ret))))
+               (begin (compiler-ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,n-fixed ,has-rest?))
+                      (if tail? (compiler-ctx-emit! ctx `(ret))))
                (let ((b (lookup (car fs) env)))
                  (if (eq? (car b) 'reg)
                      (loop (cdr fs) (cons (cdr b) regs) r)
@@ -332,6 +348,77 @@
             (if (memq (car vars) (compiler-ctx-mutated ctx))
                 (compiler-ctx-emit! ctx `(make-cell ,reg)))
             (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope)))))))
+
+;; Helper: find position of item in list, or #f
+(define (list-position item lst)
+  (let loop ((l lst) (i 0))
+    (cond ((null? l) #f)
+          ((eq? (car l) item) i)
+          (else (loop (cdr l) (+ i 1))))))
+
+;; Analyze which letrec* vars are forward-referenced by lambda init expressions.
+;; A var at position j is forward-referenced if a lambda at position i < j
+;; captures var j as a free variable.
+(define (analyze-forward-refs vars vals)
+  (let ((ht (make-eq-hashtable)))
+    (let loop ((i 0) (vs vals))
+      (if (null? vs)
+          (map car (hashtable->alist ht))
+          (begin
+            (if (and (pair? (car vs)) (eq? (car (car vs)) 'lambda))
+                (let ((fvs (analyze-free-vars-compiler (car vs) '())))
+                  (for-each (lambda (fv)
+                              (let ((pos (list-position fv vars)))
+                                (if (and pos (>= pos i))
+                                    (hashtable-set! ht fv #t))))
+                            fvs)))
+            (loop (+ i 1) (cdr vs)))))))
+
+(define (codegen-letrec* expr env next-reg tail? ctx)
+  (let* ((bindings (cadr expr))
+         (body (cddr expr))
+         (vars (map car bindings))
+         (vals (map cadr bindings))
+         (n (length vars))
+         (mutated (compiler-ctx-mutated ctx))
+         (forward-refs (analyze-forward-refs vars vals))
+         ;; Vars that need cells: mutated by set! in body OR forward-referenced
+         (needs-cell? (lambda (v) (or (memq v mutated) (memq v forward-refs))))
+         ;; Assign a register for each binding variable
+         (regs (map (lambda (i) (make-reg (+ next-reg i))) (iota n)))
+         ;; Create full scope with all vars
+         (full-scope (map cons vars regs))
+         (full-env (cons full-scope env))
+         ;; Register count beyond the letrec* bindings
+         (inner-next-reg (+ next-reg n)))
+    ;; Add forward-referenced vars to the mutated set so codegen-symbol/codegen-lambda
+    ;; uses cell-ref/cell-set for these variables throughout the compiled code
+    (vector-set! ctx 4 (append forward-refs mutated))
+    ;; For vars needing cells: initialize register to #f and create cell
+    ;; For other vars: just initialize register to #f
+    (for-each (lambda (var reg)
+                (compiler-ctx-emit! ctx `(const r0 #f))
+                (compiler-ctx-emit! ctx `(mov ,reg r0))
+                (if (needs-cell? var)
+                    (compiler-ctx-emit! ctx `(make-cell ,reg))))
+              vars regs)
+    ;; Process each binding sequentially
+    (let loop ((i 0))
+      (if (= i n)
+          ;; All bindings processed, compile body
+          (codegen `(begin ,@body) full-env inner-next-reg tail? ctx)
+          (let ((var (list-ref vars i))
+                (val (list-ref vals i))
+                (reg (list-ref regs i)))
+            ;; Compile init expression in full env
+            (if (and (pair? val) (eq? (car val) 'lambda))
+                (codegen-lambda val full-env inner-next-reg #f ctx)
+                (codegen val full-env inner-next-reg #f ctx))
+            ;; Store result: for cell vars, set the cell content; for others, direct register
+            (if (needs-cell? var)
+                (compiler-ctx-emit! ctx `(reg-cell-set! ,reg r0))
+                (compiler-ctx-emit! ctx `(mov ,reg r0)))
+            (loop (+ i 1)))))))
 
 ;;=============================================================================
 ;; SECTION 7: Main Compiler

@@ -17,27 +17,26 @@
 
 (display "Testing letrec* expansion...\n")
 
+;; letrec* should now be preserved as a core form, not desugared to let/set!
 (let* ((expr '(letrec* ((a 1) (b (+ a 1))) (list a b)))
        (expanded (macroexpand expr 'strip)))
   (display "Expanded: ") (write expanded) (newline)
-  (test "letrec* expansion to let/set!"
+  (test "letrec* preserved as core form"
         expanded
-        '(let ((a #f) (b #f))
-           (set! a 1)
-           (set! b (+ a 1))
+        '(letrec* ((a 1) (b (+ a 1)))
            (list a b))))
 
+;; Internal defines should now expand to letrec* core form
 (let* ((expr '(let () (define (f x) (if (= x 0) 1 (* x (f (- x 1))))) (f 5)))
        (expanded (macroexpand expr 'strip)))
   (display "Expanded internal define: ") (write expanded) (newline)
-  (test "internal define expansion to let/set!"
+  (test "internal define expansion to letrec*"
         expanded
         '(let ()
-           (let ((f #f))
-             (set! f (lambda (x) (if (= x 0) 1 (* x (f (- x 1))))))
+           (letrec* ((f (lambda (x) (if (= x 0) 1 (* x (f (- x 1)))))))
              (f 5)))))
 
-(display "All letrec* expansion tests passed.\n")
+(display "All letrec* expansion tests done.\n")
 
 (if (= *fail-count* 0)
     (begin 

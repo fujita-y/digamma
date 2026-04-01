@@ -589,8 +589,7 @@
 
 (test "letrec* sequential recursive binding"
       '(letrec ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))) (f 5))
-      '(let ((f #f))
-         (set! f (lambda (n) (if (= n 0) 1 (* n (f (- n 1))))))
+      '(letrec* ((f (lambda (n) (if (= n 0) 1 (* n (f (- n 1)))))))
          (f 5)))
 
 ;; =============================================================================
@@ -601,42 +600,42 @@
 ;; Internal define in lambda
 (test "lambda internal define simple"
       '(lambda (x) (define y 1) (+ x y))
-      '(lambda (x) (let ((y #f)) (set! y 1) (+ x y))))
+      '(lambda (x) (letrec* ((y 1)) (+ x y))))
 
 ;; Internal define with function syntax in lambda
 (test "lambda internal define function syntax"
       '(lambda (x) (define (f n) (* n 2)) (f x))
-      '(lambda (x) (let ((f #f)) (set! f (lambda (n) (* n 2))) (f x))))
+      '(lambda (x) (letrec* ((f (lambda (n) (* n 2)))) (f x))))
 
 ;; Multiple internal defines in lambda
 (test "lambda multiple internal defines"
       '(lambda (x) (define a 1) (define b 2) (+ x a b))
-      '(lambda (x) (let ((a #f) (b #f)) (set! a 1) (set! b 2) (+ x a b))))
+      '(lambda (x) (letrec* ((a 1) (b 2)) (+ x a b))))
 
 ;; Internal define in let
 (test "let internal define"
       '(let ((x 1)) (define y 2) (+ x y))
-      '(let ((x 1)) (let ((y #f)) (set! y 2) (+ x y))))
+      '(let ((x 1)) (letrec* ((y 2)) (+ x y))))
 
 ;; Internal define in let*
 (test "let* internal define"
       '(let* ((a 1) (b 2)) (define c 3) (+ a b c))
-      '(let ((a 1)) (let ((b 2)) (let ((c #f)) (set! c 3) (+ a b c)))))
+      '(let ((a 1)) (let ((b 2)) (letrec* ((c 3)) (+ a b c)))))
 
 ;; Internal define in letrec
 (test "letrec internal define"
       '(letrec ((f (lambda (x) x))) (define (g y) y) (f (g 1)))
-      '(let ((f #f) (g #f)) (set! f (lambda (x) x)) (set! g (lambda (y) y)) (f (g 1))))
+      '(letrec* ((f (lambda (x) x)) (g (lambda (y) y))) (f (g 1))))
 
 ;; Internal define in letrec*
 (test "letrec* internal define merged"
       '(letrec* ((a 1) (b 2)) (define c 3) (+ a b c))
-      '(let ((a #f) (b #f) (c #f)) (set! a 1) (set! b 2) (set! c 3) (+ a b c)))
+      '(letrec* ((a 1) (b 2) (c 3)) (+ a b c)))
 
 ;; Internal defines in nested begin
 (test "let internal define 2"
       '(let ((x 1)) (define y 2) (define z 3) (+ x y z))
-      '(let ((x 1)) (let ((y #f) (z #f)) (set! y 2) (set! z 3) (+ x y z))))
+      '(let ((x 1)) (letrec* ((y 2) (z 3)) (+ x y z))))
 
 ;; No internal defines should not add letrec*
 (test "lambda without internal define unchanged"
@@ -946,8 +945,7 @@
                         (* n (fact (- n 1))))))
              '(1 2 3 4 5))
        'strip)
-      '(map (let ((fact #f))
-              (set! fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))
+      '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1)))))))
               fact)
             '(1 2 3 4 5)))
 
