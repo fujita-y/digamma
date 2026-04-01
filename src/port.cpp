@@ -88,7 +88,26 @@ scm_obj_t port_standard_error() {
   rec->aux->stream = &std::cerr;
   return port;
 }
-/*
+
+scm_obj_t port_flush_output(scm_obj_t port) {
+  assert(is_port(port));
+  scm_port_rec_t* rec = (scm_port_rec_t*)to_address(port);
+  std::visit(
+      [](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (is_output_stream<T>()) {
+          if (arg != nullptr) {
+            arg->flush();
+          } else {
+            throw std::runtime_error("port_flush_output: port stream is null.");
+          }
+        } else {
+          throw std::runtime_error("port_flush_output: port does not support output.");
+        }
+      },
+      rec->aux->stream);
+  return scm_unspecified;
+}
 scm_obj_t port_put_bytes(scm_obj_t port, const uint8_t* byte, int bsize) {
   assert(is_port(port));
   scm_port_rec_t* rec = (scm_port_rec_t*)to_address(port);
@@ -113,4 +132,3 @@ scm_obj_t port_put_bytes(scm_obj_t port, const uint8_t* byte, int bsize) {
 }
 
 scm_obj_t port_put_byte(scm_obj_t port, uint8_t byte) { return port_put_bytes(port, &byte, 1); }
-*/

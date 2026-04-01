@@ -11,6 +11,7 @@
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
+#include "port.h"
 #include "printer.h"
 
 #include <cerrno>
@@ -236,6 +237,22 @@ SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
     return cons->cdr;
   }
   throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
+}
+
+static inline scm_obj_t _car(scm_obj_t self, scm_obj_t a1) {
+  if (is_cons(a1)) {
+    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+    return cons->car;
+  }
+  return (scm_obj_t) nullptr;
+}
+
+static inline scm_obj_t _cdr(scm_obj_t self, scm_obj_t a1) {
+  if (is_cons(a1)) {
+    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+    return cons->cdr;
+  }
+  return (scm_obj_t) nullptr;
 }
 
 // caar, cadr, etc. up to 5 levels - R6RS / SRFI 1 extensions
@@ -976,25 +993,87 @@ SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]) {
 }
 
 // ============================================================================
+// Ports
+// ============================================================================
+
+// current-input-port
+SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_input_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_input_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-input-port: argument must be a port");
+}
+
+// current-output-port
+SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_output_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_output_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-output-port: argument must be a port");
+}
+
+// current-error-port
+SUBR subr_current_error_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return context::s_current_error_port;
+  if (is_port(argv[0])) {
+    object_heap_t::current()->write_barrier(argv[0]);
+    context::s_current_error_port = argv[0];
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-error-port: argument must be a port");
+}
+
+// standard-input-port
+SUBR subr_standard_input_port(scm_obj_t self) { return context::s_standard_input_port; }
+
+// standard-output-port
+SUBR subr_standard_output_port(scm_obj_t self) { return context::s_standard_output_port; }
+
+// standard-error-port
+SUBR subr_standard_error_port(scm_obj_t self) { return context::s_standard_error_port; }
+
+// ============================================================================
 // I/O  - R6RS 8
 // ============================================================================
 
 // write  - R6RS 8.3
 SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).write(a1);
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  if (os) printer_t(*os).write(a1);
   return scm_unspecified;
 }
 
 // display  - R6RS 8.3
 SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
-  printer_t(std::cout).display(a1);
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  printer_t(*os).display(a1);
   return scm_unspecified;
 }
 
 // newline  - R6RS 8.3
 SUBR subr_newline(scm_obj_t self) {
-  std::cout << std::endl;
+  std::ostream* os = port_get_ostream(context::s_current_output_port);
+  assert(os != nullptr);
+  if (os) *os << std::endl;
   return scm_unspecified;
+}
+
+// flush-output-port  - R6RS 8.2.11
+SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 0) return port_flush_output(context::s_current_output_port);
+  if (argc == 1) {
+    if (!is_port(argv[0])) throw std::runtime_error("flush-output-port: argument must be a port");
+    return port_flush_output(argv[0]);
+  }
+  throw std::runtime_error("flush-output-port: wrong number of arguments");
 }
 
 // ============================================================================
@@ -1458,10 +1537,12 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
 }
 
 // codegen-and-run - Nanos extension
-SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform) {
+SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t inst_list) {
   try {
-    compiled_code_t func = codegen_t::current()->compile(coreform);
-    return (scm_obj_t)func.release_and_run();
+    scoped_gc_protect p(inst_list);
+    compiled_code_t func = codegen_t::current()->compile(inst_list);
+    scm_obj_t result = (scm_obj_t)func.release_and_run();
+    return result;
   } catch (std::exception& e) {
     throw std::runtime_error(e.what());
   }
@@ -1630,6 +1711,13 @@ void nanos_t::init_subr() {
   reg("write", (void*)subr_write, 1, 0);
   reg("display", (void*)subr_display, 1, 0);
   reg("newline", (void*)subr_newline, 0, 0);
+  reg("flush-output-port", (void*)subr_flush_output_port, 0, 1);
+  reg("current-input-port", (void*)subr_current_input_port, 0, 1);
+  reg("current-output-port", (void*)subr_current_output_port, 0, 1);
+  reg("current-error-port", (void*)subr_current_error_port, 0, 1);
+  reg("standard-input-port", (void*)subr_standard_input_port, 0, 0);
+  reg("standard-output-port", (void*)subr_standard_output_port, 0, 0);
+  reg("standard-error-port", (void*)subr_standard_error_port, 0, 0);
 
   // hashtables
   reg("hashtable?", (void*)subr_hashtable_p, 1, 0);

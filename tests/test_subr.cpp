@@ -13,9 +13,10 @@
 #include <cstring>
 #include <initializer_list>
 #include <vector>
+#include "../src/port.h"
+#include "context.h"
 #include "continuation.h"
 #include "object_heap.h"
-#include "context.h"
 
 // ---------------------------------------------------------------------------
 // Subr declarations (extern "C" via SUBR macro)
@@ -107,6 +108,13 @@ SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
 SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
 SUBR subr_uuid(scm_obj_t self);
+SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_current_error_port(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_standard_input_port(scm_obj_t self);
+SUBR subr_standard_output_port(scm_obj_t self);
+SUBR subr_standard_error_port(scm_obj_t self);
+SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]);
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -1631,6 +1639,49 @@ void test_uuid() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// current-input-port / current-output-port / current-error-port
+// standard-input-port / standard-output-port / standard-error-port
+// ---------------------------------------------------------------------------
+
+void test_port_subrs() {
+  printf("--- port subrs ---\n");
+
+  // getters
+  ASSERT_TRUE(subr_current_input_port(scm_nil, 0, nullptr) == context::s_current_input_port);
+  ASSERT_TRUE(subr_current_output_port(scm_nil, 0, nullptr) == context::s_current_output_port);
+  ASSERT_TRUE(subr_current_error_port(scm_nil, 0, nullptr) == context::s_current_error_port);
+  ASSERT_TRUE(subr_standard_input_port(scm_nil) == context::s_standard_input_port);
+  ASSERT_TRUE(subr_standard_output_port(scm_nil) == context::s_standard_output_port);
+  ASSERT_TRUE(subr_standard_error_port(scm_nil) == context::s_standard_error_port);
+
+  // setters
+  scm_obj_t p = make_port(make_symbol("test-port"));
+  scm_obj_t args[] = {p};
+
+  scm_obj_t old_in = context::s_current_input_port;
+  subr_current_input_port(scm_nil, 1, args);
+  ASSERT_TRUE(context::s_current_input_port == p);
+  context::s_current_input_port = old_in;  // restore
+
+  scm_obj_t old_out = context::s_current_output_port;
+  subr_current_output_port(scm_nil, 1, args);
+  ASSERT_TRUE(context::s_current_output_port == p);
+  context::s_current_output_port = old_out;  // restore
+
+  scm_obj_t old_err = context::s_current_error_port;
+  subr_current_error_port(scm_nil, 1, args);
+  ASSERT_TRUE(context::s_current_error_port == p);
+  context::s_current_error_port = old_err;  // restore
+
+  // flush-output-port
+  subr_flush_output_port(scm_nil, 0, nullptr);
+  scm_obj_t out_port_args[] = {context::s_standard_output_port};
+  subr_flush_output_port(scm_nil, 1, out_port_args);
+
+  port_finalize((scm_port_rec_t*)to_address(p));
+}
+
 int main(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -1679,6 +1730,7 @@ int main(int argc, char** argv) {
   test_environment_access();
   test_undef_unspecified();
   test_uuid();
+  test_port_subrs();
 
   context::destroy();
   heap->destroy();
