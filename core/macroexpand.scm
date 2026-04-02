@@ -29,7 +29,7 @@
 
 ;; Registry mapping module names to records: ((name . record) ...)
 ;; Record structure: ((exports . rename-map) . bindings)
-(define current-module-registry (make-parameter'()))
+(define current-module-registry (make-parameter '()))
 
 ;;=============================================================================
 ;; SECTION 2: Identifier & Environment Resolution

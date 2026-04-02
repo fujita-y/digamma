@@ -175,11 +175,12 @@ class codegen_t {
 
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);
-  void phase2_create_functions();
-  void phase3_generate_code();
-  void phase4_optimize_and_verify();
+  void phase2_analyze_closure_labels();
+  void phase3_create_functions();
+  void phase4_generate_code();
+  void phase5_optimize_and_verify();
+  compiled_code_t phase6_finalize();
   void optimize_module(llvm::Module& mod);
-  compiled_code_t phase5_finalize();
   void reset_compile_state();
 
   // Configure a new Module with JIT data layout, target triple, PIC/PIE level
@@ -275,10 +276,9 @@ class codegen_t {
   void add_common_closure_attributes(llvm::Function* func);
 
   // --------------------------------------------------------------------------
-  //  Analysis and debugging
+  //  Debugging
   // --------------------------------------------------------------------------
 
-  void analyze_closure_labels();
   void dump_instructions(const std::vector<Instruction>& instructions);
 
   // --------------------------------------------------------------------------

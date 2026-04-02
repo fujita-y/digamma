@@ -11,7 +11,7 @@
 
 (load "core.scm")  ; Load core system
 
-(define (gen-core-ir input-file)
+(define (gen-core-ir-each input-file)
   (define (process exp)
     (let* ((expanded (macroexpand exp))
            (optimized (optimize expanded))
@@ -24,6 +24,22 @@
         (if (eof-object? input)
             (reverse output)
             (loop (cons (process input) output) (read)))))))
+
+(define (gen-core-ir-batch input-file)
+  (define (process exp)
+    (let* ((expanded (macroexpand exp))
+           (optimized (optimize expanded))
+           (lifted (lambda-lift optimized))
+           (code (compile lifted)))
+      code))
+  (with-input-from-file input-file
+    (lambda ()
+      (list (process (cons 'begin
+                       (let loop ((input-list '()))
+                         (let ((input (read)))
+                           (if (eof-object? input)
+                               (reverse input-list)
+                               (loop (cons input input-list)))))))))))
 
 ;; macro dependency injection
 (with-input-from-file "boot/host-macro.scm"
@@ -54,5 +70,5 @@
       (lambda (source) 
         (for-each
           (lambda (x) (write x) (newline))
-          (gen-core-ir source)))
+          (gen-core-ir-each source)))
       source-files)))

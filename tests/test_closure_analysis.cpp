@@ -5,9 +5,9 @@
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
 #include "codegen.h"
+#include "context.h"
 #include "hash.h"
 #include "object_heap.h"
-#include "context.h"
 #include "reader.h"
 
 void fatal(const char* fmt, ...) {
@@ -71,7 +71,7 @@ class ClosureAnalysisTest {
     scm_obj_t code = read_code(code_str);
     codegen->phase0_create_module();
     codegen->phase1_parse_instructions(code);
-    codegen->analyze_closure_labels();
+    codegen->phase2_analyze_closure_labels();
   }
 
   // Helper to find instruction by opcode

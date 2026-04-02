@@ -22,10 +22,10 @@
 ;;=============================================================================
 
 ;; Current pattern variable bindings: ((var . value) ...)
-(define current-syntax-bindings (make-parameter'()))
+(define current-syntax-bindings (make-parameter '()))
 
 ;; Current meta-environment tracking ellipsis depth: ((var . depth) ...)
-(define current-syntax-meta-env (make-parameter'()))
+(define current-syntax-meta-env (make-parameter '()))
 
 ;;=============================================================================
 ;; 2. Utilities & Error Handling

@@ -169,7 +169,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   try {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
-    analyze_closure_labels();
+    phase2_analyze_closure_labels();
 #ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
@@ -178,10 +178,10 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
       dump_instructions(func.instructions);
     }
 #endif
-    phase2_create_functions();
-    phase3_generate_code();
-    phase4_optimize_and_verify();
-    return phase5_finalize();
+    phase3_create_functions();
+    phase4_generate_code();
+    phase5_optimize_and_verify();
+    return phase6_finalize();
   } catch (...) {
     reset_compile_state();
     throw;
@@ -224,7 +224,7 @@ void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
 //  Phase 2: Function and BasicBlock creation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase2_create_functions() {
+void codegen_t::phase3_create_functions() {
   // Create the main function and all closure functions
   // The first function in 'functions' is always the main entry point.
   if (functions.empty()) return;
@@ -294,7 +294,7 @@ void codegen_t::phase2_create_functions() {
 //  Phase 3: Code generation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase3_generate_code() {
+void codegen_t::phase4_generate_code() {
   for (auto& info : functions) {
     current_function = info.llvm_function;
     current_function_info = &info;
@@ -377,7 +377,7 @@ void codegen_t::optimize_module(llvm::Module& mod) {
   MPM.run(mod, MAM);
 }
 
-void codegen_t::phase4_optimize_and_verify() {
+void codegen_t::phase5_optimize_and_verify() {
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
@@ -442,7 +442,7 @@ static llvm::Function* getUserFunction(llvm::User* U) {
 //  Phase 5: Finalize and hand off to JIT
 // --------------------------------------------------------------------------
 
-compiled_code_t codegen_t::phase5_finalize() {
+compiled_code_t codegen_t::phase6_finalize() {
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
@@ -972,7 +972,7 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 //  Analysis and debugging
 // ============================================================================
 
-void codegen_t::analyze_closure_labels() {
+void codegen_t::phase2_analyze_closure_labels() {
   std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
 
   struct State {
