@@ -7,24 +7,22 @@
 #include <boost/context/continuation.hpp>
 #include "codegen.h"
 #include "object_heap.h"
-#include "printer.h"
 
 static thread_local bool* s_stop_the_world = nullptr;
 
 static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
-
-std::string scm_obj_to_string(scm_obj_t obj) {
-  std::stringstream ss;
-  printer_t printer(ss);
-  printer.write(obj);
-  return ss.str();
-}
 
 bool is_side_effect_free_aux_helper(const char* name) {
   // return true if function no need to call if returned value is not used
   if (starts_with(name, "c_make_closure")) return true;
   if (starts_with(name, "c_make_cons")) return true;
   if (starts_with(name, "c_construct_rest_list")) return true;
+  return false;
+}
+
+bool is_never_return_aux_helper(const char* name) {
+  // return true if function never return
+  if (starts_with(name, "c_unbound_variable_error")) return true;
   return false;
 }
 
@@ -75,8 +73,8 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
 
   scm_obj_t curr = list;
   while (is_cons(curr)) {
-    args.push_back(CAR(curr));
-    curr = CDR(curr);
+    args.push_back(cons_car(curr));
+    curr = cons_cdr(curr);
   }
   if (curr != scm_nil) throw std::runtime_error("apply: last argument must be a proper list");
 
@@ -96,16 +94,18 @@ extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {
 
 extern "C" void c_test_application(scm_obj_t proc, int argc, const char* name) {
   if (!is_closure(proc)) [[unlikely]] {
-    throw std::runtime_error("error: attempt to call a non-procedure " + scm_obj_to_string(proc) + " in variable " + name);
+    throw std::runtime_error("error: attempt to call a non-procedure " + to_string(proc) + " in variable " + name);
   }
   scm_closure_rec_t* closure = (scm_closure_rec_t*)to_address(proc);
   if (closure->rest) [[unlikely]] {
     if (argc < closure->argc) [[unlikely]] {
-      throw std::runtime_error("error: too few arguments to apply " + scm_obj_to_string(proc) + " in variable " + name);
+      throw std::runtime_error("error: too few arguments to apply " + to_string(proc) + " in variable " + name);
     }
   } else {
     if (argc != closure->argc) [[unlikely]] {
-      throw std::runtime_error("error: too many arguments to apply " + scm_obj_to_string(proc) + " in variable " + name);
+      throw std::runtime_error("error: too many arguments to apply " + to_string(proc) + " in variable " + name);
     }
   }
 }
+
+extern "C" void c_unbound_variable_error(const char* name) { throw std::runtime_error("error: unbound variable " + std::string(name)); }

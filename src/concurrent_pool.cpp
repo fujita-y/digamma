@@ -81,6 +81,7 @@ void* concurrent_pool_t::allocate(size_t size, bool for_slab, bool for_collectib
     for (int i = m_pool_memo; i < m_pool_watermark; i++) {
       if (m_pool[i] == PTAG_FREE) {
         void* slab = m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT);
+        SLAB_TRAITS_OF(slab)->owner = NULL;
         m_pool[i] = PTAG_USED | attr;
         m_pool_memo = i + 1;
         m_pool_usage = m_pool_usage + 1;

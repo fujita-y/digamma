@@ -2,15 +2,17 @@
 // See LICENSE file for terms and conditions of use.
 
 #include "core.h"
+#include "object.h"
 #include "printer.h"
 
 #include <format>
+#include <unordered_map>
 
-void printer_t::write(scm_obj_t obj) { print(obj, false); }
+void printer_t::write(scm_obj_t obj) { print(nullptr, obj, false); }
 
-void printer_t::display(scm_obj_t obj) { print(obj, true); }
+void printer_t::display(scm_obj_t obj) { print(nullptr, obj, true); }
 
-void printer_t::print(scm_obj_t obj, bool display_mode) {
+void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode) {
   if (is_fixnum(obj)) {
     out << fixnum(obj);
     return;
@@ -21,119 +23,130 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
     return;
   }
 
-  if (is_heap_object(obj)) {
-    if (is_symbol(obj)) {
-      std::string s = (char*)symbol_name(obj);
-      if (display_mode) {
-        out << s;
+  // SRFI-38: handle shared/circular structure labels for heap and cons objects
+  if (visited != nullptr && (is_heap_object(obj) || is_cons(obj))) {
+    auto it = visited->find(obj);
+    if (it != visited->end()) {
+      if (is_fixnum(it->second)) {
+        // Back-reference: object already defined above
+        out << "#" << fixnum(it->second) << "#";
         return;
+      } else {
+        // it->second == scm_true: shared, assign new tag
+        int tag = m_shared_tag++;
+        it->second = make_fixnum(tag);
+        out << "#" << tag << "=";
+        // Fall through to print the object body with the label
       }
-      bool special = false;
-      if (s.empty())
-        special = true;
-      else {
-        if (isdigit(s[0])) special = true;  // simplified check
-        for (char c : s) {
-          if (!isalnum(c) && !strchr("!$%&*+-./:<=>?@^_~", c)) {
-            special = true;
-            break;
+    }
+    // it == end(): not shared, print normally (fall through)
+  }
+
+  if (is_heap_object(obj)) {
+    switch (heap_tc6(obj)) {
+      case tc6_symbol: {
+        const char* s = (const char*)symbol_name(obj);
+        if (display_mode) {
+          out << s;
+          return;
+        }
+        std::string_view sv(s);
+        bool special = sv.empty() || isdigit((unsigned char)sv[0]);
+        if (!special) {
+          for (char c : sv) {
+            if (!isalnum((unsigned char)c) && !strchr("!$%&*+-./:<=>?@^_~", c)) {
+              special = true;
+              break;
+            }
           }
         }
-      }
-      if (special) {
-        out << '|';
-        for (char c : s) {
-          if (c == '|' || c == '\\') out << '\\';
-          out << c;
-        }
-        out << '|';
-      } else {
-        out << s;
-      }
-      return;
-    }
-    if (is_string(obj)) {
-      if (display_mode) {
-        out << (char*)string_name(obj);
+        if (special) {
+          out << '|';
+          for (char c : sv) {
+            if (c == '|' || c == '\\') out << '\\';
+            out << c;
+          }
+          out << '|';
+        } else
+          out << sv;
         return;
       }
-      out << '"';
-      std::string s = (char*)string_name(obj);
-      for (char c : s) {
-        if (c == '"')
-          out << "\\\"";
-        else if (c == '\\')
-          out << "\\\\";
-        else
-          out << c;
+      case tc6_string: {
+        const char* s = (const char*)string_name(obj);
+        if (display_mode) {
+          out << s;
+          return;
+        }
+        out << '"';
+        for (const char* p = s; *p; p++) {
+          if (*p == '"')
+            out << "\\\"";
+          else if (*p == '\\')
+            out << "\\\\";
+          else
+            out << *p;
+        }
+        out << '"';
+        return;
       }
-      out << '"';
-      return;
-    }
-    if (is_long_flonum(obj)) {
-      out << flonum(obj);
-      return;
-    }
-    if (is_vector(obj)) {
-      out << "#(";
-      int n = vector_nsize(obj);
-      scm_obj_t* elts = vector_elts(obj);
-      for (int i = 0; i < n; i++) {
-        if (i > 0) out << " ";
-        print(elts[i], display_mode);
+      case tc6_long_flonum: {
+        out << flonum(obj);
+        return;
       }
-      out << ")";
-      return;
-    }
-    if (is_values(obj)) {
-      out << "#<values";
-      int n = values_nsize(obj);
-      scm_obj_t* elts = values_elts(obj);
-      for (int i = 0; i < n; i++) {
-        out << " ";
-        print(elts[i], display_mode);
+      case tc6_vector: {
+        out << "#(";
+        int n = vector_nsize(obj);
+        scm_obj_t* elts = vector_elts(obj);
+        for (int i = 0; i < n; i++) {
+          if (i > 0) out << " ";
+          print(visited, elts[i], display_mode);
+        }
+        out << ")";
+        return;
       }
-      out << ">";
-      return;
-    }
-    if (is_u8vector(obj)) {
-      out << "#u8(";
-      int n = u8vector_nsize(obj);
-      uint8_t* elts = u8vector_elts(obj);
-      for (int i = 0; i < n; i++) {
-        if (i > 0) out << " ";
-        out << (int)elts[i];
+      case tc6_values: {
+        out << "#<values";
+        int n = values_nsize(obj);
+        scm_obj_t* elts = values_elts(obj);
+        for (int i = 0; i < n; i++) {
+          out << " ";
+          print(visited, elts[i], display_mode);
+        }
+        out << ">";
+        return;
       }
-      out << ")";
-      return;
-    }
-    if (is_closure(obj)) {
-      out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
-      return;
-    }
-    if (is_environment(obj)) {
-      out << std::format("#<environment {:#x} name:{}>", (uintptr_t)obj, (char*)environment_name(obj));
-      return;
-    }
-    if (is_cell(obj)) {
-      out << std::format("#<cell {:#x}>", (uintptr_t)obj);
-      return;
-    }
-    if (is_escape(obj)) {
-      out << std::format("#<escape {:#x}>", (uintptr_t)obj);
-      return;
-    }
-    if (is_continuation(obj)) {
-      out << std::format("#<continuation {:#x}>", (uintptr_t)obj);
-      return;
-    }
-    if (is_hashtable(obj)) {
-      out << std::format("#<hashtable {:#x}>", (uintptr_t)obj);
-      return;
-    }
-    if (is_port(obj)) {
-      out << std::format("#<port {:#x}>", (uintptr_t)obj);
-      return;
+      case tc6_u8vector: {
+        out << "#u8(";
+        int n = u8vector_nsize(obj);
+        uint8_t* elts = u8vector_elts(obj);
+        for (int i = 0; i < n; i++) {
+          if (i > 0) out << " ";
+          out << (int)elts[i];
+        }
+        out << ")";
+        return;
+      }
+      case tc6_closure:
+        out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
+        return;
+      case tc6_environment:
+        out << std::format("#<environment {:#x} name:{}>", (uintptr_t)obj, (char*)environment_name(obj));
+        return;
+      case tc6_cell:
+        out << std::format("#<cell {:#x}>", (uintptr_t)obj);
+        return;
+      case tc6_escape:
+        out << std::format("#<escape {:#x}>", (uintptr_t)obj);
+        return;
+      case tc6_continuation:
+        out << std::format("#<continuation {:#x}>", (uintptr_t)obj);
+        return;
+      case tc6_hashtable:
+        out << std::format("#<hashtable {:#x}>", (uintptr_t)obj);
+        return;
+      case tc6_port:
+        out << std::format("#<port {:#x}>", (uintptr_t)obj);
+        return;
     }
   }
 
@@ -143,20 +156,33 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
       return;
     }
     out << "(";
-    print(((scm_cons_rec_t*)obj)->car, display_mode);
-    obj = ((scm_cons_rec_t*)obj)->cdr;
-    while (is_cons(obj)) {
-      if (obj == (scm_obj_t) nullptr) {
+    print(visited, cons_car(obj), display_mode);
+    scm_obj_t cdr = cons_cdr(obj);
+    while (is_cons(cdr)) {
+      if (cdr == (scm_obj_t) nullptr) {
         out << "#<null>";
         return;
       }
+      // In shared-structure mode, if this cdr cell is shared/circular,
+      // stop the implicit list traversal and emit it as a dot-pair tail.
+      // The top-level shared check in print() will handle the #N= / #N# labels.
+      if (visited != nullptr) {
+        auto it = visited->find(cdr);
+        if (it != visited->end()) {
+          // This cdr cell is shared or circular — print as `. cdr`
+          out << " . ";
+          print(visited, cdr, display_mode);
+          out << ")";
+          return;
+        }
+      }
       out << " ";
-      print(((scm_cons_rec_t*)obj)->car, display_mode);
-      obj = ((scm_cons_rec_t*)obj)->cdr;
+      print(visited, cons_car(cdr), display_mode);
+      cdr = cons_cdr(cdr);
     }
-    if (obj != scm_nil) {
+    if (cdr != scm_nil) {
       out << " . ";
-      print(obj, display_mode);
+      print(visited, cdr, display_mode);
     }
     out << ")";
     return;
@@ -222,7 +248,7 @@ void printer_t::print(scm_obj_t obj, bool display_mode) {
   out << "#<unknown 0x" << std::hex << obj << std::dec << ">";
 }
 
-void printer_t::format(const char* fmt, ...) {
+void printer_t::printf(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
 
@@ -353,4 +379,55 @@ void printer_t::format(const char* fmt, ...) {
   }
 
   va_end(ap);
+}
+
+void printer_t::scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj) {
+  assert(visited != nullptr);
+  // Only cons, heap objects (vectors, strings, symbols) can be shared
+  if (!is_cons(obj) && !is_heap_object(obj)) return;
+
+  auto [it, inserted] = visited->try_emplace(obj, scm_false);
+  if (!inserted) {
+    if (it->second == scm_true) return;  // already confirmed shared, stop recursion
+    it->second = scm_true;               // second visit: mark as shared
+    return;
+  }
+  // First visit — recurse into children if needed
+  if (is_cons(obj)) {
+    scan(visited, cons_car(obj));
+    scan(visited, cons_cdr(obj));
+    return;
+  }
+  if (is_heap_object(obj)) {
+    switch (heap_tc6(obj)) {
+      case tc6_vector: {
+        int n = vector_nsize(obj);
+        scm_obj_t* elts = vector_elts(obj);
+        for (int i = 0; i < n; i++) scan(visited, elts[i]);
+        break;
+      }
+      case tc6_values: {
+        int n = values_nsize(obj);
+        scm_obj_t* elts = values_elts(obj);
+        for (int i = 0; i < n; i++) scan(visited, elts[i]);
+        break;
+      }
+        // tc6_string, tc6_symbol: no children, already inserted above
+    }
+  }
+}
+
+void printer_t::write_ss(scm_obj_t obj) {
+  std::unordered_map<scm_obj_t, scm_obj_t> visited;
+  m_shared_tag = 0;
+  scan(&visited, obj);
+  // Remove entries that were only seen once — they don't need labels
+  for (auto it = visited.begin(); it != visited.end();) {
+    if (it->second == scm_false) {
+      it = visited.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  print(&visited, obj, false);
 }

@@ -1,4 +1,3 @@
-(if (not (undefined? load)) (load "../core.scm"))
 
 ;; --- Test Helper Functions ---
 

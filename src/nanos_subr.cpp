@@ -9,10 +9,13 @@
 #include "continuation.h"
 #include "equiv.h"
 #include "hash.h"
+#include "list.h"
 #include "nanos.h"
 #include "object_heap.h"
 #include "port.h"
 #include "printer.h"
+#include "reader.h"
+#include "utf8.h"
 
 #include <cerrno>
 #include <cmath>
@@ -28,13 +31,13 @@ static int safe_list_length(scm_obj_t lst) {
   while (true) {
     if (fast == scm_nil) return len;
     if (!is_cons(fast)) return -1;
-    fast = CDR(fast);
+    fast = cons_cdr(fast);
     len++;
     if (fast == scm_nil) return len;
     if (!is_cons(fast)) return -1;
-    fast = CDR(fast);
+    fast = cons_cdr(fast);
     len++;
-    slow = CDR(slow);
+    slow = cons_cdr(slow);
     if (slow == fast) return -2;  // cycle
   }
 }
@@ -223,20 +226,14 @@ SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return make_cons(a1
 
 // car  - R6RS 11.9
 SUBR subr_car(scm_obj_t self, scm_obj_t a1) {
-  if (is_cons(a1)) {
-    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
-    return cons->car;
-  }
+  if (is_cons(a1)) return cons_car(a1);
   throw std::runtime_error("car: argument must be a cons cell");
 }
 
 // cdr  - R6RS 11.9
 SUBR subr_cdr(scm_obj_t self, scm_obj_t a1) {
-  if (is_cons(a1)) {
-    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
-    return cons->cdr;
-  }
-  throw std::runtime_error("cdr: argument must be a cons cell, but got " + scm_obj_to_string(a1));
+  if (is_cons(a1)) return cons_cdr(a1);
+  throw std::runtime_error("cdr: argument must be a cons cell, but got " + to_string(a1));
 }
 
 // list  - R6RS 11.9
@@ -252,20 +249,22 @@ static scm_obj_t do_transpose(int each_len, int argc, scm_obj_t argv[]) {
   scm_obj_t ans = scm_nil;
   scm_obj_t ans_tail = scm_nil;
   for (int i = 0; i < each_len; i++) {
-    scm_obj_t elt = make_cons(CAR(argv[0]), scm_nil);
+    scm_obj_t elt = make_cons(cons_car(argv[0]), scm_nil);
     scm_obj_t elt_tail = elt;
-    argv[0] = CDR(argv[0]);
+    argv[0] = cons_cdr(argv[0]);
     for (int n = 1; n < argc; n++) {
-      CDR(elt_tail) = make_cons(CAR(argv[n]), scm_nil);
-      elt_tail = CDR(elt_tail);
-      argv[n] = CDR(argv[n]);
+      scm_cons_rec_t* elt_tail_cons = (scm_cons_rec_t*)elt_tail;
+      elt_tail_cons->cdr = make_cons(cons_car(argv[n]), scm_nil);
+      elt_tail = elt_tail_cons->cdr;
+      argv[n] = cons_cdr(argv[n]);
     }
     if (ans == scm_nil) {
       ans = make_cons(elt, scm_nil);
       ans_tail = ans;
     } else {
-      CDR(ans_tail) = make_cons(elt, scm_nil);
-      ans_tail = CDR(ans_tail);
+      scm_cons_rec_t* ans_tail_cons = (scm_cons_rec_t*)ans_tail;
+      ans_tail_cons->cdr = make_cons(elt, scm_nil);
+      ans_tail = ans_tail_cons->cdr;
     }
   }
   return ans;
@@ -309,17 +308,19 @@ SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]) {
   throw std::runtime_error("list-transpose+: wrong number of arguments");
 }
 
-SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_cons_star(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc > 0) {
     if (argc == 1) return argv[0];
     scm_obj_t obj = make_cons(argv[0], scm_nil);
     scm_obj_t tail = obj;
     for (int i = 1; i < argc - 1; i++) {
       scm_obj_t e = make_cons(argv[i], scm_nil);
-      CDR(tail) = e;
+      scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+      tail_cons->cdr = e;
       tail = e;
     }
-    CDR(tail) = argv[argc - 1];
+    scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+    tail_cons->cdr = argv[argc - 1];
     return obj;
   }
   throw std::runtime_error("cons*: wrong number of arguments");
@@ -327,15 +328,17 @@ SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
 static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
   if (lst1 == scm_nil) return lst2;
-  scm_obj_t head = make_cons(CAR(lst1), scm_nil);
+  scm_obj_t head = make_cons(cons_car(lst1), scm_nil);
   scm_obj_t tail = head;
-  lst1 = CDR(lst1);
+  lst1 = cons_cdr(lst1);
   while (lst1 != scm_nil) {
-    CDR(tail) = make_cons(CAR(lst1), scm_nil);
-    tail = CDR(tail);
-    lst1 = CDR(lst1);
+    scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+    tail_cons->cdr = make_cons(cons_car(lst1), scm_nil);
+    tail = tail_cons->cdr;
+    lst1 = cons_cdr(lst1);
   }
-  CDR(tail) = lst2;
+  scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+  tail_cons->cdr = lst2;
   return head;
 }
 
@@ -357,7 +360,8 @@ SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (is_cons(a1)) {
     object_heap_t::current()->write_barrier(a2);
-    CAR(a1) = a2;
+    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+    cons->car = a2;
     return scm_unspecified;
   }
   throw std::runtime_error("set-car!: argument must be a cons cell");
@@ -367,7 +371,8 @@ SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (is_cons(a1)) {
     object_heap_t::current()->write_barrier(a2);
-    CDR(a1) = a2;
+    scm_cons_rec_t* cons = (scm_cons_rec_t*)a1;
+    cons->cdr = a2;
     return scm_unspecified;
   }
   throw std::runtime_error("set-cdr!: argument must be a cons cell");
@@ -381,13 +386,13 @@ SUBR subr_length(scm_obj_t self, scm_obj_t a1) {
   while (true) {
     if (fast == scm_nil) return make_fixnum(len);
     if (!is_cons(fast)) throw std::runtime_error("length: argument must be a proper list");
-    fast = CDR(fast);
+    fast = cons_cdr(fast);
     len++;
     if (fast == scm_nil) return make_fixnum(len);
     if (!is_cons(fast)) throw std::runtime_error("length: argument must be a proper list");
-    fast = CDR(fast);
+    fast = cons_cdr(fast);
     len++;
-    slow = CDR(slow);
+    slow = cons_cdr(slow);
     if (slow == fast) throw std::runtime_error("length: cycle detected");
   }
 }
@@ -400,11 +405,11 @@ SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a1;
   while (k > 0) {
     if (!is_cons(cur)) throw std::runtime_error("list-ref: index out of bounds or not a proper list");
-    cur = CDR(cur);
+    cur = cons_cdr(cur);
     k--;
   }
   if (!is_cons(cur)) throw std::runtime_error("list-ref: index out of bounds or not a proper list");
-  return CAR(cur);
+  return cons_car(cur);
 }
 
 // list->vector  - R6RS 11.13
@@ -413,15 +418,15 @@ SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1) {
   scm_obj_t cur = a1;
   while (is_cons(cur)) {
     len++;
-    cur = CDR(cur);
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("list->vector: argument must be a proper list");
   scm_obj_t v = make_vector(len, scm_undef);
   scm_obj_t* elts = vector_elts(v);
   cur = a1;
   for (int i = 0; i < len; i++) {
-    elts[i] = CAR(cur);
-    cur = CDR(cur);
+    elts[i] = cons_car(cur);
+    cur = cons_cdr(cur);
   }
   return v;
 }
@@ -430,11 +435,10 @@ SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1) {
 SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    if (CAR(cur) == a1) return cur;
-    cur = CDR(cur);
+    if (cons_car(cur) == a1) return cur;
+    cur = cons_cdr(cur);
   }
-  if (cur != scm_nil)
-    throw std::runtime_error("memq: second argument must be a proper list: (" + scm_obj_to_string(a1) + " " + scm_obj_to_string(a2) + ")");
+  if (cur != scm_nil) throw std::runtime_error("memq: second argument must be a proper list: (" + to_string(a1) + " " + to_string(a2) + ")");
   return scm_false;
 }
 
@@ -442,8 +446,8 @@ SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    if (eqv_p(CAR(cur), a1)) return cur;
-    cur = CDR(cur);
+    if (eqv_p(cons_car(cur), a1)) return cur;
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("memv: second argument must be a proper list");
   return scm_false;
@@ -454,8 +458,8 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
     scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
-    if (equal_p(visited, a1, CAR(cur))) return cur;
-    cur = CDR(cur);
+    if (equal_p(visited, a1, cons_car(cur))) return cur;
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("member: second argument must be a proper list");
   return scm_false;
@@ -465,10 +469,10 @@ SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    scm_obj_t pair = CAR(cur);
+    scm_obj_t pair = cons_car(cur);
     if (!is_cons(pair)) throw std::runtime_error("assq: alist must contain pairs");
-    if (CAR(pair) == a1) return pair;
-    cur = CDR(cur);
+    if (cons_car(pair) == a1) return pair;
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assq: second argument must be a proper list");
   return scm_false;
@@ -478,10 +482,10 @@ SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    scm_obj_t pair = CAR(cur);
+    scm_obj_t pair = cons_car(cur);
     if (!is_cons(pair)) throw std::runtime_error("assv: alist must contain pairs");
-    if (eqv_p(CAR(pair), a1)) return pair;
-    cur = CDR(cur);
+    if (eqv_p(cons_car(pair), a1)) return pair;
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assv: second argument must be a proper list");
   return scm_false;
@@ -491,11 +495,11 @@ SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    scm_obj_t pair = CAR(cur);
+    scm_obj_t pair = cons_car(cur);
     if (!is_cons(pair)) throw std::runtime_error("assoc: alist must contain pairs");
     scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
-    if (equal_p(visited, a1, CAR(pair))) return pair;
-    cur = CDR(cur);
+    if (equal_p(visited, a1, cons_car(pair))) return pair;
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assoc: second argument must be a proper list");
   return scm_false;
@@ -506,8 +510,8 @@ SUBR subr_reverse(scm_obj_t self, scm_obj_t a1) {
   scm_obj_t cur = a1;
   scm_obj_t result = scm_nil;
   while (is_cons(cur)) {
-    result = make_cons(CAR(cur), result);
-    cur = CDR(cur);
+    result = make_cons(cons_car(cur), result);
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("reverse: argument must be a proper list");
   return result;
@@ -580,11 +584,11 @@ SUBR subr_list_p(scm_obj_t self, scm_obj_t a1) {
   while (true) {
     if (fast == scm_nil) return scm_true;
     if (!is_cons(fast)) return scm_false;
-    fast = CDR(fast);
+    fast = cons_cdr(fast);
     if (fast == scm_nil) return scm_true;
     if (!is_cons(fast)) return scm_false;
-    fast = CDR(fast);
-    slow = CDR(slow);
+    fast = cons_cdr(fast);
+    slow = cons_cdr(slow);
     if (slow == fast) return scm_false;  // cycle
   }
 }
@@ -709,8 +713,7 @@ SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   const char* s = (const char*)string_name(a1);
   intptr_t idx = fixnum(a2);
   intptr_t len = (intptr_t)strlen(s);
-  if (idx < 0 || idx >= len)
-    throw std::runtime_error("string-ref: index out of bounds: " + scm_obj_to_string(a1) + ", " + scm_obj_to_string(a2));
+  if (idx < 0 || idx >= len) throw std::runtime_error("string-ref: index out of bounds: " + to_string(a1) + ", " + to_string(a2));
   // Decode UTF-8 character at byte position idx
   const uint8_t* p = (const uint8_t*)s + idx;
   uint32_t ucs4 = *p;  // [TODO] unicode support
@@ -919,6 +922,49 @@ SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // ============================================================================
 
 // current-input-port
+SUBR subr_put_char(scm_obj_t self, scm_obj_t port, scm_obj_t ch) {
+  if (!is_port(port)) throw std::runtime_error("put-char: first argument must be a port");
+  if (!is_char(ch)) throw std::runtime_error("put-char: second argument must be a character");
+  return port_put_char(port, ch);
+}
+
+SUBR subr_put_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2 || argc > 4) throw std::runtime_error("put-string: wrong number of arguments");
+  scm_obj_t port = argv[0];
+  scm_obj_t str = argv[1];
+  if (!is_port(port)) throw std::runtime_error("put-string: first argument must be a port");
+  if (!is_string(str)) throw std::runtime_error("put-string: second argument must be a string");
+
+  const uint8_t* s = (const uint8_t*)string_name(str);
+
+  if (argc == 2) {
+    return port_put_bytes(port, s, strlen((const char*)s));
+  }
+
+  int limit = strlen((const char*)s) + 1;
+  int len = utf8_string_length(s);
+  int start = 0;
+  int count = len;
+
+  if (argc >= 3) {
+    if (!is_fixnum(argv[2])) throw std::runtime_error("put-string: start index must be an exact integer");
+    start = fixnum(argv[2]);
+    if (start > len) throw std::runtime_error("put-string: start index out of bounds");
+    count = len - start;
+  }
+  if (argc == 4) {
+    if (!is_fixnum(argv[3])) throw std::runtime_error("put-string: count must be an exact integer");
+    count = fixnum(argv[3]);
+    if (start + count > len) throw std::runtime_error("put-string: count out of bounds");
+  }
+  int byte_offset = utf8_char_index_to_byte_offset(s, start, limit);
+  int byte_count = utf8_char_index_to_byte_offset(s + byte_offset, count, limit - byte_offset);
+
+  assert(byte_offset >= 0 && byte_offset < limit);
+  assert(byte_count >= 0 && byte_offset + byte_count < limit);
+  return port_put_bytes(port, s + byte_offset, byte_count);
+}
+
 SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return context::s_current_input_port;
   if (is_port(argv[0])) {
@@ -965,26 +1011,87 @@ SUBR subr_standard_error_port(scm_obj_t self) { return context::s_standard_error
 // ============================================================================
 
 // write  - R6RS 8.3
-SUBR subr_write(scm_obj_t self, scm_obj_t a1) {
-  std::ostream* os = port_get_ostream(context::s_current_output_port);
-  assert(os != nullptr);
-  if (os) printer_t(*os).write(a1);
+SUBR subr_write(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("write: wrong number of arguments");
+  scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
+  if (!is_port(port)) throw std::runtime_error("write: argument must be a port");
+  std::ostream* os = port_get_ostream(port);
+  if (os == nullptr) throw std::runtime_error("write: argument must be an output port");
+  printer_t(*os).write(argv[0]);
+  return scm_unspecified;
+}
+
+// write/ss - SRFI-38
+SUBR subr_write_ss(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("write/ss: wrong number of arguments");
+  scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
+  if (!is_port(port)) throw std::runtime_error("write/ss: argument must be a port");
+  std::ostream* os = port_get_ostream(port);
+  if (os == nullptr) throw std::runtime_error("write/ss: argument must be an output port");
+  printer_t(*os).write_ss(argv[0]);
   return scm_unspecified;
 }
 
 // display  - R6RS 8.3
-SUBR subr_display(scm_obj_t self, scm_obj_t a1) {
-  std::ostream* os = port_get_ostream(context::s_current_output_port);
-  assert(os != nullptr);
-  printer_t(*os).display(a1);
+SUBR subr_display(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("display: wrong number of arguments");
+  scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
+  if (!is_port(port)) throw std::runtime_error("display: argument must be a port");
+  std::ostream* os = port_get_ostream(port);
+  if (os == nullptr) throw std::runtime_error("display: argument must be an output port");
+  printer_t(*os).display(argv[0]);
   return scm_unspecified;
 }
 
+// format - SRFI-28
+SUBR subr_format(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1) throw std::runtime_error("format: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("format: first argument must be a string");
+
+  const char* fmt = (const char*)string_name(argv[0]);
+  std::ostringstream oss;
+  printer_t printer(oss);
+  int arg_idx = 1;
+
+  for (const char* p = fmt; *p; p++) {
+    if (*p == '~') {
+      p++;
+      if (*p == '\0') {
+        oss << '~';
+        break;
+      }
+      char cmd = *p;
+      if (cmd == 'a' || cmd == 'A') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~a");
+        printer.display(argv[arg_idx++]);
+      } else if (cmd == 's' || cmd == 'S') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~s");
+        printer.write(argv[arg_idx++]);
+      } else if (cmd == 'w' || cmd == 'W') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~w");
+        printer.write_ss(argv[arg_idx++]);
+      } else if (cmd == '%') {
+        oss << '\n';
+      } else if (cmd == '~') {
+        oss << '~';
+      } else {
+        oss << '~' << cmd;
+      }
+    } else {
+      oss << *p;
+    }
+  }
+  return make_string(oss.str().c_str());
+}
+
 // newline  - R6RS 8.3
-SUBR subr_newline(scm_obj_t self) {
-  std::ostream* os = port_get_ostream(context::s_current_output_port);
-  assert(os != nullptr);
-  if (os) *os << std::endl;
+SUBR subr_newline(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("newline: wrong number of arguments");
+  scm_obj_t port = (argc == 1) ? argv[0] : context::s_current_output_port;
+  if (!is_port(port)) throw std::runtime_error("newline: argument must be a port");
+  std::ostream* os = port_get_ostream(port);
+  if (os == nullptr) throw std::runtime_error("newline: argument must be an output port");
+  *os << std::endl;
   return scm_unspecified;
 }
 
@@ -996,6 +1103,67 @@ SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
     return port_flush_output(argv[0]);
   }
   throw std::runtime_error("flush-output-port: wrong number of arguments");
+}
+
+// open-file-input-port  - R6RS 8.2.7
+SUBR subr_open_file_input_port(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("open-file-input-port: argument must be a string");
+  return port_open_input_file((const char*)string_name(a1));
+}
+
+// open-file-output-port  - R6RS 8.2.10
+SUBR subr_open_file_output_port(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("open-file-output-port: argument must be a string");
+  return port_open_output_file((const char*)string_name(a1));
+}
+
+// file-exists?  - R6RS 10
+SUBR subr_file_exists_p(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("file-exists?: argument must be a string");
+  return (access((const char*)string_name(a1), F_OK) == 0) ? scm_true : scm_false;
+}
+
+SUBR thunk_string_output_port_extract(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  scm_closure_rec_t* closure = (scm_closure_rec_t*)to_address(self);
+  scm_obj_t port = closure->env[0];
+  return port_get_output_string(port);
+}
+
+SUBR subr_open_string_output_port(scm_obj_t self) {
+  scm_obj_t port = port_open_string_output_port();
+  scm_obj_t env[1] = {port};
+  scm_obj_t proc = make_closure((void*)thunk_string_output_port_extract, 0, 0, 1, env, 1);
+  scm_obj_t result = make_values(2);
+  values_elts(result)[0] = port;
+  values_elts(result)[1] = proc;
+  return result;
+}
+
+// close-port  - R6RS 8.2.6
+SUBR subr_close_port(scm_obj_t self, scm_obj_t a1) {
+  if (!is_port(a1)) throw std::runtime_error("close-port: argument must be a port");
+  port_close(a1);
+  return scm_unspecified;
+}
+
+// eof-object?  - R6RS 8.2.1
+SUBR subr_eof_object_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_eof) ? scm_true : scm_false; }
+
+// read  - R6RS 8.2.9
+SUBR subr_read(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("read: wrong number of arguments");
+  scm_obj_t port = (argc == 1) ? argv[0] : context::s_current_input_port;
+  if (!is_port(port)) throw std::runtime_error("read: argument must be a port");
+  std::istream* is = port_get_istream(port);
+  if (is == nullptr) throw std::runtime_error("read: argument must be an input port");
+
+  reader_t reader(*is);
+  bool err = false;
+  scm_obj_t obj = reader.read(err);
+  if (err) {
+    throw std::runtime_error("read: " + reader.get_error_message());
+  }
+  return obj;
 }
 
 // ============================================================================
@@ -1264,7 +1432,8 @@ SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
       head = cell;
       tail = cell;
     } else {
-      CDR(tail) = cell;
+      scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+      tail_cons->cdr = cell;
       tail = cell;
     }
   }
@@ -1289,7 +1458,7 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
   scm_environment_rec_t* src = (scm_environment_rec_t*)to_address(a2);
   scm_obj_t cur = a3;
   while (is_cons(cur)) {
-    scm_obj_t key = CAR(cur);
+    scm_obj_t key = cons_car(cur);
     if (!is_symbol(key)) throw std::runtime_error("copy-environment-variables!: list elements must be symbols");
     if (!is_symbol_interned(key)) {
       std::string msg = "copy-environment-variables!: symbol not interned: " + std::string((char*)symbol_name(key));
@@ -1308,7 +1477,7 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
       std::string msg = "copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
       throw std::runtime_error(msg);
     }
-    cur = CDR(cur);
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("copy-environment-variables!: third argument must be a proper list");
   return scm_unspecified;
@@ -1322,7 +1491,7 @@ SUBR subr_copy_environment_macros(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, sc
   scm_environment_rec_t* src = (scm_environment_rec_t*)to_address(a2);
   scm_obj_t cur = a3;
   while (is_cons(cur)) {
-    scm_obj_t key = CAR(cur);
+    scm_obj_t key = cons_car(cur);
     if (!is_symbol(key)) throw std::runtime_error("copy-environment-macros!: list elements must be symbols");
     if (!is_symbol_interned(key)) {
       std::string msg = "copy-environment-macros!: symbol not interned: " + std::string((char*)symbol_name(key));
@@ -1335,7 +1504,7 @@ SUBR subr_copy_environment_macros(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, sc
       std::string msg = "copy-environment-macros!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
       throw std::runtime_error(msg);
     }
-    cur = CDR(cur);
+    cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("copy-environment-macros!: third argument must be a proper list");
   return scm_unspecified;
@@ -1916,6 +2085,13 @@ SUBR subr_cdddddr(scm_obj_t self, scm_obj_t a1) {
 }
 
 // ============================================================================
+// Misc
+// ============================================================================
+
+// cyclic-object?
+SUBR subr_cyclic_object_p(scm_obj_t self, scm_obj_t a1) { return cyclic_object_p(a1) ? scm_true : scm_false; }
+
+// ============================================================================
 // Initialization & Registration
 // ============================================================================
 
@@ -2008,7 +2184,7 @@ void nanos_t::init_subr() {
   reg("list", (void*)subr_list, 0, 1);
   reg("list-transpose", (void*)subr_list_transpose, 1, 1);
   reg("list-transpose+", (void*)subr_list_transpose_plus, 1, 1);
-  reg("cons*", (void*)subr_cons_ast, 1, 1);
+  reg("cons*", (void*)subr_cons_star, 1, 1);
   reg("list-ref", (void*)subr_list_ref, 2, 0);
   reg("list->vector", (void*)subr_list_to_vector, 1, 0);
   reg("memq", (void*)subr_memq, 2, 0);
@@ -2075,10 +2251,22 @@ void nanos_t::init_subr() {
   reg("min", (void*)subr_min, 1, 1);
 
   // I/O
-  reg("write", (void*)subr_write, 1, 0);
-  reg("display", (void*)subr_display, 1, 0);
-  reg("newline", (void*)subr_newline, 0, 0);
+  reg("write", (void*)subr_write, 1, 1);
+  reg("write/ss", (void*)subr_write_ss, 1, 1);
+  reg("write-with-shared-structure", (void*)subr_write_ss, 1, 1);
+  reg("display", (void*)subr_display, 1, 1);
+  reg("newline", (void*)subr_newline, 0, 1);
+  reg("put-char", (void*)subr_put_char, 2, 0);
+  reg("put-string", (void*)subr_put_string, 2, 1);
+  reg("format", (void*)subr_format, 1, 1);
   reg("flush-output-port", (void*)subr_flush_output_port, 0, 1);
+  reg("open-file-input-port", (void*)subr_open_file_input_port, 1, 0);
+  reg("open-file-output-port", (void*)subr_open_file_output_port, 1, 0);
+  reg("file-exists?", (void*)subr_file_exists_p, 1, 0);
+  reg("open-string-output-port", (void*)subr_open_string_output_port, 0, 0);
+  reg("close-port", (void*)subr_close_port, 1, 0);
+  reg("eof-object?", (void*)subr_eof_object_p, 1, 0);
+  reg("read", (void*)subr_read, 0, 1);
   reg("current-input-port", (void*)subr_current_input_port, 0, 1);
   reg("current-output-port", (void*)subr_current_output_port, 0, 1);
   reg("current-error-port", (void*)subr_current_error_port, 0, 1);
@@ -2138,4 +2326,7 @@ void nanos_t::init_subr() {
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   reg("call/cc", (void*)subr_call_cc, 1, 0);
   reg("call-with-current-continuation", (void*)subr_call_cc, 1, 0);
+
+  // misc
+  reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
 }

@@ -3,7 +3,6 @@
 
 #include "core.h"
 #include "utf8.h"
-#include "object_heap.h"
 
 int ascii_cstring_pred(const char* s) {
   uint8_t c;
@@ -11,6 +10,15 @@ int ascii_cstring_pred(const char* s) {
     if (c > 0x7f) return 0;
   }
   return 1;
+}
+
+int utf8_string_length(const uint8_t* utf8) {
+  int end = strlen((const char*)utf8);
+  int c = 0;
+  for (int n = 0; n < end; c++) {
+    n += utf8_byte_count(utf8[n]);
+  }
+  return c;
 }
 
 int cnvt_ucs4_to_utf8(uint32_t ucs4, uint8_t utf8[4]) {

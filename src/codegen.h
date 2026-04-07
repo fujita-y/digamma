@@ -14,7 +14,6 @@
 #include "nanos_jit.h"
 
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 // ============================================================================
@@ -160,6 +159,8 @@ class codegen_t {
 
   std::unordered_map<scm_obj_t, Opcode> opcode_map;
 
+  std::vector<scm_obj_t> gc_protected_objects;
+
   // --------------------------------------------------------------------------
   //  Compilation pipeline (phases)
   // --------------------------------------------------------------------------
@@ -273,6 +274,7 @@ class codegen_t {
 
   llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
   void add_side_effect_free_attributes(llvm::Function* func);
+  void add_never_return_attributes(llvm::Function* func);
   void add_common_closure_attributes(llvm::Function* func);
 
   // --------------------------------------------------------------------------
@@ -295,6 +297,7 @@ class codegen_t {
 
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
+  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
 
   void destroy() { s_current = nullptr; }
 

@@ -382,7 +382,7 @@
       (if (eq? expr #t)
           #t
           (core-eval (
-              prepare-eval-expr expr literals *current-syntax-meta-env* bindings '())
+              prepare-eval-expr expr literals (current-syntax-meta-env) bindings '())
               (if (null? env) (current-environment) env)))))
 
 ;; Main syntax-case expansion engine.

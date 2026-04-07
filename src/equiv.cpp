@@ -5,13 +5,9 @@
 #include "object.h"
 #include "equiv.h"
 #include "hash.h"
-#include "object_heap.h"
 
 #include <cstring>
 
-static inline scm_obj_t pair_car(scm_obj_t obj) { return ((scm_cons_rec_t*)obj)->car; }
-
-static inline scm_obj_t pair_cdr(scm_obj_t obj) { return ((scm_cons_rec_t*)obj)->cdr; }
 
 static bool is_number(scm_obj_t obj) { return is_fixnum(obj) || is_short_flonum(obj) || is_long_flonum(obj); }
 
@@ -26,8 +22,8 @@ static bool find_and_merge_opponent(scm_obj_t visited, scm_obj_t lst1, scm_obj_t
   if (opponents != scm_undef) {
     scm_obj_t lst = opponents;
     while (is_cons(lst)) {
-      if (pair_car(lst) != lst2) {
-        lst = pair_cdr(lst);
+      if (cons_car(lst) != lst2) {
+        lst = cons_cdr(lst);
         continue;
       }
       return true;
@@ -62,9 +58,9 @@ top:
   if (is_cons(lst1)) {
     if (is_cons(lst2)) {
       if (find_and_merge_opponent(visited, lst1, lst2)) return true;
-      if (equal_p(visited, pair_car(lst1), pair_car(lst2))) {
-        lst1 = pair_cdr(lst1);
-        lst2 = pair_cdr(lst2);
+      if (equal_p(visited, cons_car(lst1), cons_car(lst2))) {
+        lst1 = cons_cdr(lst1);
+        lst2 = cons_cdr(lst2);
         goto top;
       }
     }

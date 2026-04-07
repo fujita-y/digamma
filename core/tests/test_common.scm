@@ -1,8 +1,6 @@
 ;; test_common.scm
 ;; Test suite for common.scm utilities.
 
-(if (not (undefined? load)) (load "../core.scm"))
-
 (copy-environment-variables! (current-environment) (system-environment) '(drop-elements delete every))
 
 (define *pass-count* 0)
@@ -86,7 +84,8 @@
 
 (define (set=? s1 s2)
   (and (= (length s1) (length s2))
-       (every (lambda (x) (memq x s2)) s1)))
+       (every (lambda (x) (memq x s2)) s1)
+       #t))
 
 (test "set-union (1 2) (2 3) (4)" (set=? (set-union '(1 2) '(2 3) '(4)) '(1 2 3 4)) #t)
 

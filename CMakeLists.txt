@@ -161,6 +161,7 @@ set(NANOS_CORE_SOURCES
   src/nanos_subr.cpp
   src/object.cpp
   src/object_heap.cpp
+  src/list.cpp
   src/port.cpp
   src/reader.cpp
   src/printer.cpp
@@ -234,3 +235,4 @@ add_nanos_test(test_call_ec tests/test_call_ec.cpp)
 add_nanos_test(test_call_cc tests/test_call_cc.cpp)
 add_nanos_test(test_dynamic_wind tests/test_dynamic_wind.cpp)
 add_nanos_test(test_subr tests/test_subr.cpp)
+add_nanos_test(test_list tests/test_list.cpp)

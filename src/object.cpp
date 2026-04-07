@@ -6,6 +6,9 @@
 #include "context.h"
 #include "hash.h"
 #include "object_heap.h"
+#include "printer.h"
+
+#include <sstream>
 
 inline scm_obj_t tc6_pointer(void* x, uintptr_t tc6_num) {
   assert(((uintptr_t)x & 0x07) == 0);
@@ -297,3 +300,10 @@ scm_obj_t make_list(int len, ...) {
 }
 
 scm_obj_t make_list2(scm_obj_t first, scm_obj_t second) { return make_cons(first, make_cons(second, scm_nil)); }
+
+std::string to_string(scm_obj_t obj) {
+  std::stringstream ss;
+  printer_t printer(ss);
+  printer.write(obj);
+  return ss.str();
+}

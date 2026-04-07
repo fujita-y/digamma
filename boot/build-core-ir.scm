@@ -1,6 +1,7 @@
 (cond-expand
   (gauche
    (use srfi-9)
+   (use file.util)
    (add-load-path "." :relative)
    (add-load-path "../core" :relative))
   (ypsilon
@@ -64,6 +65,7 @@
     "core/eval.scm"
     "boot/target-env.scm"))
 
+(delete-file "boot/core.ir")
 (with-output-to-file "boot/core.ir" 
   (lambda ()
     (map 

@@ -57,4 +57,19 @@ class scoped_gc_protect {
     m_obj = (scm_obj_t) nullptr;
   }
 };
+
+class scoped_gc_protect_vector {
+  scoped_gc_protect_vector(const scoped_gc_protect_vector&) = delete;
+  scoped_gc_protect_vector& operator=(const scoped_gc_protect_vector&) = delete;
+  std::vector<scm_obj_t> m_objs;
+
+ public:
+  scoped_gc_protect_vector(const std::vector<scm_obj_t>& objs) : m_objs(objs) {
+    for (scm_obj_t obj : m_objs) context::gc_protect(obj);
+  }
+  ~scoped_gc_protect_vector() {
+    for (scm_obj_t obj : m_objs) context::gc_unprotect(obj);
+  }
+};
+
 #endif

@@ -8,6 +8,7 @@
 #include "object.h"
 #include <llvm/IR/IRBuilder.h>
 
+
 // Constants
 static constexpr int BRIDGE_MAX_ARGS = 8;
 static constexpr int HEAP_OBJECT_TAG_OFFSET = 2;  // Offset to untag heap objects
@@ -28,13 +29,13 @@ static inline scm_obj_t list_nth(scm_obj_t list, int n) {
   if (n <= 0) return scm_nil;
   scm_obj_t curr = list;
   while (--n > 0 && is_cons(curr)) {
-    curr = CDR(curr);
+    curr = cons_cdr(curr);
   }
-  return is_cons(curr) ? CAR(curr) : scm_nil;
+  return is_cons(curr) ? cons_car(curr) : scm_nil;
 }
 
 // Helper function for instruction operand access (1-indexed: operand 1 is first after opcode)
-static inline scm_obj_t operand(scm_obj_t inst, int n) { return list_nth(CDR(inst), n); }
+static inline scm_obj_t operand(scm_obj_t inst, int n) { return list_nth(cons_cdr(inst), n); }
 
 // Helper function to check if a label is a closure label
 static inline bool is_closure_label(scm_obj_t label) {
@@ -49,7 +50,7 @@ static inline int count_list_length(scm_obj_t list) {
   scm_obj_t curr = list;
   while (is_cons(curr)) {
     count++;
-    curr = CDR(curr);
+    curr = cons_cdr(curr);
   }
   return count;
 }
@@ -97,14 +98,14 @@ static inline llvm::Value* getClosureEnvArrayPtr(llvm::IRBuilder<>& builder, llv
                                                  llvm::Type* int64Type) {
   llvm::Value* closure_ptr = untagPointer(builder, ctx, closure_tagged);
   llvm::Value* env_start_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), closure_ptr, CLOSURE_ENV_FIELD_OFFSET);
-  return builder.CreateBitCast(env_start_ptr, llvm::PointerType::get(ctx, 0));
+  return env_start_ptr;
 }
 
 // Helper to get pointer to cell's value field
 static inline llvm::Value* getCellValuePtr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx, llvm::Value* cell_tagged, llvm::Type* int64Type) {
   llvm::Value* cell_ptr = untagPointer(builder, ctx, cell_tagged);
   llvm::Value* value_ptr = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), cell_ptr, CELL_VALUE_FIELD_OFFSET);
-  return builder.CreateBitCast(value_ptr, llvm::PointerType::get(ctx, 0));
+  return value_ptr;
 }
 
 #endif  // CODEGEN_COMMON_H_INCLUDED

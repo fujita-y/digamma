@@ -11,6 +11,7 @@
 #include "context.h"
 #include "object_heap.h"
 
+
 thread_local static bool s_restored = false;
 thread_local static scm_continuation_rec_t* s_restored_rec = nullptr;
 __attribute__((aligned(16))) thread_local static uint8_t s_restore_stack[8192];
@@ -42,48 +43,48 @@ static void do_wind(scm_obj_t target_winders) {
   int current_len = 0;
   while (is_cons(c)) {
     current_len++;
-    c = CDR(c);
+    c = cons_cdr(c);
   }
 
   scm_obj_t t = target;
   int target_len = 0;
   while (is_cons(t)) {
     target_len++;
-    t = CDR(t);
+    t = cons_cdr(t);
   }
 
   c = current;
   t = target;
   while (current_len > target_len) {
-    c = CDR(c);
+    c = cons_cdr(c);
     current_len--;
   }
   while (target_len > current_len) {
-    t = CDR(t);
+    t = cons_cdr(t);
     target_len--;
   }
   while (c != t) {
-    c = CDR(c);
-    t = CDR(t);
+    c = cons_cdr(c);
+    t = cons_cdr(t);
   }
   scm_obj_t common_ancestor = c;
 
   // Unwind current to common ancestor
   c = current;
   while (c != common_ancestor) {
-    scm_obj_t winder = CAR(c);
-    scm_obj_t post = CDR(winder);
+    scm_obj_t winder = cons_car(c);
+    scm_obj_t post = cons_cdr(winder);
     c_call_closure_thunk_0(post);
-    c = CDR(c);
+    c = cons_cdr(c);
     set_current_winders(c);
   }
 
   // Wind target from common ancestor
   auto wind_recursive = [&](auto self, scm_obj_t t) -> void {
     if (t == common_ancestor) return;
-    self(self, CDR(t));
-    scm_obj_t winder = CAR(t);
-    scm_obj_t pre = CAR(winder);
+    self(self, cons_cdr(t));
+    scm_obj_t winder = cons_car(t);
+    scm_obj_t pre = cons_car(winder);
     c_call_closure_thunk_0(pre);
     set_current_winders(t);
   };

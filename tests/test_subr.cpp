@@ -18,6 +18,7 @@
 #include "continuation.h"
 #include "object_heap.h"
 
+
 // ---------------------------------------------------------------------------
 // Subr declarations (extern "C" via SUBR macro)
 // ---------------------------------------------------------------------------
@@ -82,7 +83,7 @@ SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
 SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_cons_ast(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_cons_star(scm_obj_t self, int argc, scm_obj_t argv[]);
 
 // Hashtables
 SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1);
@@ -210,9 +211,9 @@ static scm_obj_t make_circular_list() {
   scm_obj_t p1 = make_cons(make_fixnum(1), scm_nil);
   scm_obj_t p2 = make_cons(make_fixnum(2), scm_nil);
   scm_obj_t p3 = make_cons(make_fixnum(3), scm_nil);
-  CDR(p1) = p2;
-  CDR(p2) = p3;
-  CDR(p3) = p1;  // cycle
+  ((scm_cons_rec_t*)p1)->cdr = p2;
+  ((scm_cons_rec_t*)p2)->cdr = p3;
+  ((scm_cons_rec_t*)p3)->cdr = p1;  // cycle
   return p1;
 }
 
@@ -630,10 +631,10 @@ void test_vector() {
   // vector->list:  #(10 99 30) → (10 99 30)
   scm_obj_t lst = subr_vector_to_list(scm_nil, v3);
   ASSERT_TRUE(is_cons(lst));
-  ASSERT_TRUE(CAR(lst) == make_fixnum(10));
-  ASSERT_TRUE(CAR(CDR(lst)) == make_fixnum(99));
-  ASSERT_TRUE(CAR(CDR(CDR(lst))) == make_fixnum(30));
-  ASSERT_TRUE(CDR(CDR(CDR(lst))) == scm_nil);
+  ASSERT_TRUE(cons_car(lst) == make_fixnum(10));
+  ASSERT_TRUE(cons_car(cons_cdr(lst)) == make_fixnum(99));
+  ASSERT_TRUE(cons_car(cons_cdr(cons_cdr(lst))) == make_fixnum(30));
+  ASSERT_TRUE(cons_cdr(cons_cdr(cons_cdr(lst))) == scm_nil);
 
   // vector->list of empty vector → '()
   ASSERT_TRUE(subr_vector_to_list(scm_nil, v0) == scm_nil);
@@ -900,7 +901,7 @@ void test_pairs_lists_extra() {
 
   // cddr
   scm_obj_t cd2ar = subr_cddr(scm_nil, lst);
-  ASSERT_TRUE(is_cons(cd2ar) && CAR(cd2ar) == make_fixnum(3) && CDR(cd2ar) == scm_nil);
+  ASSERT_TRUE(is_cons(cd2ar) && cons_car(cd2ar) == make_fixnum(3) && cons_cdr(cd2ar) == scm_nil);
 
   // length
   ASSERT_TRUE(subr_length(scm_nil, lst) == make_fixnum(3));
@@ -917,7 +918,7 @@ void test_pairs_lists_extra() {
   ASSERT_TRUE(mq == mem_lst);  // found at head
 
   scm_obj_t mv = subr_memv(scm_nil, make_fixnum(2), mem_lst);
-  ASSERT_TRUE(CAR(mv) == make_fixnum(2));
+  ASSERT_TRUE(cons_car(mv) == make_fixnum(2));
 
   // string is not eq/eqv
   scm_obj_t ms_q = subr_memv(scm_nil, make_string("c"), mem_lst);  // false since eqv on strings is false unless same ptr
@@ -925,23 +926,23 @@ void test_pairs_lists_extra() {
 
   scm_obj_t ms_m = subr_member(scm_nil, make_string("c"), mem_lst);  // true via equal?
   ASSERT_TRUE(ms_m != scm_false);
-  ASSERT_TRUE(CAR(ms_m) != scm_false);
+  ASSERT_TRUE(cons_car(ms_m) != scm_false);
 
   // assq / assoc
   scm_obj_t alist = make_alist();
   scm_obj_t aq = subr_assq(scm_nil, make_symbol("b"), alist);
   ASSERT_TRUE(is_cons(aq));
-  ASSERT_TRUE(CDR(aq) == make_fixnum(2));
+  ASSERT_TRUE(cons_cdr(aq) == make_fixnum(2));
 
   scm_obj_t ac = subr_assoc(scm_nil, make_string("c"), alist);
   ASSERT_TRUE(is_cons(ac));
-  ASSERT_TRUE(CDR(ac) == make_fixnum(3));
+  ASSERT_TRUE(cons_cdr(ac) == make_fixnum(3));
 
   // reverse
   scm_obj_t rev = subr_reverse(scm_nil, lst);
-  ASSERT_TRUE(CAR(rev) == make_fixnum(3));
-  ASSERT_TRUE(CAR(CDR(rev)) == make_fixnum(2));
-  ASSERT_TRUE(CAR(CDR(CDR(rev))) == make_fixnum(1));
+  ASSERT_TRUE(cons_car(rev) == make_fixnum(3));
+  ASSERT_TRUE(cons_car(cons_cdr(rev)) == make_fixnum(2));
+  ASSERT_TRUE(cons_car(cons_cdr(cons_cdr(rev))) == make_fixnum(1));
 
   // list->vector
   scm_obj_t l2v = subr_list_to_vector(scm_nil, lst);
@@ -953,16 +954,16 @@ void test_pairs_lists_extra() {
   // set-car!
   scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
   subr_set_car(scm_nil, p, make_fixnum(99));
-  ASSERT_TRUE(CAR(p) == make_fixnum(99));
+  ASSERT_TRUE(cons_car(p) == make_fixnum(99));
 
   // list
   {
     scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
     scm_obj_t l = subr_list(scm_nil, 3, args);
-    ASSERT_TRUE(is_cons(l) && CAR(l) == make_fixnum(1));
-    ASSERT_TRUE(is_cons(CDR(l)) && CAR(CDR(l)) == make_fixnum(2));
-    ASSERT_TRUE(is_cons(CDR(CDR(l))) && CAR(CDR(CDR(l))) == make_fixnum(3));
-    ASSERT_TRUE(CDR(CDR(CDR(l))) == scm_nil);
+    ASSERT_TRUE(is_cons(l) && cons_car(l) == make_fixnum(1));
+    ASSERT_TRUE(is_cons(cons_cdr(l)) && cons_car(cons_cdr(l)) == make_fixnum(2));
+    ASSERT_TRUE(is_cons(cons_cdr(cons_cdr(l))) && cons_car(cons_cdr(cons_cdr(l))) == make_fixnum(3));
+    ASSERT_TRUE(cons_cdr(cons_cdr(cons_cdr(l))) == scm_nil);
   }
 
   // list-transpose
@@ -973,10 +974,10 @@ void test_pairs_lists_extra() {
     scm_obj_t args[] = {l1, l2};
     scm_obj_t res = subr_list_transpose(scm_nil, 2, args);
     // res should be ((1 3) (2 4))
-    scm_obj_t r1 = CAR(res);
-    scm_obj_t r2 = CAR(CDR(res));
-    ASSERT_TRUE(CAR(r1) == make_fixnum(1) && CAR(CDR(r1)) == make_fixnum(3));
-    ASSERT_TRUE(CAR(r2) == make_fixnum(2) && CAR(CDR(r2)) == make_fixnum(4));
+    scm_obj_t r1 = cons_car(res);
+    scm_obj_t r2 = cons_car(cons_cdr(res));
+    ASSERT_TRUE(cons_car(r1) == make_fixnum(1) && cons_car(cons_cdr(r1)) == make_fixnum(3));
+    ASSERT_TRUE(cons_car(r2) == make_fixnum(2) && cons_car(cons_cdr(r2)) == make_fixnum(4));
   }
 
   // list-transpose+
@@ -991,14 +992,14 @@ void test_pairs_lists_extra() {
   {
     // (cons* 1 2 3) -> (1 2 . 3)
     scm_obj_t args[] = {make_fixnum(1), make_fixnum(2), make_fixnum(3)};
-    scm_obj_t res = subr_cons_ast(scm_nil, 3, args);
-    ASSERT_TRUE(CAR(res) == make_fixnum(1));
-    ASSERT_TRUE(CAR(CDR(res)) == make_fixnum(2));
-    ASSERT_TRUE(CDR(CDR(res)) == make_fixnum(3));
+    scm_obj_t res = subr_cons_star(scm_nil, 3, args);
+    ASSERT_TRUE(cons_car(res) == make_fixnum(1));
+    ASSERT_TRUE(cons_car(cons_cdr(res)) == make_fixnum(2));
+    ASSERT_TRUE(cons_cdr(cons_cdr(res)) == make_fixnum(3));
 
     // (cons* 1) -> 1
     scm_obj_t args1[] = {make_fixnum(1)};
-    ASSERT_TRUE(subr_cons_ast(scm_nil, 1, args1) == make_fixnum(1));
+    ASSERT_TRUE(subr_cons_star(scm_nil, 1, args1) == make_fixnum(1));
   }
 }
 
@@ -1466,10 +1467,10 @@ void test_hashtable_alist() {
     bool found_a = false, found_b = false, found_c = false;
     scm_obj_t cur = alist;
     while (is_cons(cur)) {
-      scm_obj_t p = CAR(cur);
+      scm_obj_t p = cons_car(cur);
       ASSERT_TRUE(is_cons(p));
-      scm_obj_t k = CAR(p);
-      scm_obj_t v = CDR(p);
+      scm_obj_t k = cons_car(p);
+      scm_obj_t v = cons_cdr(p);
       if (k == ka) {
         ASSERT_TRUE(v == make_fixnum(1));
         found_a = true;
@@ -1483,7 +1484,7 @@ void test_hashtable_alist() {
         found_c = true;
       }
       count++;
-      cur = CDR(cur);
+      cur = cons_cdr(cur);
     }
     ASSERT_TRUE(cur == scm_nil);  // proper list
     ASSERT_TRUE(count == 3);
@@ -1506,10 +1507,10 @@ void test_hashtable_alist() {
 
     scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
     ASSERT_TRUE(is_cons(alist));
-    ASSERT_TRUE(CDR(alist) == scm_nil);  // exactly one entry
-    scm_obj_t p = CAR(alist);
-    ASSERT_TRUE(CAR(p) == kb);
-    ASSERT_TRUE(CDR(p) == make_fixnum(20));
+    ASSERT_TRUE(cons_cdr(alist) == scm_nil);  // exactly one entry
+    scm_obj_t p = cons_car(alist);
+    ASSERT_TRUE(cons_car(p) == kb);
+    ASSERT_TRUE(cons_cdr(p) == make_fixnum(20));
   }
 
   // ----------------------------------------------------------------
@@ -1537,8 +1538,8 @@ void test_hashtable_alist() {
     scm_obj_t alist = subr_hashtable_alist(scm_nil, ht);
     scm_obj_t found_a = subr_assq(scm_nil, ka, alist);
     scm_obj_t found_b = subr_assq(scm_nil, kb, alist);
-    ASSERT_TRUE(is_cons(found_a) && CDR(found_a) == make_fixnum(42));
-    ASSERT_TRUE(is_cons(found_b) && CDR(found_b) == make_fixnum(99));
+    ASSERT_TRUE(is_cons(found_a) && cons_cdr(found_a) == make_fixnum(42));
+    ASSERT_TRUE(is_cons(found_b) && cons_cdr(found_b) == make_fixnum(99));
     ASSERT_TRUE(subr_assq(scm_nil, make_symbol("absent"), alist) == scm_false);
   }
 

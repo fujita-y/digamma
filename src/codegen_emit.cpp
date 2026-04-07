@@ -106,7 +106,7 @@ void codegen_t::emit_inst(const Instruction& inst) {
 void codegen_t::emit_safepoint(const Instruction& inst) {
   llvm::FunctionType* ft = llvm::FunctionType::get(BL.getVoidTy(), false);
   llvm::Function* safepoint_func = get_or_create_external_function("c_safepoint", ft, (void*)&c_safepoint);
-  BL.CreateCall(safepoint_func);
+  BL.CreateCall(ft, safepoint_func);
 }
 
 // Emit a constant value to a register
@@ -190,7 +190,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   llvm::Type* int32Ty = this->getInt32Type();
 
   // Prepare common arguments
-  llvm::Value* code_ptr = BL.CreateBitCast(closure_func, voidPtrTy);
+  llvm::Value* code_ptr = closure_func;
   llvm::Value* argc = createInt32Constant(CT, inst.argc);
 
   llvm::Value* closure;
@@ -199,7 +199,7 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
     std::vector<llvm::Type*> simpleArgTypes = {voidPtrTy, int32Ty};
     llvm::FunctionType* simpleFT = llvm::FunctionType::get(intptrTy, simpleArgTypes, false);
     llvm::Function* make_simple_closure_func = get_or_create_external_function("c_make_closure_s1", simpleFT, (void*)&c_make_closure_s1);
-    closure = BL.CreateCall(make_simple_closure_func, {code_ptr, argc}, "closure");
+    closure = BL.CreateCall(simpleFT, make_simple_closure_func, {code_ptr, argc}, "closure");
   } else {
     // General case: Prepare environment array
     llvm::Value* env_array = nullptr;
@@ -208,11 +208,11 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
       env_array = TmpB.CreateAlloca(intptrTy, createInt32Constant(CT, nenv), "env");
       scm_obj_t curr = inst.free_indices;
       for (int i = 0; i < nenv; i++) {
-        int reg_idx = parse_reg(CAR(curr));
+        int reg_idx = parse_reg(cons_car(curr));
         llvm::Value* reg_val = get_reg(reg_idx);
         llvm::Value* ptr = BL.CreateGEP(BL.getInt64Ty(), env_array, createInt32Constant(CT, i));
         BL.CreateStore(reg_val, ptr);
-        curr = CDR(curr);
+        curr = cons_cdr(curr);
       }
     } else {
       env_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
@@ -223,10 +223,10 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 
     llvm::Value* rest = createInt32Constant(CT, inst.has_rest ? 1 : 0);
     llvm::Value* nenv_val = createInt32Constant(CT, nenv);
-    llvm::Value* env_ptr = BL.CreateBitCast(env_array, voidPtrTy);
+    llvm::Value* env_ptr = env_array;
 
     std::vector<llvm::Value*> callArgs = {code_ptr, argc, rest, nenv_val, env_ptr};
-    closure = BL.CreateCall(make_closure_func, callArgs, "closure");
+    closure = BL.CreateCall(ft, make_closure_func, callArgs, "closure");
   }
 
   set_reg(inst.rn1, closure);
@@ -272,6 +272,54 @@ void codegen_t::emit_global_ref(const Instruction& inst) {
 
   // Load the value directly
   llvm::Value* val = BL.CreateLoad(this->getInt64Type(), value_ptr, "gref_val");
+
+  if (rec->value == scm_undef && global_closure_defs.count(inst.opr2) == 0) {
+    // Variable is unbound at compile time — it may be defined at runtime (e.g.
+    // letrec forward refs), so emit a runtime guard.
+    //
+    // Structure:
+    //   if (val == scm_undef) goto error_bb;   // cold / unlikely
+    //   goto ok_bb;
+    // error_bb:
+    //   c_unbound_variable_error(name);  // NoReturn — never falls through
+    //   unreachable
+    // ok_bb:
+    //   ... (set_reg below)
+
+    llvm::Value* scm_undef_v = createInt64Constant(CT, (uint64_t)scm_undef);
+    llvm::Value* is_undef = BL.CreateICmpEQ(val, scm_undef_v, "is_undef");
+
+    llvm::BasicBlock* error_bb = llvm::BasicBlock::Create(CT, "gref_undef_err", current_function);
+    llvm::BasicBlock* ok_bb = llvm::BasicBlock::Create(CT, "gref_ok", current_function);
+
+    // Apply branch weights: error path is very unlikely (weight 1 vs 1000)
+    llvm::MDBuilder mdb(CT);
+    llvm::MDNode* weights = mdb.createBranchWeights(1, 1000);
+    BL.CreateCondBr(is_undef, error_bb, ok_bb, weights);
+
+    // --- error path ---
+    BL.SetInsertPoint(error_bb);
+    {
+      // Intern the variable name as a module-level constant C string
+      std::string var_name = to_string(inst.opr2);
+      llvm::Value* name_ptr = BL.CreateGlobalString(var_name, "gref_name");
+
+      // c_unbound_variable_error(const char* name) — NoReturn + Cold
+      llvm::FunctionType* err_ft = llvm::FunctionType::get(BL.getVoidTy(), {BL.getPtrTy()}, false);
+      llvm::Function* err_func = get_or_create_external_function("c_unbound_variable_error", err_ft, (void*)&c_unbound_variable_error);
+      llvm::CallInst* err_call = BL.CreateCall(err_ft, err_func, {name_ptr});
+      err_call->setCallingConv(llvm::CallingConv::C);
+      // NoReturn function: terminate this block with unreachable
+      BL.CreateUnreachable();
+    }
+
+    // --- normal path ---
+    BL.SetInsertPoint(ok_bb);
+
+#ifndef NDEBUG
+    printf("forward global-ref: %s %s\n", to_string(inst.opr2).c_str(), to_string(rec->value).c_str());
+#endif
+  }
 
   set_reg(inst.rn1, val);
 }
@@ -521,7 +569,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
 
         if (has_rest) {
           if (inst.argc < fixed_argc) {
-            throw std::runtime_error("error in codegen: too few arguments to apply: " + scm_obj_to_string(inst.closure_label));
+            throw std::runtime_error("error in codegen: too few arguments to apply: " + to_string(inst.closure_label));
           }
           args.push_back(createInt64Constant(CT, inst.argc));
           llvm::Value* argv_array = nullptr;
@@ -538,7 +586,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           args.push_back(argv_array);
         } else {
           if (inst.argc != fixed_argc) {
-            throw std::runtime_error("error in codegen: wrong number of arguments to apply: " + scm_obj_to_string(inst.closure_label));
+            throw std::runtime_error("error in codegen: wrong number of arguments to apply: " + to_string(inst.closure_label));
           }
           for (int i = 0; i < inst.argc; i++) {
             args.push_back(get_reg(i));
@@ -639,7 +687,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           llvm::Function::Create(target_func->getFunctionType(), llvm::Function::ExternalLinkage, target_func->getName(), this->main_module);
     }
 
-    llvm::CallInst* call = BL.CreateCall(local_target_func, args, is_tail ? "tail_call_opt" : "call_opt");
+    llvm::CallInst* call = BL.CreateCall(local_target_func->getFunctionType(), local_target_func, args, is_tail ? "tail_call_opt" : "call_opt");
     call->setCallingConv(CLOSURE_CALLING_CONV);
 
     if (is_tail) {
@@ -796,7 +844,7 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
   llvm::Type* i8_ptr = BL.getPtrTy();
   llvm::FunctionType* test_ft = llvm::FunctionType::get(BL.getVoidTy(), {i64, i32, i8_ptr}, false);
   llvm::Function* test_func = get_or_create_external_function("c_test_application", test_ft, (void*)&c_test_application);
-  llvm::Value* proc_name_val = BL.CreateGlobalString(scm_obj_to_string(inst.closure_label), "proc_name");
+  llvm::Value* proc_name_val = BL.CreateGlobalString(to_string(inst.closure_label), "proc_name");
   BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc), proc_name_val});
 
   if (inst.argc <= BRIDGE_MAX_ARGS) {
@@ -1102,7 +1150,7 @@ void codegen_t::emit_make_cell(const Instruction& inst) {
   llvm::Value* val = get_reg(inst.rn1);
 
   // Call c_make_cell
-  llvm::Value* cell = BL.CreateCall(make_cell_func, {val}, "cell");
+  llvm::Value* cell = BL.CreateCall(ft, make_cell_func, {val}, "cell");
 
   // Store result back to register
   set_reg(inst.rn1, cell);

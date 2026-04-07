@@ -1,11 +1,11 @@
 ;;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-module (core pretty-print) 
-(export pretty-print)
-(import (core destructuing-match) (core parameterize))
-(begin
+(define-module (core pretty-print)
 
+(export pretty-print)
+
+(import (core destructuring-match))
 
 #|
 
@@ -66,7 +66,6 @@
 (define pretty-print-line-length (make-parameter 100))
 (define pretty-print-initial-indent (make-parameter 0))
 (define pretty-print-maximum-lines (make-parameter #f))
-(define pretty-print-unwrap-syntax (make-parameter #f))
 
 (define pretty-print
   (lambda (expr . port)
@@ -210,22 +209,20 @@
                  (if (= (vector-length obj) 0)
                      "#()"
                      `(.&GROUP "#(" (.&NEST 2 ,@(parse-list (vector->list obj))) ")")))
-                ((tuple? obj)
-                 (format "~w" obj))
-                ((pretty-print-unwrap-syntax)
-                 (format "~u" obj))
                 (else
                  (format "~s" obj)))))
-      (if (cyclic-object? expr)
-          (format port "~w" expr)
-          (let ((width (pretty-print-line-length)))
-            (parameterize ((collect-notify #f))
-              (print width 0 `((,(pretty-print-initial-indent) .&FLAT ,(parse expr)))))))
-      (cond ((and n-more-lines (<= n-more-lines 0))
-             (put-char port #\newline)
-             (let loop ((i (pretty-print-initial-indent))) (and (> i 0) (put-char port #\space) (loop (- i 1))))
-             (put-string port "  ..."))
-            (else
-             (unspecified))))))
 
-))
+      (if (cyclic-object? expr)
+          (put-string port (format "~w" expr))
+          (let ((width (pretty-print-line-length)))
+            (print width 0 `((,(pretty-print-initial-indent) .&FLAT ,(parse expr))))))
+
+      (if (and n-more-lines (<= n-more-lines 0))
+          (begin
+            (put-char port #\newline)
+            (let loop ((i (pretty-print-initial-indent))) (and (> i 0) (put-char port #\space) (loop (- i 1))))
+            (put-string port "  ...")))
+
+      (put-char port #\newline)
+      (flush-output-port port))))
+)

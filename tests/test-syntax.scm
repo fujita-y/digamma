@@ -57,7 +57,7 @@
 
 (define (test-eval-strip-sc expected expr msg)
   (test-eval-strip msg expr expected))
-\n(display "\n>>> macroexpand\n")
+(display "\n>>> macroexpand\n")
 
 ;; Test 1: Simple macro
 
@@ -826,7 +826,7 @@
     (display "ALL TESTS PASSED.\n")
     (begin
       (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)\n\n(display "\n>>> Section 1: Standalone expansion tests\n")
+(newline)(display "\n>>> Section 1: Standalone expansion tests\n")
 
 ;; Test basic matching
 (let* ((input (make-syntax-object '(foo 1 2 3) '()))
@@ -1273,7 +1273,7 @@
     (display "ALL TESTS PASSED.\n")
     (begin
       (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)\n\n(display "\n>>> Section 1: Variable Transformers\n")
+(newline)(display "\n>>> Section 1: Variable Transformers\n")
 
 (macroexpand
  '(define-syntax var-trans
@@ -1338,7 +1338,7 @@
     (display "ALL TESTS PASSED.\n")
     (begin
       (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)\n\n(display "\n>>> Section 1: R7RS syntax-rules Features\n")
+(newline)(display "\n>>> Section 1: R7RS syntax-rules Features\n")
 
 (macroexpand
  '(define-syntax nested-rules

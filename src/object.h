@@ -210,6 +210,17 @@ inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #endif
 }
 
+inline uintptr_t tag_tc6(scm_tc6_t tag) { return (tag & 0x3f00) >> 8; }
+
+inline uintptr_t heap_tc6(scm_obj_t x) {
+  assert(is_heap_object(x));
+#if USE_TBI
+  return __builtin_rotateleft64(x, 7) & 0x3f;
+#else
+  return tag_tc6(*(scm_tc6_t*)(x - 2));
+#endif
+}
+
 inline void* to_address(scm_obj_t x) {
   assert(is_heap_object(x));
   return (void*)(x - 2);
@@ -254,7 +265,11 @@ scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_
                             scm_obj_t winders);
 scm_obj_t make_port(scm_obj_t name);
 
-inline intptr_t fixnum(scm_obj_t x) { return ((intptr_t)x >> 1); }
+inline intptr_t fixnum(scm_obj_t x) {
+  assert(is_fixnum(x));
+  return ((intptr_t)x >> 1);
+}
+
 double flonum(scm_obj_t x);
 uint8_t* symbol_name(scm_obj_t x);
 uint8_t* string_name(scm_obj_t x);
@@ -263,22 +278,68 @@ scm_obj_t environment_variables(scm_obj_t x);
 scm_obj_t environment_macros(scm_obj_t x);
 uint8_t* environment_name(scm_obj_t x);
 
-inline int vector_nsize(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->nsize; }
-inline scm_obj_t* vector_elts(scm_obj_t x) { return ((scm_vector_rec_t*)to_address(x))->elts; }
-inline int values_nsize(scm_obj_t x) { return ((scm_values_rec_t*)to_address(x))->nsize; }
-inline scm_obj_t* values_elts(scm_obj_t x) { return ((scm_values_rec_t*)to_address(x))->elts; }
-inline int u8vector_nsize(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->nsize; }
-inline uint8_t* u8vector_elts(scm_obj_t x) { return ((scm_u8vector_rec_t*)to_address(x))->elts; }
-inline scm_obj_t cell_value(scm_obj_t x) { return ((scm_cell_rec_t*)to_address(x))->value; }
+inline int vector_nsize(scm_obj_t x) {
+  assert(is_vector(x));
+  return ((scm_vector_rec_t*)to_address(x))->nsize;
+}
+
+inline scm_obj_t* vector_elts(scm_obj_t x) {
+  assert(is_vector(x));
+  return ((scm_vector_rec_t*)to_address(x))->elts;
+}
+
+inline int values_nsize(scm_obj_t x) {
+  assert(is_values(x));
+  return ((scm_values_rec_t*)to_address(x))->nsize;
+}
+
+inline scm_obj_t* values_elts(scm_obj_t x) {
+  assert(is_values(x));
+  return ((scm_values_rec_t*)to_address(x))->elts;
+}
+
+inline int u8vector_nsize(scm_obj_t x) {
+  assert(is_u8vector(x));
+  return ((scm_u8vector_rec_t*)to_address(x))->nsize;
+}
+inline uint8_t* u8vector_elts(scm_obj_t x) {
+  assert(is_u8vector(x));
+  return ((scm_u8vector_rec_t*)to_address(x))->elts;
+}
+inline scm_obj_t cell_value(scm_obj_t x) {
+  assert(is_cell(x));
+  return ((scm_cell_rec_t*)to_address(x))->value;
+}
+
 void cell_value_set(scm_obj_t x, scm_obj_t v);
 
-inline int closure_argc(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->argc; }
-inline int closure_rest(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->rest; }
-inline int closure_nenv(scm_obj_t x) { return ((scm_closure_rec_t*)to_address(x))->nenv; }
+inline int closure_argc(scm_obj_t x) {
+  assert(is_closure(x));
+  return ((scm_closure_rec_t*)to_address(x))->argc;
+}
+
+inline int closure_rest(scm_obj_t x) {
+  assert(is_closure(x));
+  return ((scm_closure_rec_t*)to_address(x))->rest;
+}
+
+inline int closure_nenv(scm_obj_t x) {
+  assert(is_closure(x));
+  return ((scm_closure_rec_t*)to_address(x))->nenv;
+}
 
 bool is_symbol_interned(scm_obj_t x);
 
-#define CAR(x) (((scm_cons_rec_t*)(x))->car)
-#define CDR(x) (((scm_cons_rec_t*)(x))->cdr)
+inline scm_obj_t cons_car(scm_obj_t x) {
+  assert(is_cons(x));
+  return ((scm_cons_rec_t*)(x))->car;
+}
+
+inline scm_obj_t cons_cdr(scm_obj_t x) {
+  assert(is_cons(x));
+  return ((scm_cons_rec_t*)(x))->cdr;
+}
+
+std::string to_string(scm_obj_t obj);
 
 #endif

@@ -41,6 +41,36 @@
         (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (for-each-n proc lst)))
               (else (error 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
+(define every
+  (lambda (proc lst1 . lst2)
+    (define every-1
+      (lambda (proc lst)
+        (or (null? lst)
+            (let loop ((head (car lst)) (rest (cdr lst)))
+              (if (null? rest) (proc head) (and (proc head) (loop (car rest) (cdr rest))))))))
+    (define every-n
+      (lambda (proc lst)
+        (or (null? lst)
+            (let loop ((head (car lst)) (rest (cdr lst)))
+              (if (null? rest) (apply proc head) (and (apply proc head) (loop (car rest) (cdr rest))))))))
+    (if (null? lst2) (every-1 proc lst1) (every-n proc (apply list-transpose* lst1 lst2)))))
+    
+(define any
+  (lambda (proc lst1 . lst2)
+    (define any-1
+      (lambda (proc lst)
+        (cond ((null? lst) #f)
+              (else
+                (let loop ((head (car lst)) (rest (cdr lst)))
+                  (if (null? rest) (proc head) (or (proc head) (loop (car rest) (cdr rest)))))))))
+    (define any-n
+      (lambda (proc lst)
+        (cond ((null? lst) #f)
+              (else
+                (let loop ((head (car lst)) (rest (cdr lst)))
+                  (if (null? rest) (apply proc head) (or (apply proc head) (loop (car rest) (cdr rest)))))))))
+    (if (null? lst2) (any-1 proc lst1) (any-n proc (apply list-transpose* lst1 lst2)))))
+
 (define make-parameter
   (lambda (init . rest)
     (define parameter-proc-0
@@ -70,73 +100,67 @@
                    (error 'make-parameter "wrong number of arguments" (cons* init rest))))))
       (begin (param init) param))))
 
-(define (every? pred lis1 . lists)
-  (let ((lists (cons lis1 lists)))
-    (if (null? (cdr lists))
-        ;; Single list case
-        (let lp ((l (car lists)))
-          (cond ((null? l) #t)
-                ((null? (cdr l)) (pred (car l)))
-                ((pred (car l)) (lp (cdr l)))
-                (else #f)))
-        ;; Multi-list case
-        (let lp ((l lists))
-          (cond ((null? (car l)) #t) ; Any list empty?
-                ((null? (cadar l)) ; Is this the last element?
-                 (apply pred (map car l)))
-                ((apply pred (map car l))
-                 (lp (map cdr l)))
-                (else #f))))))
+(define call-with-port
+  (lambda (port proc)
+    (call-with-values
+      (lambda () (proc port))
+      (lambda args
+        (close-port port)
+        (apply values args)))))
 
-(define drop-last-cdr
-  (lambda (lst)
-    (cond ((null? lst) '())
-          (else
-           (let loop ((lst lst))
-             (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
-                     (else '())))))))
+(define call-with-string-output-port
+  (lambda (proc)
+    (call-with-values
+      (lambda () (open-string-output-port))
+      (lambda (port extract)
+        (proc port)
+        (let ((result (extract))) (close-port port) result)))))
 
-(define drop-last-pair
-  (lambda (lst)
-    (cond ((null? lst) '())
-          (else
-            (let loop ((lst lst))
-              (cond ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst))))
-                    (else '())))))))
+(define scheme-load-paths (make-parameter '()))
 
-(define last-pair
-  (lambda (lst)
-    (cond ((null? lst) '())
-          (else
-            (let loop ((lst lst))
-              (cond ((pair? (cdr lst)) (loop (cdr lst)))
-                    (else lst)))))))
+(define add-load-path
+  (lambda (path)
+    (cond ((string? path)
+           (or (string=? path "")
+               (member path (scheme-load-paths))
+               (scheme-load-paths (cons path (scheme-load-paths))))
+           (scheme-load-paths))
+          (else (assertion-violation 'add-load-path (format "expected string, but got ~s" path))))))
 
-(define last-cdr
-  (lambda (lst)
-    (cond ((pair? lst)
-            (let loop ((lst lst))
-              (cond ((pair? (cdr lst)) (loop (cdr lst)))
-                    (else (cdr lst)))))
-          (else lst))))
+(define load
+  (lambda (filename . opt-env)
+    (let ((env (if (null? opt-env) (current-environment) (car opt-env))))
+      (let ((path
+              (if (file-exists? filename)
+                  filename
+                  (any
+                    (lambda (prefix)
+                      (let ((path (string-append prefix "/" filename)))
+                        (and (file-exists? path) path)))
+                    (scheme-load-paths)))))
+        (if path
+            (call-with-port
+              (open-file-input-port path)
+              (lambda (port)
+                (let loop ((expr (read port)))
+                  (cond ((eof-object? expr) (unspecified))
+                        (else (core-eval expr env) (loop (read port)))))))
+            (assertion-violation 'load (format "file ~s not found" filename)))))))
 
-(define count-pair
-  (lambda (lst)
-    (let loop ((lst lst) (n 0))
-      (cond ((pair? lst) (loop (cdr lst) (+ n 1)))
-            (else n)))))
-
-(define last-n-pair
-  (lambda (n lst)
-    (let ((m (count-pair lst)))
-      (cond ((< m n) '())
-            (else (list-tail lst (- m n)))))))
-            
-(define drop-last-n-pair
-  (lambda (n lst)
-    (cond ((null? lst) '())
-          (else
-            (let loop ((lst lst) (m (- (count-pair lst) n)))
-              (cond ((<= m 0) '())
-                    ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst) (- m 1))))
-                    (else '())))))))
+(define load-module
+  (lambda (ref)
+    (define (path-for ref)
+      (string-append
+        (apply
+          string-append
+            (cdr (let loop ((lst ref))
+                   (cond ((null? lst) '())
+                         ((symbol? (car lst))
+                          (cons "/" (cons (symbol->string (car lst)) (loop (cdr lst)))))
+                         ((number? (car lst))
+                          (cons "/" (cons (number->string (car lst)) (loop (cdr lst)))))
+                         (else (loop (cdr lst)))))))
+        ".scm"))
+    (if (assoc ref (current-module-registry))
+        (unspecified)
+        (load (path-for ref)))))

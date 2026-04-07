@@ -1,5 +1,4 @@
 ;; test_letrec_star_expansion.scm
-(if (not (undefined? load)) (load "../core.scm"))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

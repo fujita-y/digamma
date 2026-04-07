@@ -60,9 +60,8 @@ unsigned int eqv_hash(scm_obj_t obj, unsigned int bound) {
 static unsigned int obj_hash(scm_obj_t obj, int depth) {
   if (depth > EQUAL_HASH_DEPTH_LIMIT) return 17;
   if (is_cons(obj)) {
-    scm_cons_rec_t* cons = (scm_cons_rec_t*)obj;
-    uint32_t hash1 = obj_hash(cons->car, depth + 2);
-    uint32_t hash2 = obj_hash(cons->cdr, depth + 1);
+    uint32_t hash1 = obj_hash(cons_car(obj), depth + 2);
+    uint32_t hash2 = obj_hash(cons_cdr(obj), depth + 1);
     return (hash1 + hash2 * 64 - hash2);
   }
   if (is_heap_object(obj)) {

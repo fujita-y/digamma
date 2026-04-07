@@ -118,7 +118,7 @@ void nanos_t::load_ir(std::string filename) {
     if (is_cons(obj)) {
 #if IR_VERBOSE
       printf("codegen: ");
-      printer.write(CAR(CDR(obj)));
+      printer.write(cons_car(cons_cdr(obj)));
       puts("");
 #endif
       try {
@@ -251,9 +251,8 @@ bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& pri
   add_history(rx, input_buffer);
   input_buffer.clear();
 
-  for (scm_obj_t obj : objs) {
-    evaluate(obj, printer);
-  }
+  scoped_gc_protect_vector protect(objs);
+  for (scm_obj_t obj : objs) evaluate(obj, printer);
 
   return true;
 }

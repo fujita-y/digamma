@@ -197,7 +197,7 @@ void concurrent_heap_t::synchronized_collect() {
     if (m_collector_terminating) return;
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       uint8_t* slab = m_concurrent_pool->m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT);
-      traits->owner->sweep(slab);
+      if (traits->owner) traits->owner->sweep(slab);
     }
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }

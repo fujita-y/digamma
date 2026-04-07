@@ -10,9 +10,16 @@
 void port_finalize(scm_port_rec_t* rec);
 std::ostream* port_get_ostream(scm_obj_t port);
 std::istream* port_get_istream(scm_obj_t port);
+scm_obj_t port_open_input_file(const char* filename);
+scm_obj_t port_open_output_file(const char* filename);
 scm_obj_t port_put_byte(scm_obj_t port, uint8_t byte);
 scm_obj_t port_put_bytes(scm_obj_t port, const uint8_t* byte, int bsize);
+scm_obj_t port_put_char(scm_obj_t port, scm_obj_t ch);
+scm_obj_t port_put_string(scm_obj_t port, scm_obj_t str);
 scm_obj_t port_flush_output(scm_obj_t port);
+void port_close(scm_obj_t port);
+scm_obj_t port_open_string_output_port();
+scm_obj_t port_get_output_string(scm_obj_t port);
 scm_obj_t port_standard_input();
 scm_obj_t port_standard_output();
 scm_obj_t port_standard_error();

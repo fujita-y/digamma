@@ -37,24 +37,6 @@
           ((pair? x) (loop (cdr x)))
           (else #f))))
 
-;; Returns #t if any element of lst satisfies pred.
-(define (any pred lst)
-  (let loop ((lst lst))
-    (cond ((null? lst) #f)
-          ((pred (car lst)) #t)
-          (else (loop (cdr lst))))))
-
-(define any? any)
-
-;; Returns #t if every element of lst satisfies pred.
-(define (every pred lst)
-  (let loop ((lst lst))
-    (cond ((null? lst) #t)
-          ((pred (car lst)) (loop (cdr lst)))
-          (else #f))))
-
-(define every? every)
-
 ;;=============================================================================
 ;; List Transformation & Iteration
 ;;=============================================================================

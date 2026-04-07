@@ -5,11 +5,12 @@
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
 #include "codegen.h"
+#include "context.h"
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
-#include "context.h"
 #include "reader.h"
+
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
@@ -422,21 +423,21 @@ int main(int argc, char** argv) {
       printf("RestArgumentsExtra: expected cons, got %lx\n", result);
       return false;
     }
-    if (CAR(result) != make_fixnum(30)) {
-      printf("RestArgumentsExtra: car mismatch, expected 30, got %lx\n", CAR(result));
+    if (cons_car(result) != make_fixnum(30)) {
+      printf("RestArgumentsExtra: car mismatch, expected 30, got %lx\n", cons_car(result));
       return false;
     }
-    scm_obj_t cdr = CDR(result);
+    scm_obj_t cdr = cons_cdr(result);
     if (!is_cons(cdr)) {
       printf("RestArgumentsExtra: cdr expected cons, got %lx\n", cdr);
       return false;
     }
-    if (CAR(cdr) != make_fixnum(40)) {
-      printf("RestArgumentsExtra: cadr mismatch, expected 40, got %lx\n", CAR(cdr));
+    if (cons_car(cdr) != make_fixnum(40)) {
+      printf("RestArgumentsExtra: cadr mismatch, expected 40, got %lx\n", cons_car(cdr));
       return false;
     }
-    if (CDR(cdr) != scm_nil) {
-      printf("RestArgumentsExtra: cddr mismatch, expected nil, got %lx\n", CDR(cdr));
+    if (cons_cdr(cdr) != scm_nil) {
+      printf("RestArgumentsExtra: cddr mismatch, expected nil, got %lx\n", cons_cdr(cdr));
       return false;
     }
     return true;
@@ -477,14 +478,14 @@ int main(int argc, char** argv) {
       printf("GlobalClosureRest: expected cons, got %lx\n", result);
       return false;
     }
-    if (CAR(result) != make_fixnum(3)) return false;
-    scm_obj_t cdr1 = CDR(result);
+    if (cons_car(result) != make_fixnum(3)) return false;
+    scm_obj_t cdr1 = cons_cdr(result);
     if (!is_cons(cdr1)) return false;
-    if (CAR(cdr1) != make_fixnum(4)) return false;
-    scm_obj_t cdr2 = CDR(cdr1);
+    if (cons_car(cdr1) != make_fixnum(4)) return false;
+    scm_obj_t cdr2 = cons_cdr(cdr1);
     if (!is_cons(cdr2)) return false;
-    if (CAR(cdr2) != make_fixnum(5)) return false;
-    if (CDR(cdr2) != scm_nil) return false;
+    if (cons_car(cdr2) != make_fixnum(5)) return false;
+    if (cons_cdr(cdr2) != scm_nil) return false;
 
     return true;
   });

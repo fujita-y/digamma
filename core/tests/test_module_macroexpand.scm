@@ -1,7 +1,6 @@
 ;; test_module_macroexpand.scm
 ;; Test suite for define-module and import-module in macroexpand.scm
 
-(if (not (undefined? load)) (load "../core.scm"))
 
 (copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
 

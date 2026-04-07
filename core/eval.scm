@@ -42,5 +42,5 @@
         (let* ((expanded (macroexpand expr))
                (optimized (optimize expanded))
                (coreform (lambda-lift optimized))))
-          lifted)))
+          coreform)))
 

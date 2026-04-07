@@ -1,6 +1,5 @@
 ;; test_syntax_case.scm
 ;; Test suite for syntax-case and related R6RS features.
-(if (not (undefined? load)) (load "../core.scm"))
 
 (copy-environment-variables! (current-environment) (system-environment) '(expand-syntax-case make-syntax-object strip-renames))
 

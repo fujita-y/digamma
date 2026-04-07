@@ -7,15 +7,20 @@
 #include "core.h"
 #include "object.h"
 
+#include <unordered_map>
+
 class printer_t {
   std::ostream& out;
-  void print(scm_obj_t obj, bool display_mode);
+  int m_shared_tag;
+  void scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj);
+  void print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode);
 
  public:
-  printer_t(std::ostream& os) : out(os) {}
+  printer_t(std::ostream& os) : out(os), m_shared_tag(0) {}
   void write(scm_obj_t obj);
+  void write_ss(scm_obj_t obj);
   void display(scm_obj_t obj);
-  void format(const char* fmt, ...);
+  void printf(const char* fmt, ...);
 };
 
 #endif

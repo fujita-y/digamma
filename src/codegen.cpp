@@ -132,9 +132,11 @@ void codegen_t::configure_module(llvm::Module& M) {
 }
 
 std::string codegen_t::generate_unique_suffix() {
+  static std::mutex rng_mutex;
   static int counter = 0;
   static std::mt19937 gen(std::random_device{}());
   static std::uniform_int_distribution<uint32_t> distrib(0, UINT32_MAX);
+  std::lock_guard<std::mutex> lock(rng_mutex);
   uint32_t val = distrib(gen);
   counter++;
   std::stringstream ss;
@@ -162,6 +164,9 @@ void codegen_t::reset_compile_state() {
   labels.clear();
   function_map.clear();
   closure_params.clear();
+  global_closure_defs.clear();
+  for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
+  gc_protected_objects.clear();
 }
 
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
@@ -181,7 +186,10 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase3_create_functions();
     phase4_generate_code();
     phase5_optimize_and_verify();
-    return phase6_finalize();
+    compiled_code_t code = phase6_finalize();
+    for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
+    gc_protected_objects.clear();
+    return code;
   } catch (...) {
     reset_compile_state();
     throw;
@@ -517,6 +525,7 @@ void codegen_t::init_opcode_map() {
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
   closure_params.clear();
+  global_closure_defs.clear();
 
   // Create main function info
   functions.emplace_back();
@@ -530,11 +539,11 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   // Closures always start with a unique label which starts with 'C'.
   while (curr != scm_nil) {
     if (!is_cons(curr)) break;
-    scm_obj_t inst_obj = CAR(curr);
-    curr = CDR(curr);
+    scm_obj_t inst_obj = cons_car(curr);
+    curr = cons_cdr(curr);
 
     // Check for LABEL opcode to detect function switch
-    if (is_cons(inst_obj) && CAR(inst_obj) == cached_symbol_label) {
+    if (is_cons(inst_obj) && cons_car(inst_obj) == cached_symbol_label) {
       scm_obj_t label = operand(inst_obj, 1);
       if (is_closure_label(label)) {
         // Start new function
@@ -546,10 +555,14 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
         // label instruction
         parse_single_instruction(inst_obj, *current_func, current_closure_label);
 
-        // Insert safepoint before the first instruction of the closure
+        // Insert safepoint before the first instruction of the closure.
+        // Use scm_nil for .original — the safepoint emitter never inspects it,
+        // and avoiding make_cons here prevents a heap allocation (and thus a
+        // potential GC kick) while we are mid-traversal of the GC-protected
+        // inst_list, which would race with the concurrent sweeper.
         Instruction safepoint_inst;
         safepoint_inst.op = Opcode::SAFEPOINT;
-        safepoint_inst.original = make_cons(cached_symbol_safepoint, scm_nil);
+        safepoint_inst.original = scm_nil;
         current_func->instructions.push_back(safepoint_inst);
 
         continue;
@@ -585,7 +598,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
   inst.original = inst_obj;
   inst.op = Opcode::UNKNOWN;
 
-  scm_obj_t op_sym = CAR(inst_obj);
+  scm_obj_t op_sym = cons_car(inst_obj);
 
   // Look up opcode
   auto it = opcode_map.find(op_sym);
@@ -724,9 +737,9 @@ void codegen_t::parse_make_closure(const scm_obj_t& inst_obj, Instruction& inst,
   // Update max reg for free indices
   scm_obj_t fi = inst.free_indices;
   while (is_cons(fi)) {
-    int r = parse_reg(CAR(fi));
+    int r = parse_reg(cons_car(fi));
     updateMaxRegister(r, func_info.max_reg);
-    fi = CDR(fi);
+    fi = cons_cdr(fi);
   }
 }
 
@@ -911,7 +924,7 @@ void codegen_t::setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual
   llvm::Value* rest_argv_ptr = BL.CreateGEP(intptrTy, argv_ptr, fixed_argc_val, "rest_argv_ptr");
 
   // Call helper to construct the rest list
-  llvm::Value* rest_list = BL.CreateCall(helper_func, {count_i32, rest_argv_ptr}, "rest_list");
+  llvm::Value* rest_list = BL.CreateCall(helperFT, helper_func, {count_i32, rest_argv_ptr}, "rest_list");
 
   // Store rest list to register[fixed_argc]
   // In Scheme, if a function has signature (lambda (a b . rest) ...),
@@ -931,7 +944,7 @@ void codegen_t::emitWriteBarrier(llvm::Value* value) {
   std::vector<llvm::Type*> wbArgTypes = {intptrTy};
   llvm::FunctionType* wbFT = llvm::FunctionType::get(voidTy, wbArgTypes, false);
   llvm::Function* wb_func = get_or_create_external_function("c_write_barrier", wbFT, (void*)&c_write_barrier);
-  BL.CreateCall(wb_func, {value});
+  BL.CreateCall(wbFT, wb_func, {value});
 }
 
 llvm::Function* codegen_t::get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr) {
@@ -940,6 +953,7 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
     func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, main_module);
     func->setDSOLocal(true);
     if (is_side_effect_free_aux_helper(name)) add_side_effect_free_attributes(func);
+    if (is_never_return_aux_helper(name)) add_never_return_attributes(func);
     // Register the symbol with the JIT's main dylib via absoluteSymbols
     llvm::orc::SymbolMap symbols;
     symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
@@ -961,6 +975,12 @@ void codegen_t::add_side_effect_free_attributes(llvm::Function* func) {
   func->addFnAttr(llvm::Attribute::NoSync);
 }
 
+void codegen_t::add_never_return_attributes(llvm::Function* func) {
+  auto& ctx = func->getContext();
+  func->addFnAttr(llvm::Attribute::NoReturn);
+  func->addFnAttr(llvm::Attribute::Cold);
+}
+
 void codegen_t::add_common_closure_attributes(llvm::Function* func) {
   func->setVisibility(llvm::GlobalValue::HiddenVisibility);
   func->setCallingConv(CLOSURE_CALLING_CONV);
@@ -973,8 +993,6 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 // ============================================================================
 
 void codegen_t::phase2_analyze_closure_labels() {
-  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
-
   struct State {
     std::unordered_map<int, scm_obj_t> regs;
     std::unordered_map<scm_obj_t, scm_obj_t> globals;
@@ -1057,7 +1075,11 @@ void codegen_t::phase2_analyze_closure_labels() {
 #ifndef NDEBUG
                 std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
 #endif
-                current_state.regs[inst.rn1] = make_string((const char*)symbol_name(inst.opr2));
+
+                scm_obj_t string_name = make_string((const char*)symbol_name(inst.opr2));
+                context::gc_protect(string_name);
+                gc_protected_objects.push_back(string_name);
+                current_state.regs[inst.rn1] = string_name;
               }
             }
             break;

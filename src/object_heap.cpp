@@ -169,8 +169,7 @@ void object_heap_t::trace(void* obj) {
     return;
   }
 
-  uintptr_t tag = *(uintptr_t*)obj;
-  uintptr_t tc6 = (tag & 0x3f00) >> 8;
+  uintptr_t tc6 = tag_tc6(*(scm_tc6_t*)obj);
 
   switch (tc6) {
     case tc6_cell: {
@@ -246,8 +245,7 @@ void object_heap_t::finalize(void* obj) {
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
   assert(traits->owner != &m_cons);
 
-  uintptr_t tag = *(uintptr_t*)obj;
-  uintptr_t tc6 = (tag & 0x3f00) >> 8;
+  uintptr_t tc6 = tag_tc6(*(scm_tc6_t*)obj);
 
   switch (tc6) {
     case tc6_symbol: {

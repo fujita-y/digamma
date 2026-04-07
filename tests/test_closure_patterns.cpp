@@ -5,11 +5,12 @@
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
 #include "codegen.h"
+#include "context.h"
 #include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
-#include "context.h"
 #include "reader.h"
+
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
@@ -229,8 +230,8 @@ int main(int argc, char** argv) {
     intptr_t result = env.codegen->compile(call_it).release_and_run();
     // Expect (42 99)
     if (!is_cons(result)) return false;
-    if (CAR(result) != make_fixnum(42)) return false;
-    if (CAR(CDR(result)) != make_fixnum(99)) return false;
+    if (cons_car(result) != make_fixnum(42)) return false;
+    if (cons_car(cons_cdr(result)) != make_fixnum(99)) return false;
     return true;
   });
 
@@ -292,8 +293,8 @@ int main(int argc, char** argv) {
 
     intptr_t result = env.codegen->compile(code).release_and_run();
     if (!is_cons(result)) return false;
-    if (CAR(result) != make_fixnum(1)) return false;
-    if (CDR(result) != make_fixnum(2)) return false;
+    if (cons_car(result) != make_fixnum(1)) return false;
+    if (cons_cdr(result) != make_fixnum(2)) return false;
     return true;
   });
 

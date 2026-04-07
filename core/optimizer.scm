@@ -225,10 +225,7 @@
         ((eq? (car expr) var)
          (cons val (map (lambda (e) (substitute-proc e var val)) (cdr expr))))
         (else
-         (let ((new-expr (map (lambda (e) (substitute-proc e var val)) expr)))
-           (if (and (pair? (car new-expr)) (eq? (car (car new-expr)) 'lambda))
-               (optimize-once new-expr)
-               new-expr)))))
+         (map (lambda (e) (substitute-proc e var val)) expr))))
 
 (define (substitute-many expr mapping)
   (if (null? mapping)
@@ -370,7 +367,12 @@
   (let ((test (optimize-inner (cadr expr) bound-vars))
         (then (optimize-inner (caddr expr) bound-vars))
         (els  (if (null? (cdddr expr)) '(unspecified) (optimize-inner (cadddr expr) bound-vars))))
-    (cond ((and (pair? test) (eq? (car test) 'if))
+    (cond ((and (pair? test) (eq? (car test) 'if)
+                ;; Only lift when then+else are cheap to duplicate — otherwise blowup is exponential
+                ;; for deeply nested (if (if ...) T E) patterns (e.g. generated pattern-matching code).
+                (<= (+ (compute-score then *cp0-effort-limit*)
+                       (compute-score els  *cp0-effort-limit*))
+                    *cp0-score-limit*))
            (let ((a (cadr test)) (b (caddr test)) (c (cadddr test)))
              (optimize-inner `(if ,a (if ,b ,then ,els) (if ,c ,then ,els)) bound-vars)))
           ((and (pair? test) (eq? (car test) 'quote)) (if (cadr test) then els))
@@ -430,6 +432,7 @@
         (cons proc args))))
 
 (define (optimize-once expr) (optimize-inner expr '()))
+#;(define (optimize expr) expr)
 (define (optimize expr)
   (hashtable-clear! global-env) (hashtable-clear! *inlining-depth*)
   (let loop ((current expr) (prev '()) (iters 0))
