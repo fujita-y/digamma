@@ -426,7 +426,7 @@
 ;; Fresh identifier generator.
 (define (generate-temporaries l)
   (let ((lst (syntax->list l)))
-    (map (lambda (x) (make-syntax-object (generate-temporary-symbol "temp.") '())) lst)))
+    (map (lambda (x) (make-syntax-object (generate-temporary-symbol "temp") '())) lst)))
 
 (define _expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f expand-syntax-case)
 (define _expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f expand-syntax)

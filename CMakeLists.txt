@@ -159,6 +159,12 @@ set(NANOS_CORE_SOURCES
   src/nanos_jit.cpp
   src/nanos_options.cpp
   src/nanos_subr.cpp
+  src/subr_hash.cpp
+  src/subr_base.cpp
+  src/subr_cxr.cpp
+  src/subr_env.cpp
+  src/subr_io.cpp
+  src/subr_misc.cpp
   src/object.cpp
   src/object_heap.cpp
   src/list.cpp

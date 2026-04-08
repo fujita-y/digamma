@@ -2,7 +2,7 @@
 ;; Test suite for define-module and import-module in macroexpand.scm
 
 
-(copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
+(copy-environment-variables! (system-environment) (current-environment) '(lookup-module))
 
 (define *pass-count* 0)
 (define *fail-count* 0)

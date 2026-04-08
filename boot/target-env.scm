@@ -1,12 +1,8 @@
 ;; copy macro builtins to interaction environment
-(copy-environment-macros! (interaction-environment) (current-environment)
+(copy-environment-macros! (current-environment) (interaction-environment)
   (map car (hashtable->alist (environment-macros (current-environment)))))
 
-;; copy core variables to interaction environment
-#;(copy-environment-variables! (interaction-environment) (current-environment)
-  (map car (hashtable->alist (environment-variables (current-environment)))))
-
-(copy-environment-variables! (interaction-environment) (current-environment)
+(copy-environment-variables! (current-environment) (interaction-environment)
 '(
 current-input-port
 current-output-port
@@ -34,6 +30,8 @@ every
 scheme-load-paths
 add-load-path
 load-module
+lookup-process-environment
+_eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f
 *
 +
 -
@@ -397,8 +395,8 @@ safepoint
 ;safe-to-inline-val?
 set-car!
 set-cdr!
-set-minus
-set-union
+;set-minus
+;set-union
 ;should-inline?
 ;small-procedure?
 ;split-internal-defines
@@ -429,9 +427,9 @@ syntax->datum
 ;*syntax-temp-counter*
 syntax-violation
 system-environment
-take
-take-elements
-*temp-value*
+;take
+;take-elements
+;*temp-value*
 ;transpose-matches
 ;try-drop-lambda
 undefined

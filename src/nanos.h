@@ -34,8 +34,9 @@ class nanos_t {
   void run();
 
   void evaluate(scm_obj_t obj, printer_t& printer);
-  scm_obj_t call_core_eval(scm_obj_t obj);
   scm_obj_t lookup_system_environment(scm_obj_t symbol);
+  scm_obj_t call_core_eval(scm_obj_t obj);
+  scm_obj_t call_add_load_path(scm_obj_t path);
 
   static nanos_t* current() { return s_current; }
 };

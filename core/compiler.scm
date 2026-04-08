@@ -274,7 +274,7 @@
          (body (cddr expr))
          (all-free (analyze-free-vars-compiler expr '()))
          (params-list (flatten-params params))
-         (potential-free (set-minus all-free params-list))
+         (potential-free (remove-from-list all-free params-list))
          (free (filter (lambda (f)
                          (let ((b (lookup f env)))
                            (and (not (eq? (car b) 'global))

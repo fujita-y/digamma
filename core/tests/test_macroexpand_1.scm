@@ -2,7 +2,7 @@
 ;; Basic macro expansion and identifier macro tests.
 
 
-(copy-environment-variables! (current-environment) (system-environment) '(expand macroexpand-1))
+(copy-environment-variables! (system-environment) (current-environment) '(expand macroexpand-1))
 
 (define (expand1 expr) (expand expr '() '() '() '()))
 

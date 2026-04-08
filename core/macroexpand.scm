@@ -25,11 +25,13 @@
 (define *current-context* (make-parameter #f))
 
 ;; Temporary variable for passing values through eval during module processing
-(define *temp-value* #f)
+(define _eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f (make-parameter #f))
 
 ;; Registry mapping module names to records: ((name . record) ...)
 ;; Record structure: ((exports . rename-map) . bindings)
 (define current-module-registry (make-parameter '()))
+
+(define current-module-strict-mode (make-parameter #t))
 
 ;;=============================================================================
 ;; SECTION 2: Identifier & Environment Resolution
@@ -132,7 +134,7 @@
   (string-join (map symbol->string name) "."))
 
 (define (mangle-name mod-name sym)
-  (string->symbol (string-append (module-name->string mod-name) "::" (symbol->string sym))))
+  (string->symbol (string-append (module-name->string mod-name) "`" (symbol->string sym))))
 
 (define (lookup-module name)
   (let ((entry (assoc name (current-module-registry)))) (and entry (cdr entry))))
@@ -171,12 +173,21 @@
         (else bindings))))
 
 (define (process-import-set import-set)
-  (let* ((lib-name (extract-library-name import-set)) (record (lookup-module lib-name)))
-    (unless record (error "Module not found" lib-name))
-    (let* ((export-info (car record)) (exports (car export-info)) (rename-map (cdr export-info)) (bindings (cdr record))
-           (renamed-bindings (map (lambda (b) (let ((rename (assq (car b) rename-map))) (if rename (cons (cdr rename) (cdr b)) b))) bindings))
-           (exported (filter (lambda (b) (memq (car b) exports)) renamed-bindings)))
-      (apply-import-spec import-set exported))))
+  (let ((lib-name (extract-library-name import-set)))
+    (load-module lib-name)
+    (let ((record (lookup-module lib-name)))
+      (unless record (error "Module not found" lib-name))
+      (let* ((export-info (car record)) 
+             (exports (car export-info)) 
+             (rename-map (cdr export-info)) 
+             (bindings (cdr record))
+             (renamed-bindings 
+               (map (lambda (b)
+                      (let ((rename (assq (car b) rename-map)))
+                        (if rename (cons (cdr rename) (cdr b)) b)))
+                    bindings))
+             (exported (filter (lambda (b) (memq (car b) exports)) renamed-bindings)))
+        (apply-import-spec import-set exported)))))
 
 (define (extract-module-defined-ids forms)
   (let loop ((forms forms) (ids '()))
@@ -200,8 +211,52 @@
                                 defs))))))
 
 (define (inject-binding! name value)
-  (set! *temp-value* value)
-  (core-eval `(define ,name *temp-value*) (current-environment)))
+  (_eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f value)
+  (core-eval `(define ,name (_eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f)) (current-environment)))
+
+;; Collect all free symbol references from expanded code.
+;; Returns a list of symbols that appear in variable-reference position,
+;; excluding those bound by lambda, let, or letrec* in the code.
+(define (collect-referenced-ids expr)
+  (let ((seen (make-eq-hashtable)))
+    (let walk ((expr expr) (bound '()))
+      (cond
+        ((symbol? expr)
+         (unless (or (memq expr bound) (hashtable-contains? seen expr))
+           (hashtable-set! seen expr #t)))
+        ((not (pair? expr)) (unspecified))
+        (else
+         (let ((head (car expr)))
+           (cond
+             ((eq? head 'quote) (unspecified))
+             ((eq? head 'lambda)
+              (let* ((params (cadr expr))
+                     (body (cddr expr))
+                     (new-bound (append (get-param-names params) bound)))
+                (for-each (lambda (e) (walk e new-bound)) body)))
+             ((or (eq? head 'let) (eq? head 'letrec*))
+              (let* ((bindings (cadr expr))
+                     (body (cddr expr))
+                     (vars (map car bindings))
+                     (vals (map cadr bindings))
+                     (inner-bound (append vars bound)))
+                (if (eq? head 'let)
+                    (for-each (lambda (v) (walk v bound)) vals)
+                    (for-each (lambda (v) (walk v inner-bound)) vals))
+                (for-each (lambda (e) (walk e inner-bound)) body)))
+             ((eq? head 'define)
+              (let ((pattern (cadr expr)))
+                (let ((name (if (pair? pattern) (car pattern) pattern)))
+                  (for-each (lambda (e) (walk e bound)) (cddr expr)))))
+             ((eq? head 'set!)
+              (walk (caddr expr) bound))
+             ((eq? head 'if)
+              (for-each (lambda (e) (walk e bound)) (cdr expr)))
+             ((eq? head 'begin)
+              (for-each (lambda (e) (walk e bound)) (cdr expr)))
+             (else
+              (for-each (lambda (e) (walk e bound)) expr)))))))
+    (map car (hashtable->alist seen))))
 
 ;;=============================================================================
 ;; SECTION 4: Macro Transformers & Helpers
@@ -519,6 +574,21 @@
          (env-promise (list 'promise #f))
          (macro-b (extract-macro-defs exp-forms env-promise s-env inner-r marks)))
     (set-car! (cdr env-promise) (append (map (lambda (b) (cons (car b) (unwrap-macro-binding (cdr b)))) macro-b) inner-m))
+    ;; Strict mode: check for unimported identifier references
+    (when (current-module-strict-mode)
+      (let* ((refs (collect-referenced-ids (cons 'begin rt-forms)))
+             (imported-ids (map car imported-bindings))
+             (macro-ids (map car macro-b))
+             (mangled-ids (map cdr internal-m))
+             (known-ids (append imported-ids def-ids macro-ids mangled-ids)))
+        (for-each
+          (lambda (id)
+            (unless (or (memq id known-ids)
+                        (lookup-builtin-handler id)
+                        (environment-macro-contains? id)
+                        (environment-variable-contains? id))
+              (assertion-violation 'define-module (format "unbound variable ~s in ~s" id mod-name))))
+          refs)))
     (let* ((imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
            (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))
       (let* ((proc (core-eval wrapper (current-environment))) (vals (proc)) (rt-bindings (map cons def-ids vals)))

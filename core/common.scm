@@ -7,9 +7,6 @@
 ;; Globals & State
 ;;=============================================================================
 
-;; Counter for generating unique temporary symbol names
-(define *syntax-temp-counter* 0)
-
 ;; Counter for generating unique suffixes to ensure hygiene during renaming
 (define *suffix-counter* 0)
 
@@ -26,10 +23,6 @@
   (set! *mark-counter* (+ *mark-counter* 1))
   *mark-counter*)
 
-;;=============================================================================
-;; Predicates
-;;=============================================================================
-
 ;; Returns #t if x is a proper list, #f otherwise.
 (define (proper-list? x)
   (let loop ((x x))
@@ -37,57 +30,19 @@
           ((pair? x) (loop (cdr x)))
           (else #f))))
 
-;;=============================================================================
-;; List Transformation & Iteration
-;;=============================================================================
-
-;; Tail-recursive filter.
-(define (filter pred lst)
-  (let loop ((lst lst) (acc '()))
-    (cond ((null? lst) (reverse acc))
-          ((pred (car lst)) (loop (cdr lst) (cons (car lst) acc)))
-          (else (loop (cdr lst) acc)))))
-
-;; Left-associative fold.
-(define (fold proc seed lst)
-  (let loop ((lst lst) (acc seed))
-    (if (null? lst)
-        acc
-        (loop (cdr lst) (proc (car lst) acc)))))
-
-;; Returns a list of integers from 0 to n-1.
-(define (iota n)
-  (let loop ((i 0) (acc '()))
-    (if (= i n)
-        (reverse acc)
-        (loop (+ i 1) (cons i acc)))))
-
-;; Partition lst into two lists: those that satisfy pred and those that do not.
-(define (partition pred lst)
-  (let loop ((lst lst) (in '()) (out '()))
-    (cond ((null? lst) (values (reverse in) (reverse out)))
-          ((pred (car lst)) (loop (cdr lst) (cons (car lst) in) out))
-          (else (loop (cdr lst) in (cons (car lst) out))))))
-
 ;; Returns the first n elements of lst.
-(define (take-elements lst n)
+(define (list-head lst n)
   (let loop ((lst lst) (n n) (acc '()))
     (if (or (<= n 0) (null? lst))
         (reverse acc)
         (loop (cdr lst) (- n 1) (cons (car lst) acc)))))
 
-(define take take-elements)
-(define list-head take-elements)
-
 ;; Returns the tail of lst starting after the first n elements.
-(define (drop-elements lst n)
+(define (list-tail lst n)
   (let loop ((lst lst) (n n))
     (if (or (<= n 0) (null? lst))
         lst
         (loop (cdr lst) (- n 1)))))
-
-(define drop drop-elements)
-(define list-tail drop-elements)
 
 ;; Join a list of strings with a delimiter.
 (define (string-join strings delimiter)
@@ -118,38 +73,10 @@
                 (else (cons input acc)))))
       exprs))
 
-;; Remove items from a list (uses memq for comparison).
+;; Remove items from a list.
 (define (remove-from-list lst remove-items)
-  (let loop ((lst lst) (acc '()))
-    (cond ((null? lst) (reverse acc))
-          ((memq (car lst) remove-items) (loop (cdr lst) acc))
-          (else (loop (cdr lst) (cons (car lst) acc))))))
-
-;; Delete all occurrences of x in lst (uses equal? for comparison).
-(define (delete x lst)
-  (let loop ((lst lst) (acc '()))
-    (cond ((null? lst) (reverse acc))
-          ((equal? x (car lst)) (loop (cdr lst) acc))
-          (else (loop (cdr lst) (cons (car lst) acc))))))
-
-;;=============================================================================
-;; Set Operations
-;;=============================================================================
-
-;; Union of multiple sets (lists treated as sets).
-(define (set-union . sets)
   (let ((ht (make-eq-hashtable)))
-    (for-each (lambda (s)
-                (for-each (lambda (x) (hashtable-set! ht x #t)) s))
-              sets)
-    (map car (hashtable->alist ht))))
+    (for-each (lambda (x) (hashtable-set! ht x #t)) remove-items)
+    (filter (lambda (x) (not (hashtable-contains? ht x))) lst)))
 
-;; Set difference: s1 minus s2.
-(define (set-minus s1 s2)
-  (let ((ht (make-eq-hashtable)))
-    (for-each (lambda (x) (hashtable-set! ht x #t)) s2)
-    (filter (lambda (x) (not (hashtable-contains? ht x))) s1)))
-
-(define (generate-temporary-symbol prefix)
-  (set! *syntax-temp-counter* (+ *syntax-temp-counter* 1))
-  (string->symbol (string-append prefix (number->string *syntax-temp-counter*))))
+(define (generate-temporary-symbol prefix) (gensym prefix))

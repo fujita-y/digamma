@@ -12,26 +12,6 @@
                (nanos-ir (compile coreform)))
           (codegen-and-run nanos-ir)))))
 
-    #|
-        (newline)
-        (display "macroexpanded form:\n")
-        (write expanded)
-        (newline)
-        (newline)
-        (display "optimized form:\n")
-        (write optimized)
-        (newline)
-        (newline)
-        (display "lifted form:\n")
-        (write lifted)
-        (newline)
-        (newline)
-        (display "compiled code for nanos input:\n")
-        (write coreform)
-        (newline)
-        (newline)
-    |#
-
 (define (compile-to-coreform expr env)
   (if (eq? (current-environment) env)
       (let* ((expanded (macroexpand expr))

@@ -26,6 +26,7 @@
    (define (system-environment) (interaction-environment))
    (define (copy-environment-variables! . args) #t))
   (ypsilon
+   (import (srfi 1))
    (define (uuid) (make-uuid))
    (define (make-equal-hashtable) (make-hashtable equal-hash equal?))
    (define (hashtable->alist ht)
@@ -33,6 +34,7 @@
        (map cons (vector->list keys) (vector->list vals))))
    (define (core-eval expr env) (eval expr env))
    (define (copy-environment-variables! . args) #t))
+   (define fold fold-left)
   (else))
 
 (define *current-macro-environment* (make-eq-hashtable))

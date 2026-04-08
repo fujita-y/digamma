@@ -13,6 +13,7 @@ class nanos_options {
   static std::string boot_file;
   static std::string env_name;
   static std::string script_file;
+  static std::vector<std::string> load_paths;
 };
 
 #endif

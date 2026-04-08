@@ -1,4 +1,4 @@
-(copy-environment-variables! (current-environment) (system-environment) '(lookup-module))
+(copy-environment-variables! (system-environment) (current-environment) '(lookup-module))
 
 (define *pass-count* 0)
 (define *fail-count* 0)
@@ -370,24 +370,24 @@
 ;; Use Case 8.1: Set Implementation
 ;; Uses a list to store unique elements.
 (define-module (data set)
-  (export make-set set-add set-member? set-union2)
+  (export make-set set-add set-member? set-union)
   (begin
     (define (make-set) '())
     (define (set-member? s x)
       (if (memq x s) #t #f))
     (define (set-add s x)
       (if (set-member? s x) s (cons x s)))
-    (define (set-union2 s1 s2)
+    (define (set-union s1 s2)
       (if (null? s1)
           s2
-          (set-union2 (cdr s1) (set-add s2 (car s1)))))))
+          (set-union (cdr s1) (set-add s2 (car s1)))))))
 
 (import-module (data set))
 
 (test "Set usage"
       '(let* ((s1 (set-add (set-add (make-set) 1) 2))
               (s2 (set-add (make-set) 3))
-              (s3 (set-union2 s1 s2)))
+              (s3 (set-union s1 s2)))
          (list (set-member? s3 1)
                (set-member? s3 2)
                (set-member? s3 3)

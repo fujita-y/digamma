@@ -426,8 +426,8 @@
         (let ((params (cadr proc)) (body (cddr proc)))
           (if (and (list? params) (= (length params) (length args))) (optimize-inner `(let ,(map list params args) ,@body) bound-vars)
               (if (and (list? params) (< (length params) (length args)))
-                  (let ((extra (drop args (length params))))
-                    (optimize-inner `(begin ,@extra (let ,(map list params (take args (length params))) ,@body)) bound-vars))
+                  (let ((extra (list-tail args (length params))))
+                    (optimize-inner `(begin ,@extra (let ,(map list params (list-head args (length params))) ,@body)) bound-vars))
                   (cons proc args))))
         (cons proc args))))
 

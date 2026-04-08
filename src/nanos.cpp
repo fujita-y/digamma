@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <llvm/Support/TargetSelect.h>
+#include <ranges>
 #include <replxx.hxx>
 #include <sstream>
 #include <string>
@@ -157,6 +158,17 @@ scm_obj_t nanos_t::call_core_eval(scm_obj_t obj) {
   return (scm_obj_t)bridge(core_eval, 2, args);
 }
 
+scm_obj_t nanos_t::call_add_load_path(scm_obj_t path) {
+  scm_obj_t add_load_path = lookup_system_environment(make_symbol("add-load-path"));
+  if (!is_closure(add_load_path)) {
+    throw std::runtime_error("add-load-path is not a closure");
+  }
+  codegen_t* cg = codegen_t::current();
+  auto bridge = cg->call_closure_bridge();
+  scm_obj_t args[1] = {path};
+  return (scm_obj_t)bridge(add_load_path, 1, args);
+}
+
 void nanos_t::run() {
   puts(";; nanos - scheme-like lisp-2 interpreter for bootstrapping.");
 #if USE_TBI
@@ -183,6 +195,10 @@ void nanos_t::run() {
     throw std::runtime_error("Invalid environment name");
   }
   std::cout << ";; environment: " << std::string((char*)environment_name(context::s_current_environment)) << std::endl;
+
+  for (const auto& path : nanos_options::load_paths | std::views::reverse) {
+    call_add_load_path(make_string(path.c_str()));
+  }
 
   if (!nanos_options::script_file.empty()) {
     load_script(nanos_options::script_file);

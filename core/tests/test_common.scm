@@ -1,8 +1,6 @@
 ;; test_common.scm
 ;; Test suite for common.scm utilities.
 
-(copy-environment-variables! (current-environment) (system-environment) '(drop-elements delete every))
-
 (define *pass-count* 0)
 (define *fail-count* 0)
 
@@ -54,13 +52,13 @@
   (test "partition (even? (1 2 3 4 5)) - in" in '(2 4))
   (test "partition (even? (1 2 3 4 5)) - out" out '(1 3 5)))
 
-(test "take (1 2 3 4) 2" (take-elements '(1 2 3 4) 2) '(1 2))
-(test "take (1 2 3 4) 0" (take-elements '(1 2 3 4) 0) '())
-(test "take () 2" (take-elements '() 2) '())
+(test "list-head (1 2 3 4) 2" (list-head '(1 2 3 4) 2) '(1 2))
+(test "list-head (1 2 3 4) 0" (list-head '(1 2 3 4) 0) '())
+(test "list-head () 2" (list-head '() 2) '())
 
-(test "drop (1 2 3 4) 2" (drop-elements '(1 2 3 4) 2) '(3 4))
-(test "drop (1 2 3 4) 0" (drop-elements '(1 2 3 4) 0) '(1 2 3 4))
-(test "drop () 2" (drop-elements '() 2) '())
+(test "list-tail (1 2 3 4) 2" (list-tail '(1 2 3 4) 2) '(3 4))
+(test "list-tail (1 2 3 4) 0" (list-tail '(1 2 3 4) 0) '(1 2 3 4))
+(test "list-tail () 2" (list-tail '() 2) '())
 
 (test "string-join (\"a\" \"b\" \"c\") \",\"" (string-join '("a" "b" "c") ",") "a,b,c")
 (test "string-join (\"a\") \",\"" (string-join '("a") ",") "a")
@@ -75,21 +73,7 @@
 
 #;(test "remove-from-list (1 2 3 4 5) (2 4)" (remove-from-list '(1 2 3 4 5) '(2 4)) '(1 3 5))
 
-(test "delete 2 (1 2 3 2 4)" (delete 2 '(1 2 3 2 4)) '(1 3 4))
-
-;; =============================================================================
-;; Set Operations
-;; =============================================================================
-(display "\n>>> Set Operations\n")
-
-(define (set=? s1 s2)
-  (and (= (length s1) (length s2))
-       (every (lambda (x) (memq x s2)) s1)
-       #t))
-
-(test "set-union (1 2) (2 3) (4)" (set=? (set-union '(1 2) '(2 3) '(4)) '(1 2 3 4)) #t)
-
-(test "set-minus (1 2 3 4) (2 4)" (set-minus '(1 2 3 4) '(2 4)) '(1 3))
+#;(test "delete 2 (1 2 3 2 4)" (delete 2 '(1 2 3 2 4)) '(1 3 4))
 
 ;; =============================================================================
 ;; Patterns

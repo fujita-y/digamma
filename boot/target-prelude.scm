@@ -17,11 +17,11 @@
     (if (null? lst2)
         (if (list? lst1)
             (map-1 proc lst1)
-            (error 'map "expected proper list" (cons* proc lst1 lst2)))
+            (assertion-violation 'map "expected proper list" (cons* proc lst1 lst2)))
         (cond ((apply list-transpose+ lst1 lst2)
                => (lambda (lst) (map-n proc lst)))
               (else
-               (error 'map "expected same length proper lists" (cons* proc lst1 lst2)))))))
+               (assertion-violation 'map "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
 (define for-each
   (lambda (proc lst1 . lst2)
@@ -37,9 +37,9 @@
     (if (null? lst2)
         (if (list? lst1)
             (for-each-1 proc lst1)
-            (error 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))
+            (assertion-violation 'for-each "expected proper list" (cons* proc lst1 lst2)))
         (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (for-each-n proc lst)))
-              (else (error 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
+              (else (assertion-violation 'for-each "expected same length proper lists" (cons* proc lst1 lst2)))))))
 
 (define every
   (lambda (proc lst1 . lst2)
@@ -70,6 +70,22 @@
                 (let loop ((head (car lst)) (rest (cdr lst)))
                   (if (null? rest) (apply proc head) (or (apply proc head) (loop (car rest) (cdr rest)))))))))
     (if (null? lst2) (any-1 proc lst1) (any-n proc (apply list-transpose* lst1 lst2)))))
+
+(define fold
+  (lambda (proc seed lst1 . lst2)
+    (define fold-left-1
+      (lambda (proc seed lst)
+        (cond ((null? lst) seed) (else (fold-left-1 proc (proc seed (car lst)) (cdr lst))))))
+    (define fold-left-n
+      (lambda (proc seed lst)
+        (cond ((null? lst) seed)
+              (else (fold-left-n proc (apply proc (append (list seed) (car lst))) (cdr lst))))))
+    (if (null? lst2)
+        (if (list? lst1)
+            (fold-left-1 proc seed lst1)
+            (assertion-violation 'fold "expected proper list" (cons* proc seed lst1 lst2)))
+        (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (fold-left-n proc seed lst)))
+              (else (assertion-violation 'fold "expected same length proper lists" (cons* proc seed lst1 lst2)))))))
 
 (define make-parameter
   (lambda (init . rest)
@@ -116,16 +132,58 @@
         (proc port)
         (let ((result (extract))) (close-port port) result)))))
 
+;; Tail-recursive filter.
+(define (filter pred lst)
+  (let loop ((lst lst) (acc '()))
+    (cond ((null? lst) (reverse acc))
+          ((pred (car lst)) (loop (cdr lst) (cons (car lst) acc)))
+          (else (loop (cdr lst) acc)))))
+
+;; Left-associative fold.
+(define (fold proc seed lst)
+  (let loop ((lst lst) (acc seed))
+    (if (null? lst)
+        acc
+        (loop (cdr lst) (proc (car lst) acc)))))
+
+;; Returns a list of integers from 0 to n-1.
+(define (iota n)
+  (let loop ((i 0) (acc '()))
+    (if (= i n)
+        (reverse acc)
+        (loop (+ i 1) (cons i acc)))))
+
+;; Partition lst into two lists: those that satisfy pred and those that do not.
+(define (partition pred lst)
+  (let loop ((lst lst) (in '()) (out '()))
+    (cond ((null? lst) (values (reverse in) (reverse out)))
+          ((pred (car lst)) (loop (cdr lst) (cons (car lst) in) out))
+          (else (loop (cdr lst) in (cons (car lst) out))))))
+
 (define scheme-load-paths (make-parameter '()))
+
+(define home-directory
+  (lambda ()
+    (let ((path (or (lookup-process-environment "HOME") "")))
+      (and (file-exists? path) path))))
+
+(define expand-path
+  (lambda (path)
+    (cond ((and (>= (string-length path) 2) 
+                (eqv? (string-ref path 0) #\~)
+                (eqv? (string-ref path 1) #\/))
+           (string-append (or (home-directory) "") (substring path 1 (string-length path))))
+          (else path))))
 
 (define add-load-path
   (lambda (path)
-    (cond ((string? path)
-           (or (string=? path "")
-               (member path (scheme-load-paths))
-               (scheme-load-paths (cons path (scheme-load-paths))))
-           (scheme-load-paths))
-          (else (assertion-violation 'add-load-path (format "expected string, but got ~s" path))))))
+    (let ((path (expand-path path)))
+      (cond ((string? path)
+             (or (string=? path "")
+                 (member path (scheme-load-paths))
+                 (scheme-load-paths (cons path (scheme-load-paths))))
+             (scheme-load-paths))
+            (else (assertion-violation 'add-load-path (format "expected string, but got ~s" path)))))))
 
 (define load
   (lambda (filename . opt-env)
@@ -145,15 +203,15 @@
                 (let loop ((expr (read port)))
                   (cond ((eof-object? expr) (unspecified))
                         (else (core-eval expr env) (loop (read port)))))))
-            (assertion-violation 'load (format "file ~s not found" filename)))))))
+            (assertion-violation 'load (format "file ~s not found in ~s" filename (scheme-load-paths))))))))
 
 (define load-module
-  (lambda (ref)
-    (define (path-for ref)
+  (lambda (lib-name)
+    (define (path-for lib-name)
       (string-append
         (apply
           string-append
-            (cdr (let loop ((lst ref))
+            (cdr (let loop ((lst lib-name))
                    (cond ((null? lst) '())
                          ((symbol? (car lst))
                           (cons "/" (cons (symbol->string (car lst)) (loop (cdr lst)))))
@@ -161,6 +219,6 @@
                           (cons "/" (cons (number->string (car lst)) (loop (cdr lst)))))
                          (else (loop (cdr lst)))))))
         ".scm"))
-    (if (assoc ref (current-module-registry))
+    (if (assoc lib-name (current-module-registry))
         (unspecified)
-        (load (path-for ref)))))
+        (load (path-for lib-name)))))

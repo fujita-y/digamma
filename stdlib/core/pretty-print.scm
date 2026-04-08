@@ -73,7 +73,7 @@
           (n-more-lines (and (pretty-print-maximum-lines) (- (pretty-print-maximum-lines) 1))))
       (define indent-type1?
         (lambda (id)
-          (memq id '(library define-library define define-syntax define-macro define-inline define-constant
+          (memq id '(library define-library define-module define define-syntax define-macro define-inline define-constant
                      syntax-rules lambda let letrec let* letrec letrec* let-values let*-values
                      destructuring-match parameterize))))
       (define indent-type2?

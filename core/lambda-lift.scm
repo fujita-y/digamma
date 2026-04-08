@@ -53,7 +53,7 @@
                                                     (let ((lam (caddr s)))
                                                       (list (cadr s) lam (analyze-free-vars-optimizer lam '()))))
                                                   sets)))
-                            (let fixpoint ((forbidden (append env (set-minus vars (map car candidates))))
+                            (let fixpoint ((forbidden (append env (remove-from-list vars (map car candidates))))
                                            (current-candidates candidates))
                               (let loop-cand ((rest current-candidates) (new-candidates '()) (new-forbidden forbidden) (changed #f))
                                 (if (pair? rest)
@@ -99,7 +99,7 @@
                                                    #f)))
                                            bindings))))
                     ;; Fixpoint: remove candidates whose free vars reference forbidden (env-external) symbols
-                    (let fixpoint ((forbidden (append env (set-minus vars (map car candidates))))
+                    (let fixpoint ((forbidden (append env (remove-from-list vars (map car candidates))))
                                    (current-candidates candidates))
                       (let loop-cand ((rest current-candidates) (new-candidates '()) (new-forbidden forbidden) (changed #f))
                         (if (pair? rest)

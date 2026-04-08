@@ -1,6 +1,6 @@
 ;; tests/test-syntax.scm
 
-(copy-environment-variables! (current-environment) (system-environment) '(make-syntax-object strip-renames expand-syntax-case))
+(copy-environment-variables! (system-environment) (current-environment) '(make-syntax-object strip-renames expand-syntax-case))
 
 (define *pass-count* 0)
 (define *fail-count* 0)
