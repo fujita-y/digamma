@@ -10,17 +10,6 @@
 
 #include <sstream>
 
-inline scm_obj_t tc6_pointer(void* x, uintptr_t tc6_num) {
-  assert(((uintptr_t)x & 0x07) == 0);
-#if USE_TBI
-  return (uintptr_t)x | 0x02 | tc6_num << 57;
-#else
-  return (uintptr_t)x | 0x02;
-#endif
-}
-
-inline scm_tc6_t tc6_tag(uintptr_t tc6_num) { return (tc6_num << 8) | 0x06; }
-
 constexpr int short_flonum_tag_shift = 3;
 constexpr uint64_t short_flonum_tag = 0x4;
 constexpr uint64_t short_flonum_tag_mask = 0x7;
@@ -59,8 +48,8 @@ scm_obj_t make_flonum(double d) {
     object_heap_t& heap = *object_heap_t::current();
     scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)heap.alloc_flonum();
     rec->value = d;
-    rec->tag = tc6_tag(tc6_long_flonum);
-    return tc6_pointer(rec, tc6_long_flonum);
+    rec->tag = make_tc6_tag(tc6_long_flonum);
+    return tc6_tagged_pointer(rec, tc6_long_flonum);
   }
   return u64;
 }
@@ -85,9 +74,9 @@ scm_obj_t make_symbol(const char* name) {
   int n = strlen(name) + 1;
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
   memcpy(datum, name, n);
-  rec->tag = tc6_tag(tc6_symbol);
+  rec->tag = make_tc6_tag(tc6_symbol);
   rec->name = datum;
-  scm_obj_t obj = tc6_pointer(rec, tc6_symbol);
+  scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
   context::s_symbols[name] = obj;
   return obj;
 }
@@ -98,9 +87,9 @@ scm_obj_t make_uninterned_symbol(const char* name) {
   int n = strlen(name) + 1;
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
   memcpy(datum, name, n);
-  rec->tag = tc6_tag(tc6_symbol);
+  rec->tag = make_tc6_tag(tc6_symbol);
   rec->name = datum;
-  scm_obj_t obj = tc6_pointer(rec, tc6_symbol);
+  scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
   return obj;
 }
 
@@ -124,8 +113,8 @@ scm_obj_t make_string(const char* name) {
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
   memcpy(datum, name, n);
   rec->name = datum;
-  rec->tag = tc6_tag(tc6_string);
-  return tc6_pointer(rec, tc6_string);
+  rec->tag = make_tc6_tag(tc6_string);
+  return tc6_tagged_pointer(rec, tc6_string);
 }
 
 uint8_t* string_name(scm_obj_t x) {
@@ -141,8 +130,8 @@ scm_obj_t make_vector(int nsize, scm_obj_t init) {
   for (int i = 0; i < nsize; i++) {
     rec->elts[i] = init;
   }
-  rec->tag = tc6_tag(tc6_vector);
-  return tc6_pointer(rec, tc6_vector);
+  rec->tag = make_tc6_tag(tc6_vector);
+  return tc6_tagged_pointer(rec, tc6_vector);
 }
 
 scm_obj_t make_values(int nsize) {
@@ -153,8 +142,8 @@ scm_obj_t make_values(int nsize) {
   for (int i = 0; i < nsize; i++) {
     rec->elts[i] = scm_unspecified;
   }
-  rec->tag = tc6_tag(tc6_values);
-  return tc6_pointer(rec, tc6_values);
+  rec->tag = make_tc6_tag(tc6_values);
+  return tc6_tagged_pointer(rec, tc6_values);
 }
 
 scm_obj_t make_u8vector(int nsize) {
@@ -164,8 +153,8 @@ scm_obj_t make_u8vector(int nsize) {
   memset(elts, 0, nsize * sizeof(uint8_t));
   rec->elts = elts;
   rec->nsize = nsize;
-  rec->tag = tc6_tag(tc6_u8vector);
-  return tc6_pointer(rec, tc6_u8vector);
+  rec->tag = make_tc6_tag(tc6_u8vector);
+  return tc6_tagged_pointer(rec, tc6_u8vector);
 }
 
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
@@ -180,8 +169,8 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity) {
   rec->aux->used = 0;
   rec->aux->live = 0;
   for (int i = 0; i < (nsize * 2); i++) rec->aux->elts[i] = scm_hash_free;
-  rec->tag = tc6_tag(tc6_hashtable);
-  return tc6_pointer(rec, tc6_hashtable);
+  rec->tag = make_tc6_tag(tc6_hashtable);
+  return tc6_tagged_pointer(rec, tc6_hashtable);
 }
 
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl) {
@@ -195,8 +184,19 @@ scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[
   for (int i = 0; i < nsize; i++) {
     rec->env[i] = env[i];
   }
-  rec->tag = tc6_tag(tc6_closure);
-  return tc6_pointer(rec, tc6_closure);
+  rec->tag = make_tc6_tag(tc6_closure);
+  return tc6_tagged_pointer(rec, tc6_closure);
+}
+
+scm_obj_t make_tuple(int nsize) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_tuple_rec_t* rec = (scm_tuple_rec_t*)heap.alloc_collectible(sizeof(scm_tuple_rec_t) + (nsize - 1) * sizeof(scm_obj_t));
+  rec->nsize = nsize;
+  for (int i = 0; i < nsize; i++) {
+    rec->elts[i] = scm_unspecified;
+  }
+  rec->tag = make_tc6_tag(tc6_tuple);
+  return tc6_tagged_pointer(rec, tc6_tuple);
 }
 
 scm_obj_t make_environment(scm_obj_t name) {
@@ -205,8 +205,8 @@ scm_obj_t make_environment(scm_obj_t name) {
   rec->name = name;
   rec->variables = make_hashtable(symbol_hash, symbol_equiv, 16);
   rec->macros = make_hashtable(symbol_hash, symbol_equiv, 16);
-  rec->tag = tc6_tag(tc6_environment);
-  return tc6_pointer(rec, tc6_environment);
+  rec->tag = make_tc6_tag(tc6_environment);
+  return tc6_tagged_pointer(rec, tc6_environment);
 }
 
 scm_obj_t environment_variables(scm_obj_t x) {
@@ -233,8 +233,8 @@ scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders) {
   *rec->uctx = *uctx;
   rec->sp = sp;
   rec->winders = winders;
-  rec->tag = tc6_tag(tc6_escape);
-  return tc6_pointer(rec, tc6_escape);
+  rec->tag = make_tc6_tag(tc6_escape);
+  return tc6_tagged_pointer(rec, tc6_escape);
 }
 
 scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,
@@ -248,16 +248,16 @@ scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_
   rec->shadow_copy = shadow_copy;
   rec->stack_bottom = stack_bottom;
   rec->winders = winders;
-  rec->tag = tc6_tag(tc6_continuation);
-  return tc6_pointer(rec, tc6_continuation);
+  rec->tag = make_tc6_tag(tc6_continuation);
+  return tc6_tagged_pointer(rec, tc6_continuation);
 }
 
 scm_obj_t make_cell(scm_obj_t value) {
   object_heap_t& heap = *object_heap_t::current();
   scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();
   rec->value = value;
-  rec->tag = tc6_tag(tc6_cell);
-  return tc6_pointer(rec, tc6_cell);
+  rec->tag = make_tc6_tag(tc6_cell);
+  return tc6_tagged_pointer(rec, tc6_cell);
 }
 
 scm_obj_t make_port(scm_obj_t name) {
@@ -267,8 +267,8 @@ scm_obj_t make_port(scm_obj_t name) {
   rec->aux = new port_aux_t;
   rec->aux->stream = std::monostate{};
   rec->aux->owned = false;
-  rec->tag = tc6_tag(tc6_port);
-  return tc6_pointer(rec, tc6_port);
+  rec->tag = make_tc6_tag(tc6_port);
+  return tc6_tagged_pointer(rec, tc6_port);
 }
 
 void cell_value_set(scm_obj_t x, scm_obj_t v) {

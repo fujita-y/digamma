@@ -740,7 +740,7 @@ SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
 
 // symbol->string  - R6RS 11.10
 SUBR subr_symbol_to_string(scm_obj_t self, scm_obj_t a1) {
-  if (!is_symbol(a1)) throw std::runtime_error("symbol->string: argument must be a symbol");
+  if (!is_symbol(a1)) throw std::runtime_error("symbol->string: argument must be a symbol: " + to_string(a1));
   return make_string((const char*)symbol_name(a1));
 }
 

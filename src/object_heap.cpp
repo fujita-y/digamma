@@ -169,7 +169,7 @@ void object_heap_t::trace(void* obj) {
     return;
   }
 
-  uintptr_t tc6 = tag_tc6(*(scm_tc6_t*)obj);
+  uintptr_t tc6 = tag_tc6_num(*(scm_tc6_t*)obj);
 
   switch (tc6) {
     case tc6_cell: {
@@ -231,6 +231,13 @@ void object_heap_t::trace(void* obj) {
       m_concurrent_heap.trace_memory_range((uint64_t)rec->stack_copy, (uint64_t)rec->stack_copy + rec->stack_size);
       return;
     }
+    case tc6_tuple: {
+      scm_tuple_rec_t* rec = (scm_tuple_rec_t*)obj;
+      for (int i = 0; i < rec->nsize; i++) {
+        shade(rec->elts[i]);
+      }
+      return;
+    }
     case tc6_long_flonum:
     case tc6_symbol:
     case tc6_string:
@@ -245,7 +252,7 @@ void object_heap_t::finalize(void* obj) {
   slab_traits_t* traits = SLAB_TRAITS_OF(obj);
   assert(traits->owner != &m_cons);
 
-  uintptr_t tc6 = tag_tc6(*(scm_tc6_t*)obj);
+  uintptr_t tc6 = tag_tc6_num(*(scm_tc6_t*)obj);
 
   switch (tc6) {
     case tc6_symbol: {
@@ -299,6 +306,7 @@ void object_heap_t::finalize(void* obj) {
       rec->shadow_copy = nullptr;
       return;
     }
+    case tc6_tuple:
     case tc6_closure:
     case tc6_long_flonum:
     case tc6_environment:

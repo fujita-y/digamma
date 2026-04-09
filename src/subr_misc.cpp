@@ -136,6 +136,41 @@ SUBR subr_with_cpp_exception_handler(scm_obj_t self, scm_obj_t handler, scm_obj_
 }
 
 // ============================================================================
+// Tuple
+// ============================================================================
+
+// tuple?
+SUBR subr_tuple_p(scm_obj_t self, scm_obj_t a1) { return is_tuple(a1) ? scm_true : scm_false; }
+
+// tuple
+SUBR subr_tuple(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  scm_obj_t t = make_tuple(argc);
+  scm_obj_t* elts = tuple_elts(t);
+  for (int i = 0; i < argc; i++) elts[i] = argv[i];
+  return t;
+}
+
+// tuple-ref
+SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  assert(is_tuple(a1));
+  assert(is_fixnum(a2));
+  int index = (int)fixnum(a2);
+  assert(index >= 0 && index < tuple_nsize(a1));
+  return tuple_elts(a1)[index];
+}
+
+// tuple-set!
+SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
+  assert(is_tuple(a1));
+  assert(is_fixnum(a2));
+  int index = (int)fixnum(a2);
+  assert(index >= 0 && index < tuple_nsize(a1));
+  object_heap_t::current()->write_barrier(a3);
+  tuple_elts(a1)[index] = a3;
+  return scm_unspecified;
+}
+
+// ============================================================================
 // Misc
 // ============================================================================
 
@@ -165,4 +200,8 @@ void init_subr_misc() {
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
   reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, 0);
+  reg("tuple", (void*)subr_tuple, 0, 1);
+  reg("tuple?", (void*)subr_tuple_p, 1, 0);
+  reg("tuple-ref", (void*)subr_tuple_ref, 2, 0);
+  reg("tuple-set!", (void*)subr_tuple_set, 3, 0);
 }

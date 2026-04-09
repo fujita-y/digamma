@@ -36,6 +36,7 @@
     string<=? string>=? string-ci=? string-ci<? string-ci>? string-ci<=? string-ci>=?
     substring string-append string->list list->string string-copy string->number
     vector? make-vector vector vector-length vector-ref vector->list list->vector
+    tuple? tuple tuple-ref
     procedure? bytevector? bytevector-length bytevector-u8-ref))
 
 ;;=============================================================================

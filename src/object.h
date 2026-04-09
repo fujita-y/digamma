@@ -51,6 +51,7 @@ constexpr uintptr_t tc6_cell = 9;
 constexpr uintptr_t tc6_escape = 10;
 constexpr uintptr_t tc6_continuation = 11;
 constexpr uintptr_t tc6_port = 12;
+constexpr uintptr_t tc6_tuple = 13;
 /*
 constexpr uintptr_t tc6_subr = ;
 constexpr uintptr_t tc6_continuation = ;
@@ -196,6 +197,12 @@ struct scm_port_rec_t {
   port_aux_t* aux;
 };
 
+struct scm_tuple_rec_t {
+  scm_tc6_t tag;
+  int nsize;
+  scm_obj_t elts[1];
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -210,16 +217,27 @@ inline bool is_tc6(scm_obj_t x, uintptr_t tc6) {
 #endif
 }
 
-inline uintptr_t tag_tc6(scm_tc6_t tag) { return (tag & 0x3f00) >> 8; }
+inline uintptr_t tag_tc6_num(scm_tc6_t tag) { return (tag & 0x3f00) >> 8; }
 
-inline uintptr_t heap_tc6(scm_obj_t x) {
+inline uintptr_t heap_tc6_num(scm_obj_t x) {
   assert(is_heap_object(x));
 #if USE_TBI
   return __builtin_rotateleft64(x, 7) & 0x3f;
 #else
-  return tag_tc6(*(scm_tc6_t*)(x - 2));
+  return tag_tc6_num(*(scm_tc6_t*)(x - 2));
 #endif
 }
+
+inline scm_obj_t tc6_tagged_pointer(void* x, uintptr_t tc6_num) {
+  assert(((uintptr_t)x & 0x07) == 0);
+#if USE_TBI
+  return (uintptr_t)x | 0x02 | (uint64_t)tc6_num << 57;
+#else
+  return (uintptr_t)x | 0x02;
+#endif
+}
+
+inline scm_tc6_t make_tc6_tag(uintptr_t tc6_num) { return (tc6_num << 8) | 0x06; }
 
 inline void* to_address(scm_obj_t x) {
   assert(is_heap_object(x));
@@ -242,6 +260,7 @@ inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
 inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
 inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
 inline bool is_port(scm_obj_t x) { return is_tc6(x, tc6_port); }
+inline bool is_tuple(scm_obj_t x) { return is_tc6(x, tc6_tuple); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
@@ -264,6 +283,7 @@ scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
 scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,
                             scm_obj_t winders);
 scm_obj_t make_port(scm_obj_t name);
+scm_obj_t make_tuple(int nsize);
 
 inline intptr_t fixnum(scm_obj_t x) {
   assert(is_fixnum(x));
@@ -286,6 +306,16 @@ inline int vector_nsize(scm_obj_t x) {
 inline scm_obj_t* vector_elts(scm_obj_t x) {
   assert(is_vector(x));
   return ((scm_vector_rec_t*)to_address(x))->elts;
+}
+
+inline int tuple_nsize(scm_obj_t x) {
+  assert(is_tuple(x));
+  return ((scm_tuple_rec_t*)to_address(x))->nsize;
+}
+
+inline scm_obj_t* tuple_elts(scm_obj_t x) {
+  assert(is_tuple(x));
+  return ((scm_tuple_rec_t*)to_address(x))->elts;
 }
 
 inline int values_nsize(scm_obj_t x) {

@@ -116,6 +116,11 @@ SUBR subr_standard_input_port(scm_obj_t self);
 SUBR subr_standard_output_port(scm_obj_t self);
 SUBR subr_standard_error_port(scm_obj_t self);
 SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_tuple_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_tuple(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -1683,7 +1688,47 @@ void test_port_subrs() {
   port_finalize((scm_port_rec_t*)to_address(p));
 }
 
+// ---------------------------------------------------------------------------
+// tuple  — Nanos extension
+// ---------------------------------------------------------------------------
+
+static scm_obj_t call_tuple(std::initializer_list<scm_obj_t> args) {
+  std::vector<scm_obj_t> v(args);
+  return subr_tuple(scm_nil, (int)v.size(), v.data());
+}
+
+void test_tuple() {
+  printf("--- tuple / tuple? / tuple-ref / tuple-set! ---\n");
+
+  // (tuple) → empty tuple
+  scm_obj_t t0 = call_tuple({});
+  ASSERT_TRUE(is_tuple(t0));
+  PRED_TRUE(subr_tuple_p, t0);
+  ASSERT_TRUE(tuple_nsize(t0) == 0);
+
+  // (tuple 1 2 3)
+  scm_obj_t t3 = call_tuple({make_fixnum(1), make_fixnum(2), make_fixnum(3)});
+  ASSERT_TRUE(is_tuple(t3));
+  PRED_TRUE(subr_tuple_p, t3);
+  ASSERT_TRUE(tuple_nsize(t3) == 3);
+
+  // tuple-ref
+  ASSERT_TRUE(subr_tuple_ref(scm_nil, t3, make_fixnum(0)) == make_fixnum(1));
+  ASSERT_TRUE(subr_tuple_ref(scm_nil, t3, make_fixnum(1)) == make_fixnum(2));
+  ASSERT_TRUE(subr_tuple_ref(scm_nil, t3, make_fixnum(2)) == make_fixnum(3));
+
+  // tuple-set!
+  subr_tuple_set(scm_nil, t3, make_fixnum(1), make_fixnum(99));
+  ASSERT_TRUE(subr_tuple_ref(scm_nil, t3, make_fixnum(1)) == make_fixnum(99));
+
+  // non-tuples
+  PRED_FALSE(subr_tuple_p, make_vector(1, scm_nil));
+  PRED_FALSE(subr_tuple_p, make_proper_list_123());
+  PRED_FALSE(subr_tuple_p, make_fixnum(0));
+}
+
 int main(int argc, char** argv) {
+
   printf("Starting test_subr\n");
   fflush(stdout);
 
@@ -1732,8 +1777,10 @@ int main(int argc, char** argv) {
   test_undef_unspecified();
   test_uuid();
   test_port_subrs();
+  test_tuple();
 
   context::destroy();
+
   heap->destroy();
   delete heap;
 

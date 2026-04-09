@@ -65,7 +65,8 @@
     "core/eval.scm"
     "boot/target-env.scm"))
 
-(delete-file "boot/core.ir")
+(and (file-exists? "boot/core.ir") (delete-file "boot/core.ir"))
+
 (with-output-to-file "boot/core.ir" 
   (lambda ()
     (map 

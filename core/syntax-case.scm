@@ -45,24 +45,23 @@
 ;; Syntax objects wrap datums with lexical context information.
 ;; A syntax object is a 3-element vector: #(**syntax-object** datum context)
 (define (make-syntax-object datum context)
-  (if (or (symbol? datum) (pair? datum) (vector? datum))
-      (vector '**syntax-object** datum context)
+  (if (or (symbol? datum) (pair? datum) (tuple? datum))
+      (tuple ':syntax-object datum context)
       datum))
 
 (define (syntax-object? obj)
-  (and (vector? obj)
-       (= (vector-length obj) 3)
-       (eq? (vector-ref obj 0) '**syntax-object**)))
+  (and (tuple? obj)
+       (eq? (tuple-ref obj 0) ':syntax-object)))
 
 (define (syntax-object-datum obj)
-  (if (syntax-object? obj) (vector-ref obj 1) obj))
+  (if (syntax-object? obj) (tuple-ref obj 1) obj))
 
 (define (syntax-object-context obj)
-  (if (syntax-object? obj) (vector-ref obj 2) '()))
+  (if (syntax-object? obj) (tuple-ref obj 2) '()))
 
 (define (get-identifier-context id)
   (cond
-    ((syntax-object? id) (vector-ref id 2))
+    ((syntax-object? id) (tuple-ref id 2))
     ((symbol? id)
      (let ((entry (hashtable-ref *rename-env* id #f)))
        (if entry (cdr entry) '())))
@@ -82,15 +81,14 @@
 
 ;; Variable transformers for set! interception.
 (define (make-variable-transformer proc)
-  (vector '**variable-transformer** proc))
+  (tuple ':variable-transformer proc))
 
 (define (variable-transformer? obj)
-  (and (vector? obj)
-       (= (vector-length obj) 2)
-       (eq? (vector-ref obj 0) '**variable-transformer**)))
+  (and (tuple? obj)
+       (eq? (tuple-ref obj 0) ':variable-transformer)))
 
 (define (variable-transformer-procedure obj)
-  (vector-ref obj 1))
+  (tuple-ref obj 1))
 
 ;; Convert syntax object containing a list into a list of syntax objects.
 (define (syntax->list obj)

@@ -262,8 +262,8 @@
 ;; SECTION 4: Macro Transformers & Helpers
 ;;=============================================================================
 
-(define (macro-binding? val) (and (pair? val) (eq? (car val) '**macro**)))
-(define (make-macro-binding trans) (cons '**macro** trans))
+(define (macro-binding? val) (and (pair? val) (eq? (car val) ':macro)))
+(define (make-macro-binding trans) (cons ':macro trans))
 (define (unwrap-macro-binding val) (cdr val))
 
 ;; Construct a begin expression, flattening nested begins and handling empty/single cases.

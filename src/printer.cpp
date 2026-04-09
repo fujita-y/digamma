@@ -43,7 +43,7 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
   }
 
   if (is_heap_object(obj)) {
-    switch (heap_tc6(obj)) {
+    switch (heap_tc6_num(obj)) {
       case tc6_symbol: {
         const char* s = (const char*)symbol_name(obj);
         if (display_mode) {
@@ -99,7 +99,7 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
         scm_obj_t* elts = vector_elts(obj);
         for (int i = 0; i < n; i++) {
           if (i > 0) out << " ";
-          print(visited, elts[i], display_mode);
+          print(visited, elts[i], false);
         }
         out << ")";
         return;
@@ -110,7 +110,7 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
         scm_obj_t* elts = values_elts(obj);
         for (int i = 0; i < n; i++) {
           out << " ";
-          print(visited, elts[i], display_mode);
+          print(visited, elts[i], false);
         }
         out << ">";
         return;
@@ -146,6 +146,25 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
         return;
       case tc6_port:
         out << std::format("#<port {:#x}>", (uintptr_t)obj);
+        return;
+      case tc6_tuple:
+        if (tuple_nsize(obj) == 0) {
+          out << "#<tuple>";
+          return;
+        }
+        if (is_symbol(tuple_elts(obj)[0])) {
+          out << "#<" << (const char*)symbol_name(tuple_elts(obj)[0]);
+          int n = tuple_nsize(obj);
+          scm_obj_t* elts = tuple_elts(obj);
+          for (int i = 1; i < n; i++) {
+            out << " ";
+            print(visited, elts[i], false);
+          }
+          out << ">";
+
+          return;
+        }
+        out << std::format("#<tuple {:#x} size:{}>", (uintptr_t)obj, tuple_nsize(obj));
         return;
     }
   }
@@ -399,7 +418,7 @@ void printer_t::scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_
     return;
   }
   if (is_heap_object(obj)) {
-    switch (heap_tc6(obj)) {
+    switch (heap_tc6_num(obj)) {
       case tc6_vector: {
         int n = vector_nsize(obj);
         scm_obj_t* elts = vector_elts(obj);
