@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "exception.h"
 #include "nanos.h"
 #include "nanos_options.h"
 
@@ -9,10 +10,21 @@ int main(int argc, char** argv) {
   nanos_options::parse(argc, argv);
   nanos_t* nanos = new nanos_t();
   nanos->init();
-  nanos->run();
+  int status = 0;
+  try {
+    nanos->run();
+  } catch (const nanos_exit_t& e) {
+    status = e.get_status();
+  } catch (const std::exception& e) {
+    std::cerr << "Unhandled std::exception: " << e.what() << std::endl;
+    status = 1;
+  } catch (...) {
+    std::cerr << "Unhandled unknown exception" << std::endl;
+    status = 1;
+  }
   nanos->destroy();
   delete nanos;
-  return 0;
+  return status;
 }
 
 void fatal(const char* fmt, ...) {

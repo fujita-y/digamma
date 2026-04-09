@@ -1,4 +1,8 @@
+;;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
+
 (define-module (core let-values)
+
   (export let-values let*-values)
   
   (define-syntax let-values
@@ -17,5 +21,7 @@
        (let () body1 body2 ...))
       ((let*-values (binding rest ...) body1 body2 ...)
        (let-values (binding)
-         (let*-values (rest ...) body1 body2 ...))))))
+         (let*-values (rest ...) body1 body2 ...)))))
+
+)
 

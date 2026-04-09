@@ -32,6 +32,7 @@ add-load-path
 load-module
 lookup-process-environment
 _eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f
+with-cpp-exception-handler
 *
 +
 -
@@ -278,7 +279,7 @@ infinite?
 ;inst-arg2
 ;inst-op
 integer?
-;interaction-environment
+interaction-environment
 ;internal-define->binding
 ;intersect-ll
 iota

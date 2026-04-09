@@ -1095,6 +1095,7 @@ void init_subr_base() {
   reg("call/cc", (void*)subr_call_cc, 1, 0);
   reg("call-with-current-continuation", (void*)subr_call_cc, 1, 0);
   reg("call/ec", (void*)subr_call_ec, 1, 0);
+  reg("call-with-escape-continuation", (void*)subr_call_ec, 1, 0);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, 0);
   reg("values", (void*)subr_values, 0, 1);
   reg("call-with-values", (void*)subr_call_with_values, 2, 0);

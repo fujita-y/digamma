@@ -9,8 +9,8 @@
 #include <ucontext.h>
 #include "codegen_aux.h"
 #include "context.h"
+#include "exception.h"
 #include "object_heap.h"
-
 
 thread_local static bool s_restored = false;
 thread_local static scm_continuation_rec_t* s_restored_rec = nullptr;
@@ -144,12 +144,18 @@ __attribute__((used)) __attribute__((no_sanitize("hwaddress"))) extern "C" void 
   setcontext(rec->uctx);
 }
 
-__attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continuation_rec_t* rec, scm_obj_t val) {
-  do_wind(rec->winders);
+__attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_obj_t cont_obj, scm_continuation_rec_t* rec, scm_obj_t val) {
+  try {
+    do_wind(rec->winders);
+  } catch (...) {
+    context::gc_unprotect(cont_obj);
+    throw;
+  }
   object_heap_t::current()->write_barrier(val);
   context::s_continuation_captured_retval = val;
   s_restored = true;
   s_restored_rec = rec;
+  context::gc_unprotect(cont_obj);
   // Acquire collector lock before switching to the temp stack. Once we switch SP
   // to s_restore_stack the mutator cannot reach a safepoint, so we must prevent
   // the GC from entering a stop-the-world phase during this window. The lock is
@@ -169,32 +175,50 @@ __attribute__((no_sanitize("hwaddress"))) void restore_continuation(scm_continua
 SUBR subr_invoke_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
-  scoped_gc_protect gc_protect(cont_obj);
+  context::gc_protect(cont_obj);
   scm_continuation_rec_t* cont_rec = (scm_continuation_rec_t*)to_address(cont_obj);
-  if (argc > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
+  if (argc > 1) {
+    context::gc_unprotect(cont_obj);
+    throw std::runtime_error("apply: continuation expects at most 1 argument");
+  }
   scm_obj_t val = (argc == 0) ? scm_undef : argv[0];
-  restore_continuation(cont_rec, val);
+  restore_continuation(cont_obj, cont_rec, val);
   return scm_undef;
 }
 
 SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_closure_rec_t* clo = (scm_closure_rec_t*)to_address(self);
   scm_obj_t cont_obj = clo->env[0];
-  scoped_gc_protect gc_protect(cont_obj);
+  context::gc_protect(cont_obj);
   scm_escape_rec_t* cont_rec = (scm_escape_rec_t*)to_address(cont_obj);
-  if (argc > 1) throw std::runtime_error("apply: continuation expects at most 1 argument");
-  if (cont_rec->invoked) throw std::runtime_error("apply: one-shot continuation already invoked");
-  if (!cont_rec->uctx) throw std::runtime_error("apply: invalid continuation");
+  if (argc > 1) {
+    context::gc_unprotect(cont_obj);
+    throw std::runtime_error("apply: continuation expects at most 1 argument");
+  }
+  if (cont_rec->invoked) {
+    context::gc_unprotect(cont_obj);
+    throw std::runtime_error("apply: one-shot continuation already invoked");
+  }
+  if (!cont_rec->uctx) {
+    context::gc_unprotect(cont_obj);
+    throw std::runtime_error("apply: invalid continuation");
+  }
 
   scm_obj_t retval = (argc == 0) ? scm_undef : argv[0];
   object_heap_t::current()->write_barrier(retval);
   cont_rec->retval = retval;
   cont_rec->invoked = true;
 
-  do_wind(cont_rec->winders);
+  try {
+    do_wind(cont_rec->winders);
+  } catch (...) {
+    context::gc_unprotect(cont_obj);
+    throw;
+  }
 
   context::s_continuation_captured_retval = retval;
   s_restored = true;
+  context::gc_unprotect(cont_obj);
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
   __asm__ volatile("mov %0, sp" : "=r"(sp));
@@ -270,12 +294,14 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
       scm_obj_t ret = scm_undef;
       try {
         ret = c_apply_helper(proc, 1, argv);
+      } catch (const nanos_exit_t& e) {
+        throw;
       } catch (const std::exception& e) {
-        fprintf(stderr, "Exception while evaluating call/ec procedure: %s\n", e.what());
-        exit(EXIT_FAILURE);
+        std::cerr << "Exception while evaluating call/ec procedure: " << e.what() << std::endl;
+        throw nanos_exit_t(1);
       } catch (...) {
-        fprintf(stderr, "Unknown exception while evaluating call/ec procedure\n");
-        exit(EXIT_FAILURE);
+        std::cerr << "Unknown exception while evaluating call/ec procedure" << std::endl;
+        throw nanos_exit_t(1);
       }
 
       if (!rec->invoked) {
@@ -304,7 +330,14 @@ SUBR subr_dynamic_wind(scm_obj_t self, scm_obj_t pre, scm_obj_t value, scm_obj_t
   scm_obj_t winder = make_cons(pre, post);
   scm_obj_t old_winders = get_current_winders();
   set_current_winders(make_cons(winder, old_winders));
-  scm_obj_t res = c_call_closure_thunk_0(value);
+  scm_obj_t res = scm_unspecified;
+  try {
+    res = c_call_closure_thunk_0(value);
+  } catch (...) {
+    set_current_winders(old_winders);
+    c_call_closure_thunk_0(post);
+    throw;
+  }
   set_current_winders(old_winders);
   c_call_closure_thunk_0(post);
   return res;

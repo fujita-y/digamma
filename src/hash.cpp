@@ -214,7 +214,10 @@ void hashtable_set(scm_obj_t obj, scm_obj_t key, scm_obj_t value) {
   object_heap_t::current()->write_barrier(key);
   object_heap_t::current()->write_barrier(value);
   int n = put(ht, key, value);
-  if (n) rehash(ht, n);
+  if (n) {
+    rehash(ht, n);
+    object_heap_t::current()->write_barrier(obj);
+  }
 }
 
 void hashtable_delete(scm_obj_t obj, scm_obj_t key) {

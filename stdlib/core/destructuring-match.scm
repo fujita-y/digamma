@@ -1,5 +1,10 @@
-(define-module (core destructuring-match) 
+;;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+;;; See LICENSE file for terms and conditions of use.
+
+(define-module (core destructuring-match)
+
   (export destructuring-match)
+
   (import (core let-values))
 
   (define drop-last-cdr
@@ -247,4 +252,5 @@
             '((car . cdar) (cdr . cddr) (caar . cdaar) (cadr . cdadr) (cdar . cddar) (cddr . cdddr)
               (caaar . cdaaar) (caadr . cdaadr) (cadar . cadadar) (caddr . cdaddr) (cdaar . cddaar)
               (cdadr . cddadr) (cddar . cdddar) (cdddr . cddddr)))
+
 )

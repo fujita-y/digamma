@@ -10,6 +10,7 @@
 #include "cond.h"
 #include "mutex.h"
 #include "queue.h"
+#include <atomic>
 
 #define MARK_STACK_SIZE_INIT          16384  // 16K object, 64K/128K bytes
 #define MARK_STACK_SIZE_GROW          4096   // 4K object, 16K/32K bytes
@@ -77,11 +78,11 @@ class concurrent_heap_t {
   mutex_t m_collector_lock;
   void** m_mark_stack;
   int m_root_snapshot_mode;
-  bool m_read_barrier;
-  bool m_write_barrier;
-  bool m_collector_kicked;
-  bool m_mutator_stopped;
-  bool m_stop_the_world;
+  std::atomic<bool> m_read_barrier;
+  std::atomic<bool> m_write_barrier;
+  std::atomic<bool> m_collector_kicked;
+  std::atomic<bool> m_mutator_stopped;
+  std::atomic<bool> m_stop_the_world;
 
   void set_snapshot_root_proc(std::function<void()> callback) { m_snapshot_root_proc = callback; }
   void set_trace_proc(std::function<void(void* obj)> callback) { m_trace_proc = callback; }
@@ -149,7 +150,7 @@ class concurrent_heap_t {
   int m_mark_stack_size;
   bool m_collector_ready;
   bool m_collector_terminating;
-  bool m_alloc_barrier;
+  std::atomic<bool> m_alloc_barrier;
 
   __attribute__((no_sanitize("hwaddress"))) void snapshot_stack();
   void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }

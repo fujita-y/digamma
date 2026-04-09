@@ -2,6 +2,7 @@
 #include "nanos.h"
 #include "codegen.h"
 #include "context.h"
+#include "exception.h"
 #include "hash.h"
 #include "nanos_jit.h"
 #include "nanos_options.h"
@@ -88,8 +89,10 @@ void nanos_t::load_script(std::string filename) {
     }
     try {
       evaluate(obj, printer);
-    } catch (std::exception& e) {
-      printf("%s\n", e.what());
+    } catch (const nanos_exit_t& e) {
+      throw;
+    } catch (const std::exception& e) {
+      std::cerr << "Exception while loading script: " << e.what() << std::endl;
       exit(1);
     }
   }
@@ -130,8 +133,10 @@ void nanos_t::load_ir(std::string filename) {
         printer.write((scm_obj_t)result);
         puts("");
 #endif
-      } catch (std::exception& e) {
-        printf("%s\n", e.what());
+      } catch (const nanos_exit_t& e) {
+        throw;
+      } catch (const std::exception& e) {
+        std::cerr << "Exception while loading boot IR: " << e.what() << std::endl;
         exit(1);
       }
     }
@@ -289,7 +294,9 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
       puts("\n");
     }
 #endif
+  } catch (const nanos_exit_t& e) {
+    throw;
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "exception: " << e.what() << std::endl;
   }
 }

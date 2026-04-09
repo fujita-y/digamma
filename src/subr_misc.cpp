@@ -7,8 +7,8 @@
 #include "context.h"
 #include "continuation.h"
 #include "equiv.h"
+#include "exception.h"
 #include "list.h"
-#include "nanos.h"
 #include "object_heap.h"
 #include "subr.h"
 
@@ -85,23 +85,53 @@ SUBR subr_uuid(scm_obj_t self) {
 }
 
 SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  nanos_t::current()->destroy();
-  if (argc == 0) exit(0);
-  scm_obj_t a1 = argv[0];
-  if (is_fixnum(a1)) exit((int)fixnum(a1));
-  if (a1 == scm_false) exit(1);
-  exit(0);
+  int status = 0;
+  if (argc > 1) throw std::runtime_error("exit: too many arguments");
+  if (argc == 1) {
+    scm_obj_t a1 = argv[0];
+    if (is_fixnum(a1)) {
+      status = (int)fixnum(a1);
+    } else if (a1 == scm_false) {
+      status = 1;
+    } else {
+      throw std::runtime_error("exit: argument must be a fixnum or #f");
+    }
+  }
+  throw nanos_exit_t(status);
 }
 
 // codegen-and-run - Nanos extension
 SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t inst_list) {
+  scoped_gc_protect p(inst_list);
+  compiled_code_t func = codegen_t::current()->compile(inst_list);
+  scm_obj_t result = (scm_obj_t)func.release_and_run();
+  return result;
+}
+
+// ============================================================================
+// Exception Interface
+// ============================================================================
+
+// with-cpp-exception-handler - Nanos extension
+// (with-cpp-exception-handler handler thunk)
+// Calls (thunk). If a C++ std::exception escapes, calls (handler message-string)
+// instead of propagating it. nanos_exit_t is always re-thrown.
+SUBR subr_with_cpp_exception_handler(scm_obj_t self, scm_obj_t handler, scm_obj_t thunk) {
+  if (!is_closure(handler)) throw std::runtime_error("with-cpp-exception-handler: first argument must be a procedure");
+  if (!is_closure(thunk)) throw std::runtime_error("with-cpp-exception-handler: second argument must be a procedure");
+  codegen_t* cg = codegen_t::current();
+  if (!cg) throw std::runtime_error("with-cpp-exception-handler: JIT not initialized");
+  auto bridge = cg->call_closure_bridge();
   try {
-    scoped_gc_protect p(inst_list);
-    compiled_code_t func = codegen_t::current()->compile(inst_list);
-    scm_obj_t result = (scm_obj_t)func.release_and_run();
-    return result;
-  } catch (std::exception& e) {
-    throw std::runtime_error(e.what());
+    return (scm_obj_t)bridge(thunk, 0, nullptr);
+  } catch (const nanos_exit_t&) {
+    throw;
+  } catch (const std::exception& e) {
+    scm_obj_t msg = make_string(e.what());
+    return (scm_obj_t)bridge(handler, 1, &msg);
+  } catch (...) {
+    scm_obj_t msg = make_string("unknown exception");
+    return (scm_obj_t)bridge(handler, 1, &msg);
   }
 }
 
@@ -134,4 +164,5 @@ void init_subr_misc() {
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
+  reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, 0);
 }

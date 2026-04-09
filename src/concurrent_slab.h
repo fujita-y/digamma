@@ -91,14 +91,16 @@ class concurrent_slab_t {
     return (bitmap[bit_n >> 3] & (1 << (bit_n & 7))) != 0;
   }
 
+  // mutator calls
   void unconditional_mark(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
     int bit_n = ((intptr_t)obj & (SLAB_SIZE - 1)) >> m_object_size_shift;
     assert(bit_n < m_bitmap_size * 8);
-    bitmap[bit_n >> 3] |= (1 << (bit_n & 7));
+    __atomic_fetch_or(bitmap + (bit_n >> 3), (uint8_t)(1 << (bit_n & 7)), __ATOMIC_RELAXED);
   }
 
+  // collector calls
   __attribute__((no_sanitize("hwaddress"))) bool test_and_set_mark(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
@@ -107,8 +109,7 @@ class concurrent_slab_t {
     uint8_t bit = (1 << (bit_n & 7));
     uint8_t* p = bitmap + (bit_n >> 3);
     if (*p & bit) return true;
-    *p |= bit;
-    return false;
+    return (__atomic_fetch_or(p, bit, __ATOMIC_RELAXED) & bit) != 0;
   }
 };
 

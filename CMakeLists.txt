@@ -122,7 +122,6 @@ target_compile_options(nanos_config INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
   $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
-  $<$<CONFIG:Debug>:-fsanitize=hwaddress>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>

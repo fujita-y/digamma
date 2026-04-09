@@ -3,9 +3,9 @@
 
 (define-module (core pretty-print)
 
-(export pretty-print)
+  (export pretty-print)
 
-(import (core destructuring-match))
+  (import (core destructuring-match))
 
 #|
 
@@ -63,166 +63,167 @@
 
 |#
 
-(define pretty-print-line-length (make-parameter 100))
-(define pretty-print-initial-indent (make-parameter 0))
-(define pretty-print-maximum-lines (make-parameter #f))
+  (define pretty-print-line-length (make-parameter 100))
+  (define pretty-print-initial-indent (make-parameter 0))
+  (define pretty-print-maximum-lines (make-parameter #f))
 
-(define pretty-print
-  (lambda (expr . port)
-    (let ((port (if (pair? port) (car port) (current-output-port)))
-          (n-more-lines (and (pretty-print-maximum-lines) (- (pretty-print-maximum-lines) 1))))
-      (define indent-type1?
-        (lambda (id)
-          (memq id '(library define-library define-module define define-syntax define-macro define-inline define-constant
-                     syntax-rules lambda let letrec let* letrec letrec* let-values let*-values
-                     destructuring-match parameterize))))
-      (define indent-type2?
-        (lambda (id)
-          (memq id '(if cond case and or set! import export cons map))))
-      (define indent-type3?
-        (lambda (id)
-          (memq id '(do let-optionals))))
-      (define indent-type4?
-        (lambda (id)
-          (memq id '(let-syntax letrec-syntax with-syntax))))
-      (define fits?
-        (lambda (w lst)
-          (and (>= w 0)
-               (or (null? lst)
-                   (destructuring-match lst
-                     (((_ _ ()) . z) (fits? w z))
-                     (((_ '.&BREAK #\;) . z) #t)
-                     (((_ '.&FLAT #\;) . z) (fits? (- w 1) z))
-                     (((_ _ (? string? s)) . z) (fits? (- w (string-length s)) z))
-                     (((i _ ('.&GROUP . x)) . z) (fits? w `((,i .&FLAT ,x) ,@z)))
-                     (((i m ('.&NEST j . x)) . z) (fits? w `((,(+ i j) ,m ,x) ,@z)))
-                     (((i m (x . y)) . z) (fits? w `((,i ,m ,x) (,i ,m ,y) ,@z))))))))
-      (define print
-        (lambda (w k lst)
-          (or (null? lst)
-              (destructuring-match lst
-                (((_ _ ()) . z) (print w k z))
-                (((i '.&BREAK #\;) . z)
-                 (cond ((or (eq? n-more-lines #f) (> n-more-lines 0))
-                        (and n-more-lines (set! n-more-lines (- n-more-lines 1)))
-                        (put-char port #\newline)
-                        (let loop ((i i)) (and (> i 0) (put-char port #\space) (loop (- i 1))))
-                        (print w i z))))
-                (((_ '.&FLAT #\;) . z)
-                 (begin
-                   (put-char port #\space)
-                   (print w (+ k 1) z)))
-                (((_ _ (? string? s)) . z)
-                 (begin
-                   (put-string port s)
-                   (print w (+ k (string-length s)) z)))
-                (((i _ ('.&GROUP . x)) . z)
-                 (let ((flat `((,i .&FLAT ,x) ,@z)))
-                   (if (fits? (- w k) flat)
-                       (print w k flat)
-                       (print w k `((,i .&BREAK ,x) ,@z)))))
-                (((i m ('.&NEST j . x)) . z)
-                 (print w k `((,(+ i j) ,m ,x) ,@z)))
-                (((i m (x . y)) . z)
-                 (print w k `((,i ,m ,x) (,i ,m ,y) ,@z)))))))
-      (define symbol->length
-        (lambda (obj)
-          (string-length (symbol->string obj))))
-      (define parse-list
-        (lambda (lst)
-          (cond ((null? lst) '())
-                ((null? (cdr lst))
-                 (list (parse (car lst))))
-                ((and (eq? (car lst) 'unquote) (pair? (cdr lst)) (null? (cddr lst)))
-                 (list "." #\; "," (parse (cadr lst))))
-                ((pair? (cdr lst))
-                 (cons* (parse (car lst)) #\; (parse-list (cdr lst))))
-                (else
-                 (list (parse (car lst)) #\; "." #\; (parse (cdr lst)))))))
-      (define parse
-        (lambda (obj)
-          (cond ((pair? obj)
-                 (destructuring-match obj
-                   (('quote e) `("'" (.&NEST 1 ,(parse e))))
-                   (('unquote e) `("," (.&NEST 1 ,(parse e))))
-                   (('quasiquote e) `("`" (.&NEST 1 ,(parse e))))
-                   (('unquote-splicing e) `(",@" (.&NEST 2 ,(parse e))))
-                   (('syntax e) `("#'" (.&NEST 2 ,(parse e))))
-                   (('quasisyntax e) `("#`" (.&NEST 2 ,(parse e))))
-                   (('unsyntax e) `("#," (.&NEST 2 ,(parse e))))
-                   (('unsyntax-splicing e) `("#,@" (.&NEST 3 ,(parse e))))
-                   ;; named let
-                   (('let (? symbol? e1) e2 . (? pair? e3))
-                    `(.&GROUP ,(format "(let ~a " e1)
-                              (.&NEST 2
-                                      (.&NEST ,(+ (symbol->length e1) 4)
-                                              ,(parse e2))
-                                      #\;
-                                      ,@(parse-list e3) ")")))
-                   ;; syntax-rules with <ellipsis>
-                   (('syntax-rules (? symbol? e1) (? list? e2) . (? pair? e3))
-                    `(.&GROUP (.&NEST 2 (.&GROUP "(syntax-rules" #\; ,(parse e1) #\; ,(parse e2))
+  (define pretty-print
+    (lambda (expr . port)
+      (let ((port (if (pair? port) (car port) (current-output-port)))
+            (n-more-lines (and (pretty-print-maximum-lines) (- (pretty-print-maximum-lines) 1))))
+        (define indent-type1?
+          (lambda (id)
+            (memq id '(library define-library define-module define define-syntax define-macro define-inline define-constant
+                      syntax-rules lambda let letrec let* letrec letrec* let-values let*-values
+                      destructuring-match parameterize))))
+        (define indent-type2?
+          (lambda (id)
+            (memq id '(if cond case and or set! import export cons map))))
+        (define indent-type3?
+          (lambda (id)
+            (memq id '(do let-optionals))))
+        (define indent-type4?
+          (lambda (id)
+            (memq id '(let-syntax letrec-syntax with-syntax))))
+        (define fits?
+          (lambda (w lst)
+            (and (>= w 0)
+                (or (null? lst)
+                    (destructuring-match lst
+                      (((_ _ ()) . z) (fits? w z))
+                      (((_ '.&BREAK #\;) . z) #t)
+                      (((_ '.&FLAT #\;) . z) (fits? (- w 1) z))
+                      (((_ _ (? string? s)) . z) (fits? (- w (string-length s)) z))
+                      (((i _ ('.&GROUP . x)) . z) (fits? w `((,i .&FLAT ,x) ,@z)))
+                      (((i m ('.&NEST j . x)) . z) (fits? w `((,(+ i j) ,m ,x) ,@z)))
+                      (((i m (x . y)) . z) (fits? w `((,i ,m ,x) (,i ,m ,y) ,@z))))))))
+        (define print
+          (lambda (w k lst)
+            (or (null? lst)
+                (destructuring-match lst
+                  (((_ _ ()) . z) (print w k z))
+                  (((i '.&BREAK #\;) . z)
+                  (cond ((or (eq? n-more-lines #f) (> n-more-lines 0))
+                          (and n-more-lines (set! n-more-lines (- n-more-lines 1)))
+                          (put-char port #\newline)
+                          (let loop ((i i)) (and (> i 0) (put-char port #\space) (loop (- i 1))))
+                          (print w i z))))
+                  (((_ '.&FLAT #\;) . z)
+                  (begin
+                    (put-char port #\space)
+                    (print w (+ k 1) z)))
+                  (((_ _ (? string? s)) . z)
+                  (begin
+                    (put-string port s)
+                    (print w (+ k (string-length s)) z)))
+                  (((i _ ('.&GROUP . x)) . z)
+                  (let ((flat `((,i .&FLAT ,x) ,@z)))
+                    (if (fits? (- w k) flat)
+                        (print w k flat)
+                        (print w k `((,i .&BREAK ,x) ,@z)))))
+                  (((i m ('.&NEST j . x)) . z)
+                  (print w k `((,(+ i j) ,m ,x) ,@z)))
+                  (((i m (x . y)) . z)
+                  (print w k `((,i ,m ,x) (,i ,m ,y) ,@z)))))))
+        (define symbol->length
+          (lambda (obj)
+            (string-length (symbol->string obj))))
+        (define parse-list
+          (lambda (lst)
+            (cond ((null? lst) '())
+                  ((null? (cdr lst))
+                  (list (parse (car lst))))
+                  ((and (eq? (car lst) 'unquote) (pair? (cdr lst)) (null? (cddr lst)))
+                  (list "." #\; "," (parse (cadr lst))))
+                  ((pair? (cdr lst))
+                  (cons* (parse (car lst)) #\; (parse-list (cdr lst))))
+                  (else
+                  (list (parse (car lst)) #\; "." #\; (parse (cdr lst)))))))
+        (define parse
+          (lambda (obj)
+            (cond ((pair? obj)
+                  (destructuring-match obj
+                    (('quote e) `("'" (.&NEST 1 ,(parse e))))
+                    (('unquote e) `("," (.&NEST 1 ,(parse e))))
+                    (('quasiquote e) `("`" (.&NEST 1 ,(parse e))))
+                    (('unquote-splicing e) `(",@" (.&NEST 2 ,(parse e))))
+                    (('syntax e) `("#'" (.&NEST 2 ,(parse e))))
+                    (('quasisyntax e) `("#`" (.&NEST 2 ,(parse e))))
+                    (('unsyntax e) `("#," (.&NEST 2 ,(parse e))))
+                    (('unsyntax-splicing e) `("#,@" (.&NEST 3 ,(parse e))))
+                    ;; named let
+                    (('let (? symbol? e1) e2 . (? pair? e3))
+                      `(.&GROUP ,(format "(let ~a " e1)
+                                (.&NEST 2
+                                        (.&NEST ,(+ (symbol->length e1) 4)
+                                                ,(parse e2))
+                                        #\;
+                                        ,@(parse-list e3) ")")))
+                    ;; syntax-rules with <ellipsis>
+                    (('syntax-rules (? symbol? e1) (? list? e2) . (? pair? e3))
+                      `(.&GROUP (.&NEST 2 (.&GROUP "(syntax-rules" #\; ,(parse e1) #\; ,(parse e2))
+                                          #\;
+                                          ,@(parse-list e3)) ")"))
+                    ;; syntax-case
+                    (('syntax-case e1 (? list? e2) . (? pair? e3))
+                      `(.&GROUP (.&NEST 2 (.&GROUP "(syntax-case" #\; ,(parse e1) #\; ,(parse e2))
+                                          #\;
+                                          ,@(parse-list e3)) ")"))
+                    (((? indent-type1? e1) e2 . (? pair? e3))
+                      `(.&GROUP ,(format "(~a " e1)
+                                (.&NEST 2
+                                        (.&NEST ,(symbol->length e1)
+                                                ,(parse e2))
+                                        #\;
+                                        ,@(parse-list e3) ")")))
+                    (((? indent-type2? e1) e2 . (? pair? e3))
+                      `(.&GROUP ,(format "(~a " e1)
+                                (.&NEST ,(+ (symbol->length e1) 2)
+                                        ,(parse e2)
                                         #\;
                                         ,@(parse-list e3)) ")"))
-                   ;; syntax-case
-                   (('syntax-case e1 (? list? e2) . (? pair? e3))
-                    `(.&GROUP (.&NEST 2 (.&GROUP "(syntax-case" #\; ,(parse e1) #\; ,(parse e2))
+                    (((? indent-type3? e1) e2 e3 . (? pair? e4))
+                      `(.&GROUP ,(format "(~a " e1)
+                                (.&NEST 2
+                                        (.&NEST 2
+                                                ,(parse e2) #\; ,(parse e3))
+                                        #\;
+                                        ,@(parse-list e4) ")")))
+                    (((? indent-type4? e1) e2 . (? pair? e3))
+                      `(.&GROUP ,(format "(~a" e1)
+                                (.&NEST 2
+                                        (.&NEST 2
+                                                #\;
+                                                ,(parse e2))
                                         #\;
                                         ,@(parse-list e3)) ")"))
-                   (((? indent-type1? e1) e2 . (? pair? e3))
-                    `(.&GROUP ,(format "(~a " e1)
-                              (.&NEST 2
-                                      (.&NEST ,(symbol->length e1)
-                                              ,(parse e2))
-                                      #\;
-                                      ,@(parse-list e3) ")")))
-                   (((? indent-type2? e1) e2 . (? pair? e3))
-                    `(.&GROUP ,(format "(~a " e1)
-                              (.&NEST ,(+ (symbol->length e1) 2)
-                                      ,(parse e2)
-                                      #\;
-                                      ,@(parse-list e3)) ")"))
-                   (((? indent-type3? e1) e2 e3 . (? pair? e4))
-                    `(.&GROUP ,(format "(~a " e1)
-                              (.&NEST 2
-                                      (.&NEST 2
-                                              ,(parse e2) #\; ,(parse e3))
-                                      #\;
-                                      ,@(parse-list e4) ")")))
-                   (((? indent-type4? e1) e2 . (? pair? e3))
-                    `(.&GROUP ,(format "(~a" e1)
-                              (.&NEST 2
-                                      (.&NEST 2
-                                              #\;
-                                              ,(parse e2))
-                                      #\;
-                                      ,@(parse-list e3)) ")"))
-                   (('else . _)
-                    `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))
-                   (('_ . _)
-                    `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))
-                   (((? symbol? _) . _)
-                    `(.&GROUP "(" (.&NEST 2 ,@(parse-list obj)) ")"))
-                   (_
-                    `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))))
-                ((vector? obj)
-                 (if (= (vector-length obj) 0)
-                     "#()"
-                     `(.&GROUP "#(" (.&NEST 2 ,@(parse-list (vector->list obj))) ")")))
-                (else
-                 (format "~s" obj)))))
+                    (('else . _)
+                      `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))
+                    (('_ . _)
+                      `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))
+                    (((? symbol? _) . _)
+                      `(.&GROUP "(" (.&NEST 2 ,@(parse-list obj)) ")"))
+                    (_
+                      `(.&GROUP "(" (.&NEST 1 ,@(parse-list obj)) ")"))))
+                  ((vector? obj)
+                  (if (= (vector-length obj) 0)
+                      "#()"
+                      `(.&GROUP "#(" (.&NEST 2 ,@(parse-list (vector->list obj))) ")")))
+                  (else
+                  (format "~s" obj)))))
 
-      (if (cyclic-object? expr)
-          (put-string port (format "~w" expr))
-          (let ((width (pretty-print-line-length)))
-            (print width 0 `((,(pretty-print-initial-indent) .&FLAT ,(parse expr))))))
+        (if (cyclic-object? expr)
+            (put-string port (format "~w" expr))
+            (let ((width (pretty-print-line-length)))
+              (print width 0 `((,(pretty-print-initial-indent) .&FLAT ,(parse expr))))))
 
-      (if (and n-more-lines (<= n-more-lines 0))
-          (begin
-            (put-char port #\newline)
-            (let loop ((i (pretty-print-initial-indent))) (and (> i 0) (put-char port #\space) (loop (- i 1))))
-            (put-string port "  ...")))
+        (if (and n-more-lines (<= n-more-lines 0))
+            (begin
+              (put-char port #\newline)
+              (let loop ((i (pretty-print-initial-indent))) (and (> i 0) (put-char port #\space) (loop (- i 1))))
+              (put-string port "  ...")))
 
-      (put-char port #\newline)
-      (flush-output-port port))))
+        (put-char port #\newline)
+        (flush-output-port port))))
+
 )

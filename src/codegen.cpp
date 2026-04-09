@@ -770,6 +770,9 @@ void codegen_t::parse_call(const scm_obj_t& inst_obj, Instruction& inst, Functio
   inst.argc = fixnum(operand(inst_obj, 2));
 
   if (inst.rn1 < 0) {
+    std::cerr << "[codegen] Malformed call instruction: ";
+    printer_t(std::cerr).write(inst_obj);
+    std::cerr << std::endl;
     fatal("%s:%u codegen: call requires a register operand for closure", __FILE__, __LINE__);
   }
   updateMaxRegister(inst.rn1, func_info.max_reg);
@@ -780,6 +783,9 @@ void codegen_t::parse_tail_call(const scm_obj_t& inst_obj, Instruction& inst, Fu
   inst.argc = fixnum(operand(inst_obj, 2));
 
   if (inst.rn1 < 0) {
+    std::cerr << "[codegen] Malformed tail-call instruction: ";
+    printer_t(std::cerr).write(inst_obj);
+    std::cerr << std::endl;
     fatal("%s:%u codegen: tail-call requires a register operand for closure", __FILE__, __LINE__);
   }
   updateMaxRegister(inst.rn1, func_info.max_reg);
