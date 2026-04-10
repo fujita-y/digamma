@@ -102,7 +102,6 @@ SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
 // codegen-and-run - Nanos extension
 SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t inst_list) {
-  scoped_gc_protect p(inst_list);
   compiled_code_t func = codegen_t::current()->compile(inst_list);
   scm_obj_t result = (scm_obj_t)func.release_and_run();
   return result;

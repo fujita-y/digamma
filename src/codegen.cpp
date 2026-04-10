@@ -170,6 +170,9 @@ void codegen_t::reset_compile_state() {
 }
 
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
+  context::gc_protect(inst_list);
+  gc_protected_objects.push_back(inst_list);
+
   CompileScope scope(*this);
   try {
     phase0_create_module();
@@ -187,6 +190,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase4_generate_code();
     phase5_optimize_and_verify();
     compiled_code_t code = phase6_finalize();
+
     for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
     gc_protected_objects.clear();
     return code;
