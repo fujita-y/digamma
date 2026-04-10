@@ -67,9 +67,11 @@ double flonum(scm_obj_t x) {
 
 scm_obj_t make_symbol(const char* name) {
   object_heap_t& heap = *object_heap_t::current();
-  std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
-  auto it = context::s_symbols.find(name);
-  if (it != context::s_symbols.end()) return it->second;
+  {
+    std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
+    auto it = context::s_symbols.find(name);
+    if (it != context::s_symbols.end()) return it->second;
+  }
   scm_symbol_rec_t* rec = (scm_symbol_rec_t*)heap.alloc_symbol();
   int n = strlen(name) + 1;
   uint8_t* datum = (uint8_t*)heap.alloc_private(n);
@@ -77,7 +79,12 @@ scm_obj_t make_symbol(const char* name) {
   rec->tag = make_tc6_tag(tc6_symbol);
   rec->name = datum;
   scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
-  context::s_symbols[name] = obj;
+  {
+    std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
+    auto it = context::s_symbols.find(name);
+    if (it != context::s_symbols.end()) return it->second;
+    context::s_symbols[name] = obj;
+  }
   return obj;
 }
 
