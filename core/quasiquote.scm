@@ -5,7 +5,7 @@
 ;; Expand quasiquote (backquote) syntax into core forms: quote, list, cons, and append.
 ;; This implementation handles nested quasiquotation and splicing correctly according to R7RS.
 
-(define (expand-quasiquote expr)
+(define (expand-qq-form expr)
   
   ;; --- Identifier Predicates ---
   ;; These handle potential renaming/tagging by the macro expander (e.g., "unquote.123").

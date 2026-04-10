@@ -46,12 +46,12 @@
 ;; A syntax object is a 3-element vector: #(**syntax-object** datum context)
 (define (make-syntax-object datum context)
   (if (or (symbol? datum) (pair? datum) (tuple? datum))
-      (tuple ':syntax-object datum context)
+      (tuple 'syntax datum context)
       datum))
 
 (define (syntax-object? obj)
   (and (tuple? obj)
-       (eq? (tuple-ref obj 0) ':syntax-object)))
+       (eq? (tuple-ref obj 0) 'syntax)))
 
 (define (syntax-object-datum obj)
   (if (syntax-object? obj) (tuple-ref obj 1) obj))
@@ -81,11 +81,11 @@
 
 ;; Variable transformers for set! interception.
 (define (make-variable-transformer proc)
-  (tuple ':variable-transformer proc))
+  (tuple 'variable-transformer proc))
 
 (define (variable-transformer? obj)
   (and (tuple? obj)
-       (eq? (tuple-ref obj 0) ':variable-transformer)))
+       (eq? (tuple-ref obj 0) 'variable-transformer)))
 
 (define (variable-transformer-procedure obj)
   (tuple-ref obj 1))

@@ -5,7 +5,7 @@
 
   (export pretty-print)
 
-  (import (core destructuring-match))
+  (import (core destructuring))
 
 #|
 

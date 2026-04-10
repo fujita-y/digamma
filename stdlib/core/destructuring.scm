@@ -1,9 +1,9 @@
 ;;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
-(define-module (core destructuring-match)
+(define-module (core destructuring)
 
-  (export destructuring-match)
+  (export destructuring-match destructuring-bind)
 
   (import (core let-values))
 
@@ -242,11 +242,37 @@
                               (let* (?subexprs ...)
                                 (cond ?dispatch ... (else #f))))))))))))))
 
+  (define-syntax destructuring-bind
+    (lambda (x)
+      (syntax-case x ()
+        ((?_ ?pat ?expr ?body ...)
+         (let ((pat (syntax->datum #'?pat))
+               (datum (gensym "tmp"))
+               (ren (make-eq-hashtable))
+               (mem (vector '())))
+           (let-values (((match inits vars)
+                         (compile-match ren mem pat datum '() '() '())))
+             (cond ((not (null? (vector-ref mem 0)))
+                    (syntax-violation 'destructuring-bind "tail match not supported" x pat))
+                   ((duplicates? vars)
+                    (syntax-violation 'destructuring-bind "duplicate variables" x pat))
+                   (match
+                    (with-syntax
+                        ((?datum (datum->syntax #'k datum))
+                         ((?vars ...) (map (lambda (e) (datum->syntax #'?_ e)) vars))
+                         ((?inits ...) (map (lambda (e) (datum->syntax #'k e)) inits))
+                         ((?body ...) (datum->syntax #'?_ (syntax->datum (syntax (?body ...))))))
+                      (syntax
+                       (let ((?datum ?expr))
+                         (let ((?vars ?inits) ...)
+                           ?body ...)))))
+                   (else
+                    (syntax-violation 'destructuring-bind "malformed pattern" x pat)))))))))
+
   (for-each (lambda (e) (hashtable-set! ca---r (car e) (cdr e)))
             '((car . caar) (cdr . cadr) (caar . caaar) (cadr . caadr) (cdar . cadar) (cddr . caddr)
               (caaar . caaaar) (caadr . caaadr) (cadar . caadar) (caddr . caaddr) (cdaar . cadaar)
               (cdadr . cadadr) (cddar . caddar) (cdddr . cadddr)))
-
 
   (for-each (lambda (e) (hashtable-set! cd---r (car e) (cdr e)))
             '((car . cdar) (cdr . cddr) (caar . cdaar) (cadr . cdadr) (cdar . cddar) (cddr . cdddr)

@@ -556,7 +556,7 @@
 
 (define (expand-quote expr m-env s-env r-env marks) `(quote ,(strip-renames (cadr expr))))
 
-(define (expand-quasiquote-form expr m-env s-env r-env marks) (expand (expand-quasiquote (cadr expr)) m-env s-env r-env marks))
+(define (expand-quasiquote expr m-env s-env r-env marks) (expand (expand-qq-form (cadr expr)) m-env s-env r-env marks))
 
 ;;=============================================================================
 ;; SECTION 7: Expansion Engine
@@ -672,7 +672,7 @@
     (cons 'let*-syntax expand-let*-syntax)
     (cons 'let-syntax expand-let-syntax)
     (cons 'or expand-or)
-    (cons 'quasiquote expand-quasiquote-form)
+    (cons 'quasiquote expand-quasiquote)
     (cons 'quote expand-quote)
     (cons 'set! expand-set!)))
   
