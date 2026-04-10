@@ -35,7 +35,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 #define ASSERT_TRUE(expr)                       \
   if (!(expr)) {                                \

@@ -32,7 +32,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static void test_cyclic_object_p(scm_obj_t obj, bool expected, const char* name) {
   bool result = cyclic_object_p(obj);

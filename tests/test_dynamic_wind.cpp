@@ -32,7 +32,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static int pre_count = 0;
 static int value_count = 0;

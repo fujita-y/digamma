@@ -55,7 +55,15 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+static scm_obj_t codegen_and_run(scm_obj_t inst_list) {
+  scoped_gc_protect protect(inst_list);
+  compiled_code_t func = codegen_t::current()->compile(inst_list);
+  scm_obj_t result = (scm_obj_t)func.release_and_run();
+  return result;
+}
+
 static bool some_test_failed = false;
+
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
@@ -159,7 +167,7 @@ int main(int argc, char** argv) {
         "(mov r4 r0) (mov r6 r2) (mov r8 r3) (global-ref r9 cdr) (mov r0 r8) (call r9 1) "
         "(mov r7 r0) (global-ref r8 map) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) "
         "(global-ref r6 cons) (mov r0 r4) (mov r1 r5) (tail-call r6 2))");
-    env.codegen->compile(map_code).release_and_run();
+    codegen_and_run(map_code);
 
     // Define deriv
     scm_obj_t deriv_code = env.read_code(
@@ -204,14 +212,14 @@ int main(int argc, char** argv) {
         "(label C2) (mov r3 r0) (const r4 /) (mov r6 r3) (global-ref r7 deriv) (mov r0 r6) "
         "(call r7 1) (mov r5 r0) (mov r6 r3) (global-ref r7 list) (mov r0 r4) (mov r1 r5) "
         "(mov r2 r6) (tail-call r7 3))");
-    env.codegen->compile(deriv_code).release_and_run();
+    codegen_and_run(deriv_code);
 
     // Run test case
     scm_obj_t test_case = env.read_code(
         "((const r1 (+ (* 3 x x) (* a x x) (* b x) 5)) "
         "(global-ref r2 deriv) (mov r0 r1) (call r2 1) (ret))");
 
-    intptr_t result = env.codegen->compile(test_case).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(test_case);
 
     // Check result
     const char* expected_sexp =
@@ -273,7 +281,7 @@ int main(int argc, char** argv) {
        (mov r1 r5)
        (tail-call r6 2))
     )");
-    env.codegen->compile(map_code).release_and_run();
+    codegen_and_run(map_code);
 
     // Run test case
     scm_obj_t test_case = env.read_code(R"(
@@ -293,7 +301,7 @@ int main(int argc, char** argv) {
        (mov r1 r4) 
        (tail-call r5 2))
     )");
-    intptr_t result = env.codegen->compile(test_case).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(test_case);
 
     // Expected: (4 3 2)
     const char* expected_sexp = "(4 3 2)";
@@ -315,13 +323,13 @@ int main(int argc, char** argv) {
     scm_obj_t map_code = env.read_code(R"(
       ((make-closure r0 C1 () 2 #f) (global-set! map r0) (ret) (label C1) (mov r2 r1) (mov r1 r0) (const r0 #f) (mov r3 r0) (closure-self r3) (make-closure r0 C2 (r3) 2 #f) (mov r3 r0) (mov r4 r1) (mov r0 r2) (mov r5 r0) (mov r6 r3) (mov r0 r4) (mov r1 r5) (tail-call r6 2) (label C2) (mov r3 r1) (mov r2 r0) (mov r4 r3) (global-ref r5 null?) (mov r0 r4) (call r5 1) (if L1 L2) (label L1) (const r0 ()) (ret) (label L2) (mov r6 r3) (global-ref r7 car) (mov r0 r6) (call r7 1) (mov r5 r0) (mov r6 r2) (call r6 1) (mov r4 r0) (mov r6 r2) (mov r8 r3) (global-ref r9 cdr) (mov r0 r8) (call r9 1) (mov r7 r0) (closure-self r0) (mov r8 r0) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (global-ref r6 cons) (mov r0 r4) (mov r1 r5) (tail-call r6 2))
     )");
-    env.codegen->compile(map_code).release_and_run();
+    codegen_and_run(map_code);
 
     // Run test case
     scm_obj_t test_case = env.read_code(R"(
       ((make-closure r0 C1 () 1 #f) (mov r2 r0) (const r3 (1 2 3)) (global-ref r4 map) (mov r1 r3) (call r4 2) (ret) (label C1) (mov r2 r0) (const r3 5) (mov r4 r2) (global-ref r5 list) (mov r0 r3) (mov r1 r4) (tail-call r5 2))
     )");
-    intptr_t result = env.codegen->compile(test_case).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(test_case);
 
     // Expected: ((5 1) (5 2) (5 3))
     const char* expected_sexp = "((5 1) (5 2) (5 3))";
@@ -342,7 +350,7 @@ int main(int argc, char** argv) {
 
     // Set trace? to #f
     scm_obj_t set_trace = env.read_code("((const r0 #f) (global-set! trace? r0) (ret))");
-    env.codegen->compile(set_trace).release_and_run();
+    codegen_and_run(set_trace);
 
     // Define nqueens and its helper functions
     scm_obj_t nqueens_code = env.read_code(R"(
@@ -353,13 +361,13 @@ int main(int argc, char** argv) {
        (label C2) (mov r1 r0) (const r0 #f) (mov r2 r0) (closure-self r2) (make-closure r0 C3 (r2) 2 #f) (mov r2 r0) (mov r3 r1) (const r0 ()) (mov r4 r0) (mov r5 r2) (mov r0 r3) (mov r1 r4) (tail-call r5 2)
        (label C3) (mov r3 r1) (mov r2 r0) (mov r4 r0) (const r5 0) (global-ref r6 =) (mov r1 r5) (call r6 2) (if L1 L2) (label L1) (mov r0 r3) (ret) (label L2) (mov r5 r2) (const r6 1) (global-ref r7 -) (mov r0 r5) (mov r1 r6) (call r7 2) (mov r4 r0) (mov r6 r2) (mov r7 r3) (global-ref r8 cons) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (closure-self r0) (mov r6 r0) (mov r0 r4) (mov r1 r5) (tail-call r6 2)))
     )");
-    env.codegen->compile(nqueens_code).release_and_run();
+    codegen_and_run(nqueens_code);
 
     // Run test case: (nqueens 8)
     scm_obj_t test_case = env.read_code(R"(
       ((const r1 8) (global-ref r2 nqueens) (mov r0 r1) (call r2 1) (ret))
     )");
-    intptr_t result = env.codegen->compile(test_case).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(test_case);
 
     // Expected: 92
     if (result != make_fixnum(92)) {

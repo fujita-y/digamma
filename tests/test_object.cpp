@@ -28,7 +28,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static bool test_fixnum_in_range(int64_t i64) {
   int64_t x1 = i64;

@@ -31,7 +31,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static bool test_return_normally() {
   auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };

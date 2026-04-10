@@ -27,7 +27,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static bool test_symbol_intern(const char* name) {
   scm_obj_t x1 = make_symbol(name);

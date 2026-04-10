@@ -41,7 +41,15 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+static scm_obj_t codegen_and_run(scm_obj_t inst_list) {
+  scoped_gc_protect protect(inst_list);
+  compiled_code_t func = codegen_t::current()->compile(inst_list);
+  scm_obj_t result = (scm_obj_t)func.release_and_run();
+  return result;
+}
+
 static bool some_test_failed = false;
+
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
@@ -118,7 +126,7 @@ int main(int argc, char** argv) {
         "((make-closure r0 C1 () 0 #f) "
         "(call r0 0) (ret) "
         "(label C1) (const r0 100) (ret))");
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(100);
   });
 
@@ -127,10 +135,10 @@ int main(int argc, char** argv) {
     scm_obj_t setup = env.read_code(
         "((make-closure r0 C1 () 0 #f) (global-set! f r0) (ret) "
         "(label C1) (const r0 200) (ret))");
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     scm_obj_t code = env.read_code("((global-ref r0 f) (call r0 0) (ret))");
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(200);
   });
 
@@ -150,7 +158,7 @@ int main(int argc, char** argv) {
         "(const r1 10) "
         "(global-ref r2 +) "
         "(call r2 2) (ret))");  // returns output of +
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     // apply-it: (lambda (f arg) (f arg))
     // C2 args: r0 (f), r1 (arg).
@@ -170,7 +178,7 @@ int main(int argc, char** argv) {
         "(mov r2 r0) "
         "(mov r0 r1) "
         "(call r2 1) (ret))");
-    env.codegen->compile(apply_it).release_and_run();
+    codegen_and_run(apply_it);
 
     // Call: (apply-it adder 5)
     // r0 = apply-it
@@ -185,7 +193,7 @@ int main(int argc, char** argv) {
         "(global-ref r3 apply-it) "
         "(call r3 2) (ret))");
 
-    intptr_t result = env.codegen->compile(call_it).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(call_it);
     return result == make_fixnum(15);
   });
 
@@ -198,7 +206,7 @@ int main(int argc, char** argv) {
     scm_obj_t setup = env.read_code(
         "((make-closure r0 C1 () 0 #t) (global-set! list-it r0) (ret) "
         "(label C1) (ret))");
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     // apply-it-2: (lambda (f arg1 arg2) (f arg1 arg2))
     // C2 args: r0=f, r1=arg1, r2=arg2
@@ -215,7 +223,7 @@ int main(int argc, char** argv) {
         "(mov r0 r1) "
         "(mov r1 r2) "
         "(call r3 2) (ret))");
-    env.codegen->compile(apply_it).release_and_run();
+    codegen_and_run(apply_it);
 
     // Call: (apply-it-2 list-it 42 99)
     // Args: r0=list-it, r1=42, r2=99.
@@ -227,7 +235,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply-it-2) "
         "(call r10 3) (ret))");
 
-    intptr_t result = env.codegen->compile(call_it).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(call_it);
     // Expect (42 99)
     if (!is_cons(result)) return false;
     if (cons_car(result) != make_fixnum(42)) return false;
@@ -244,7 +252,7 @@ int main(int argc, char** argv) {
         "((make-closure r0 CBig () 12 #f) (global-set! big-f r0) (ret) "
         "(label CBig) "
         "(mov r0 r11) (ret))");
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     // Caller
     // Prepare args r0...r11.
@@ -258,7 +266,7 @@ int main(int argc, char** argv) {
         "(global-ref r20 big-f) "
         "(call r20 12) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(11);
   });
 
@@ -281,7 +289,7 @@ int main(int argc, char** argv) {
         "(label C1) "
         "(global-ref r2 cons) "
         "(call r2 2) (ret))");
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     // (apply my-cons '(1 2))
     // args: r0=my-cons, r1='(1 2).
@@ -291,7 +299,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     if (!is_cons(result)) return false;
     if (cons_car(result) != make_fixnum(1)) return false;
     if (cons_cdr(result) != make_fixnum(2)) return false;

@@ -32,7 +32,9 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+
 static bool some_test_failed = false;
+
 
 static bool test_standard_ports() {
   scm_obj_t sin = context::s_standard_input_port;

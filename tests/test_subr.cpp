@@ -154,7 +154,9 @@ void trace(const char* fmt, ...) {
 // Test infrastructure
 // ---------------------------------------------------------------------------
 
+
 static bool some_test_failed = false;
+
 
 #define ASSERT_TRUE(expr)                         \
   do {                                            \

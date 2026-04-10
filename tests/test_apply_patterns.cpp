@@ -40,7 +40,15 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+static scm_obj_t codegen_and_run(scm_obj_t inst_list) {
+  scoped_gc_protect protect(inst_list);
+  compiled_code_t func = codegen_t::current()->compile(inst_list);
+  scm_obj_t result = (scm_obj_t)func.release_and_run();
+  return result;
+}
+
 static bool some_test_failed = false;
+
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
@@ -151,7 +159,7 @@ int main(int argc, char** argv) {
         // call apply with 2 args: +, '(1 2)
         "(tail-call r3 2))");
 
-    intptr_t result = env.codegen->compile(correct_code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(correct_code);
     return result == make_fixnum(3);
   });
 
@@ -174,7 +182,7 @@ int main(int argc, char** argv) {
         "(global-ref r2 +) "
         "(call r2 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(4);
   });
 
@@ -208,7 +216,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(3);
   });
 
@@ -224,7 +232,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 4) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(10);
   });
 
@@ -244,7 +252,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "  // apply itself
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(3);
   });
 
@@ -256,7 +264,7 @@ int main(int argc, char** argv) {
     scm_obj_t setup = env.read_code(
         "((make-closure r0 C1 () 1 #f) (global-set! f r0) (ret) "
         "(label C1) (const r1 1) (global-ref r2 +) (call r2 2) (ret))");
-    env.codegen->compile(setup).release_and_run();
+    codegen_and_run(setup);
 
     scm_obj_t code = env.read_code(
         "((global-ref r0 f) "
@@ -264,7 +272,7 @@ int main(int argc, char** argv) {
         "(global-ref r10 apply) "
         "(call r10 2) (ret))");
 
-    intptr_t result = env.codegen->compile(code).release_and_run();
+    intptr_t result = (intptr_t)codegen_and_run(code);
     return result == make_fixnum(11);
   });
 

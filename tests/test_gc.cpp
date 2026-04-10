@@ -31,7 +31,9 @@ void trace(const char* fmt, ...) {
 inline scm_obj_t car(scm_obj_t x) { return ((scm_cons_rec_t*)x)->car; }
 inline scm_obj_t cdr(scm_obj_t x) { return ((scm_cons_rec_t*)x)->cdr; }
 
+
 static bool some_test_failed = false;
+
 
 static void* subr_stub_ptr = (void*)0xdeadbeef;
 
