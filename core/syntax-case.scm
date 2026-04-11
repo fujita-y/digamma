@@ -45,9 +45,11 @@
 ;; Syntax objects wrap datums with lexical context information.
 ;; A syntax object is a 3-element vector: #(**syntax-object** datum context)
 (define (make-syntax-object datum context)
-  (if (or (symbol? datum) (pair? datum) (tuple? datum))
-      (tuple 'syntax datum context)
-      datum))
+  (if (syntax-object? datum)
+      datum
+      (if (or (symbol? datum) (pair? datum) (tuple? datum))
+          (tuple 'syntax datum context)
+          datum)))
 
 (define (syntax-object? obj)
   (and (tuple? obj)
