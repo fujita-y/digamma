@@ -329,6 +329,7 @@ static scm_obj_t append2(scm_obj_t lst1, scm_obj_t lst2) {
   scm_obj_t tail = head;
   lst1 = cons_cdr(lst1);
   while (lst1 != scm_nil) {
+    if (!is_cons(lst1)) throw std::runtime_error("error: append: wrong type of arguments");
     scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
     tail_cons->cdr = make_cons(cons_car(lst1), scm_nil);
     tail = tail_cons->cdr;

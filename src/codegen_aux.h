@@ -18,6 +18,12 @@ extern "C" void c_safepoint(void);
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc);
 extern "C" void c_test_application(scm_obj_t proc, int argc, const char* name);
 extern "C" void c_unbound_variable_error(const char* name);
+extern "C" scm_obj_t c_num_add(scm_obj_t arg1, scm_obj_t arg2);
+extern "C" scm_obj_t c_num_sub(scm_obj_t arg1, scm_obj_t arg2);
+extern "C" scm_obj_t c_num_equal(scm_obj_t arg1, scm_obj_t arg2);
+extern "C" void c_error_car(scm_obj_t obj);
+extern "C" void c_error_cdr(scm_obj_t obj);
+extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2);
 
 bool is_side_effect_free_aux_helper(const char* name);
 bool is_never_return_aux_helper(const char* name);

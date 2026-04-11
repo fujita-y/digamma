@@ -110,9 +110,7 @@ class ClosureAnalysisTest {
   }
 };
 
-
 static bool some_test_failed = false;
-
 
 void run_test(const char* name, std::function<bool(ClosureAnalysisTest&)> test) {
   printf("Running test: %s\n", name);

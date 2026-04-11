@@ -18,6 +18,7 @@ SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consumer);
+#include "subr.h"
 SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
 SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
@@ -911,6 +912,48 @@ int main(int argc, char** argv) {
     scm_obj_t code = env.read_code("((const r0 123) (ret))");
     scm_obj_t result = subr_codegen_and_run(scm_nil, code);
     return result == make_fixnum(123);
+  });
+
+  run_test("InlinedCar", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("car"), make_closure((void*)subr_car, 1, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 (1 . 2)) "
+        "(global-ref r2 car) "
+        "(mov r0 r1) "
+        "(call r2 1) "
+        "(ret))");
+    intptr_t result = (intptr_t)codegen_and_run(code);
+    return result == make_fixnum(1);
+  });
+
+  run_test("InlinedCdr", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("cdr"), make_closure((void*)subr_cdr, 1, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 (1 . 2)) "
+        "(global-ref r2 cdr) "
+        "(mov r0 r1) "
+        "(call r2 1) "
+        "(ret))");
+    intptr_t result = (intptr_t)codegen_and_run(code);
+    return result == make_fixnum(2);
+  });
+
+  run_test("InlinedCarError", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("car"), make_closure((void*)subr_car, 1, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 123) "
+        "(global-ref r2 car) "
+        "(mov r0 r1) "
+        "(call r2 1) "
+        "(ret))");
+    try {
+      codegen_and_run(code);
+    } catch (const std::runtime_error& e) {
+      if (std::string(e.what()).find("car: argument must be a pair") != std::string::npos) {
+        return true;
+      }
+    }
+    return false;
   });
 
   context::destroy();

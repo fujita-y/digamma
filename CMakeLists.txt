@@ -147,6 +147,8 @@ set(NANOS_CORE_SOURCES
   src/codegen.cpp
   src/codegen_aux.cpp
   src/codegen_emit.cpp
+  src/codegen_inline.cpp
+  src/codegen_map.cpp
   src/concurrent_heap.cpp
   src/concurrent_pool.cpp
   src/concurrent_slab.cpp

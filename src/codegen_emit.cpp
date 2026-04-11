@@ -5,6 +5,7 @@
 #include "codegen_aux.h"
 #include "codegen_common.h"
 #include "context.h"
+#include "object_heap.h"
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
@@ -24,8 +25,9 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 
-#define BL (*builder)
-#define CT (*context_uptr)
+#define ENABLE_INLINE 1
+#define BL            (*builder)
+#define CT            (*context_uptr)
 
 // ============================================================================
 // Instruction Emission Switch
@@ -104,9 +106,35 @@ void codegen_t::emit_inst(const Instruction& inst) {
 // ============================================================================
 
 void codegen_t::emit_safepoint(const Instruction& inst) {
+  // Get the address of the stop-the-world flag from the heap
+  std::atomic<bool>* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
+  llvm::Value* poll_addr_const = createInt64Constant(CT, (uint64_t)poll_ptr);
+  llvm::Value* poll_val_ptr = BL.CreateIntToPtr(poll_addr_const, BL.getPtrTy());
+
+  // Load of the flag
+  llvm::LoadInst* load = BL.CreateLoad(BL.getInt8Ty(), poll_val_ptr, "safepoint_poll");
+  load->setAlignment(llvm::Align(1));
+
+  // Check if a stop-the-world event is requested (flag != 0)
+  llvm::Value* is_requested = BL.CreateICmpNE(load, BL.getInt8(0), "safepoint_requested");
+
+  // Create blocks for the fast and slow paths
+  llvm::BasicBlock* slow_path = llvm::BasicBlock::Create(CT, "safepoint_slow", current_function);
+  llvm::BasicBlock* fast_path = llvm::BasicBlock::Create(CT, "safepoint_fast", current_function);
+
+  // Use branch weights to tell LLVM that the slow path is extremely unlikely
+  llvm::MDBuilder MDB(CT);
+  BL.CreateCondBr(is_requested, slow_path, fast_path, MDB.createBranchWeights(1, 1000000));
+
+  // --- Slow Path: Call the runtime handler ---
+  BL.SetInsertPoint(slow_path);
   llvm::FunctionType* ft = llvm::FunctionType::get(BL.getVoidTy(), false);
   llvm::Function* safepoint_func = get_or_create_external_function("c_safepoint", ft, (void*)&c_safepoint);
   BL.CreateCall(ft, safepoint_func);
+  BL.CreateBr(fast_path);
+
+  // --- Fast Path: Continue execution ---
+  BL.SetInsertPoint(fast_path);
 }
 
 // Emit a constant value to a register
@@ -530,6 +558,45 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
 }
 
 void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
+#if ENABLE_INLINE
+  if (is_symbol(inst.closure_label)) {
+    scm_obj_t val = context::environment_variable_ref(inst.closure_label);
+    if (is_closure(val)) {
+      scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
+      void* code_ptr = closure_rec->code;
+
+      std::string label_name = (const char*)symbol_name(inst.closure_label);
+
+      // inline unary primitives
+      if (inst.argc == 1) {
+        auto it = unary_code_map.find(code_ptr);
+        if (it != unary_code_map.end()) {
+          // std::cout << "inline unary primitive: " << label_name << std::endl;
+          (this->*(it->second))(is_tail);
+          return;
+        }
+
+        auto it_tc6 = tc6_code_map.find(code_ptr);
+        if (it_tc6 != tc6_code_map.end()) {
+          // std::cout << "inline tc6 primitive: " << label_name << std::endl;
+          emit_tc6_predicate(it_tc6->second, is_tail);
+          return;
+        }
+      }
+
+      // inline binary primitives
+      if (inst.argc == 2) {
+        auto it = binary_code_map.find(code_ptr);
+        if (it != binary_code_map.end()) {
+          // std::cout << "inline binary primitive: " << label_name << std::endl;
+          (this->*(it->second))(is_tail);
+          return;
+        }
+      }
+    }
+  }
+#endif
+
   // Check if it is a global closure (known at compile time but not in this module's function_map)
   if (is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) {
     // Attempt to resolve it as a global closure

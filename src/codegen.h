@@ -14,6 +14,7 @@
 #include "nanos_jit.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // ============================================================================
@@ -158,6 +159,10 @@ class codegen_t {
   bridge_func_t cached_call_closure_bridge = nullptr;
 
   std::unordered_map<scm_obj_t, Opcode> opcode_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> unary_code_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
+  std::unordered_map<void*, int> tc6_code_map;
+  std::unordered_set<void*> no_gc_code_set;
 
   std::vector<scm_obj_t> gc_protected_objects;
 
@@ -176,11 +181,12 @@ class codegen_t {
 
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);
+  void phase3_analyze_safepoints();
   void phase2_analyze_closure_labels();
-  void phase3_create_functions();
-  void phase4_generate_code();
-  void phase5_optimize_and_verify();
-  compiled_code_t phase6_finalize();
+  void phase4_create_functions();
+  void phase5_generate_code();
+  void phase6_optimize_and_verify();
+  compiled_code_t phase7_finalize();
   void optimize_module(llvm::Module& mod);
   void reset_compile_state();
 
@@ -253,6 +259,21 @@ class codegen_t {
                               llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block);
   void emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst, bool is_tail,
                                 llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block);
+
+  // --------------------------------------------------------------------------
+  //  Inline primitives
+  // --------------------------------------------------------------------------
+  void emit_null_p_subr(bool is_tail);
+  void emit_pair_p_subr(bool is_tail);
+  void emit_tc6_predicate(int tc6_num, bool is_tail);
+  void emit_eq_p_subr(bool is_tail);
+  void emit_not_subr(bool is_tail);
+  void emit_car_subr(bool is_tail);
+  void emit_cdr_subr(bool is_tail);
+  void emit_num_add_subr(bool is_tail);
+  void emit_num_sub_subr(bool is_tail);
+  void emit_num_eq_subr(bool is_tail);
+  void emit_append2_subr(bool is_tail);
 
   // --------------------------------------------------------------------------
   //  IR helpers — types, values, utilities

@@ -6,12 +6,11 @@
 #include "codegen_aux.h"
 #include "codegen_common.h"
 #include "context.h"
-#include "object_heap.h"
 #include "printer.h"
 
 #include <cstddef>
 #include <fstream>
-
+#include <iostream>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
 #include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
@@ -175,6 +174,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
     phase2_analyze_closure_labels();
+    phase3_analyze_safepoints();
 #ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
@@ -183,10 +183,10 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
       dump_instructions(func.instructions);
     }
 #endif
-    phase3_create_functions();
-    phase4_generate_code();
-    phase5_optimize_and_verify();
-    compiled_code_t code = phase6_finalize();
+    phase4_create_functions();
+    phase5_generate_code();
+    phase6_optimize_and_verify();
+    compiled_code_t code = phase7_finalize();
 
     for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
     gc_protected_objects.clear();
@@ -229,11 +229,55 @@ void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
   function_map.clear();
 }
 
+void codegen_t::phase3_analyze_safepoints() {
+  for (auto& func : functions) {
+    if (func.instructions.empty()) continue;
+    bool needs_safepoint = false;
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+      auto& inst = func.instructions[i];
+      if (inst.op == Opcode::MAKE_CLOSURE || inst.op == Opcode::MAKE_CELL) {
+        needs_safepoint = true;
+        break;
+      } else if (inst.op == Opcode::CALL || inst.op == Opcode::TAIL_CALL) {
+        if (is_symbol(inst.closure_label)) {
+          if (is_closure_label(inst.closure_label)) {
+            // std::cout << "#### phase3_analyze_safepoints: closure label " << to_string(inst.closure_label) << std::endl;
+            continue;
+          }
+          scm_obj_t val = context::environment_variable_ref(inst.closure_label);
+          if (is_closure(val)) {
+            scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
+            void* code_ptr = closure_rec->code;
+            if (no_gc_code_set.contains(code_ptr)) {
+              // std::cout << "#### phase3_analyze_safepoints: known subr " << to_string(inst.closure_label) << std::endl;
+              continue;
+            }
+          }
+        }
+        needs_safepoint = true;
+        break;
+      }
+    }
+    if (needs_safepoint) {
+      Instruction si;
+      si.op = Opcode::SAFEPOINT;
+      si.original = scm_nil;
+      size_t insert_pos = 0;
+      if (func.instructions.size() > 0 && func.instructions[0].op == Opcode::LABEL) {
+        insert_pos = 1;
+      }
+      func.instructions.insert(func.instructions.begin() + insert_pos, si);
+    } else {
+      // std::cout << "#### phase3_analyze_safepoints: no safepoint for " << to_string(func.label) << std::endl;
+    }
+  }
+}
+
 // --------------------------------------------------------------------------
 //  Phase 2: Function and BasicBlock creation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase3_create_functions() {
+void codegen_t::phase4_create_functions() {
   // Create the main function and all closure functions
   // The first function in 'functions' is always the main entry point.
   if (functions.empty()) return;
@@ -303,7 +347,7 @@ void codegen_t::phase3_create_functions() {
 //  Phase 3: Code generation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase4_generate_code() {
+void codegen_t::phase5_generate_code() {
   for (auto& info : functions) {
     current_function = info.llvm_function;
     current_function_info = &info;
@@ -386,7 +430,7 @@ void codegen_t::optimize_module(llvm::Module& mod) {
   MPM.run(mod, MAM);
 }
 
-void codegen_t::phase5_optimize_and_verify() {
+void codegen_t::phase6_optimize_and_verify() {
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
@@ -451,7 +495,7 @@ static llvm::Function* getUserFunction(llvm::User* U) {
 //  Phase 5: Finalize and hand off to JIT
 // --------------------------------------------------------------------------
 
-compiled_code_t codegen_t::phase6_finalize() {
+compiled_code_t codegen_t::phase7_finalize() {
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
@@ -496,33 +540,6 @@ compiled_code_t codegen_t::phase6_finalize() {
 //  Instruction parsing
 // ============================================================================
 
-void codegen_t::init_opcode_map() {
-  opcode_map[make_symbol("const")] = Opcode::CONST;
-  opcode_map[make_symbol("mov")] = Opcode::MOV;
-  opcode_map[make_symbol("if")] = Opcode::IF;
-  opcode_map[make_symbol("jump")] = Opcode::JUMP;
-  opcode_map[make_symbol("label")] = Opcode::LABEL;
-  opcode_map[make_symbol("ret")] = Opcode::RET;
-  opcode_map[make_symbol("make-closure")] = Opcode::MAKE_CLOSURE;
-  opcode_map[make_symbol("global-set!")] = Opcode::GLOBAL_SET;
-  opcode_map[make_symbol("global-ref")] = Opcode::GLOBAL_REF;
-  opcode_map[make_symbol("call")] = Opcode::CALL;
-  opcode_map[make_symbol("tail-call")] = Opcode::TAIL_CALL;
-  opcode_map[make_symbol("closure-ref")] = Opcode::CLOSURE_REF;
-  opcode_map[make_symbol("closure-set!")] = Opcode::CLOSURE_SET;
-  opcode_map[make_symbol("closure-cell-set!")] = Opcode::CLOSURE_CELL_SET;
-  opcode_map[make_symbol("closure-self")] = Opcode::CLOSURE_SELF;
-  opcode_map[make_symbol("closure-cell-ref")] = Opcode::CLOSURE_CELL_REF;
-  opcode_map[make_symbol("reg-cell-ref")] = Opcode::REG_CELL_REF;
-  opcode_map[make_symbol("reg-cell-set!")] = Opcode::REG_CELL_SET;
-  opcode_map[make_symbol("make-cell")] = Opcode::MAKE_CELL;
-  opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
-  object_heap_t* heap = object_heap_t::current();
-  for (const auto& pair : opcode_map) {
-    context::gc_protect(pair.first);
-  }
-}
-
 void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
   closure_params.clear();
@@ -555,16 +572,6 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
 
         // label instruction
         parse_single_instruction(inst_obj, *current_func, current_closure_label);
-
-        // Insert safepoint before the first instruction of the closure.
-        // Use scm_nil for .original — the safepoint emitter never inspects it,
-        // and avoiding make_cons here prevents a heap allocation (and thus a
-        // potential GC kick) while we are mid-traversal of the GC-protected
-        // inst_list, which would race with the concurrent sweeper.
-        Instruction safepoint_inst;
-        safepoint_inst.op = Opcode::SAFEPOINT;
-        safepoint_inst.original = scm_nil;
-        current_func->instructions.push_back(safepoint_inst);
 
         continue;
       }

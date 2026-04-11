@@ -25,6 +25,8 @@ bool is_side_effect_free_aux_helper(const char* name) {
 bool is_never_return_aux_helper(const char* name) {
   // return true if function never return
   if (starts_with(name, "c_unbound_variable_error")) return true;
+  if (starts_with(name, "c_error_car")) return true;
+  if (starts_with(name, "c_error_cdr")) return true;
   return false;
 }
 
@@ -111,3 +113,45 @@ extern "C" void c_test_application(scm_obj_t proc, int argc, const char* name) {
 }
 
 extern "C" void c_unbound_variable_error(const char* name) { throw std::runtime_error("error: unbound variable " + std::string(name)); }
+
+extern "C" scm_obj_t c_num_add(scm_obj_t arg1, scm_obj_t arg2) {
+  throw std::runtime_error("error: +: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" scm_obj_t c_num_sub(scm_obj_t arg1, scm_obj_t arg2) {
+  throw std::runtime_error("error: -: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" scm_obj_t c_num_equal(scm_obj_t arg1, scm_obj_t arg2) {
+  throw std::runtime_error("error: =: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" void c_error_car(scm_obj_t obj) { throw std::runtime_error("error: car: argument must be a pair: " + to_string(obj)); }
+
+extern "C" void c_error_cdr(scm_obj_t obj) { throw std::runtime_error("error: cdr: argument must be a pair: " + to_string(obj)); }
+
+extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2) {
+  if (arg1 == scm_nil) [[unlikely]] {
+    return arg2;
+  }
+  if (!is_cons(arg1)) [[unlikely]] {
+    throw std::runtime_error("error: append: wrong type of arguments: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  scm_obj_t lst1 = arg1;
+  scm_obj_t lst2 = arg2;
+  scm_obj_t head = make_cons(cons_car(lst1), scm_nil);
+  scm_obj_t tail = head;
+  lst1 = cons_cdr(lst1);
+  while (lst1 != scm_nil) [[likely]] {
+    if (!is_cons(lst1)) [[unlikely]] {
+      throw std::runtime_error("error: append: wrong type of arguments: " + to_string(arg1) + " " + to_string(arg2));
+    }
+    scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+    tail_cons->cdr = make_cons(cons_car(lst1), scm_nil);
+    tail = tail_cons->cdr;
+    lst1 = cons_cdr(lst1);
+  }
+  scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
+  tail_cons->cdr = lst2;
+  return head;
+}
