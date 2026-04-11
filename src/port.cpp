@@ -4,13 +4,13 @@
 #include "core.h"
 #include "object.h"
 
+#include <cstring>
 #include <fstream>   // IWYU pragma: keep
 #include <iostream>  // IWYU pragma: keep
 #include <istream>   // IWYU pragma: keep
 #include <ostream>   // IWYU pragma: keep
 #include <sstream>   // IWYU pragma: keep
 #include <variant>
-#include <cstring>
 #include "utf8.h"
 
 template <typename T> inline constexpr bool is_output_stream() {
@@ -95,7 +95,7 @@ scm_obj_t port_standard_error() {
 }
 
 scm_obj_t port_open_input_file(const char* filename) {
-  std::cout << "port_open_input_file: " << filename << std::endl;
+  // std::cout << "port_open_input_file: " << filename << std::endl;
   std::ifstream* ifs = new std::ifstream(filename, std::ios::binary);
   if (!ifs->is_open()) {
     delete ifs;

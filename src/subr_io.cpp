@@ -2,10 +2,10 @@
 // See LICENSE file for terms and conditions of use.
 
 #include "core.h"
+#include "object.h"
 #include "context.h"
 #include "list.h"
 #include "nanos.h"
-#include "object.h"
 #include "object_heap.h"
 #include "port.h"
 #include "printer.h"
@@ -169,6 +169,8 @@ SUBR subr_format(scm_obj_t self, int argc, scm_obj_t argv[]) {
         printer.write_ss(argv[arg_idx++]);
       } else if (cmd == '%') {
         oss << '\n';
+      } else if (cmd == '!') {
+        oss.flush();
       } else if (cmd == '~') {
         oss << '~';
       } else {
