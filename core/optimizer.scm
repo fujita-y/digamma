@@ -317,7 +317,16 @@
                 (let ((var (car b)) (val (cadr b)))
                   (if (and (pair? val) (eq? (car val) 'let))
                       (begin (set! floated (append floated (cadr val)))
-                             (set! main (append main (list (list var (if (null? (cddr val)) '() (car (reverse (cddr val)))))))))
+                             (let* ((inner-body (cddr val))
+                                    (last-expr  (if (null? inner-body) '() (car (reverse inner-body))))
+                                    (mid-exprs  (if (or (null? inner-body) (null? (cdr inner-body)))
+                                                    '()
+                                                    (reverse (cdr (reverse inner-body))))))
+                               ;; Preserve intermediate side-effecting expressions by
+                               ;; prepending them to the outer body before further optimization.
+                               (unless (null? mid-exprs)
+                                 (set! body (append mid-exprs body)))
+                               (set! main (append main (list (list var last-expr))))))
                       (set! main (append main (list b))))))
               bindings)
     (if (not (null? floated))
