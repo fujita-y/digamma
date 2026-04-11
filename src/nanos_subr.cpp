@@ -23,6 +23,7 @@ void nanos_t::init_subr() {
   };
 
   init_subr_base();
+  init_subr_arith();
   init_subr_cxr();
   init_subr_io();
   init_subr_hash();

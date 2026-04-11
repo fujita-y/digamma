@@ -43,6 +43,7 @@ class context {
   static void add_literal(scm_obj_t obj);
   static void gc_protect(scm_obj_t obj);
   static void gc_unprotect(scm_obj_t obj);
+  static bool is_gc_protected(scm_obj_t obj);
 };
 
 class scoped_gc_protect {

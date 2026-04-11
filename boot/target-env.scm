@@ -37,6 +37,7 @@ tuple
 tuple?
 tuple-ref
 tuple-set!
+time-usage
 *
 +
 -

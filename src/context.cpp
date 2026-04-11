@@ -133,9 +133,26 @@ void context::add_literal(scm_obj_t obj) {
 
 void context::gc_protect(scm_obj_t obj) {
   if (is_cons(obj) || is_heap_object(obj)) {
+    if (s_gc_protected.contains(obj)) {
+      fatal("%s:%u gc_protect called on already protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
+    }
     object_heap_t::current()->write_barrier(obj);
     s_gc_protected.insert(obj);
   }
 }
 
-void context::gc_unprotect(scm_obj_t obj) { s_gc_protected.erase(obj); }
+void context::gc_unprotect(scm_obj_t obj) {
+  if (is_cons(obj) || is_heap_object(obj)) {
+    if (!s_gc_protected.contains(obj)) {
+      fatal("%s:%u gc_unprotect called on non-protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
+    }
+    s_gc_protected.erase(obj);
+  }
+}
+
+bool context::is_gc_protected(scm_obj_t obj) {
+  if (is_cons(obj) || is_heap_object(obj)) {
+    return s_gc_protected.contains(obj);
+  }
+  return true;
+}

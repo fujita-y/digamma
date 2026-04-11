@@ -248,6 +248,7 @@ inline bool is_fixnum(scm_obj_t x) { return (x & 0x01) == 0x01; }
 inline bool is_char(scm_obj_t x) { return (x & 0xf7) == 0x16; }
 inline bool is_short_flonum(scm_obj_t x) { return (x & 0x07) == 0x04; }
 inline bool is_long_flonum(scm_obj_t x) { return is_tc6(x, tc6_long_flonum); }
+inline bool is_flonum(scm_obj_t x) { return is_short_flonum(x) || is_long_flonum(x); }
 inline bool is_symbol(scm_obj_t x) { return is_tc6(x, tc6_symbol); }
 inline bool is_string(scm_obj_t x) { return is_tc6(x, tc6_string); }
 inline bool is_vector(scm_obj_t x) { return is_tc6(x, tc6_vector); }
@@ -290,7 +291,20 @@ inline intptr_t fixnum(scm_obj_t x) {
   return ((intptr_t)x >> 1);
 }
 
-double flonum(scm_obj_t x);
+double short_flonum_to_double(uint64_t u64);
+
+inline double flonum(scm_obj_t x) {
+  assert(is_flonum(x));
+  if (is_short_flonum(x)) {
+    return short_flonum_to_double((uint64_t)x);
+  }
+  if (is_long_flonum(x)) {
+    scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)to_address(x);
+    return rec->value;
+  }
+  return nan("");
+}
+
 uint8_t* symbol_name(scm_obj_t x);
 uint8_t* string_name(scm_obj_t x);
 

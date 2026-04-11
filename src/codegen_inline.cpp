@@ -297,6 +297,52 @@ void codegen_t::emit_num_sub_subr(bool is_tail) {
   }
 }
 
+void codegen_t::emit_num_mul_subr(bool is_tail) {
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
+  llvm::Value* mask = createInt64Constant(CT, 0x01);
+  llvm::Value* args_mask = BL.CreateAnd(args_and, mask, "args_mask");
+  llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* mul_bb = llvm::BasicBlock::Create(CT, "mul_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(is_fixnum_cmp, mul_bb, err_bb, branch_weights);
+
+  BL.SetInsertPoint(mul_bb);
+  // Using the formula: (X >> 1) * (Y - 1) + 1 for fixnums
+  // ((2x+1) >> 1) * ((2y+1) - 1) + 1 = x * 2y + 1 = 2xy + 1
+  llvm::Value* x_val = BL.CreateAShr(arg1, createInt64Constant(CT, 1), "x_val");
+  llvm::Value* y_tagged_even = BL.CreateSub(arg2, createInt64Constant(CT, 1), "y_tagged_even");
+  llvm::Value* prod = BL.CreateMul(x_val, y_tagged_even, "prod");
+  llvm::Value* res = BL.CreateAdd(prod, createInt64Constant(CT, 1), "res");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(err_bb);
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::FunctionType* c_num_mul_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_mul_func = get_or_create_external_function("c_num_mul", c_num_mul_ft, (void*)&c_num_mul);
+  llvm::Value* call_err = BL.CreateCall(c_num_mul_ft, c_num_mul_func, {arg1, arg2}, "call_err");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(cont_bb);
+  llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "mul_res");
+  phi->addIncoming(res, mul_bb);
+  phi->addIncoming(call_err, err_bb);
+
+  if (is_tail) {
+    BL.CreateRet(phi);
+  } else {
+    set_reg(0, phi);
+  }
+}
+
 void codegen_t::emit_num_eq_subr(bool is_tail) {
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
@@ -324,14 +370,190 @@ void codegen_t::emit_num_eq_subr(bool is_tail) {
 
   BL.SetInsertPoint(err_bb);
   llvm::Type* intptrTy = this->getInt64Type();
-  llvm::FunctionType* c_num_equal_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
-  llvm::Function* c_num_equal_func = get_or_create_external_function("c_num_equal", c_num_equal_ft, (void*)&c_num_equal);
-  llvm::Value* call_err = BL.CreateCall(c_num_equal_ft, c_num_equal_func, {arg1, arg2}, "call_err");
+  llvm::FunctionType* c_num_eq_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_eq_func = get_or_create_external_function("c_num_eq", c_num_eq_ft, (void*)&c_num_eq);
+  llvm::Value* call_err = BL.CreateCall(c_num_eq_ft, c_num_eq_func, {arg1, arg2}, "call_err");
   BL.CreateBr(cont_bb);
 
   BL.SetInsertPoint(cont_bb);
   llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "equal_res");
   phi->addIncoming(eq_res, eq_bb);
+  phi->addIncoming(call_err, err_bb);
+
+  if (is_tail) {
+    BL.CreateRet(phi);
+  } else {
+    set_reg(0, phi);
+  }
+}
+
+void codegen_t::emit_num_lt_subr(bool is_tail) {
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
+  llvm::Value* mask = createInt64Constant(CT, 0x01);
+  llvm::Value* args_mask = BL.CreateAnd(args_and, mask, "args_mask");
+  llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* lt_bb = llvm::BasicBlock::Create(CT, "lt_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(is_fixnum_cmp, lt_bb, err_bb, branch_weights);
+
+  BL.SetInsertPoint(lt_bb);
+  llvm::Value* is_lt = BL.CreateICmpSLT(arg1, arg2, "is_lt");
+  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
+  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
+  llvm::Value* lt_res = BL.CreateSelect(is_lt, scm_true_val, scm_false_val, "lt_res");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(err_bb);
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::FunctionType* c_num_lt_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_lt_func = get_or_create_external_function("c_num_lt", c_num_lt_ft, (void*)&c_num_lt);
+  llvm::Value* call_err = BL.CreateCall(c_num_lt_ft, c_num_lt_func, {arg1, arg2}, "call_err");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(cont_bb);
+  llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "lt_res_phi");
+  phi->addIncoming(lt_res, lt_bb);
+  phi->addIncoming(call_err, err_bb);
+
+  if (is_tail) {
+    BL.CreateRet(phi);
+  } else {
+    set_reg(0, phi);
+  }
+}
+
+void codegen_t::emit_num_gt_subr(bool is_tail) {
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
+  llvm::Value* mask = createInt64Constant(CT, 0x01);
+  llvm::Value* args_mask = BL.CreateAnd(args_and, mask, "args_mask");
+  llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* gt_bb = llvm::BasicBlock::Create(CT, "gt_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(is_fixnum_cmp, gt_bb, err_bb, branch_weights);
+
+  BL.SetInsertPoint(gt_bb);
+  llvm::Value* is_gt = BL.CreateICmpSGT(arg1, arg2, "is_gt");
+  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
+  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
+  llvm::Value* gt_res = BL.CreateSelect(is_gt, scm_true_val, scm_false_val, "gt_res");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(err_bb);
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::FunctionType* c_num_gt_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_gt_func = get_or_create_external_function("c_num_gt", c_num_gt_ft, (void*)&c_num_gt);
+  llvm::Value* call_err = BL.CreateCall(c_num_gt_ft, c_num_gt_func, {arg1, arg2}, "call_err");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(cont_bb);
+  llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "gt_res_phi");
+  phi->addIncoming(gt_res, gt_bb);
+  phi->addIncoming(call_err, err_bb);
+
+  if (is_tail) {
+    BL.CreateRet(phi);
+  } else {
+    set_reg(0, phi);
+  }
+}
+
+void codegen_t::emit_num_le_subr(bool is_tail) {
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
+  llvm::Value* mask = createInt64Constant(CT, 0x01);
+  llvm::Value* args_mask = BL.CreateAnd(args_and, mask, "args_mask");
+  llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* le_bb = llvm::BasicBlock::Create(CT, "le_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(is_fixnum_cmp, le_bb, err_bb, branch_weights);
+
+  BL.SetInsertPoint(le_bb);
+  llvm::Value* is_le = BL.CreateICmpSLE(arg1, arg2, "is_le");
+  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
+  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
+  llvm::Value* le_res = BL.CreateSelect(is_le, scm_true_val, scm_false_val, "le_res");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(err_bb);
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::FunctionType* c_num_le_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_le_func = get_or_create_external_function("c_num_le", c_num_le_ft, (void*)&c_num_le);
+  llvm::Value* call_err = BL.CreateCall(c_num_le_ft, c_num_le_func, {arg1, arg2}, "call_err");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(cont_bb);
+  llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "le_res_phi");
+  phi->addIncoming(le_res, le_bb);
+  phi->addIncoming(call_err, err_bb);
+
+  if (is_tail) {
+    BL.CreateRet(phi);
+  } else {
+    set_reg(0, phi);
+  }
+}
+
+void codegen_t::emit_num_ge_subr(bool is_tail) {
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
+  llvm::Value* mask = createInt64Constant(CT, 0x01);
+  llvm::Value* args_mask = BL.CreateAnd(args_and, mask, "args_mask");
+  llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* ge_bb = llvm::BasicBlock::Create(CT, "ge_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(is_fixnum_cmp, ge_bb, err_bb, branch_weights);
+
+  BL.SetInsertPoint(ge_bb);
+  llvm::Value* is_ge = BL.CreateICmpSGE(arg1, arg2, "is_ge");
+  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
+  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
+  llvm::Value* ge_res = BL.CreateSelect(is_ge, scm_true_val, scm_false_val, "ge_res");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(err_bb);
+  llvm::Type* intptrTy = this->getInt64Type();
+  llvm::FunctionType* c_num_ge_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
+  llvm::Function* c_num_ge_func = get_or_create_external_function("c_num_ge", c_num_ge_ft, (void*)&c_num_ge);
+  llvm::Value* call_err = BL.CreateCall(c_num_ge_ft, c_num_ge_func, {arg1, arg2}, "call_err");
+  BL.CreateBr(cont_bb);
+
+  BL.SetInsertPoint(cont_bb);
+  llvm::PHINode* phi = BL.CreatePHI(intptrTy, 2, "ge_res_phi");
+  phi->addIncoming(ge_res, ge_bb);
   phi->addIncoming(call_err, err_bb);
 
   if (is_tail) {

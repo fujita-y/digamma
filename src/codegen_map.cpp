@@ -30,7 +30,7 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
   object_heap_t* heap = object_heap_t::current();
   for (const auto& pair : opcode_map) {
-    context::gc_protect(pair.first);
+    if (!context::is_gc_protected(pair.first)) context::gc_protect(pair.first);
   }
 
   // initialize code_ptr dispatch maps
@@ -43,7 +43,12 @@ void codegen_t::init_opcode_map() {
   binary_code_map[(void*)subr_eq_p] = &codegen_t::emit_eq_p_subr;
   binary_code_map[(void*)subr_num_add] = &codegen_t::emit_num_add_subr;
   binary_code_map[(void*)subr_num_sub] = &codegen_t::emit_num_sub_subr;
+  binary_code_map[(void*)subr_num_mul] = &codegen_t::emit_num_mul_subr;
   binary_code_map[(void*)subr_num_eq] = &codegen_t::emit_num_eq_subr;
+  binary_code_map[(void*)subr_num_lt] = &codegen_t::emit_num_lt_subr;
+  binary_code_map[(void*)subr_num_gt] = &codegen_t::emit_num_gt_subr;
+  binary_code_map[(void*)subr_num_le] = &codegen_t::emit_num_le_subr;
+  binary_code_map[(void*)subr_num_ge] = &codegen_t::emit_num_ge_subr;
   binary_code_map[(void*)subr_append] = &codegen_t::emit_append2_subr;
 
   tc6_code_map[(void*)subr_symbol_p] = tc6_symbol;

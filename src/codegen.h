@@ -272,7 +272,12 @@ class codegen_t {
   void emit_cdr_subr(bool is_tail);
   void emit_num_add_subr(bool is_tail);
   void emit_num_sub_subr(bool is_tail);
+  void emit_num_mul_subr(bool is_tail);
   void emit_num_eq_subr(bool is_tail);
+  void emit_num_lt_subr(bool is_tail);
+  void emit_num_gt_subr(bool is_tail);
+  void emit_num_le_subr(bool is_tail);
+  void emit_num_ge_subr(bool is_tail);
   void emit_append2_subr(bool is_tail);
 
   // --------------------------------------------------------------------------

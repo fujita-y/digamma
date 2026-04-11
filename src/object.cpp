@@ -32,7 +32,7 @@ static uint64_t double_to_short_flonum(double d) {
   return (rot << short_flonum_tag_shift) + short_flonum_tag;
 }
 
-static double short_flonum_to_double(uint64_t u64) {
+double short_flonum_to_double(uint64_t u64) {
   assert((u64 & short_flonum_tag_mask) == short_flonum_tag);
   uint64_t val = u64 >> short_flonum_tag_shift;
   if (val == 0) return 0.0;
@@ -52,17 +52,6 @@ scm_obj_t make_flonum(double d) {
     return tc6_tagged_pointer(rec, tc6_long_flonum);
   }
   return u64;
-}
-
-double flonum(scm_obj_t x) {
-  if (is_short_flonum(x)) {
-    return short_flonum_to_double((uint64_t)x);
-  }
-  if (is_long_flonum(x)) {
-    scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)to_address(x);
-    return rec->value;
-  }
-  fatal("%s:%u internal error: flonum expected.", __FILE__, __LINE__);
 }
 
 scm_obj_t make_symbol(const char* name) {

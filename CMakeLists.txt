@@ -161,6 +161,7 @@ set(NANOS_CORE_SOURCES
   src/nanos_options.cpp
   src/nanos_subr.cpp
   src/subr_hash.cpp
+  src/subr_arith.cpp
   src/subr_base.cpp
   src/subr_cxr.cpp
   src/subr_env.cpp
@@ -243,3 +244,5 @@ add_nanos_test(test_call_cc tests/test_call_cc.cpp)
 add_nanos_test(test_dynamic_wind tests/test_dynamic_wind.cpp)
 add_nanos_test(test_subr tests/test_subr.cpp)
 add_nanos_test(test_list tests/test_list.cpp)
+add_nanos_test(test_arith tests/test_arith.cpp)
+add_nanos_test(test_codegen_aux tests/test_codegen_aux.cpp)

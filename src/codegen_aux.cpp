@@ -114,18 +114,6 @@ extern "C" void c_test_application(scm_obj_t proc, int argc, const char* name) {
 
 extern "C" void c_unbound_variable_error(const char* name) { throw std::runtime_error("error: unbound variable " + std::string(name)); }
 
-extern "C" scm_obj_t c_num_add(scm_obj_t arg1, scm_obj_t arg2) {
-  throw std::runtime_error("error: +: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
-}
-
-extern "C" scm_obj_t c_num_sub(scm_obj_t arg1, scm_obj_t arg2) {
-  throw std::runtime_error("error: -: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
-}
-
-extern "C" scm_obj_t c_num_equal(scm_obj_t arg1, scm_obj_t arg2) {
-  throw std::runtime_error("error: =: arguments must be fixnums: " + to_string(arg1) + " " + to_string(arg2));
-}
-
 extern "C" void c_error_car(scm_obj_t obj) { throw std::runtime_error("error: car: argument must be a pair: " + to_string(obj)); }
 
 extern "C" void c_error_cdr(scm_obj_t obj) { throw std::runtime_error("error: cdr: argument must be a pair: " + to_string(obj)); }
@@ -154,4 +142,134 @@ extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2) {
   scm_cons_rec_t* tail_cons = (scm_cons_rec_t*)tail;
   tail_cons->cdr = lst2;
   return head;
+}
+
+extern "C" scm_obj_t c_num_add(scm_obj_t arg1, scm_obj_t arg2) {
+  if (is_flonum(arg1)) {
+    if (is_flonum(arg2)) return make_flonum(flonum(arg1) + flonum(arg2));
+    if (is_fixnum(arg2)) return make_flonum(flonum(arg1) + fixnum(arg2));
+  } else if (is_flonum(arg2)) {
+    if (is_fixnum(arg1)) return make_flonum(fixnum(arg1) + flonum(arg2));
+  }
+  throw std::runtime_error("+: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" scm_obj_t c_num_sub(scm_obj_t arg1, scm_obj_t arg2) {
+  if (is_flonum(arg1)) {
+    if (is_flonum(arg2)) return make_flonum(flonum(arg1) - flonum(arg2));
+    if (is_fixnum(arg2)) return make_flonum(flonum(arg1) - fixnum(arg2));
+  } else if (is_flonum(arg2)) {
+    if (is_fixnum(arg1)) return make_flonum(fixnum(arg1) - flonum(arg2));
+  }
+  throw std::runtime_error("- : arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" scm_obj_t c_num_mul(scm_obj_t arg1, scm_obj_t arg2) {
+  if (is_flonum(arg1)) {
+    if (is_flonum(arg2)) return make_flonum(flonum(arg1) * flonum(arg2));
+    if (is_fixnum(arg2)) return make_flonum(flonum(arg1) * fixnum(arg2));
+  } else if (is_flonum(arg2)) {
+    if (is_fixnum(arg1)) return make_flonum(fixnum(arg1) * flonum(arg2));
+  }
+  throw std::runtime_error("*: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+}
+
+extern "C" scm_obj_t c_num_eq(scm_obj_t arg1, scm_obj_t arg2) {
+  double lhs;
+  double rhs;
+  if (is_fixnum(arg1)) {
+    lhs = fixnum(arg1);
+  } else if (is_flonum(arg1)) {
+    lhs = flonum(arg1);
+  } else {
+    throw std::runtime_error("=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  if (is_fixnum(arg2)) {
+    rhs = fixnum(arg2);
+  } else if (is_flonum(arg2)) {
+    rhs = flonum(arg2);
+  } else {
+    throw std::runtime_error("=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  return lhs == rhs ? scm_true : scm_false;
+}
+
+extern "C" scm_obj_t c_num_lt(scm_obj_t arg1, scm_obj_t arg2) {
+  double lhs;
+  double rhs;
+  if (is_fixnum(arg1)) {
+    lhs = fixnum(arg1);
+  } else if (is_flonum(arg1)) {
+    lhs = flonum(arg1);
+  } else {
+    throw std::runtime_error("<: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  if (is_fixnum(arg2)) {
+    rhs = fixnum(arg2);
+  } else if (is_flonum(arg2)) {
+    rhs = flonum(arg2);
+  } else {
+    throw std::runtime_error("<: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  return lhs < rhs ? scm_true : scm_false;
+}
+
+extern "C" scm_obj_t c_num_gt(scm_obj_t arg1, scm_obj_t arg2) {
+  double lhs;
+  double rhs;
+  if (is_fixnum(arg1)) {
+    lhs = fixnum(arg1);
+  } else if (is_flonum(arg1)) {
+    lhs = flonum(arg1);
+  } else {
+    throw std::runtime_error(">: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  if (is_fixnum(arg2)) {
+    rhs = fixnum(arg2);
+  } else if (is_flonum(arg2)) {
+    rhs = flonum(arg2);
+  } else {
+    throw std::runtime_error(">: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  return lhs > rhs ? scm_true : scm_false;
+}
+
+extern "C" scm_obj_t c_num_le(scm_obj_t arg1, scm_obj_t arg2) {
+  double lhs;
+  double rhs;
+  if (is_fixnum(arg1)) {
+    lhs = fixnum(arg1);
+  } else if (is_flonum(arg1)) {
+    lhs = flonum(arg1);
+  } else {
+    throw std::runtime_error("<=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  if (is_fixnum(arg2)) {
+    rhs = fixnum(arg2);
+  } else if (is_flonum(arg2)) {
+    rhs = flonum(arg2);
+  } else {
+    throw std::runtime_error("<=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  return lhs <= rhs ? scm_true : scm_false;
+}
+
+extern "C" scm_obj_t c_num_ge(scm_obj_t arg1, scm_obj_t arg2) {
+  double lhs;
+  double rhs;
+  if (is_fixnum(arg1)) {
+    lhs = fixnum(arg1);
+  } else if (is_flonum(arg1)) {
+    lhs = flonum(arg1);
+  } else {
+    throw std::runtime_error(">=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  if (is_fixnum(arg2)) {
+    rhs = fixnum(arg2);
+  } else if (is_flonum(arg2)) {
+    rhs = flonum(arg2);
+  } else {
+    throw std::runtime_error(">=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
+  }
+  return lhs >= rhs ? scm_true : scm_false;
 }

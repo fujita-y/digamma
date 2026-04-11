@@ -177,6 +177,17 @@ SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
 // cyclic-object?
 SUBR subr_cyclic_object_p(scm_obj_t self, scm_obj_t a1) { return cyclic_object_p(a1) ? scm_true : scm_false; }
 
+// time-usage
+SUBR subr_time_usage(scm_obj_t self) {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  struct rusage usage;
+  getrusage(RUSAGE_SELF, &usage);
+  return make_list(3, make_flonum((double)tv.tv_sec + tv.tv_usec / 1000000.0),
+                   make_flonum((double)usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0),
+                   make_flonum((double)usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0));
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -199,6 +210,7 @@ void init_subr_misc() {
   reg("continuation?", (void*)subr_continuation_p, 1, 0);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
   reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
+  reg("time-usage", (void*)subr_time_usage, 0, 0);
   reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, 0);
   reg("tuple", (void*)subr_tuple, 0, 1);
   reg("tuple?", (void*)subr_tuple_p, 1, 0);
