@@ -155,7 +155,22 @@
       (string->symbol (string-append "C" (number->string (compiler-ctx-inc-closure-labels! ctx)) "_"(uuid)))
       (string->symbol (string-append "L" (number->string (compiler-ctx-inc-labels! ctx))))))
 
-(define (make-reg i) (string->symbol (string-append "r" (number->string i))))
+;; Pre-intern register symbols r0..r127 at top level so they are permanently
+;; rooted in the global environment and cannot be collected by the concurrent GC
+;; even when a globals-only root snapshot is taken during JIT-compiled compilation.
+;; This eliminates the race where make-reg allocates a symbol that only lives on
+;; the JIT call stack until it is stored into the compiler context.
+(define *pre-interned-regs*
+  (let loop ((i 0) (acc '()))
+    (if (> i 127)
+        (list->vector (reverse acc))
+        (loop (+ i 1)
+              (cons (string->symbol (string-append "r" (number->string i))) acc)))))
+
+(define (make-reg i)
+  (if (and (>= i 0) (< i (vector-length *pre-interned-regs*)))
+      (vector-ref *pre-interned-regs* i)
+      (string->symbol (string-append "r" (number->string i)))))
 
 (define (lookup var env)
   (let loop ((e env))
@@ -325,10 +340,16 @@
 (define (codegen-application expr env next-reg tail? ctx)
   (let* ((proc (car expr)) (args (cdr expr)) (num-args (length args)) (base-reg (max 1 next-reg)))
     (codegen-args args env base-reg ctx)
+    ;; Compile proc before allocating call-reg: codegen may trigger GC, and a
+    ;; freshly-allocated symbol held only on the JIT call stack can be swept if
+    ;; the concurrent GC takes a globals-only root snapshot before the symbol is
+    ;; stored into the compiler context.  By allocating call-reg after all
+    ;; sub-compilation is done we minimise this window; the *pre-interned-regs*
+    ;; vector above eliminates it entirely for r0..r127.
+    (if (and (pair? proc) (eq? (car proc) 'lambda))
+        (codegen-lambda proc env (+ base-reg num-args) #f ctx)
+        (codegen proc env (+ base-reg num-args) #f ctx))
     (let ((call-reg (make-reg (+ base-reg num-args))))
-      (if (and (pair? proc) (eq? (car proc) 'lambda))
-          (codegen-lambda proc env (+ base-reg num-args) #f ctx)
-          (codegen proc env (+ base-reg num-args) #f ctx))
       (compiler-ctx-emit! ctx `(mov ,call-reg r0))
       (move-args num-args base-reg ctx)
       (if tail?
