@@ -255,19 +255,36 @@
     (if tail? (compiler-ctx-emit! ctx `(ret)))))
 
 (define (codegen-if expr env next-reg tail? ctx)
+  ;; Compile the test first (may trigger GC), then allocate labels immediately
+  ;; before they are stored into ctx.  This follows the same principle as the
+  ;; codegen-application fix: a freshly-allocated symbol that only lives on the
+  ;; JIT call stack can be swept when the concurrent GC takes a globals-only
+  ;; root snapshot during one of the recursive codegen calls.
+  (codegen (cadr expr) env next-reg #f ctx)
+  ;; Allocate t-label and f-label after test compilation, store them at once.
   (let ((t-label (gen-label ctx))
-        (f-label (gen-label ctx))
-        (end-label (gen-label ctx)))
-    (codegen (cadr expr) env next-reg #f ctx)
+        (f-label (gen-label ctx)))
     (compiler-ctx-emit! ctx `(if ,t-label ,f-label))
     (compiler-ctx-emit! ctx `(label ,t-label))
+    ;; Compile the then-branch.  end-label is allocated afterwards to avoid a
+    ;; GC window where it would only be reachable from the JIT stack.
     (codegen (caddr expr) env next-reg tail? ctx)
-    (if (not tail?) (compiler-ctx-emit! ctx `(jump ,end-label)))
-    (compiler-ctx-emit! ctx `(label ,f-label))
-    (if (null? (cdddr expr))
-        (begin (compiler-ctx-emit! ctx `(const r0 #f)) (if tail? (compiler-ctx-emit! ctx `(ret))))
-        (codegen (cadddr expr) env next-reg tail? ctx))
-    (if (not tail?) (compiler-ctx-emit! ctx `(label ,end-label)))))
+    (if (not tail?)
+        ;; Non-tail: allocate end-label now that then-branch compilation is done.
+        (let ((end-label (gen-label ctx)))
+          (compiler-ctx-emit! ctx `(jump ,end-label))
+          (compiler-ctx-emit! ctx `(label ,f-label))
+          (if (null? (cdddr expr))
+              (compiler-ctx-emit! ctx `(const r0 #f))
+              (codegen (cadddr expr) env next-reg #f ctx))
+          (compiler-ctx-emit! ctx `(label ,end-label)))
+        ;; Tail: no end-label needed.
+        (begin
+          (compiler-ctx-emit! ctx `(label ,f-label))
+          (if (null? (cdddr expr))
+              (begin (compiler-ctx-emit! ctx `(const r0 #f))
+                     (compiler-ctx-emit! ctx `(ret)))
+              (codegen (cadddr expr) env next-reg tail? ctx))))))
 
 (define (codegen-set! expr env next-reg tail? ctx)
   (let ((var (cadr expr))
