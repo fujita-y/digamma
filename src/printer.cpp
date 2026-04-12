@@ -267,139 +267,6 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
   out << "#<unknown 0x" << std::hex << obj << std::dec << ">";
 }
 
-void printer_t::printf(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-
-  const char* p = fmt;
-  while (*p) {
-    if (*p == '%') {
-      p++;
-      if (*p == '\0') {
-        // format string ends with '%'
-        out << '%';
-        break;
-      }
-      if (*p == '%') {
-        // '%%' -> '%'
-        out << '%';
-        p++;
-        continue;
-      }
-      if (*p == 'w') {
-        // '%w' -> format a Scheme object
-        scm_obj_t obj = va_arg(ap, scm_obj_t);
-        write(obj);
-        p++;
-        continue;
-      }
-      // Handle standard printf directives
-      // We'll collect the format spec and use sprintf for standard types
-      const char* spec_start = p - 1;  // points to '%'
-
-      // Skip flags: -, +, space, #, 0
-      while (*p == '-' || *p == '+' || *p == ' ' || *p == '#' || *p == '0') {
-        p++;
-      }
-
-      // Skip width
-      while (isdigit(*p)) {
-        p++;
-      }
-
-      // Skip precision
-      if (*p == '.') {
-        p++;
-        while (isdigit(*p)) {
-          p++;
-        }
-      }
-
-      // Skip length modifiers: h, l, L, z, t, etc.
-      while (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'z' || *p == 't' || *p == 'j') {
-        p++;
-      }
-
-      // Now we should be at the conversion specifier
-      if (*p == '\0') {
-        // Incomplete format specifier
-        break;
-      }
-
-      char conversion = *p;
-      p++;
-
-      // Extract the format specifier
-      size_t spec_len = p - spec_start;
-      char spec[64];
-      if (spec_len >= sizeof(spec)) {
-        spec_len = sizeof(spec) - 1;
-      }
-      memcpy(spec, spec_start, spec_len);
-      spec[spec_len] = '\0';
-
-      char buf[256];
-      switch (conversion) {
-        case 'd':
-        case 'i': {
-          int val = va_arg(ap, int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'u':
-        case 'o':
-        case 'x':
-        case 'X': {
-          unsigned int val = va_arg(ap, unsigned int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'f':
-        case 'F':
-        case 'e':
-        case 'E':
-        case 'g':
-        case 'G': {
-          double val = va_arg(ap, double);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'c': {
-          int val = va_arg(ap, int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 's': {
-          const char* val = va_arg(ap, const char*);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'p': {
-          void* val = va_arg(ap, void*);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        default:
-          // Unknown conversion, just output the spec as-is
-          out << spec;
-          break;
-      }
-    } else {
-      // Regular character
-      out << *p;
-      p++;
-    }
-  }
-
-  va_end(ap);
-}
-
 void printer_t::scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj) {
   assert(visited != nullptr);
   // Only cons, heap objects (vectors, strings, symbols) can be shared
@@ -449,4 +316,41 @@ void printer_t::write_ss(scm_obj_t obj) {
     }
   }
   print(&visited, obj, false);
+}
+
+void printer_t::format(int argc, scm_obj_t argv[]) {
+  if (argc < 1) fatal("%s:%u too few arguments", __FILE__, __LINE__);
+  const char* fmt = (const char*)string_name(argv[0]);
+  int arg_idx = 1;
+
+  for (const char* p = fmt; *p; p++) {
+    if (*p == '~') {
+      p++;
+      if (*p == '\0') {
+        out << '~';
+        break;
+      }
+      char cmd = *p;
+      if (cmd == 'a' || cmd == 'A') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~a");
+        display(argv[arg_idx++]);
+      } else if (cmd == 's' || cmd == 'S') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~s");
+        write(argv[arg_idx++]);
+      } else if (cmd == 'w' || cmd == 'W') {
+        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~w");
+        write_ss(argv[arg_idx++]);
+      } else if (cmd == '%') {
+        out << '\n';
+      } else if (cmd == '!') {
+        out.flush();
+      } else if (cmd == '~') {
+        out << '~';
+      } else {
+        out << '~' << cmd;
+      }
+    } else {
+      out << *p;
+    }
+  }
 }

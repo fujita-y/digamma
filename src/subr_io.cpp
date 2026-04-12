@@ -144,42 +144,9 @@ SUBR subr_display(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_format(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) throw std::runtime_error("format: too few arguments");
   if (!is_string(argv[0])) throw std::runtime_error("format: first argument must be a string");
-
-  const char* fmt = (const char*)string_name(argv[0]);
   std::ostringstream oss;
   printer_t printer(oss);
-  int arg_idx = 1;
-
-  for (const char* p = fmt; *p; p++) {
-    if (*p == '~') {
-      p++;
-      if (*p == '\0') {
-        oss << '~';
-        break;
-      }
-      char cmd = *p;
-      if (cmd == 'a' || cmd == 'A') {
-        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~a");
-        printer.display(argv[arg_idx++]);
-      } else if (cmd == 's' || cmd == 'S') {
-        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~s");
-        printer.write(argv[arg_idx++]);
-      } else if (cmd == 'w' || cmd == 'W') {
-        if (arg_idx >= argc) throw std::runtime_error("format: too few arguments for ~w");
-        printer.write_ss(argv[arg_idx++]);
-      } else if (cmd == '%') {
-        oss << '\n';
-      } else if (cmd == '!') {
-        oss.flush();
-      } else if (cmd == '~') {
-        oss << '~';
-      } else {
-        oss << '~' << cmd;
-      }
-    } else {
-      oss << *p;
-    }
-  }
+  printer.format(argc, argv);
   return make_string(oss.str().c_str());
 }
 

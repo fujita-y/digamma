@@ -20,7 +20,7 @@ class printer_t {
   void write(scm_obj_t obj);
   void write_ss(scm_obj_t obj);
   void display(scm_obj_t obj);
-  void printf(const char* fmt, ...);
+  void format(int argc, scm_obj_t argv[]);
 };
 
 #endif
