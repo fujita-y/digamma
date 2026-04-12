@@ -14,16 +14,15 @@ void printer_t::write(scm_obj_t obj) { print(nullptr, obj, false); }
 void printer_t::display(scm_obj_t obj) { print(nullptr, obj, true); }
 
 void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode) {
-  if (is_fixnum(obj) || is_char(obj) || obj <= scm_eof) {
-    if (is_char(obj)) {
-      print_char(obj, display_mode);
-      return;
-    }
+  if (is_fixnum(obj) || is_singleton(obj)) {
     print_immediate(obj);
     return;
   }
-
-  if (is_short_flonum(obj)) {
+  if (is_char(obj)) {
+    print_char(obj, display_mode);
+    return;
+  }
+  if (is_flonum(obj)) {
     print_flonum(flonum(obj));
     return;
   }

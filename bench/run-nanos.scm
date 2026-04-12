@@ -1,4 +1,4 @@
-(import-module (core destructuring))
+(import-module (core))
 (add-load-path "~/github/digamma/bench/gambit-benchmarks")
 
 (define warmup #t)
@@ -10,7 +10,7 @@
        (let ((result (apply (lambda () expr) '())))
          (destructuring-bind (real-end user-end sys-end) (time-usage)
            (let ((real (- real-end real-start)) (user (- user-end user-start)) (sys (- sys-end sys-start)))
-             (display (format "~%;; ~s real ~s user ~s sys~!" real user sys))
+             (display (format "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!" real user sys))
              result)))))))
 
 (define (run-bench name count ok? run)
@@ -26,7 +26,7 @@
           (run-bench name 1 ok? run))
       (let ((result (time (run-bench name count ok? run))))
         (and (not (ok? result)) (display (format "~%;; wrong result: ~s~%~!" result))))
-      (display (format "~%;;  ----------------------------------------------------------------~!"))
+      (display (format ";;  ----------------------------------------------------------------~!"))
       (unspecified)))
 
 (define load-bench-n-run
