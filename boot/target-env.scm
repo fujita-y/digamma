@@ -4,6 +4,8 @@
 
 (copy-environment-variables! (current-environment) (interaction-environment)
 '(
+zero?
+remainder
 current-input-port
 current-output-port
 current-error-port

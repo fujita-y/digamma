@@ -3,15 +3,7 @@
 
 #include "core.h"
 #include "object.h"
-#include "codegen.h"
-#include "codegen_aux.h"
 #include "context.h"
-#include "continuation.h"
-#include "equiv.h"
-#include "hash.h"
-#include "nanos.h"
-#include "object_heap.h"
-#include "printer.h"
 #include "subr.h"
 
 #include <cerrno>
@@ -19,7 +11,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <sstream>
 
 // ============================================================================
 // Arithmetic  - R6RS 11.7
@@ -310,6 +301,26 @@ SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_true;
 }
 
+SUBR subr_zero_p(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) {
+    return fixnum(a1) == 0 ? scm_true : scm_false;
+  } else if (is_flonum(a1)) {
+    return flonum(a1) == 0.0 ? scm_true : scm_false;
+  } else {
+    throw std::runtime_error("zero?: argument must be a number");
+  }
+}
+
+SUBR subr_remainder(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_fixnum(a1) || !is_fixnum(a2)) {
+    throw std::runtime_error("remainder: integers expected");
+  }
+  intptr_t v1 = fixnum(a1);
+  intptr_t v2 = fixnum(a2);
+  if (v2 == 0) throw std::runtime_error("remainder: division by zero");
+  return make_fixnum(v1 % v2);
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -331,4 +342,6 @@ void init_subr_arith() {
   reg(">", (void*)subr_num_gt, 2, 1);
   reg("<=", (void*)subr_num_le, 2, 1);
   reg(">=", (void*)subr_num_ge, 2, 1);
+  reg("zero?", (void*)subr_zero_p, 1, 0);
+  reg("remainder", (void*)subr_remainder, 2, 0);
 }

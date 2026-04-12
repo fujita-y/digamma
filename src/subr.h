@@ -26,6 +26,8 @@ SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_zero_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_remainder(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_car(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cdr(scm_obj_t self, scm_obj_t a1);
@@ -96,7 +98,6 @@ SUBR subr_cyclic_object_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
 SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_time_usage(scm_obj_t self);
-
 
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cadr(scm_obj_t self, scm_obj_t a1);
