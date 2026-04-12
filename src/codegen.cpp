@@ -475,21 +475,6 @@ void codegen_t::phase6_optimize_and_verify() {
   }
 }
 
-// Helper function to find which llvm::Function an llvm::User belongs to,
-// by looking through Instruction and ConstantExpr.
-static llvm::Function* getUserFunction(llvm::User* U) {
-  if (auto* I = llvm::dyn_cast<llvm::Instruction>(U)) {
-    return I->getFunction();
-  }
-  if (auto* CE = llvm::dyn_cast<llvm::ConstantExpr>(U)) {
-    for (llvm::User* CEU : CE->users()) {
-      if (llvm::Function* F = getUserFunction(CEU)) {
-        return F;
-      }
-    }
-  }
-  return nullptr;
-}
 
 // --------------------------------------------------------------------------
 //  Phase 5: Finalize and hand off to JIT

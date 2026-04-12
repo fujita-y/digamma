@@ -95,7 +95,7 @@ Error nanos_jit_t::addIRModule(ThreadSafeModule TSM, ResourceTrackerSP RT) {
 }
 
 Expected<ExecutorAddr> nanos_jit_t::lookup(StringRef Name) {
-  auto Sym = ES->lookup({&MainJD}, Mangle(Name.str()), llvm::orc::SymbolState::Ready);
+  auto Sym = ES->lookup({&MainJD}, Mangle(Name), llvm::orc::SymbolState::Ready);
   if (!Sym) return Sym.takeError();
   return Sym->getAddress();
 }
