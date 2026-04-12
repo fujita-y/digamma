@@ -101,14 +101,21 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
+
+(define-syntax exact->inexact (syntax-rules () ((_ x) (+ x 0.0))))
+
+quotient
+
 (display (format "\n\n;;  GABRIEL\n"))
 (time-bench tak 1000)
 (display (format "\n\n;;  ARITHMETIC\n"))
 (time-bench fib 1)
 (time-bench fibfp 1)
+(time-bench mbrot 20)
 (display (format "\n\n;;  MISCELLANEOUS\n"))
 (time-bench ack 3)
 (time-bench nqueens 450)
+(time-bench paraffins 100)
 
 (newline)
 (newline)

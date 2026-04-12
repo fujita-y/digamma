@@ -6,6 +6,10 @@
 '(
 zero?
 remainder
+quotient
+exact->inexact
+odd?
+even?
 current-input-port
 current-output-port
 current-error-port

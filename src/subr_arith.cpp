@@ -321,6 +321,36 @@ SUBR subr_remainder(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return make_fixnum(v1 % v2);
 }
 
+SUBR subr_quotient(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_fixnum(a1) || !is_fixnum(a2)) {
+    throw std::runtime_error("quotient: integers expected");
+  }
+  intptr_t v1 = fixnum(a1);
+  intptr_t v2 = fixnum(a2);
+  if (v2 == 0) throw std::runtime_error("quotient: division by zero");
+  return make_fixnum(v1 / v2);
+}
+
+SUBR subr_exact_to_inexact(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) {
+    return make_flonum((double)fixnum(a1));
+  } else if (is_flonum(a1)) {
+    return a1;
+  } else {
+    throw std::runtime_error("exact->inexact: number expected");
+  }
+}
+
+SUBR subr_odd_p(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) return (fixnum(a1) & 1) ? scm_true : scm_false;
+  throw std::runtime_error("odd?: integer expected");
+}
+
+SUBR subr_even_p(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) return (fixnum(a1) & 1) == 0 ? scm_true : scm_false;
+  throw std::runtime_error("even?: integer expected");
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -344,4 +374,8 @@ void init_subr_arith() {
   reg(">=", (void*)subr_num_ge, 2, 1);
   reg("zero?", (void*)subr_zero_p, 1, 0);
   reg("remainder", (void*)subr_remainder, 2, 0);
+  reg("quotient", (void*)subr_quotient, 2, 0);
+  reg("exact->inexact", (void*)subr_exact_to_inexact, 1, 0);
+  reg("odd?", (void*)subr_odd_p, 1, 0);
+  reg("even?", (void*)subr_even_p, 1, 0);
 }
