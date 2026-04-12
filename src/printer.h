@@ -21,6 +21,16 @@ class printer_t {
   void write_ss(scm_obj_t obj);
   void display(scm_obj_t obj);
   void format(int argc, scm_obj_t argv[]);
+
+ private:
+  void print_flonum(double d);
+  void print_symbol(scm_obj_t obj, bool display_mode);
+  void print_string(scm_obj_t obj, bool display_mode);
+  void print_list(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode);
+  void print_vector(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj);
+  void print_bytevector(scm_obj_t obj);
+  void print_immediate(scm_obj_t obj);
+  void print_char(scm_obj_t obj, bool display_mode);
 };
 
 #endif
