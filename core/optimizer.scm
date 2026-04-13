@@ -39,6 +39,16 @@
     tuple? tuple tuple-ref
     procedure? bytevector? bytevector-length bytevector-u8-ref))
 
+;; Primitives that structurally mutate their first argument (set-car!, set-cdr!, etc.).
+;; Used to detect when a binding value's free variable is mutated before the variable is used.
+(define structural-mutation-primitives
+  '(set-car! set-cdr!
+    vector-set! vector-fill!
+    string-set! string-fill!
+    bytevector-u8-set!
+    hashtable-set! hashtable-delete!
+    list-set!))
+
 ;;=============================================================================
 ;; 2. Analysis & Misc Utilities
 ;;=============================================================================
@@ -148,6 +158,10 @@
     (map car (hashtable->alist ht))))
 
 ;; Combined analysis for opt-let-inner.
+;; Returns two values:
+;;   mutated  — variables directly assigned via set! or structurally mutated via
+;;              set-car!, set-cdr!, vector-set!, etc. (the first argument)
+;;   usage    — hashtable mapping each variable to (count . in-lambda?)
 (define (analyze-body-combined body shadowed)
   (let ((usage (make-eq-hashtable))
         (mutated (make-eq-hashtable)))
@@ -161,6 +175,12 @@
             ((eq? (car e) 'set!)
              (unless (memq (cadr e) lbound) (hashtable-set! mutated (cadr e) #t))
              (walk (caddr e) lambda-depth s lbound))
+            ;; Structural mutation: record the first argument as structurally mutated.
+            ((and (pair? e) (memq (car e) structural-mutation-primitives))
+             (let ((target (cadr e)))
+               (when (symbol? target)
+                 (hashtable-set! mutated target #t)))
+             (for-each (lambda (be) (walk be lambda-depth s lbound)) (cdr e)))
             ((eq? (car e) 'lambda)
              (let* ((plist (flatten-params-opt (cadr e)))
                     (new-s (append plist s))
@@ -200,6 +220,12 @@
          (not (and (memq (car expr) pure-primitives)
                    (not (any has-effects? (cdr expr))))))))
 
+;; Check whether it is safe to substitute `val` for `var` throughout the body.
+;; Inlining is blocked when any free variable of `val` appears in `mutated-vars`,
+;; which now includes both set!-assigned variables AND the first arguments of
+;; structural mutation primitives (set-cdr!, vector-set!, etc.).  This prevents
+;; the incorrect transformation:
+;;   (let ((x (cdr a))) (set-cdr! a '()) x)  =>  (begin (set-cdr! a '()) (cdr a))
 (define (safe-to-inline-val? var val body-usage bound-vars mutated-vars)
   (let ((fvars (analyze-free-vars-optimizer val '())))
     (and (not (any (lambda (v) (memq v mutated-vars)) fvars))

@@ -102,8 +102,8 @@
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
 (display (format "\n\n;;  GABRIEL\n"))
-;(time-bench browse 600)
-;(time-bench cpstak 80)
+(time-bench browse 600)
+(time-bench cpstak 80)
 ;;;(time-bench ctak 25) ;; timeout
 ;;;(time-bench dderiv 160000) ;; stack-overflow
 ;;;(time-bench deriv 320000) ;; stack-overflow
@@ -111,9 +111,9 @@
 ;;;(time-bench diviter 200000) ;; stack-overflow
 ;;;(time-bench divrec 140000) ;; stack-overflow
 ;;;(time-bench puzzle 24) ;; timeout
-;(time-bench tak 1000)
-;(time-bench takl 70)
-;(time-bench triangl 2)
+(time-bench tak 1000)
+(time-bench takl 70)
+(time-bench triangl 2)
 (display (format "\n\n;;  ARITHMETIC\n"))
 (time-bench fib 1)
 (time-bench fibfp 1)
