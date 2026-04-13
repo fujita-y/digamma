@@ -32,7 +32,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_heap.init(&m_concurrent_pool);
 
   m_trip_bytes = 0;
-  m_collect_trip_bytes = init_size / 8;
+  m_collect_trip_bytes = init_size / 2;
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });

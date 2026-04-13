@@ -14,7 +14,7 @@
 
 #define MARK_STACK_SIZE_INIT          16384  // 16K object, 64K/128K bytes
 #define MARK_STACK_SIZE_GROW          4096   // 4K object, 16K/32K bytes
-#define SHADE_QUEUE_SIZE              4096   // 4K object, 16K/32K bytes
+#define SHADE_QUEUE_SIZE              65536  // 64K object, 256K/512K bytes
 
 #define ROOT_SNAPSHOT_MODE_GLOBALS    0
 #define ROOT_SNAPSHOT_MODE_LOCALS     1
