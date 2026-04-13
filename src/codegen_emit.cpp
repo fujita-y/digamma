@@ -107,7 +107,7 @@ void codegen_t::emit_inst(const Instruction& inst) {
 
 void codegen_t::emit_safepoint(const Instruction& inst) {
   // Get the address of the stop-the-world flag from the heap
-  std::atomic<bool>* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
+  bool* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
   llvm::Value* poll_addr_const = createInt64Constant(CT, (uint64_t)poll_ptr);
   llvm::Value* poll_val_ptr = BL.CreateIntToPtr(poll_addr_const, BL.getPtrTy());
 

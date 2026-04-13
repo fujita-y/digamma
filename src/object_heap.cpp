@@ -58,6 +58,21 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
 
+  // cache configuration: allow slabs to be reused instead of returned to pool on each sweep
+  int base_cache_limit = (int)(m_collect_trip_bytes / SLAB_SIZE);
+  m_cons.m_cache_limit = base_cache_limit;
+  m_cells.m_cache_limit = base_cache_limit / 4;
+  m_flonums.m_cache_limit = base_cache_limit / 8;
+  m_symbols.m_cache_limit = base_cache_limit / 8;
+  m_strings.m_cache_limit = base_cache_limit / 8;
+  m_vectors.m_cache_limit = base_cache_limit / 8;
+  m_values.m_cache_limit = base_cache_limit / 8;
+  m_u8vectors.m_cache_limit = base_cache_limit / 8;
+  m_hashtables.m_cache_limit = base_cache_limit / 8;
+  m_environments.m_cache_limit = base_cache_limit / 8;
+  m_ports.m_cache_limit = base_cache_limit / 8;
+  for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].m_cache_limit = base_cache_limit / 8;
+
   s_current = this;
 }
 

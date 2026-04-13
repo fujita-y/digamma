@@ -30,14 +30,14 @@ concurrent_heap_t::concurrent_heap_t() {
   m_collector_lock.init();
   m_mutator_wake.init();
   m_collector_wake.init();
-  m_write_barrier.store(false, std::memory_order_relaxed);
-  m_read_barrier.store(false, std::memory_order_relaxed);
-  m_alloc_barrier.store(false, std::memory_order_relaxed);
-  m_collector_kicked.store(false, std::memory_order_relaxed);
+  m_write_barrier = false;
+  m_read_barrier = false;
+  m_alloc_barrier = false;
+  m_collector_kicked = false;
   m_collector_ready = false;
   m_collector_terminating = false;
-  m_stop_the_world.store(false, std::memory_order_relaxed);
-  m_mutator_stopped.store(false, std::memory_order_relaxed);
+  m_stop_the_world = false;
+  m_mutator_stopped = false;
 }
 
 void concurrent_heap_t::init(concurrent_pool_t* pool) {
@@ -120,7 +120,7 @@ void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
 }
 
 void concurrent_heap_t::safepoint() {
-  while (m_stop_the_world.load(std::memory_order_acquire)) {
+  while (m_stop_the_world) {
     switch (m_root_snapshot_mode) {
       case ROOT_SNAPSHOT_MODE_GLOBALS:
         snapshot_root();
@@ -141,11 +141,11 @@ void concurrent_heap_t::safepoint() {
         break;
     }
     m_collector_lock.lock();
-    while (m_stop_the_world.load(std::memory_order_relaxed)) {
-      m_mutator_stopped.store(true, std::memory_order_relaxed);
+    while (m_stop_the_world) {
+      m_mutator_stopped = true;
       m_collector_wake.signal();
       m_mutator_wake.wait(m_collector_lock);
-      m_mutator_stopped.store(false, std::memory_order_relaxed);
+      m_mutator_stopped = false;
     }
     m_collector_wake.signal();
     m_collector_lock.unlock();
@@ -153,10 +153,10 @@ void concurrent_heap_t::safepoint() {
 }
 
 void concurrent_heap_t::collect() {
-  if (m_collector_kicked.load(std::memory_order_relaxed) == false) {
+  if (m_collector_kicked == false) {
     m_collector_lock.lock();
-    if (m_collector_kicked.load(std::memory_order_relaxed) == false && m_collector_ready) {
-      m_collector_kicked.store(true, std::memory_order_relaxed);
+    if (m_collector_kicked == false && m_collector_ready) {
+      m_collector_kicked = true;
       m_collector_wake.signal();
       GCTRACE(";; [collector: running]\n");
     }
@@ -168,14 +168,14 @@ void concurrent_heap_t::synchronized_collect() {
   clear_trip_bytes();
 
   // mark
-  assert(m_mutator_stopped.load(std::memory_order_relaxed) == false);
+  assert(m_mutator_stopped == false);
   m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_EVERYTHING;
-  m_stop_the_world.store(true, std::memory_order_release);
+  m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world phase 1]\n");
-  while (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
-    if (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+    if (!m_mutator_stopped) {
       dequeue_root();
       m_mutator_wake.signal();
     }
@@ -190,7 +190,7 @@ void concurrent_heap_t::synchronized_collect() {
   m_sweep_wavefront = (uint8_t*)m_concurrent_pool->m_pool;
 
   update_weak_reference();
-  m_read_barrier.store(false, std::memory_order_relaxed);
+  m_read_barrier = false;
 
   slab_traits_t* traits = SLAB_TRAITS_OF(m_concurrent_pool->m_pool);
   for (int i = 0; i < m_concurrent_pool->m_pool_watermark; i++) {
@@ -203,16 +203,16 @@ void concurrent_heap_t::synchronized_collect() {
   }
 
   GCTRACE(";; [collector: start-the-world]\n");
-  m_stop_the_world.store(false, std::memory_order_release);
+  m_stop_the_world = false;
   m_sweep_wavefront = (uint8_t*)m_concurrent_pool->m_pool + m_concurrent_pool->m_pool_size;
   m_mutator_wake.signal();
-  while (m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
 
   // end
-  m_collector_kicked.store(false, std::memory_order_relaxed);
+  m_collector_kicked = false;
   GCTRACE(";; [collector: waiting]\n");
   double t3 = msec();
 
@@ -224,27 +224,27 @@ void concurrent_heap_t::synchronized_collect() {
 }
 
 void concurrent_heap_t::concurrent_collect() {
-  assert(m_mutator_stopped.load(std::memory_order_relaxed) == false);
+  assert(m_mutator_stopped == false);
 
   // mark phase 1
   m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_GLOBALS;
-  m_stop_the_world.store(true, std::memory_order_release);
+  m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world]\n");
-  while (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
-    if (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+    if (!m_mutator_stopped) {
       dequeue_root();
       m_mutator_wake.signal();
     }
   }
   double t1 = msec();
   clear_trip_bytes();
-  m_write_barrier.store(true, std::memory_order_release);
-  m_stop_the_world.store(false, std::memory_order_release);
+  m_write_barrier = true;
+  m_stop_the_world = false;
   m_mutator_wake.signal();
   GCTRACE(";; [collector: start-the-world phase 1]\n");
-  while (m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
@@ -255,12 +255,12 @@ void concurrent_heap_t::concurrent_collect() {
 
   // mark phase 2
   m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_LOCALS;
-  m_stop_the_world.store(true, std::memory_order_release);
+  m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world phase 2]\n");
-  while (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
-    if (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+    if (!m_mutator_stopped) {
       dequeue_root();
       m_mutator_wake.signal();
     }
@@ -268,10 +268,10 @@ void concurrent_heap_t::concurrent_collect() {
 
   m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_EVERYTHING;
 fallback:
-  m_stop_the_world.store(false, std::memory_order_release);
+  m_stop_the_world = false;
   m_mutator_wake.signal();
   GCTRACE(";; [collector: start-the-world phase 2]\n");
-  while (m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
   }
@@ -284,20 +284,20 @@ fallback:
 #endif
 
   // final mark
-  assert(m_mutator_stopped.load(std::memory_order_relaxed) == false);
+  assert(m_mutator_stopped == false);
 
-  m_stop_the_world.store(true, std::memory_order_release);
+  m_stop_the_world = true;
   GCTRACE(";; [collector: stop-the-world final]\n");
-  while (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (!m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);
-    if (!m_mutator_stopped.load(std::memory_order_relaxed)) {
+    if (!m_mutator_stopped) {
       dequeue_root();
       m_mutator_wake.signal();
     }
   }
   double t4 = msec();
-  m_write_barrier.store(false, std::memory_order_release);
+  m_write_barrier = false;
   GCTRACE(";; [collector: synchronized-mark]\n");
   dequeue_root();
 
@@ -306,7 +306,7 @@ fallback:
   #if DEBUG_CONCURRENT_COLLECT
     puts("synchronized_mark() timeout, resume mutator and restart concurrent_mark");
   #endif
-    m_write_barrier.store(true, std::memory_order_release);
+    m_write_barrier = true;
     m_root_snapshot_mode = ROOT_SNAPSHOT_MODE_RETRY;
     goto fallback;
   }
@@ -317,11 +317,11 @@ fallback:
 
   // sweep
   m_sweep_wavefront = (uint8_t*)m_concurrent_pool->m_pool;
-  m_alloc_barrier.store(true, std::memory_order_release);
-  m_read_barrier.store(true, std::memory_order_relaxed);
-  m_stop_the_world.store(false, std::memory_order_release);
+  m_alloc_barrier = true;
+  m_read_barrier = true;
+  m_stop_the_world = false;
   m_mutator_wake.signal();
-  while (m_mutator_stopped.load(std::memory_order_relaxed)) {
+  while (m_mutator_stopped) {
     if (m_collector_terminating) return;
     m_collector_wake.wait(m_collector_lock);  // to make mutator run now
   }
@@ -330,7 +330,7 @@ fallback:
   double t5 = msec();
 
   update_weak_reference();
-  m_read_barrier.store(false, std::memory_order_relaxed);
+  m_read_barrier = false;
 
   int capacity = (m_concurrent_pool->m_pool_size >> SLAB_SIZE_SHIFT);
   uint8_t* slab = m_concurrent_pool->m_pool;
@@ -354,7 +354,7 @@ fallback:
       do {
         if (i == m_concurrent_pool->m_pool_watermark) {
           m_sweep_wavefront = (uint8_t*)m_concurrent_pool->m_pool + m_concurrent_pool->m_pool_size;
-          m_alloc_barrier.store(false, std::memory_order_release);
+          m_alloc_barrier = false;
           goto finish;
         }
         slab += SLAB_SIZE;
@@ -365,7 +365,7 @@ fallback:
   }
 
 finish:
-  m_collector_kicked.store(false, std::memory_order_relaxed);
+  m_collector_kicked = false;
   GCTRACE(";; [collector: waiting]\n");
   double t6 = msec();
   m_usage.m_duration = t6 - t1;
@@ -391,7 +391,7 @@ void* concurrent_heap_t::collector_thread(void* param) {
   concurrent_heap.m_collector_ready = true;
   GCTRACE(";; [collector: ready]\n");
   while (!concurrent_heap.m_collector_terminating) {
-    if (concurrent_heap.m_collector_kicked.load(std::memory_order_relaxed) == false) {
+    if (concurrent_heap.m_collector_kicked == false) {
       concurrent_heap.m_collector_wake.wait(concurrent_heap.m_collector_lock);
       continue;
     }
@@ -516,13 +516,13 @@ void concurrent_heap_t::enqueue_root(void* obj) {
 // Run on mutator thread
 void concurrent_heap_t::write_barrier(void* rhs) {
   // simple (Dijkstra)
-  if (m_write_barrier.load(std::memory_order_relaxed)) {
+  if (m_write_barrier) {
     if (SLAB_DATUM_BITS_TEST(rhs)) {
       if (m_concurrent_pool->in_pool(rhs)) {
         if (SLAB_TRAITS_OF(rhs)->owner->state(rhs) == false) {
           while (m_shade_queue.wait_lock_try_put(rhs) == false) {
             if (SLAB_TRAITS_OF(rhs)->owner->state(rhs)) break;
-            if (m_stop_the_world.load(std::memory_order_relaxed)) {
+            if (m_stop_the_world) {
               GCTRACE(";; [write-barrier: m_shade_queue overflow, during stop-the-world]\n");
               m_collector_lock.lock();
               m_collector_wake.signal();
