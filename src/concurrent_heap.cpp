@@ -3,7 +3,9 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
+#include <algorithm>
 #include <unordered_set>
+#include <vector>
 #include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
@@ -77,20 +79,27 @@ void* concurrent_heap_t::is_live_object(uint64_t addr) {
 }
 
 void concurrent_heap_t::snapshot_stack() {
+  // Thread-local vector: allocated once per thread, reused across STW pauses.
+  // sort+unique gives the same deduplication as unordered_set with no heap allocation.
+  static thread_local std::vector<uint64_t> raw;
+
   uint64_t regs[11];
   capture_arm64_core_state(regs);
-  uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];  // last reg is stack pointer
-  uint64_t thread_stack_bottom = capture_thread_stack_bottom();
-  std::unordered_set<uint64_t> raw;
-  raw.reserve(array_sizeof(regs) - 1 + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t));
-  for (int i = 0; i < array_sizeof(regs) - 1; i++) {
-    raw.insert(prune_memory_address(regs[i]));
-  }
-  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
-    raw.insert(prune_memory_address(*(uint64_t*)addr));
-  }
-  for (const auto& addr : raw) {
-    void* live = is_live_object(addr);
+  uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];      // last reg is stack pointer
+  uint64_t thread_stack_bottom = capture_thread_stack_bottom();  // cached — no syscall after first call
+
+  size_t n = (array_sizeof(regs) - 1) + (thread_stack_bottom - thread_stack_top) / sizeof(uint64_t);
+  raw.clear();
+  raw.reserve(n);  // no-op once capacity is sufficient
+
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) raw.push_back(prune_memory_address(regs[i]));
+  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t))
+    raw.push_back(prune_memory_address(*(uint64_t*)addr));
+
+  std::sort(raw.begin(), raw.end());
+  auto end_it = std::unique(raw.begin(), raw.end());
+  for (auto it = raw.begin(); it != end_it; ++it) {
+    void* live = is_live_object(*it);
     if (live) enqueue_root(live);
   }
 
@@ -102,7 +111,7 @@ void concurrent_heap_t::snapshot_stack() {
   printf(";; x19-x28: [");
   for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
-  printf(";; raw size: %ld\n", raw.size());
+  printf(";; raw size: %ld\n", end_it - raw.begin());
 #endif
 }
 
