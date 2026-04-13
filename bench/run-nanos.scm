@@ -104,13 +104,13 @@
 (display (format "\n\n;;  GABRIEL\n"))
 (time-bench browse 600)
 (time-bench cpstak 80)
-;;;(time-bench ctak 25) ;; timeout
-;;;(time-bench dderiv 160000) ;; stack-overflow
-;;;(time-bench deriv 320000) ;; stack-overflow
-(time-bench destruc 100) ;; error
-;;;(time-bench diviter 200000) ;; stack-overflow
-;;;(time-bench divrec 140000) ;; stack-overflow
-;;;(time-bench puzzle 24) ;; timeout
+;;(time-bench ctak 25) ;; timeout
+(time-bench dderiv 160000)
+(time-bench deriv 320000)
+(time-bench destruc 100)
+(time-bench diviter 200000)
+(time-bench divrec 140000)
+;;(time-bench puzzle 24) ;; 36s
 (time-bench tak 1000)
 (time-bench takl 70)
 (time-bench triangl 2)
