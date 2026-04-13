@@ -325,6 +325,14 @@ class codegen_t {
   std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
   std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
 
+  // Cross-function closure-cell label tracking:
+  //   closure_cell_labels[closure_label][cell_idx] = value_label
+  //     Records the closure label stored in each cell slot of a closure,
+  //     populated when reg-cell-set! writes a known closure into a captured
+  //     cell register (make_closure_free_reg is a local in phase2, scoped
+  //     per function to avoid false cross-function matches).
+  std::unordered_map<scm_obj_t, std::unordered_map<int, scm_obj_t>> closure_cell_labels;
+
   void destroy() { s_current = nullptr; }
 
   static codegen_t* current() {
