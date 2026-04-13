@@ -39,8 +39,6 @@ static int safe_list_length(scm_obj_t lst) {
   }
 }
 
-
-
 // ============================================================================
 // Pairs & Lists  - R6RS 11.9
 // ============================================================================
@@ -200,7 +198,7 @@ SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
     cons->cdr = a2;
     return scm_unspecified;
   }
-  throw std::runtime_error("set-cdr!: argument must be a cons cell");
+  throw std::runtime_error("set-cdr!: argument must be a cons cell: " + to_string(a1) + " " + to_string(a2));
 }
 
 // length  - R6RS 11.9
