@@ -993,7 +993,8 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 
 void codegen_t::phase2_analyze_closure_labels() {
   struct State {
-    std::unordered_map<int, scm_obj_t> regs;
+    std::unordered_map<int, scm_obj_t> regs;     // reg index -> closure label
+    std::unordered_map<int, scm_obj_t> cells;     // reg-cell index -> closure label
     std::unordered_map<scm_obj_t, scm_obj_t> globals;
 
     bool merge(const State& other) {
@@ -1005,6 +1006,17 @@ void codegen_t::phase2_analyze_closure_labels() {
         } else if (regs[reg] != label) {
           if (regs[reg] != scm_nil) {
             regs[reg] = scm_nil;
+            changed = true;
+          }
+        }
+      }
+      for (auto const& [cell, label] : other.cells) {
+        if (cells.find(cell) == cells.end()) {
+          cells[cell] = label;
+          changed = true;
+        } else if (cells[cell] != label) {
+          if (cells[cell] != scm_nil) {
+            cells[cell] = scm_nil;
             changed = true;
           }
         }
@@ -1081,6 +1093,16 @@ void codegen_t::phase2_analyze_closure_labels() {
                 current_state.regs[inst.rn1] = string_name;
               }
             }
+            break;
+          case Opcode::REG_CELL_SET:
+            // (reg-cell-set! cell-reg value-reg): store value of rn2 into the cell held in rn1
+            current_state.cells[inst.rn1] =
+                (current_state.regs.count(inst.rn2) ? current_state.regs[inst.rn2] : scm_nil);
+            break;
+          case Opcode::REG_CELL_REF:
+            // (reg-cell-ref dst-reg cell-reg): load from the cell in rn2 into rn1
+            current_state.regs[inst.rn1] =
+                (current_state.cells.count(inst.rn2) ? current_state.cells[inst.rn2] : scm_nil);
             break;
           case Opcode::CALL:
           case Opcode::TAIL_CALL:
