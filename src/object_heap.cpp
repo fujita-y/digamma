@@ -8,6 +8,8 @@
 #include "context.h"
 #include "port.h"
 
+#define DEFALUT_COLLECT_TRIP_BYTES (4 * 1024 * 1024)
+
 thread_local object_heap_t* object_heap_t::s_current;
 
 inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
@@ -32,7 +34,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_heap.init(&m_concurrent_pool);
 
   m_trip_bytes = 0;
-  m_collect_trip_bytes = init_size / 8;
+  m_collect_trip_bytes = DEFALUT_COLLECT_TRIP_BYTES;
 
   m_concurrent_heap.set_trace_proc([this](void* obj) { this->trace(obj); });
   m_concurrent_heap.set_finalize_proc([this](void* obj) { this->finalize(obj); });
@@ -57,6 +59,21 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_ports.init(&m_concurrent_heap, clp2(sizeof(scm_port_rec_t)), true, true);
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].init(&m_concurrent_heap, 1 << (n + 4), true, true);
   for (int n = 0; n < array_sizeof(m_privates); n++) m_privates[n].init(&m_concurrent_heap, 1 << (n + 4), false, false);
+
+  // cache configuration: allow slabs to be reused instead of returned to pool on each sweep
+  int base_cache_limit = (int)(m_collect_trip_bytes / SLAB_SIZE);
+  m_cons.m_cache_limit = base_cache_limit;
+  m_cells.m_cache_limit = base_cache_limit / 4;
+  m_flonums.m_cache_limit = base_cache_limit / 8;
+  m_symbols.m_cache_limit = base_cache_limit / 8;
+  m_strings.m_cache_limit = base_cache_limit / 8;
+  m_vectors.m_cache_limit = base_cache_limit / 8;
+  m_values.m_cache_limit = base_cache_limit / 8;
+  m_u8vectors.m_cache_limit = base_cache_limit / 8;
+  m_hashtables.m_cache_limit = base_cache_limit / 8;
+  m_environments.m_cache_limit = base_cache_limit / 8;
+  m_ports.m_cache_limit = base_cache_limit / 8;
+  for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].m_cache_limit = base_cache_limit / 8;
 
   s_current = this;
 }

@@ -52,7 +52,7 @@ class object_heap_t {
   void destroy();
   void safepoint() { m_concurrent_heap.safepoint(); }
   void* is_live_object(uint64_t addr) { return m_concurrent_heap.is_live_object(addr); }
-  std::atomic<bool>* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
+  bool* stop_the_world_ptr() { return &m_concurrent_heap.m_stop_the_world; }
   void collect() { m_concurrent_heap.collect(); }
   mutex_t& collector_lock() { return m_concurrent_heap.m_collector_lock; }
   void* alloc_cons() { return alloc_object(m_cons); }

@@ -54,8 +54,7 @@ nanos_jit_t::~nanos_jit_t() {
 // ============================================================================
 
 Expected<std::unique_ptr<nanos_jit_t>> nanos_jit_t::Create() {
-  auto EPC = SelfExecutorProcessControl::Create(
-      nullptr, std::make_unique<DynamicThreadPoolTaskDispatcher>(std::make_optional(std::thread::hardware_concurrency())));
+  auto EPC = SelfExecutorProcessControl::Create(nullptr, std::make_unique<DynamicThreadPoolTaskDispatcher>(std::make_optional<size_t>(2)));
   if (!EPC) return EPC.takeError();
 
   auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
@@ -95,7 +94,7 @@ Error nanos_jit_t::addIRModule(ThreadSafeModule TSM, ResourceTrackerSP RT) {
 }
 
 Expected<ExecutorAddr> nanos_jit_t::lookup(StringRef Name) {
-  auto Sym = ES->lookup({&MainJD}, Mangle(Name.str()), llvm::orc::SymbolState::Ready);
+  auto Sym = ES->lookup({&MainJD}, Mangle(Name), llvm::orc::SymbolState::Ready);
   if (!Sym) return Sym.takeError();
   return Sym->getAddress();
 }

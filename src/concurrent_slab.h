@@ -91,16 +91,19 @@ class concurrent_slab_t {
     return (bitmap[bit_n >> 3] & (1 << (bit_n & 7))) != 0;
   }
 
-  // mutator calls
+  // mutator calls — only when alloc_barrier==true (sweep phase), only on slabs AHEAD
+  // of the sweep wavefront (collector not yet there) → sole writer, no atomic needed.
   void unconditional_mark(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
     int bit_n = ((intptr_t)obj & (SLAB_SIZE - 1)) >> m_object_size_shift;
     assert(bit_n < m_bitmap_size * 8);
-    __atomic_fetch_or(bitmap + (bit_n >> 3), (uint8_t)(1 << (bit_n & 7)), __ATOMIC_RELAXED);
+    bitmap[bit_n >> 3] |= (uint8_t)(1 << (bit_n & 7));
   }
 
-  // collector calls
+  // collector calls — only when alloc_barrier==false (mark phase); mutator's
+  // unconditional_mark is gated by alloc_barrier==true, so collector is sole
+  // bitmap writer here → no atomic needed.
   __attribute__((no_sanitize("hwaddress"))) bool test_and_set_mark(void* obj) {
     assert(m_bitmap_size);
     uint8_t* bitmap = (uint8_t*)SLAB_TRAITS_OF(obj) - m_bitmap_size;
@@ -109,7 +112,8 @@ class concurrent_slab_t {
     uint8_t bit = (1 << (bit_n & 7));
     uint8_t* p = bitmap + (bit_n >> 3);
     if (*p & bit) return true;
-    return (__atomic_fetch_or(p, bit, __ATOMIC_RELAXED) & bit) != 0;
+    *p |= bit;
+    return false;
   }
 };
 

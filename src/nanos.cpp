@@ -45,8 +45,10 @@ void nanos_t::init_codegen() {
 void nanos_t::init() {
   object_heap_t* heap = new object_heap_t();
 #ifndef NDEBUG
-  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 512 * 1024 * 1024);
+  // debug build
+  heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 #else
+  // release build
   heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 #endif
   context::init();

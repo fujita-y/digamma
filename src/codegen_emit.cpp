@@ -107,7 +107,7 @@ void codegen_t::emit_inst(const Instruction& inst) {
 
 void codegen_t::emit_safepoint(const Instruction& inst) {
   // Get the address of the stop-the-world flag from the heap
-  std::atomic<bool>* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
+  bool* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
   llvm::Value* poll_addr_const = createInt64Constant(CT, (uint64_t)poll_ptr);
   llvm::Value* poll_val_ptr = BL.CreateIntToPtr(poll_addr_const, BL.getPtrTy());
 
@@ -546,7 +546,7 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
       BL.CreateStore(get_reg(i), p);
     }
   } else {
-    argv_array = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i64_ptr));
+    argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
   }
 
   auto call = BL.CreateCall(ft, apply_helper, {proc, argc_val, argv_array}, "apply_opt");
@@ -932,7 +932,7 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
         BL.CreateStore(get_reg(i), p);
       }
     } else {
-      argv_array = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i64_ptr));
+      argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
     }
 
     auto call = BL.CreateCall(bridge->getFunctionType(), bridge, {closure, argc_val, argv_array}, "bridge_call");
@@ -955,13 +955,11 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
   // Read closure's rest field to determine calling convention
   llvm::Value* closure_ptr = untagPointer(BL, CT, closure);
   llvm::Value* rest_field_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_REST_FIELD_OFFSET);
-  llvm::Value* rest_field_ptr_i32 = rest_field_ptr;
-  llvm::Value* rest_flag = BL.CreateLoad(BL.getInt32Ty(), rest_field_ptr_i32, "rest");
+  llvm::Value* rest_flag = BL.CreateLoad(BL.getInt32Ty(), rest_field_ptr, "rest");
 
   // Load cdecl field (already defined at top of file)
   llvm::Value* cdecl_field_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), closure_ptr, CLOSURE_CDECL_FIELD_OFFSET);
-  llvm::Value* cdecl_field_ptr_i32 = cdecl_field_ptr;
-  llvm::Value* cdecl_flag = BL.CreateLoad(BL.getInt32Ty(), cdecl_field_ptr_i32, "cdecl");
+  llvm::Value* cdecl_flag = BL.CreateLoad(BL.getInt32Ty(), cdecl_field_ptr, "cdecl");
 
   // Branch based on rest flag
   llvm::Value* is_rest = BL.CreateICmpNE(rest_flag, BL.getInt32(0), "is_rest");

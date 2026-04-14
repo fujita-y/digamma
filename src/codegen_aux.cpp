@@ -8,9 +8,7 @@
 #include "codegen.h"
 #include "object_heap.h"
 
-#include <atomic>
-
-static thread_local std::atomic<bool>* s_stop_the_world = nullptr;
+static thread_local bool* s_stop_the_world = nullptr;
 
 static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
 
@@ -32,14 +30,14 @@ bool is_never_return_aux_helper(const char* name) {
 
 extern "C" void c_safepoint(void) {
   if (s_stop_the_world != nullptr) [[likely]] {
-    if (s_stop_the_world->load(std::memory_order_acquire)) [[unlikely]] {
+    if (*s_stop_the_world) [[unlikely]] {
       object_heap_t::current()->safepoint();
     }
     return;
   }
   object_heap_t* heap = object_heap_t::current();
   s_stop_the_world = heap->stop_the_world_ptr();
-  if (s_stop_the_world->load(std::memory_order_acquire)) heap->safepoint();
+  if (*s_stop_the_world) heap->safepoint();
 }
 
 extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[]) {

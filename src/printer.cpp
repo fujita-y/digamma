@@ -6,6 +6,7 @@
 #include "printer.h"
 
 #include <format>
+#include <iomanip>
 #include <unordered_map>
 
 void printer_t::write(scm_obj_t obj) { print(nullptr, obj, false); }
@@ -13,13 +14,16 @@ void printer_t::write(scm_obj_t obj) { print(nullptr, obj, false); }
 void printer_t::display(scm_obj_t obj) { print(nullptr, obj, true); }
 
 void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode) {
-  if (is_fixnum(obj)) {
-    out << fixnum(obj);
+  if (is_fixnum(obj) || is_singleton(obj)) {
+    print_immediate(obj);
     return;
   }
-
-  if (is_short_flonum(obj)) {
-    out << flonum(obj);
+  if (is_char(obj)) {
+    print_char(obj, display_mode);
+    return;
+  }
+  if (is_flonum(obj)) {
+    print_flonum(flonum(obj));
     return;
   }
 
@@ -28,82 +32,30 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
     auto it = visited->find(obj);
     if (it != visited->end()) {
       if (is_fixnum(it->second)) {
-        // Back-reference: object already defined above
         out << "#" << fixnum(it->second) << "#";
         return;
       } else {
-        // it->second == scm_true: shared, assign new tag
         int tag = m_shared_tag++;
         it->second = make_fixnum(tag);
         out << "#" << tag << "=";
-        // Fall through to print the object body with the label
       }
     }
-    // it == end(): not shared, print normally (fall through)
   }
 
   if (is_heap_object(obj)) {
     switch (heap_tc6_num(obj)) {
-      case tc6_symbol: {
-        const char* s = (const char*)symbol_name(obj);
-        if (display_mode) {
-          out << s;
-          return;
-        }
-        std::string_view sv(s);
-        bool special = sv.empty() || isdigit((unsigned char)sv[0]);
-        if (!special) {
-          for (char c : sv) {
-            if (!isalnum((unsigned char)c) && !strchr("!$%&*+-./:<=>?@^_~", c)) {
-              special = true;
-              break;
-            }
-          }
-        }
-        if (special) {
-          out << '|';
-          for (char c : sv) {
-            if (c == '|' || c == '\\') out << '\\';
-            out << c;
-          }
-          out << '|';
-        } else
-          out << sv;
+      case tc6_symbol:
+        print_symbol(obj, display_mode);
         return;
-      }
-      case tc6_string: {
-        const char* s = (const char*)string_name(obj);
-        if (display_mode) {
-          out << s;
-          return;
-        }
-        out << '"';
-        for (const char* p = s; *p; p++) {
-          if (*p == '"')
-            out << "\\\"";
-          else if (*p == '\\')
-            out << "\\\\";
-          else
-            out << *p;
-        }
-        out << '"';
+      case tc6_string:
+        print_string(obj, display_mode);
         return;
-      }
-      case tc6_long_flonum: {
-        out << flonum(obj);
+      case tc6_long_flonum:
+        print_flonum(flonum(obj));
         return;
-      }
-      case tc6_vector: {
-        out << "#(";
-        int n = vector_nsize(obj);
-        scm_obj_t* elts = vector_elts(obj);
-        for (int i = 0; i < n; i++) {
-          if (i > 0) out << " ";
-          print(visited, elts[i], false);
-        }
-        out << ")";
+      case tc6_vector:
+        print_vector(visited, obj);
         return;
-      }
       case tc6_values: {
         out << "#<values";
         int n = values_nsize(obj);
@@ -115,17 +67,9 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
         out << ">";
         return;
       }
-      case tc6_u8vector: {
-        out << "#u8(";
-        int n = u8vector_nsize(obj);
-        uint8_t* elts = u8vector_elts(obj);
-        for (int i = 0; i < n; i++) {
-          if (i > 0) out << " ";
-          out << (int)elts[i];
-        }
-        out << ")";
+      case tc6_u8vector:
+        print_bytevector(obj);
         return;
-      }
       case tc6_closure:
         out << std::format("#<closure {:#x} argc:{} rest:{} nenv:{}>", (uintptr_t)obj, closure_argc(obj), closure_rest(obj), closure_nenv(obj));
         return;
@@ -161,7 +105,6 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
             print(visited, elts[i], false);
           }
           out << ">";
-
           return;
         }
         out << std::format("#<tuple {:#x} size:{}>", (uintptr_t)obj, tuple_nsize(obj));
@@ -170,44 +113,128 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
   }
 
   if (is_cons(obj)) {
-    if (obj == (scm_obj_t) nullptr) {
-      out << "#<null>";
-      return;
-    }
-    out << "(";
-    print(visited, cons_car(obj), display_mode);
-    scm_obj_t cdr = cons_cdr(obj);
-    while (is_cons(cdr)) {
-      if (cdr == (scm_obj_t) nullptr) {
-        out << "#<null>";
-        return;
-      }
-      // In shared-structure mode, if this cdr cell is shared/circular,
-      // stop the implicit list traversal and emit it as a dot-pair tail.
-      // The top-level shared check in print() will handle the #N= / #N# labels.
-      if (visited != nullptr) {
-        auto it = visited->find(cdr);
-        if (it != visited->end()) {
-          // This cdr cell is shared or circular — print as `. cdr`
-          out << " . ";
-          print(visited, cdr, display_mode);
-          out << ")";
-          return;
-        }
-      }
-      out << " ";
-      print(visited, cons_car(cdr), display_mode);
-      cdr = cons_cdr(cdr);
-    }
-    if (cdr != scm_nil) {
-      out << " . ";
-      print(visited, cdr, display_mode);
-    }
-    out << ")";
+    print_list(visited, obj, display_mode);
     return;
   }
 
-  // Immediate constants
+  out << "#<unknown 0x" << std::hex << obj << std::dec << ">";
+}
+
+void printer_t::print_flonum(double d) {
+  std::ostringstream buf;
+  buf << std::setprecision(17) << d;
+  std::string s = buf.str();
+  if (s.find('.') == std::string::npos && s.find('e') == std::string::npos) {
+    s += ".0";
+  }
+  out << s;
+}
+
+void printer_t::print_symbol(scm_obj_t obj, bool display_mode) {
+  const char* s = (const char*)symbol_name(obj);
+  if (display_mode) {
+    out << s;
+    return;
+  }
+  std::string_view sv(s);
+  bool special = sv.empty() || isdigit((unsigned char)sv[0]);
+  if (!special) {
+    for (char c : sv) {
+      if (!isalnum((unsigned char)c) && !strchr("!$%&*+-./:<=>?@^_~", c)) {
+        special = true;
+        break;
+      }
+    }
+  }
+  if (special) {
+    out << '|';
+    for (char c : sv) {
+      if (c == '|' || c == '\\') out << '\\';
+      out << c;
+    }
+    out << '|';
+  } else
+    out << sv;
+}
+
+void printer_t::print_string(scm_obj_t obj, bool display_mode) {
+  const char* s = (const char*)string_name(obj);
+  if (display_mode) {
+    out << s;
+    return;
+  }
+  out << '"';
+  for (const char* p = s; *p; p++) {
+    if (*p == '"')
+      out << "\\\"";
+    else if (*p == '\\')
+      out << "\\\\";
+    else
+      out << *p;
+  }
+  out << '"';
+}
+
+void printer_t::print_vector(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj) {
+  out << "#(";
+  int n = vector_nsize(obj);
+  scm_obj_t* elts = vector_elts(obj);
+  for (int i = 0; i < n; i++) {
+    if (i > 0) out << " ";
+    print(visited, elts[i], false);
+  }
+  out << ")";
+}
+
+void printer_t::print_bytevector(scm_obj_t obj) {
+  out << "#u8(";
+  int n = u8vector_nsize(obj);
+  uint8_t* elts = u8vector_elts(obj);
+  for (int i = 0; i < n; i++) {
+    if (i > 0) out << " ";
+    out << (int)elts[i];
+  }
+  out << ")";
+}
+
+void printer_t::print_list(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode) {
+  if (obj == (scm_obj_t) nullptr) {
+    out << "#<null>";
+    return;
+  }
+  out << "(";
+  print(visited, cons_car(obj), display_mode);
+  scm_obj_t cdr = cons_cdr(obj);
+  while (is_cons(cdr)) {
+    if (cdr == (scm_obj_t) nullptr) {
+      out << "#<null>";
+      return;
+    }
+    if (visited != nullptr) {
+      auto it = visited->find(cdr);
+      if (it != visited->end()) {
+        out << " . ";
+        print(visited, cdr, display_mode);
+        out << ")";
+        return;
+      }
+    }
+    out << " ";
+    print(visited, cons_car(cdr), display_mode);
+    cdr = cons_cdr(cdr);
+  }
+  if (cdr != scm_nil) {
+    out << " . ";
+    print(visited, cdr, display_mode);
+  }
+  out << ")";
+}
+
+void printer_t::print_immediate(scm_obj_t obj) {
+  if (is_fixnum(obj)) {
+    out << fixnum(obj);
+    return;
+  }
   if (obj == scm_true) {
     out << "#t";
     return;
@@ -232,172 +259,37 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
     out << "#<eof>";
     return;
   }
-
-  if (is_char(obj)) {
-    uint32_t c = (uint32_t)(obj >> 32);
-    if (display_mode) {
-      out << (char)c;
-      return;
-    }
-    out << "#\\";
-    if (c > 32 && c < 127) {
-      out << (char)c;
-    } else {
-      switch (c) {
-        case ' ':
-          out << "space";
-          break;
-        case '\n':
-          out << "newline";
-          break;
-        case '\r':
-          out << "return";
-          break;
-        case '\t':
-          out << "tab";
-          break;
-        default:
-          out << "x" << std::hex << c << std::dec;
-          break;
-      }
-    }
-    return;
-  }
-
   out << "#<unknown 0x" << std::hex << obj << std::dec << ">";
 }
 
-void printer_t::printf(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-
-  const char* p = fmt;
-  while (*p) {
-    if (*p == '%') {
-      p++;
-      if (*p == '\0') {
-        // format string ends with '%'
-        out << '%';
+void printer_t::print_char(scm_obj_t obj, bool display_mode) {
+  uint32_t c = (uint32_t)(obj >> 32);
+  if (display_mode) {
+    out << (char)c;
+    return;
+  }
+  out << "#\\";
+  if (c > 32 && c < 127) {
+    out << (char)c;
+  } else {
+    switch (c) {
+      case ' ':
+        out << "space";
         break;
-      }
-      if (*p == '%') {
-        // '%%' -> '%'
-        out << '%';
-        p++;
-        continue;
-      }
-      if (*p == 'w') {
-        // '%w' -> format a Scheme object
-        scm_obj_t obj = va_arg(ap, scm_obj_t);
-        write(obj);
-        p++;
-        continue;
-      }
-      // Handle standard printf directives
-      // We'll collect the format spec and use sprintf for standard types
-      const char* spec_start = p - 1;  // points to '%'
-
-      // Skip flags: -, +, space, #, 0
-      while (*p == '-' || *p == '+' || *p == ' ' || *p == '#' || *p == '0') {
-        p++;
-      }
-
-      // Skip width
-      while (isdigit(*p)) {
-        p++;
-      }
-
-      // Skip precision
-      if (*p == '.') {
-        p++;
-        while (isdigit(*p)) {
-          p++;
-        }
-      }
-
-      // Skip length modifiers: h, l, L, z, t, etc.
-      while (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'z' || *p == 't' || *p == 'j') {
-        p++;
-      }
-
-      // Now we should be at the conversion specifier
-      if (*p == '\0') {
-        // Incomplete format specifier
+      case '\n':
+        out << "newline";
         break;
-      }
-
-      char conversion = *p;
-      p++;
-
-      // Extract the format specifier
-      size_t spec_len = p - spec_start;
-      char spec[64];
-      if (spec_len >= sizeof(spec)) {
-        spec_len = sizeof(spec) - 1;
-      }
-      memcpy(spec, spec_start, spec_len);
-      spec[spec_len] = '\0';
-
-      char buf[256];
-      switch (conversion) {
-        case 'd':
-        case 'i': {
-          int val = va_arg(ap, int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'u':
-        case 'o':
-        case 'x':
-        case 'X': {
-          unsigned int val = va_arg(ap, unsigned int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'f':
-        case 'F':
-        case 'e':
-        case 'E':
-        case 'g':
-        case 'G': {
-          double val = va_arg(ap, double);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'c': {
-          int val = va_arg(ap, int);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 's': {
-          const char* val = va_arg(ap, const char*);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        case 'p': {
-          void* val = va_arg(ap, void*);
-          snprintf(buf, sizeof(buf), spec, val);
-          out << buf;
-          break;
-        }
-        default:
-          // Unknown conversion, just output the spec as-is
-          out << spec;
-          break;
-      }
-    } else {
-      // Regular character
-      out << *p;
-      p++;
+      case '\r':
+        out << "return";
+        break;
+      case '\t':
+        out << "tab";
+        break;
+      default:
+        out << "x" << std::hex << c << std::dec;
+        break;
     }
   }
-
-  va_end(ap);
 }
 
 void printer_t::scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj) {
@@ -449,4 +341,81 @@ void printer_t::write_ss(scm_obj_t obj) {
     }
   }
   print(&visited, obj, false);
+}
+
+void printer_t::format(int argc, scm_obj_t argv[]) {
+  if (argc < 1) fatal("%s:%u too few arguments", __FILE__, __LINE__);
+  const char* fmt = (const char*)string_name(argv[0]);
+  int arg_idx = 1;
+
+  auto next_arg = [&]() -> scm_obj_t {
+    if (arg_idx >= argc) throw std::runtime_error("format: too few arguments: " + to_string(argv[0]));
+    return argv[arg_idx++];
+  };
+
+  for (const char* p = fmt; *p; p++) {
+    if (*p != '~') {
+      out << *p;
+      continue;
+    }
+    p++;
+    if (*p == '\0') {
+      out << '~';
+      break;
+    }
+    char c = *p;
+    switch (c) {
+      case 'a':
+        display(next_arg());
+        break;
+      case 's':
+        write(next_arg());
+        break;
+      case 'w':
+        write_ss(next_arg());
+        break;
+      case '%':
+        out << '\n';
+        break;
+      case '!':
+        out.flush();
+        break;
+      case '~':
+        out << '~';
+        break;
+      default:
+        if (isdigit(static_cast<unsigned char>(c))) {
+          int width = 0;
+          while (isdigit(static_cast<unsigned char>(*p))) {
+            width = width * 10 + (*p++ - '0');
+          }
+          int fraction = 0;
+          bool has_fraction = false;
+          if (*p == ',') {
+            p++;
+            has_fraction = true;
+            while (isdigit(static_cast<unsigned char>(*p))) {
+              fraction = fraction * 10 + (*p++ - '0');
+            }
+          }
+          if (*p == 'f') {
+            scm_obj_t arg = next_arg();
+            double val;
+            if (is_fixnum(arg))
+              val = static_cast<double>(fixnum(arg));
+            else if (is_flonum(arg))
+              val = flonum(arg);
+            else
+              throw std::runtime_error("format: argument is not a number: " + to_string(arg));
+
+            out << std::fixed << std::showpoint << std::setw(width) << std::setprecision(fraction) << val;
+            break;
+          }
+          out << '~';
+          // Fall through (or handle error)
+        }
+        out << '~' << c;
+        break;
+    }
+  }
 }

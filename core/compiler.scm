@@ -155,7 +155,22 @@
       (string->symbol (string-append "C" (number->string (compiler-ctx-inc-closure-labels! ctx)) "_"(uuid)))
       (string->symbol (string-append "L" (number->string (compiler-ctx-inc-labels! ctx))))))
 
-(define (make-reg i) (string->symbol (string-append "r" (number->string i))))
+;; Pre-intern register symbols r0..r127 at top level so they are permanently
+;; rooted in the global environment and cannot be collected by the concurrent GC
+;; even when a globals-only root snapshot is taken during JIT-compiled compilation.
+;; This eliminates the race where make-reg allocates a symbol that only lives on
+;; the JIT call stack until it is stored into the compiler context.
+(define *pre-interned-regs*
+  (let loop ((i 0) (acc '()))
+    (if (> i 127)
+        (list->vector (reverse acc))
+        (loop (+ i 1)
+              (cons (string->symbol (string-append "r" (number->string i))) acc)))))
+
+(define (make-reg i)
+  (if (and (>= i 0) (< i (vector-length *pre-interned-regs*)))
+      (vector-ref *pre-interned-regs* i)
+      (string->symbol (string-append "r" (number->string i)))))
 
 (define (lookup var env)
   (let loop ((e env))
@@ -209,12 +224,16 @@
                 (codegen-application expr env next-reg tail? ctx)))))
 
 (define (codegen-args args env arg-base ctx)
+  ;; Compile each argument first (may trigger GC), THEN allocate temp-reg.
+  ;; A symbol allocated before codegen would only be reachable from the JIT
+  ;; call stack during sub-compilation — invisible to a globals-only GC snapshot.
   (let loop ((as args) (i 0))
     (if (not (null? as))
-        (let ((temp-reg (make-reg (+ arg-base i))))
+        (begin
           (codegen (car as) env (+ arg-base i 1) #f ctx)
-          (compiler-ctx-emit! ctx `(mov ,temp-reg r0))
-          (loop (cdr as) (+ i 1))))))
+          (let ((temp-reg (make-reg (+ arg-base i))))
+            (compiler-ctx-emit! ctx `(mov ,temp-reg r0))
+            (loop (cdr as) (+ i 1)))))))
 
 (define (move-args num-args base ctx)
   (let move-loop ((j 0))
@@ -240,19 +259,36 @@
     (if tail? (compiler-ctx-emit! ctx `(ret)))))
 
 (define (codegen-if expr env next-reg tail? ctx)
+  ;; Compile the test first (may trigger GC), then allocate labels immediately
+  ;; before they are stored into ctx.  This follows the same principle as the
+  ;; codegen-application fix: a freshly-allocated symbol that only lives on the
+  ;; JIT call stack can be swept when the concurrent GC takes a globals-only
+  ;; root snapshot during one of the recursive codegen calls.
+  (codegen (cadr expr) env next-reg #f ctx)
+  ;; Allocate t-label and f-label after test compilation, store them at once.
   (let ((t-label (gen-label ctx))
-        (f-label (gen-label ctx))
-        (end-label (gen-label ctx)))
-    (codegen (cadr expr) env next-reg #f ctx)
+        (f-label (gen-label ctx)))
     (compiler-ctx-emit! ctx `(if ,t-label ,f-label))
     (compiler-ctx-emit! ctx `(label ,t-label))
+    ;; Compile the then-branch.  end-label is allocated afterwards to avoid a
+    ;; GC window where it would only be reachable from the JIT stack.
     (codegen (caddr expr) env next-reg tail? ctx)
-    (if (not tail?) (compiler-ctx-emit! ctx `(jump ,end-label)))
-    (compiler-ctx-emit! ctx `(label ,f-label))
-    (if (null? (cdddr expr))
-        (begin (compiler-ctx-emit! ctx `(const r0 #f)) (if tail? (compiler-ctx-emit! ctx `(ret))))
-        (codegen (cadddr expr) env next-reg tail? ctx))
-    (if (not tail?) (compiler-ctx-emit! ctx `(label ,end-label)))))
+    (if (not tail?)
+        ;; Non-tail: allocate end-label now that then-branch compilation is done.
+        (let ((end-label (gen-label ctx)))
+          (compiler-ctx-emit! ctx `(jump ,end-label))
+          (compiler-ctx-emit! ctx `(label ,f-label))
+          (if (null? (cdddr expr))
+              (compiler-ctx-emit! ctx `(const r0 #f))
+              (codegen (cadddr expr) env next-reg #f ctx))
+          (compiler-ctx-emit! ctx `(label ,end-label)))
+        ;; Tail: no end-label needed.
+        (begin
+          (compiler-ctx-emit! ctx `(label ,f-label))
+          (if (null? (cdddr expr))
+              (begin (compiler-ctx-emit! ctx `(const r0 #f))
+                     (compiler-ctx-emit! ctx `(ret)))
+              (codegen (cadddr expr) env next-reg tail? ctx))))))
 
 (define (codegen-set! expr env next-reg tail? ctx)
   (let ((var (cadr expr))
@@ -280,7 +316,6 @@
                            (and (not (eq? (car b) 'global))
                                 (not (eq? (car b) 'self)))))
                        potential-free))
-         (entry-label (gen-label ctx 'closure))
          (prev-code (compiler-ctx-code ctx))
          (max-outgoing (analyze-max-outgoing-args `(begin ,@body))))
     (let* ((params-info (analyze-params params))
@@ -296,39 +331,46 @@
               (cl-scope (let loop ((f free) (i 0))
                           (if (null? f) '() (cons (cons (car f) i) (loop (cdr f) (+ i 1)))))))
          (compiler-ctx-set-code! ctx '())
-         (compiler-ctx-emit! ctx `(label ,entry-label))
-         (let move-params ((i (- n-total-params 1)))
-           (if (>= i 0)
-               (begin (compiler-ctx-emit! ctx `(mov ,(make-reg (+ new-base i)) ,(make-reg i))) (move-params (- i 1)))))
-         (let* ((self-bindings (if (null? env) '()
+         (let ((entry-label (gen-label ctx 'closure)))
+           (compiler-ctx-emit! ctx `(label ,entry-label))
+           (let move-params ((i (- n-total-params 1)))
+             (if (>= i 0)
+                 (begin (compiler-ctx-emit! ctx `(mov ,(make-reg (+ new-base i)) ,(make-reg i))) (move-params (- i 1)))))
+           (let* ((self-bindings (if (null? env) '()
                                     (let ((scope (car env)))
                                       (if (and (pair? scope) (not (memq (car scope) '(cl num-params))))
                                           (filter (lambda (b) (eq? (cdr b) 'self)) scope)
                                           '())))))
-            (for-each (lambda (p) (if (memq (car p) (compiler-ctx-mutated ctx)) (compiler-ctx-emit! ctx `(make-cell ,(cdr p))))) new-scope)
-            (codegen `(begin ,@body) (cons (list (cons 'num-params n-total-params)) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-total-params) #t ctx))
-         (compiler-ctx-add-closure! ctx (reverse (compiler-ctx-code ctx)))
-         (compiler-ctx-set-code! ctx prev-code)
-         (let loop ((fs free) (regs '()) (r next-reg))
-           (if (null? fs)
-               (begin (compiler-ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,n-fixed ,has-rest?))
-                      (if tail? (compiler-ctx-emit! ctx `(ret))))
-               (let ((b (lookup (car fs) env)))
-                 (if (eq? (car b) 'reg)
-                     (loop (cdr fs) (cons (cdr b) regs) r)
-                     (let ((tmp (make-reg r)))
-                       (if (eq? (car b) 'self)
-                           (compiler-ctx-emit! ctx `(closure-self ,tmp))
-                           (compiler-ctx-emit! ctx `(closure-ref ,tmp ,(cdr b))))
-                       (loop (cdr fs) (cons tmp regs) (+ r 1)))))))))))
+              (for-each (lambda (p) (if (memq (car p) (compiler-ctx-mutated ctx)) (compiler-ctx-emit! ctx `(make-cell ,(cdr p))))) new-scope)
+              (codegen `(begin ,@body) (cons (list (cons 'num-params n-total-params)) (cons new-scope (cons self-bindings (list (cons 'cl cl-scope))))) (+ new-base n-total-params) #t ctx))
+           (compiler-ctx-add-closure! ctx (reverse (compiler-ctx-code ctx)))
+           (compiler-ctx-set-code! ctx prev-code)
+           (let loop ((fs free) (regs '()) (r next-reg))
+             (if (null? fs)
+                 (begin (compiler-ctx-emit! ctx `(make-closure r0 ,entry-label ,(reverse regs) ,n-fixed ,has-rest?))
+                        (if tail? (compiler-ctx-emit! ctx `(ret))))
+                 (let ((b (lookup (car fs) env)))
+                   (if (eq? (car b) 'reg)
+                       (loop (cdr fs) (cons (cdr b) regs) r)
+                       (let ((tmp (make-reg r)))
+                         (if (eq? (car b) 'self)
+                             (compiler-ctx-emit! ctx `(closure-self ,tmp))
+                             (compiler-ctx-emit! ctx `(closure-ref ,tmp ,(cdr b))))
+                         (loop (cdr fs) (cons tmp regs) (+ r 1))))))))))))
 
 (define (codegen-application expr env next-reg tail? ctx)
   (let* ((proc (car expr)) (args (cdr expr)) (num-args (length args)) (base-reg (max 1 next-reg)))
     (codegen-args args env base-reg ctx)
+    ;; Compile proc before allocating call-reg: codegen may trigger GC, and a
+    ;; freshly-allocated symbol held only on the JIT call stack can be swept if
+    ;; the concurrent GC takes a globals-only root snapshot before the symbol is
+    ;; stored into the compiler context.  By allocating call-reg after all
+    ;; sub-compilation is done we minimise this window; the *pre-interned-regs*
+    ;; vector above eliminates it entirely for r0..r127.
+    (if (and (pair? proc) (eq? (car proc) 'lambda))
+        (codegen-lambda proc env (+ base-reg num-args) #f ctx)
+        (codegen proc env (+ base-reg num-args) #f ctx))
     (let ((call-reg (make-reg (+ base-reg num-args))))
-      (if (and (pair? proc) (eq? (car proc) 'lambda))
-          (codegen-lambda proc env (+ base-reg num-args) #f ctx)
-          (codegen proc env (+ base-reg num-args) #f ctx))
       (compiler-ctx-emit! ctx `(mov ,call-reg r0))
       (move-args num-args base-reg ctx)
       (if tail?
@@ -340,14 +382,18 @@
     (let loop ((vs vals) (vars vars) (r next-reg) (new-scope '()))
       (if (null? vs)
           (codegen `(begin ,@body) (cons new-scope env) r tail? ctx)
-          (let ((reg (make-reg r)))
+          ;; Compile binding value first (may trigger GC), then allocate reg.
+          ;; Allocating reg before codegen leaves it only on the JIT stack
+          ;; during sub-compilation — vulnerable to globals-only GC snapshots.
+          (begin
             (if (and (pair? (car vs)) (eq? (car (car vs)) 'lambda))
                 (codegen-lambda (car vs) env (+ r 1) #f ctx)
                 (codegen (car vs) env (+ r 1) #f ctx))
-            (compiler-ctx-emit! ctx `(mov ,reg r0))
-            (if (memq (car vars) (compiler-ctx-mutated ctx))
-                (compiler-ctx-emit! ctx `(make-cell ,reg)))
-            (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope)))))))
+            (let ((reg (make-reg r)))
+              (compiler-ctx-emit! ctx `(mov ,reg r0))
+              (if (memq (car vars) (compiler-ctx-mutated ctx))
+                  (compiler-ctx-emit! ctx `(make-cell ,reg)))
+              (loop (cdr vs) (cdr vars) (+ r 1) (cons (cons (car vars) reg) new-scope))))))))
 
 ;; Helper: find position of item in list, or #f
 (define (list-position item lst)

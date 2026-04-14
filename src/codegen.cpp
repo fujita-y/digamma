@@ -164,6 +164,7 @@ void codegen_t::reset_compile_state() {
   function_map.clear();
   closure_params.clear();
   global_closure_defs.clear();
+  closure_cell_labels.clear();
   for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
   gc_protected_objects.clear();
 }
@@ -475,22 +476,6 @@ void codegen_t::phase6_optimize_and_verify() {
   }
 }
 
-// Helper function to find which llvm::Function an llvm::User belongs to,
-// by looking through Instruction and ConstantExpr.
-static llvm::Function* getUserFunction(llvm::User* U) {
-  if (auto* I = llvm::dyn_cast<llvm::Instruction>(U)) {
-    return I->getFunction();
-  }
-  if (auto* CE = llvm::dyn_cast<llvm::ConstantExpr>(U)) {
-    for (llvm::User* CEU : CE->users()) {
-      if (llvm::Function* F = getUserFunction(CEU)) {
-        return F;
-      }
-    }
-  }
-  return nullptr;
-}
-
 // --------------------------------------------------------------------------
 //  Phase 5: Finalize and hand off to JIT
 // --------------------------------------------------------------------------
@@ -544,6 +529,7 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   functions.clear();
   closure_params.clear();
   global_closure_defs.clear();
+  closure_cell_labels.clear();
 
   // Create main function info
   functions.emplace_back();
@@ -1008,7 +994,8 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 
 void codegen_t::phase2_analyze_closure_labels() {
   struct State {
-    std::unordered_map<int, scm_obj_t> regs;
+    std::unordered_map<int, scm_obj_t> regs;   // reg index -> closure label
+    std::unordered_map<int, scm_obj_t> cells;  // reg-cell index -> closure label
     std::unordered_map<scm_obj_t, scm_obj_t> globals;
 
     bool merge(const State& other) {
@@ -1020,6 +1007,17 @@ void codegen_t::phase2_analyze_closure_labels() {
         } else if (regs[reg] != label) {
           if (regs[reg] != scm_nil) {
             regs[reg] = scm_nil;
+            changed = true;
+          }
+        }
+      }
+      for (auto const& [cell, label] : other.cells) {
+        if (cells.find(cell) == cells.end()) {
+          cells[cell] = label;
+          changed = true;
+        } else if (cells[cell] != label) {
+          if (cells[cell] != scm_nil) {
+            cells[cell] = scm_nil;
             changed = true;
           }
         }
@@ -1040,6 +1038,11 @@ void codegen_t::phase2_analyze_closure_labels() {
   };
 
   for (auto& func : functions) {
+    // Per-function map: closure_label -> {free_idx -> reg_idx}
+    // Scoped to this function so REG_CELL_SET only matches closures
+    // make-closure'd in the same function body.
+    std::unordered_map<scm_obj_t, std::unordered_map<int, int>> make_closure_free_reg;
+
     std::unordered_map<scm_obj_t, State> block_entry_states;
     bool changed = true;
     while (changed) {
@@ -1059,6 +1062,19 @@ void codegen_t::phase2_analyze_closure_labels() {
         switch (inst.op) {
           case Opcode::MAKE_CLOSURE:
             current_state.regs[inst.rn1] = inst.opr1;
+            // Record which register each free-variable slot captures, so that
+            // a subsequent reg-cell-set! into that register can propagate the
+            // written label into closure_cell_labels for use in the closure body.
+            {
+              scm_obj_t fi = inst.free_indices;
+              int idx = 0;
+              while (is_cons(fi)) {
+                int reg = parse_reg(cons_car(fi));
+                make_closure_free_reg[inst.opr1][idx] = reg;
+                fi = cons_cdr(fi);
+                idx++;
+              }
+            }
             break;
           case Opcode::CLOSURE_SELF:
             current_state.regs[inst.rn1] = func.label;
@@ -1097,6 +1113,44 @@ void codegen_t::phase2_analyze_closure_labels() {
               }
             }
             break;
+          case Opcode::REG_CELL_SET:
+            // (reg-cell-set! cell-reg value-reg): store value of rn2 into the cell held in rn1
+            {
+              scm_obj_t val_label = current_state.regs.count(inst.rn2) ? current_state.regs[inst.rn2] : scm_nil;
+              current_state.cells[inst.rn1] = val_label;
+              // Propagate into closure_cell_labels only for the letrec self-referential
+              // pattern: (make-closure r0 C (... rN ...) ...) followed by
+              // (make-cell rN) / (reg-cell-set! rN r0).  The cell at free-var
+              // slot k of closure C holds C itself iff val_label == cl_label.
+              if (is_closure_label(val_label)) {
+                auto it = make_closure_free_reg.find(val_label);
+                if (it != make_closure_free_reg.end()) {
+                  for (auto& [free_idx, reg_idx] : it->second) {
+                    if (reg_idx == inst.rn1) {
+                      closure_cell_labels[val_label][free_idx] = val_label;
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          case Opcode::REG_CELL_REF:
+            // (reg-cell-ref dst-reg cell-reg): load from the cell in rn2 into rn1
+            current_state.regs[inst.rn1] = (current_state.cells.count(inst.rn2) ? current_state.cells[inst.rn2] : scm_nil);
+            break;
+          case Opcode::CLOSURE_CELL_REF: {
+            // (closure-cell-ref dst-reg idx): read cell slot idx of the current closure.
+            // If that slot holds a known closure label (populated when the containing
+            // closure was constructed via make-closure + reg-cell-set!), propagate it.
+            int cell_idx = (int)fixnum(inst.opr2);
+            scm_obj_t cl_label = func.label;
+            if (closure_cell_labels.count(cl_label) && closure_cell_labels[cl_label].count(cell_idx)) {
+              current_state.regs[inst.rn1] = closure_cell_labels[cl_label][cell_idx];
+            } else {
+              current_state.regs[inst.rn1] = scm_nil;
+            }
+            break;
+          }
           case Opcode::CALL:
           case Opcode::TAIL_CALL:
             if (current_state.regs.count(inst.rn1)) {
@@ -1136,7 +1190,11 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
   if (!ofs.is_open()) return;
   printer_t printer(ofs);
   for (const auto& inst : instructions) {
-    printer.write(inst.original);
+    if (inst.original == scm_nil) {
+      ofs << "(safepoint)";
+    } else {
+      printer.write(inst.original);
+    }
     if (inst.closure_label != scm_nil) {
       ofs << " ; closure_label: ";
       printer.write(inst.closure_label);

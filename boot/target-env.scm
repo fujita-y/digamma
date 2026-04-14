@@ -4,6 +4,12 @@
 
 (copy-environment-variables! (current-environment) (interaction-environment)
 '(
+zero?
+remainder
+quotient
+exact->inexact
+odd?
+even?
 current-input-port
 current-output-port
 current-error-port
