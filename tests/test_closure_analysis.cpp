@@ -71,7 +71,7 @@ class ClosureAnalysisTest {
     scm_obj_t code = read_code(code_str);
     codegen->phase0_create_module();
     codegen->phase1_parse_instructions(code);
-    codegen->phase2_analyze_closure_labels();
+    codegen->phase2a_analyze_closure_labels();
   }
 
   // Helper to find instruction by opcode

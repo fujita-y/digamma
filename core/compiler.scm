@@ -134,7 +134,11 @@
                    (analyze-max-outgoing-args proc)
                    (fold (lambda (e acc) (max acc (analyze-max-outgoing-args e))) 0 args))))))
         (else
-         (fold (lambda (e acc) (max acc (analyze-max-outgoing-args e))) 0 expr))))
+         (let ((args (cdr expr))
+               (proc (car expr)))
+           (max (length args)
+                (analyze-max-outgoing-args proc)
+                (fold (lambda (e acc) (max acc (analyze-max-outgoing-args e))) 0 args))))))
 
 ;;=============================================================================
 ;; SECTION 5: Compiler Context & Register Helpers

@@ -188,6 +188,19 @@ SUBR subr_time_usage(scm_obj_t self) {
                    make_flonum((double)usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0));
 }
 
+// current-collect-trip-bytes - Nanos extension
+SUBR subr_current_collect_trip_bytes(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  object_heap_t* heap = object_heap_t::current();
+  if (argc == 0) return make_fixnum(heap->m_collect_trip_bytes);
+  if (is_fixnum(argv[0])) {
+    intptr_t val = fixnum(argv[0]);
+    if (val < 0) throw std::runtime_error("current-collect-trip-bytes: argument must be a non-negative integer");
+    heap->m_collect_trip_bytes = (uint64_t)val;
+    return scm_unspecified;
+  }
+  throw std::runtime_error("current-collect-trip-bytes: argument must be a fixnum");
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -216,4 +229,5 @@ void init_subr_misc() {
   reg("tuple?", (void*)subr_tuple_p, 1, 0);
   reg("tuple-ref", (void*)subr_tuple_ref, 2, 0);
   reg("tuple-set!", (void*)subr_tuple_set, 3, 0);
+  reg("current-collect-trip-bytes", (void*)subr_current_collect_trip_bytes, 0, 1);
 }

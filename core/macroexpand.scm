@@ -513,7 +513,7 @@
   (let ((head (cadr expr)))
     (if (pair? head)
         (expand `(define ,(car head) (lambda ,(cdr head) ,@(cddr expr))) m-env s-env r-env marks)
-        `(define ,head ,@(flatten-begins (map-improper (lambda (x) (expand x m-env s-env r-env marks)) (cddr expr)))))))
+        `(define ,head ,(expand (caddr expr) m-env s-env r-env marks)))))
 
 (define (expand-cond expr m-env s-env r-env marks)
   (let ((clauses (cdr expr)))
@@ -524,6 +524,10 @@
                 ((and (pair? (cdr clause)) (core-form? (cadr clause) '=> s-env))
                  (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
                    (expand `(let ((,tmp ,(car clause))) (if ,tmp (,(caddr clause) ,tmp) (cond ,@rest))) m-env s-env r-env marks)))
+                ((null? (cdr clause))
+                 ;; Bare test clause: (cond (test) ...) should return the value of test if truthy
+                 (let ((tmp (rename-symbol 'tmp (fresh-suffix))))
+                   (expand `(let ((,tmp ,(car clause))) (if ,tmp ,tmp (cond ,@rest))) m-env s-env r-env marks)))
                 (else 
                  (expand `(if ,(car clause) ,(make-seq (cdr clause)) (cond ,@rest)) m-env s-env r-env marks)))))))
 

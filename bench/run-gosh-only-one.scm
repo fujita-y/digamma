@@ -1,53 +1,37 @@
-;; ypsilon run-ypsilon.scm
+;; gosh run-gosh.scm
 
 (define warmup #t)
-(define filename "bench.ypsilon.out")
+(define filename "bench.gosh.out")
 
-(import (core) (srfi :6))
+(use gauche.time)
 (add-load-path "./gambit-benchmarks")
-(define undefine (lambda (x) x))
+(define bitwise-and logand)
+(define bitwise-not lognot)
 
 (define output-port (open-output-string))
 
 (define-syntax time
   (syntax-rules ()
     ((_ expr)
-     (destructuring-bind (real-start user-start sys-start) (time-usage)
-       (let ((result (apply (lambda () expr) '())))
-         (destructuring-bind (real-end user-end sys-end) (time-usage)
-           (let ((real (- real-end real-start)) (user (- user-end user-start)) (sys (- sys-end sys-start)))
-             (format #t "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!" real user sys)
-             (format output-port "\t~s~%" real)))
-         result)))))
-
-(define wait-codegen-idle
-  (lambda ()
-    (let loop ()
-      (usleep 100000)
-      (cond ((= (codegen-queue-count) 0))
-            (else (loop))))))
+     (let ((result expr) (time-result (time-this 1 (lambda () expr))))
+       (let ((real (time-result-real time-result))
+             (user (time-result-user time-result))
+             (sys (time-result-sys time-result)))
+         (format #t "~%;;~10,6f real ~11,6f user ~11,6f sys~%" real user sys)
+         (format output-port "\t~s~%" real))
+       result))))
 
 (define (run-benchmark name count ok? run-maker . args)
-  (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
+  (format #t "~%;;  ~a (x~a)" (pad-space name 7) count)
   (format output-port "~s" name)
   (let ((run (apply run-maker args)))
-      (if warmup
-          (begin
-            (run-bench name 1 ok? run)
-            (wait-codegen-idle)))
+      (if warmup (run-bench name 1 ok? run))
       (let ((result (time (run-bench name count ok? run))))
-        (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
-      (format #t ";;  ----------------------------------------------------------------~!")
-      (unspecified)))
+        (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~%" result)))
+      (format #t ";;  ----------------------------------------------------------------")
+      (if #f #f)))
 
-(define call-with-output-file/truncate
-  (lambda (file-name proc)
-    (let ((p (open-file-output-port
-              file-name
-              (file-options no-fail)
-              (buffer-mode block)
-              (native-transcoder))))
-      (call-with-port p proc))))
+(define call-with-output-file/truncate call-with-output-file)
 
 (define fatal-error
   (lambda x
@@ -72,17 +56,13 @@
     (load (string-append name ".scm"))
     (main)))
 
-(define-syntax time-bench
-  (lambda (x)
-    (syntax-case x ()
-      ((?_ name count)
-       (let ((symbolic-name (syntax->datum (syntax name))))
-         (with-syntax ((symbol-iters (datum->syntax #'?_ (string->symbol (format "~a-iters" symbolic-name))))
-                       (string-name (datum->syntax #'?_ (symbol->string symbolic-name))))
-           (syntax
-            (begin
-              (define symbol-iters count)
-              (load-bench-n-run string-name)))))))))
+(define-macro time-bench
+  (lambda (name count)
+    `(begin
+       (define ,(string->symbol (format #f "~a-iters" name)) ,count)
+       (load-bench-n-run ,(symbol->string name)))))
+
+(define (main . x) #f)
 
 (define-syntax FLOATvector-const (syntax-rules () ((_ . lst) (list->vector 'lst))))
 (define-syntax FLOATvector? (syntax-rules () ((_ x) (vector? x))))
@@ -127,57 +107,10 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-#!compatible
-
-(format #t "\n\n;;  Waiting for codegen queue empty ...~%~!")
-(wait-codegen-idle)
-
-(format #t "\n\n;;  GABRIEL\n")
-(time-bench browse 600)
-(time-bench cpstak 80)
-;(time-bench ctak 25)
-(time-bench dderiv 160000)
-(time-bench deriv 320000)
-(time-bench destruc 100)
-(time-bench diviter 200000)
-(time-bench divrec 140000)
-;(time-bench puzzle 24)
-(time-bench tak 1000)
-(time-bench takl 70)
-(time-bench triangl 2)
-
-(format #t "\n\n;;  ARITHMETIC\n")
-(time-bench fft 400)
-(time-bench fib 1)
-;(time-bench fibc 200)
-(time-bench fibfp 1)
-(time-bench mbrot 20)
-(time-bench nucleic 2)
-(time-bench pnpoly 40000)
-(time-bench sum 10000)
-(time-bench sumfp 1200)
-
-(format #t "\n\n;;  MISCELLANEOUS\n")
-(time-bench ack 3)
-(time-bench boyer 10)
-(time-bench nboyer 1)
-(time-bench conform 8)
-(time-bench earley 60)
-(time-bench graphs 20)
-(time-bench mazefun 200)
-(time-bench nqueens 450)
-(time-bench paraffins 100)
-(time-bench peval 20)
-(time-bench ray 1)
-(time-bench scheme 3000)
+(time-bench conform 1)
 
 (newline)
 (newline)
-
-(format #t "JIT code generation statistics~%")
-(display-codegen-statistics)
-(format #t "Heap memory statistics~%")
-(display-heap-statistics)
 
 (if filename
     (call-with-output-file/truncate
@@ -186,3 +119,5 @@
         (format port "~a" (get-output-string output-port)))))
 
 (exit)
+
+; cd bench; gosh run-gosh-only-one.scm

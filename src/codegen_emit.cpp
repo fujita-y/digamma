@@ -212,6 +212,79 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
   // Count free variables
   int nenv = count_list_length(inst.free_indices);
 
+  // -------------------------------------------------------------------------
+  // No-escape fast path: build the scm_closure_rec_t directly on the stack.
+  //
+  // stack_alloc is a strictly stronger property than no_escape: the closure
+  // value never flowed through a heap cell, so the struct cannot be accessed
+  // after the creating frame returns.  We can therefore skip c_make_closure
+  // and lay out the struct inline on the stack frame.
+  // -------------------------------------------------------------------------
+  if (inst.stack_alloc) {
+    // Total byte size: fixed header + nenv slots.
+    // scm_closure_rec_t already has env[1] so we only need (nenv-1) extra slots.
+    int struct_bytes = (int)sizeof(scm_closure_rec_t) + (nenv > 1 ? (nenv - 1) * (int)sizeof(scm_obj_t) : 0);
+
+    // Alloca in the entry block so the lifetime equals the enclosing function call.
+    llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
+    llvm::AllocaInst* raw = TmpB.CreateAlloca(BL.getInt8Ty(), createInt32Constant(CT, struct_bytes), "clo_stack");
+    raw->setAlignment(llvm::Align(8));  // required: low 3 bits of address must be 0 for tagging
+
+    // Fill fields at the current insertion point.
+
+    // 1. tag word  — make_tc6_tag(tc6_closure) = (7<<8)|0x06 = 0x0706
+    BL.CreateStore(createInt64Constant(CT, make_tc6_tag(tc6_closure)), raw);
+
+    // 2. code pointer
+    llvm::Value* code_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CLOSURE_CODE_FIELD_OFFSET);
+    BL.CreateStore(closure_func, code_field);
+
+    // 3. argc
+    llvm::Value* argc_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CLOSURE_ARGC_FIELD_OFFSET);
+    BL.CreateStore(createInt32Constant(CT, inst.argc), argc_field);
+
+    // 4. rest
+    llvm::Value* rest_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CLOSURE_REST_FIELD_OFFSET);
+    BL.CreateStore(createInt32Constant(CT, inst.has_rest ? 1 : 0), rest_field);
+
+    // 5. cdecl = 0  (JIT closures always use the Scheme calling convention)
+    llvm::Value* cdecl_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CLOSURE_CDECL_FIELD_OFFSET);
+    BL.CreateStore(createInt32Constant(CT, 0), cdecl_field);
+
+    // 6. nenv
+    llvm::Value* nenv_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CLOSURE_NENV_FIELD_OFFSET);
+    BL.CreateStore(createInt32Constant(CT, nenv), nenv_field);
+
+    // 7. Free-variable slots
+    scm_obj_t curr = inst.free_indices;
+    for (int i = 0; i < nenv; i++) {
+      int reg_idx = parse_reg(cons_car(curr));
+      llvm::Value* reg_val = get_reg(reg_idx);
+      int slot_offset = CLOSURE_ENV_FIELD_OFFSET + i * (int)sizeof(scm_obj_t);
+      llvm::Value* env_slot = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, slot_offset);
+      BL.CreateStore(reg_val, env_slot);
+      curr = cons_cdr(curr);
+    }
+
+    // 8. Compute tagged scm_obj_t.
+    //    Non-TBI: tagged = ptr | 0x02
+    //    TBI:     tagged = ptr | 0x02 | (tc6_closure << 57)
+    //    The alloca is 8-byte aligned, so low 3 bits of address are 0.
+#if USE_TBI
+    constexpr uint64_t kTagMask = 0x02ULL | ((uint64_t)tc6_closure << 57);
+#else
+    constexpr uint64_t kTagMask = 0x02ULL;
+#endif
+    llvm::Value* raw_int = BL.CreatePtrToInt(raw, BL.getInt64Ty(), "clo_addr");
+    llvm::Value* tagged = BL.CreateOr(raw_int, createInt64Constant(CT, kTagMask), "clo_tagged");
+    set_reg(inst.rn1, tagged);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Heap-allocation path (escaping closures)
+  // -------------------------------------------------------------------------
+
   // Common types
   llvm::Type* intptrTy = this->getInt64Type();
   llvm::Type* voidPtrTy = this->getVoidPtrType();
@@ -692,7 +765,7 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     } else {
       scm_obj_t val = context::environment_variable_ref(inst.closure_label);
       if (val != scm_undef && !is_closure(val)) {
-        throw std::runtime_error("error in codegen: attempt to call a non-procedure");
+        throw std::runtime_error("error in codegen: attempt to call a non-procedure: " + to_string(val));
       }
     }
   }
@@ -1090,8 +1163,8 @@ void codegen_t::emit_closure_set(const Instruction& inst) {
   // Store the value
   BL.CreateStore(val, val_ptr);
 
-  // Write barrier
-  emitWriteBarrier(val);
+  // Write barrier — skipped for no-escape closures (GC cannot observe them)
+  if (!inst.no_escape) emitWriteBarrier(val);
 }
 
 // Load current closure object into register
@@ -1157,8 +1230,8 @@ void codegen_t::emit_closure_cell_set(const Instruction& inst) {
   // Store the value
   BL.CreateStore(val, value_ptr_typed);
 
-  // Write barrier on value being stored
-  emitWriteBarrier(val);
+  // Write barrier — skipped for no-escape closures (GC cannot observe them)
+  if (!inst.no_escape) emitWriteBarrier(val);
 }
 
 // Unbox cell in source register to destination register
@@ -1196,8 +1269,8 @@ void codegen_t::emit_reg_cell_set(const Instruction& inst) {
   // Store value
   BL.CreateStore(val, value_ptr_typed);
 
-  // Write barrier on value being stored
-  emitWriteBarrier(val);
+  // Write barrier — skipped for no-escape closures (GC cannot observe them)
+  if (!inst.no_escape) emitWriteBarrier(val);
 }
 
 // Create a cell from register value and store in the same register

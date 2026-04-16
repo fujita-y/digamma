@@ -34,6 +34,8 @@
     (load (string-append name ".scm"))
     (main)))
 
+(define call-with-output-file/truncate call-with-output-file)
+
 (define fatal-error
   (lambda x
     (display (format "fatal-error: ~s" x))
@@ -115,13 +117,29 @@
 (time-bench takl 70)
 (time-bench triangl 2)
 (display (format "\n\n;;  ARITHMETIC\n"))
+(time-bench fft 400)
 (time-bench fib 1)
+;; (time-bench fibc 200) ;; timeout
 (time-bench fibfp 1)
 (time-bench mbrot 20)
+(time-bench nucleic 2)
+(time-bench pnpoly 40000)
+(time-bench sum 10000)
+(time-bench sumfp 1200)
+
 (display (format "\n\n;;  MISCELLANEOUS\n"))
 (time-bench ack 3)
+(time-bench boyer 10)
+(time-bench nboyer 1)
+(time-bench conform 8)
+(time-bench earley 60)
+(time-bench graphs 20)
+(time-bench mazefun 200)
 (time-bench nqueens 450)
 (time-bench paraffins 100)
+(time-bench peval 20)
+(time-bench ray 1)
+(time-bench scheme 3000)
 
 (newline)
 (newline)

@@ -1,6 +1,12 @@
 ;;; RAY -- Ray-trace a simple scene with spheres, generating a ".pgm" file.
 ;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
 
+;;; without this workaroud,
+;;; intersect is forward reference in this code and nanos compiler capture another proc 
+;;; defined in another code already loaded.
+(undefine 'intersect)
+;;;
+
 (define (make-point x y z)
   (vector x y z))
 

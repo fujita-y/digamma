@@ -132,6 +132,14 @@
         (proc port)
         (let ((result (extract))) (close-port port) result)))))
 
+(define call-with-input-file
+  (lambda (string proc)
+    (call-with-port (open-file-input-port string) proc)))
+
+(define call-with-output-file
+  (lambda (string proc)
+    (call-with-port (open-file-output-port string) proc)))
+
 ;; Tail-recursive filter.
 (define (filter pred lst)
   (let loop ((lst lst) (acc '()))

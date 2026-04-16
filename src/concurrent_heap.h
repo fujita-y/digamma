@@ -14,6 +14,7 @@
 #define MARK_STACK_SIZE_INIT          16384  // 16K object, 64K/128K bytes
 #define MARK_STACK_SIZE_GROW          4096   // 4K object, 16K/32K bytes
 #define SHADE_QUEUE_SIZE              4096   // 4K object, 16K/32K bytes
+#define DEQUEUE_BATCH_COUNT           1024
 
 #define ROOT_SNAPSHOT_MODE_GLOBALS    0
 #define ROOT_SNAPSHOT_MODE_LOCALS     1
@@ -70,7 +71,7 @@ class concurrent_heap_t {
   void write_barrier(void* rhs);
   void safepoint();
 
-  concurrent_queue_t<void*> m_shade_queue;
+  spsc_lockfree_queue_t<void*> m_shade_queue;
   collector_usage_t m_usage;
   cond_t m_mutator_wake;
   cond_t m_collector_wake;

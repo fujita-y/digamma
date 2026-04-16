@@ -172,7 +172,16 @@ void object_heap_t::shade(scm_obj_t obj) {
     return;
   }
   if (!is_heap_object(obj)) return;
-  m_concurrent_heap.shade(to_address(obj));
+  void* addr = to_address(obj);
+  // Stack-allocated closures (from the stack_alloc optimization) have a valid
+  // closure tag but live on the mutator stack, not in the GC pool.  The GC
+  // must not try to trace or mark them — they are kept live by the stack frame
+  // and are guaranteed to be dead before any future GC cycle can reach them.
+  if (!m_concurrent_pool.in_pool(addr)) {
+    assert(is_closure(obj));
+    return;
+  }
+  m_concurrent_heap.shade(addr);
 }
 
 void object_heap_t::trace(void* obj) {
@@ -337,7 +346,12 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
   if (is_cons(obj)) {
     m_concurrent_heap.enqueue_root((void*)obj);
   } else if (is_heap_object(obj)) {
-    m_concurrent_heap.enqueue_root(to_address(obj));
+    void* addr = to_address(obj);
+    if (!m_concurrent_pool.in_pool(addr)) {
+      assert(is_closure(obj));
+      return;  // stack-allocated object — skip
+    }
+    m_concurrent_heap.enqueue_root(addr);
   }
 }
 

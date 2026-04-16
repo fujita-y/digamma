@@ -38,6 +38,7 @@ CTestTestfile.cmake
 vcpkg_installed/
 
 # Misc
+__pycache__
 *.cache
 *.d
 *.sublime-project

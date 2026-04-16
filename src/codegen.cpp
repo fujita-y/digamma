@@ -174,8 +174,9 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
   try {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
-    phase2_analyze_closure_labels();
-    phase3_analyze_safepoints();
+    phase2a_analyze_closure_labels();
+    phase2b_analyze_no_escape();
+    phase2c_analyze_safepoints();
 #ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
@@ -184,10 +185,10 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
       dump_instructions(func.instructions);
     }
 #endif
-    phase4_create_functions();
-    phase5_generate_code();
-    phase6_optimize_and_verify();
-    compiled_code_t code = phase7_finalize();
+    phase3_create_functions();
+    phase4_generate_code();
+    phase5_optimize_and_verify();
+    compiled_code_t code = phase6_finalize();
 
     for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
     gc_protected_objects.clear();
@@ -230,7 +231,7 @@ void codegen_t::phase1_parse_instructions(scm_obj_t inst_list) {
   function_map.clear();
 }
 
-void codegen_t::phase3_analyze_safepoints() {
+void codegen_t::phase2c_analyze_safepoints() {
   for (auto& func : functions) {
     if (func.instructions.empty()) continue;
     bool needs_safepoint = false;
@@ -278,7 +279,7 @@ void codegen_t::phase3_analyze_safepoints() {
 //  Phase 2: Function and BasicBlock creation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase4_create_functions() {
+void codegen_t::phase3_create_functions() {
   // Create the main function and all closure functions
   // The first function in 'functions' is always the main entry point.
   if (functions.empty()) return;
@@ -348,7 +349,7 @@ void codegen_t::phase4_create_functions() {
 //  Phase 3: Code generation
 // --------------------------------------------------------------------------
 
-void codegen_t::phase5_generate_code() {
+void codegen_t::phase4_generate_code() {
   for (auto& info : functions) {
     current_function = info.llvm_function;
     current_function_info = &info;
@@ -431,7 +432,7 @@ void codegen_t::optimize_module(llvm::Module& mod) {
   MPM.run(mod, MAM);
 }
 
-void codegen_t::phase6_optimize_and_verify() {
+void codegen_t::phase5_optimize_and_verify() {
   // Verify all functions first
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
@@ -480,7 +481,7 @@ void codegen_t::phase6_optimize_and_verify() {
 //  Phase 5: Finalize and hand off to JIT
 // --------------------------------------------------------------------------
 
-compiled_code_t codegen_t::phase7_finalize() {
+compiled_code_t codegen_t::phase6_finalize() {
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
@@ -992,7 +993,7 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 //  Analysis and debugging
 // ============================================================================
 
-void codegen_t::phase2_analyze_closure_labels() {
+void codegen_t::phase2a_analyze_closure_labels() {
   struct State {
     std::unordered_map<int, scm_obj_t> regs;   // reg index -> closure label
     std::unordered_map<int, scm_obj_t> cells;  // reg-cell index -> closure label
@@ -1185,6 +1186,345 @@ void codegen_t::phase2_analyze_closure_labels() {
   }
 }
 
+// ============================================================================
+//  Phase 2b: No-escape analysis for MAKE_CLOSURE instructions
+// ============================================================================
+
+// For each MAKE_CLOSURE instruction, determine if the resulting closure object
+// can escape to heap-reachable memory.  A closure is considered non-escaping
+// (no_escape = true) when the closure value never reaches heap-reachable memory.
+//
+// Alias tracking uses three parallel sets:
+//   aliases      — registers currently holding the closure directly
+//   cell_aliases — registers whose pointed-to heap-cell contains the closure
+//   slot_aliases — free-var slot indices of the current closure that contain
+//                  the closure value
+//
+// REG_CELL_SET / CLOSURE_CELL_SET are treated like MOV into a cell:
+//   writing the closure into a cell does NOT immediately escape it.
+//   The closure escapes only when the *cell itself* escapes, i.e., the
+//   cell-register is stored to a global, passed to an unknown callee, or
+//   captured as a free variable of another closure.
+// REG_CELL_REF / CLOSURE_CELL_REF retrieve the value back into aliases.
+//
+// MAKE_CELL rn1: wraps rn1's value in a cell and writes the cell back to rn1;
+//   moves the direct alias from `aliases` into `cell_aliases`.
+//
+// A genuine escape is declared only when:
+//   - RET: r0 holds a direct or cell alias
+//   - GLOBAL_SET: rn1 is a direct or cell alias
+//   - CALL/TAIL_CALL arg: a direct or cell alias appears as a call argument
+//   - MAKE_CLOSURE free-var: a direct or cell alias is captured
+//   - CALL/TAIL_CALL callee: the closure is called through an unknown callee
+//
+// Note: this pass runs after phase2_analyze_closure_labels so that
+// inst.closure_label is already populated for CALL/TAIL_CALL instructions.
+// NOTE: function_map is populated in phase4 (after this pass), so we build
+// our own local_labels set from the parsed functions list instead.
+
+void codegen_t::phase2b_analyze_no_escape() {
+  // Build the set of closure labels compiled in this batch from the already-
+  // parsed functions list.  function_map is not yet populated at this phase.
+  std::unordered_set<scm_obj_t> local_labels;
+  for (const auto& fi : functions) {
+    if (fi.label != scm_nil) local_labels.insert(fi.label);
+  }
+
+  for (auto& func : functions) {
+    const auto& insts = func.instructions;
+    const size_t n = insts.size();
+
+    for (size_t mk = 0; mk < n; ++mk) {
+      auto& mk_inst = func.instructions[mk];
+      if (mk_inst.op != Opcode::MAKE_CLOSURE) continue;
+
+      const int dst = mk_inst.rn1;
+      if (dst < 0) continue;
+
+      std::unordered_set<int> aliases;       // direct register aliases
+      std::unordered_set<int> cell_aliases;  // cell-register aliases
+      std::unordered_set<int> slot_aliases;  // closure free-var slot aliases
+      aliases.insert(dst);
+
+      bool escaped = false;
+      bool cell_aliases_used = false;  // becomes true if closure ever flowed through a heap cell
+      bool tail_called = false;        // becomes true if closure is tail-called from creating frame
+
+      for (size_t i = mk + 1; i < n && !escaped; ++i) {
+        const auto& inst = insts[i];
+
+        // Track when cell_aliases gains an entry (closure stored into a heap cell).
+        size_t prev_cell_count = cell_aliases.size();
+
+        switch (inst.op) {
+          // ---- RET ----------------------------------------------------------
+          case Opcode::RET:
+            // Returns r0; escape if r0 holds the closure or a cell with it.
+            if (aliases.count(0) || cell_aliases.count(0)) {
+              escaped = true;
+            }
+            break;
+
+          // ---- MOV ----------------------------------------------------------
+          case Opcode::MOV: {
+            // Propagate both alias kinds.
+            bool src_direct = inst.rn2 >= 0 && aliases.count(inst.rn2);
+            bool src_cell = inst.rn2 >= 0 && cell_aliases.count(inst.rn2);
+            if (inst.rn1 >= 0) {
+              if (src_direct)
+                aliases.insert(inst.rn1);
+              else
+                aliases.erase(inst.rn1);
+              if (src_cell)
+                cell_aliases.insert(inst.rn1);
+              else
+                cell_aliases.erase(inst.rn1);
+            }
+            break;
+          }
+
+          // ---- MAKE_CELL ----------------------------------------------------
+          case Opcode::MAKE_CELL:
+            // make-cell rn1: wraps rn1's current value in a heap cell and writes
+            // the cell pointer back into rn1.  If rn1 held the closure directly,
+            // it now holds a cell containing the closure.
+            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) {
+              aliases.erase(inst.rn1);
+              cell_aliases.insert(inst.rn1);
+            }
+            break;
+
+          // ---- REG_CELL_SET -------------------------------------------------
+          case Opcode::REG_CELL_SET:
+            // reg-cell-set! rn1(cell-reg) rn2(value):
+            // Stores rn2 into the cell object pointed to by rn1.
+            // This is like MOV into a cell — does NOT immediately escape.
+            // The closure in rn2 flows into the cell held by rn1.
+            if (inst.rn2 >= 0 && aliases.count(inst.rn2)) {
+              if (inst.rn1 >= 0) cell_aliases.insert(inst.rn1);
+              // rn2 still holds the closure value directly (src not consumed).
+            }
+            // reg-cell-set! writes *through* rn1 (the cell pointer) — it does
+            // not overwrite rn1 as a register, so direct aliases in rn1 survive.
+            break;
+
+          // ---- REG_CELL_REF -------------------------------------------------
+          case Opcode::REG_CELL_REF:
+            // reg-cell-ref rn1(dst) rn2(cell-reg):
+            // Loads the cell's contents into rn1.
+            if (inst.rn2 >= 0 && cell_aliases.count(inst.rn2)) {
+              if (inst.rn1 >= 0) aliases.insert(inst.rn1);  // closure retrieved
+            } else {
+              if (inst.rn1 >= 0) aliases.erase(inst.rn1);  // non-closure loaded
+            }
+            break;
+
+          // ---- CLOSURE_CELL_SET ---------------------------------------------
+          case Opcode::CLOSURE_CELL_SET:
+            // closure-cell-set! opr1(slot-idx) rn2(value):
+            // Stores rn2 into free-var slot opr1 of the current closure.
+            // Like MOV into a slot — does NOT immediately escape.
+            if (inst.rn2 >= 0 && aliases.count(inst.rn2)) {
+              slot_aliases.insert((int)fixnum(inst.opr1));
+              // rn2 still holds the closure.
+            }
+            break;
+
+          // ---- CLOSURE_CELL_REF ---------------------------------------------
+          case Opcode::CLOSURE_CELL_REF:
+            // closure-cell-ref rn1(dst) opr2(slot-idx):
+            // Loads free-var slot opr2 into rn1.
+            if (slot_aliases.count((int)fixnum(inst.opr2))) {
+              if (inst.rn1 >= 0) aliases.insert(inst.rn1);
+            } else {
+              if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            }
+            break;
+
+          // ---- GLOBAL_SET ---------------------------------------------------
+          case Opcode::GLOBAL_SET:
+            // Storing a direct alias or a cell-register globally escapes the
+            // closure (directly or via the cell that holds it).
+            if (inst.rn1 >= 0 && (aliases.count(inst.rn1) || cell_aliases.count(inst.rn1))) {
+              escaped = true;
+            }
+            break;
+
+          // ---- MAKE_CLOSURE -------------------------------------------------
+          case Opcode::MAKE_CLOSURE: {
+            // If a direct alias or a cell-reg alias is captured as a free
+            // variable, the closure (or the cell holding it) escapes.
+            scm_obj_t fi = inst.free_indices;
+            while (is_cons(fi)) {
+              int r = parse_reg(cons_car(fi));
+              if (r >= 0 && (aliases.count(r) || cell_aliases.count(r))) {
+                escaped = true;
+                break;
+              }
+              fi = cons_cdr(fi);
+            }
+            // Kill any alias overwritten by this instruction's destination.
+            if (inst.rn1 >= 0) {
+              aliases.erase(inst.rn1);
+              cell_aliases.erase(inst.rn1);
+            }
+            break;
+          }
+
+          // ---- CALL / TAIL_CALL --------------------------------------------
+          case Opcode::CALL:
+          case Opcode::TAIL_CALL: {
+            // The safe-HOF exemption applies ONLY to regular CALL instructions.
+            //
+            // For CALL: the creating frame stays alive while the HOF executes,
+            // so the HOF can safely call back into a stack-allocated closure
+            // argument.
+            //
+            // For TAIL_CALL: the creating frame is released BEFORE the callee
+            // runs, so any stack-allocated closure in an argument position will
+            // be dangling when the callee (even a safe HOF) tries to call it.
+            bool callee_is_safe_hof =
+                inst.op == Opcode::CALL && is_symbol(inst.closure_label) && proc_arg_safe_callees.count(inst.closure_label);
+
+            if (!callee_is_safe_hof) {
+              // If a direct alias or a cell-reg alias appears as a call argument,
+              // the callee may store it on the heap (or call it after frame exits).
+              for (int a = 0; a < inst.argc; ++a) {
+                if (aliases.count(a) || cell_aliases.count(a)) {
+                  if (inst.op == Opcode::TAIL_CALL) {
+                    // Frame exits before callee runs — closure would be dangling.
+                    tail_called = true;
+                  } else {
+                    escaped = true;
+                  }
+                  break;
+                }
+              }
+            }
+            if (escaped) break;
+
+            // Closure used as the callee: non-escaping only if it is a
+            // locally-compiled closure (receives `self`, not heap-stored).
+            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) {
+              bool known_local = is_symbol(inst.closure_label) && local_labels.count(inst.closure_label);
+              if (!known_local) {
+                escaped = true;
+              } else if (inst.op == Opcode::TAIL_CALL) {
+                // A tail-call from the creating frame exits that frame before
+                // the closure runs — a stack-allocated struct would be dangling.
+                tail_called = true;
+              }
+            }
+            // A cell alias in callee position is conservatively an escape.
+            if (!escaped && inst.rn1 >= 0 && cell_aliases.count(inst.rn1)) {
+              escaped = true;
+            }
+
+            // For a regular CALL (not tail-call), the argument registers
+            // r0..r(argc-1) are consumed and r0 is overwritten with the return
+            // value.  Kill any stale closure aliases in those slots so that
+            // subsequent aliases don't propagate a phantom alias from the
+            // return-value register into later instructions.
+            //
+            // Example of the false positive this prevents:
+            //   (mov r0 r5)      ; r0 = closure (r5 already aliased it)
+            //   (call map 2)     ; map(closure, x) — safe HOF, frame stays alive
+            //   (mov r4 r0)      ; WITHOUT this kill: r4 gets stale closure alias
+            //   (tail-call len 1); tail-call with r0 re-loaded from r4 → false tail_called
+            //
+            // Note: for TAIL_CALL the analysis is already done (escaped/tail_called
+            // set above) and the frame no longer matters, so no kill needed there.
+            if (inst.op == Opcode::CALL) {
+              for (int a = 0; a < inst.argc; ++a) {
+                aliases.erase(a);
+                cell_aliases.erase(a);
+              }
+            }
+            break;
+          }
+
+
+
+          // ---- default ------------------------------------------------------
+          default:
+            // Any instruction that writes rn1 kills aliases there.
+            if (inst.rn1 >= 0) {
+              aliases.erase(inst.rn1);
+              cell_aliases.erase(inst.rn1);
+            }
+            break;
+        }
+
+        // If cell_aliases grew this iteration, the closure flowed through a heap cell.
+        if (cell_aliases.size() > prev_cell_count) cell_aliases_used = true;
+      }
+
+      mk_inst.no_escape = !escaped;
+      // stack_alloc requires no_escape AND:
+      //   - closure never flowed through a heap cell (cell_aliases_used = false)
+      //   - closure is not tail-called from the creating frame (tail_called = false)
+      // Both would allow the closure to be accessed after the creating frame exits.
+      mk_inst.stack_alloc = !escaped && !cell_aliases_used && !tail_called;
+    }
+
+    // ----------------------------------------------------------------
+    // Second pass: propagate no_escape from MAKE_CLOSURE to store
+    // instructions so that emit_reg_cell_set / emit_closure_set /
+    // emit_closure_cell_set can skip the write barrier.
+    //
+    // We do a single linear forward sweep per function (conservative:
+    // no loop-back edges are considered, but the typical patterns are
+    // straight-line code generated for let/letrec).  At each point we
+    // maintain the set of registers that currently hold (directly or via
+    // MOV) a value produced by a no_escape MAKE_CLOSURE.
+    // ----------------------------------------------------------------
+    {
+      std::unordered_set<int> no_escape_regs;
+
+      for (auto& inst : func.instructions) {
+        switch (inst.op) {
+          case Opcode::MAKE_CLOSURE:
+            if (inst.no_escape && inst.rn1 >= 0)
+              no_escape_regs.insert(inst.rn1);
+            else if (inst.rn1 >= 0)
+              no_escape_regs.erase(inst.rn1);
+            break;
+
+          case Opcode::MOV:
+            // Propagate through copies.
+            if (inst.rn1 >= 0) {
+              if (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2))
+                no_escape_regs.insert(inst.rn1);
+              else
+                no_escape_regs.erase(inst.rn1);
+            }
+            break;
+
+          case Opcode::REG_CELL_SET:
+            // rn2 is the value being stored into the cell held by rn1.
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            break;
+
+          case Opcode::CLOSURE_SET:
+            // rn2 is the value being stored into the current closure's env slot.
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            break;
+
+          case Opcode::CLOSURE_CELL_SET:
+            // rn2 is the value being stored into a cell slot of the current closure.
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            break;
+
+          default:
+            // Any instruction that writes rn1 kills the tracking for that register.
+            if (inst.rn1 >= 0) no_escape_regs.erase(inst.rn1);
+            break;
+        }
+      }
+    }
+  }
+}
+
 void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) {
   std::ofstream ofs("/tmp/nanos.ins", std::ios::app);
   if (!ofs.is_open()) return;
@@ -1198,6 +1538,12 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
     if (inst.closure_label != scm_nil) {
       ofs << " ; closure_label: ";
       printer.write(inst.closure_label);
+    }
+    if (inst.op == Opcode::MAKE_CLOSURE) {
+      ofs << " ; no_escape: " << (inst.no_escape ? "true" : "false") << " ; stack_alloc: " << (inst.stack_alloc ? " true" : "false");
+    }
+    if (inst.op == Opcode::CLOSURE_SET || inst.op == Opcode::CLOSURE_CELL_SET || inst.op == Opcode::REG_CELL_SET) {
+      ofs << " ; no_escape: " << (inst.no_escape ? "true" : "false");
     }
     ofs << "\n";
   }

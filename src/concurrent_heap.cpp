@@ -10,6 +10,8 @@
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
+#include <time.h>
+
 #define DEBUG_CONCURRENT_COLLECT 0
 #define ENSURE_REALTIME          (5.0)  // in msec (1.0 == 0.001sec)
 #define TIMEOUT_CHECK_EACH       (500)
@@ -350,7 +352,10 @@ fallback:
     if (GCSLABP(m_concurrent_pool->m_pool[i])) {
       if (SLAB_TRAITS_OF(slab)->owner == NULL) {
         GCTRACE(";; [collector: wait for mutator complete slab init]\n");
-        sched_yield();
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 1;
+        nanosleep(&ts, NULL);
         continue;
       }
       debug_check_slab(slab);
@@ -429,10 +434,9 @@ void concurrent_heap_t::concurrent_mark() {
   m_collector_lock.unlock();
   do {
     while (true) {
-      void* obj;
-      if (m_shade_queue.try_get(&obj)) shade(obj);
+      dequeue_root();
       if (m_mark_sp == m_mark_stack) break;
-      obj = *--m_mark_sp;
+      void* obj = *--m_mark_sp;
       trace(obj);
     }
   } while (m_shade_queue.count());
@@ -497,10 +501,11 @@ void concurrent_heap_t::interior_shade(void* ref) {
 
 // Run on collector thread
 void concurrent_heap_t::dequeue_root() {
-  void* obj;
-  while (m_shade_queue.count()) {
-    m_shade_queue.get(&obj);
-    shade(obj);
+  void* batch[DEQUEUE_BATCH_COUNT];
+  while (true) {
+    int n = m_shade_queue.batch_get(batch, array_sizeof(batch));
+    if (n == 0) break;
+    for (int i = 0; i < n; i++) shade(batch[i]);
   }
 }
 
@@ -509,7 +514,7 @@ void concurrent_heap_t::enqueue_root(void* obj) {
   assert(m_stop_the_world);
   if (SLAB_DATUM_BITS_TEST(obj)) {
     if (m_concurrent_pool->in_pool(obj)) {
-      while (m_shade_queue.wait_lock_try_put(obj) == false) {
+      while (m_shade_queue.try_put(obj) == false) {
         m_collector_lock.lock();
         m_collector_wake.signal();
         m_mutator_wake.wait(m_collector_lock);
@@ -529,7 +534,7 @@ void concurrent_heap_t::write_barrier(void* rhs) {
     if (SLAB_DATUM_BITS_TEST(rhs)) {
       if (m_concurrent_pool->in_pool(rhs)) {
         if (SLAB_TRAITS_OF(rhs)->owner->state(rhs) == false) {
-          while (m_shade_queue.wait_lock_try_put(rhs) == false) {
+          while (m_shade_queue.try_put(rhs) == false) {
             if (SLAB_TRAITS_OF(rhs)->owner->state(rhs)) break;
             if (m_stop_the_world) {
               GCTRACE(";; [write-barrier: m_shade_queue overflow, during stop-the-world]\n");
@@ -538,8 +543,11 @@ void concurrent_heap_t::write_barrier(void* rhs) {
               m_mutator_wake.wait(m_collector_lock);
               m_collector_lock.unlock();
             } else {
-              GCTRACE(";; [write-barrier: m_shade_queue overflow, mutator sched_yield]\n");
-              sched_yield();
+              GCTRACE(";; [write-barrier: m_shade_queue overflow, mutator nanosleep]\n");
+              struct timespec ts;
+              ts.tv_sec = 0;
+              ts.tv_nsec = 1;
+              nanosleep(&ts, NULL);
             }
             m_usage.m_shade_queue_hazard++;
           }

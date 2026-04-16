@@ -195,7 +195,21 @@
                (let ((new-s (append vars s)))
                  (for-each (lambda (b) (walk (cadr b) lambda-depth new-s lbound)) (cadr e))
                  (for-each (lambda (be) (walk be lambda-depth new-s lbound)) (cddr e)))))
-            (else (for-each (lambda (be) (walk be lambda-depth s lbound)) e))))
+            (else
+             ;; For non-pure user-defined function calls, conservatively mark all
+             ;; direct symbol arguments as structurally mutated. A call like
+             ;; (conf-set-merge-new! conf-set) may mutate objects referenced by
+             ;; its arguments internally (e.g. via vector-set!). Without this,
+             ;; bindings like (head (vector-ref conf-set 4)) could be incorrectly
+             ;; inlined past such calls, reading the post-mutation value instead.
+             (when (and (pair? e)
+                        (symbol? (car e))
+                        (not (memq (car e) pure-primitives)))
+               (for-each (lambda (be)
+                           (when (and (symbol? be) (not (memq be lbound)))
+                             (hashtable-set! mutated be #t)))
+                         (cdr e)))
+             (for-each (lambda (be) (walk be lambda-depth s lbound)) e))))
     (values (map car (hashtable->alist mutated)) usage)))
 
 (define (has-effects? expr)
@@ -237,22 +251,30 @@
 ;;=============================================================================
 
 (define (substitute-proc expr var val)
-  (cond ((not (pair? expr)) expr)
-        ((eq? (car expr) 'quote) expr)
-        ((eq? (car expr) 'lambda)
-         (if (memq var (flatten-params-opt (cadr expr)))
-             expr
-             `(lambda ,(cadr expr) ,@(map (lambda (e) (substitute-proc e var val)) (cddr expr)))))
-        ((eq? (car expr) 'letrec*)
-         (let* ((vars (map car (cadr expr))))
-           (if (memq var vars)
-               expr
-               `(letrec* ,(map (lambda (b) (list (car b) (substitute-proc (cadr b) var val))) (cadr expr))
-                  ,@(map (lambda (e) (substitute-proc e var val)) (cddr expr))))))
-        ((eq? (car expr) var)
-         (cons val (map (lambda (e) (substitute-proc e var val)) (cdr expr))))
-        (else
-         (map (lambda (e) (substitute-proc e var val)) expr))))
+  ; Precompute free variables of val to avoid capture checks repeatedly
+  (let ((val-fvs (analyze-free-vars-optimizer val '())))
+    (let recur ((expr expr))
+      (cond ((eq? expr var) val)
+            ((not (pair? expr)) expr)
+            ((eq? (car expr) 'quote) expr)
+            ((eq? (car expr) 'lambda)
+             ; Stop if var is shadowed OR if val's free vars would be captured
+             (let ((params (flatten-params-opt (cadr expr))))
+               (if (or (memq var params)
+                       (any (lambda (fv) (memq fv params)) val-fvs))
+                   expr
+                   `(lambda ,(cadr expr) ,@(map recur (cddr expr))))))
+            ((eq? (car expr) 'letrec*)
+             (let ((vars (map car (cadr expr))))
+               (if (or (memq var vars)
+                       (any (lambda (fv) (memq fv vars)) val-fvs))
+                   expr
+                   `(letrec* ,(map (lambda (b) (list (car b) (recur (cadr b)))) (cadr expr))
+                      ,@(map recur (cddr expr))))))
+            ((eq? (car expr) var)
+             (cons val (map recur (cdr expr))))
+            (else
+             (map recur expr))))))
 
 (define (substitute-many expr mapping)
   (if (null? mapping)
@@ -261,19 +283,32 @@
             ((not (pair? expr)) expr)
             ((eq? (car expr) 'quote) expr)
             ((eq? (car expr) 'lambda)
-             (let* ((params (cadr expr))
-                    (new-mapping (filter (lambda (p) (not (memq (car p) (flatten-params-opt params)))) mapping)))
-               `(lambda ,params ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
+             ; Filter: remove mappings whose key is shadowed OR whose val fvs would be captured
+             (let* ((params (flatten-params-opt (cadr expr)))
+                    (new-mapping (filter (lambda (p)
+                                          (and (not (memq (car p) params))
+                                               (not (any (lambda (fv) (memq fv params))
+                                                         (analyze-free-vars-optimizer (cdr p) '())))))
+                                        mapping)))
+               `(lambda ,(cadr expr) ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
             ((eq? (car expr) 'let)
              (let* ((bindings (cadr expr))
                     (vars (map car bindings))
-                    (new-mapping (filter (lambda (p) (not (memq (car p) vars))) mapping)))
+                    (new-mapping (filter (lambda (p)
+                                          (and (not (memq (car p) vars))
+                                               (not (any (lambda (fv) (memq fv vars))
+                                                         (analyze-free-vars-optimizer (cdr p) '())))))
+                                        mapping)))
                `(let ,(map (lambda (b) (list (car b) (substitute-many (cadr b) mapping))) bindings)
                   ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
             ((eq? (car expr) 'letrec*)
              (let* ((bindings (cadr expr))
                     (vars (map car bindings))
-                    (new-mapping (filter (lambda (p) (not (memq (car p) vars))) mapping)))
+                    (new-mapping (filter (lambda (p)
+                                          (and (not (memq (car p) vars))
+                                               (not (any (lambda (fv) (memq fv vars))
+                                                         (analyze-free-vars-optimizer (cdr p) '())))))
+                                        mapping)))
                `(letrec* ,(map (lambda (b) (list (car b) (substitute-many (cadr b) new-mapping))) bindings)
                   ,@(map (lambda (e) (substitute-many e new-mapping)) (cddr expr)))))
             (else (map (lambda (e) (substitute-many e mapping)) expr)))))
@@ -371,7 +406,7 @@
                                  (if (has-effects? val) (set! new-bind (cons b new-bind))))
                                 ((and (not (memq var mutated)) (pair? val) (eq? (car val) 'lambda) (and (pair? (car body)) (eq? (car (car body)) 'if)))
                                  (let ((res (try-drop-lambda var val (car body))))
-                                   (if (car res) (set! body (list (cdr res))) (set! new-bind (cons b new-bind)))))
+                                   (if (car res) (set! body (cons (cdr res) (cdr body))) (set! new-bind (cons b new-bind)))))
                                 ((or (> count 0) (memq var mutated) (has-effects? val))
                                  (set! new-bind (cons b new-bind))))))
                       main)

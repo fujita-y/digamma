@@ -61,6 +61,16 @@ struct Instruction {
   bool has_rest = false;
   scm_obj_t free_indices = scm_nil;
   scm_obj_t closure_label = scm_nil;
+  // For MAKE_CLOSURE: true if the closure cannot escape to heap-reachable memory,
+  // i.e. it is only used directly as a callee within the same compile unit and
+  // is never stored to globals, cells, or passed as a non-callee argument.
+  // Used to elide write barriers on stores of this closure's value.
+  bool no_escape = false;
+  // Stronger than no_escape: the closure value never flowed through a heap cell
+  // (cell_aliases stayed empty during the escape scan).  Safe to stack-allocate
+  // because the struct cannot be accessed after the creating frame returns.
+  bool stack_alloc = false;
+
 };
 
 // ============================================================================
@@ -163,6 +173,11 @@ class codegen_t {
   std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
   std::unordered_map<void*, int> tc6_code_map;
   std::unordered_set<void*> no_gc_code_set;
+  // Symbols of known higher-order functions that call their closure arguments
+  // but never store them on the heap.  Used by phase2b_analyze_no_escape to
+  // avoid falsely marking a closure as escaped when it is only passed to one
+  // of these safe callees.
+  std::unordered_set<scm_obj_t> proc_arg_safe_callees;
 
   std::vector<scm_obj_t> gc_protected_objects;
 
@@ -181,12 +196,13 @@ class codegen_t {
 
   void phase0_create_module();
   void phase1_parse_instructions(scm_obj_t inst_list);
-  void phase3_analyze_safepoints();
-  void phase2_analyze_closure_labels();
-  void phase4_create_functions();
-  void phase5_generate_code();
-  void phase6_optimize_and_verify();
-  compiled_code_t phase7_finalize();
+  void phase2a_analyze_closure_labels();
+  void phase2b_analyze_no_escape();
+  void phase2c_analyze_safepoints();
+  void phase3_create_functions();
+  void phase4_generate_code();
+  void phase5_optimize_and_verify();
+  compiled_code_t phase6_finalize();
   void optimize_module(llvm::Module& mod);
   void reset_compile_state();
 

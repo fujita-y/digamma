@@ -1,13 +1,7 @@
-;; ypsilon run-ypsilon.scm
+(import-module (core))
+(add-load-path "~/github/digamma/bench/gambit-benchmarks")
 
 (define warmup #t)
-(define filename "bench.ypsilon.out")
-
-(import (core) (srfi :6))
-(add-load-path "./gambit-benchmarks")
-(define undefine (lambda (x) x))
-
-(define output-port (open-output-string))
 
 (define-syntax time
   (syntax-rules ()
@@ -16,50 +10,8 @@
        (let ((result (apply (lambda () expr) '())))
          (destructuring-bind (real-end user-end sys-end) (time-usage)
            (let ((real (- real-end real-start)) (user (- user-end user-start)) (sys (- sys-end sys-start)))
-             (format #t "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!" real user sys)
-             (format output-port "\t~s~%" real)))
-         result)))))
-
-(define wait-codegen-idle
-  (lambda ()
-    (let loop ()
-      (usleep 100000)
-      (cond ((= (codegen-queue-count) 0))
-            (else (loop))))))
-
-(define (run-benchmark name count ok? run-maker . args)
-  (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
-  (format output-port "~s" name)
-  (let ((run (apply run-maker args)))
-      (if warmup
-          (begin
-            (run-bench name 1 ok? run)
-            (wait-codegen-idle)))
-      (let ((result (time (run-bench name count ok? run))))
-        (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~!" result)))
-      (format #t ";;  ----------------------------------------------------------------~!")
-      (unspecified)))
-
-(define call-with-output-file/truncate
-  (lambda (file-name proc)
-    (let ((p (open-file-output-port
-              file-name
-              (file-options no-fail)
-              (buffer-mode block)
-              (native-transcoder))))
-      (call-with-port p proc))))
-
-(define fatal-error
-  (lambda x
-    (format #t "fatal-error: ~s" x)
-    (exit)))
-
-(define pad-space
-  (lambda (str n)
-    (let ((pad (- n (string-length str))))
-      (if (<= pad 0)
-          str
-          (string-append str (make-string pad #\space))))))
+             (display (format "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!" real user sys))
+             result)))))))
 
 (define (run-bench name count ok? run)
   (let loop ((i 0) (result (list 'undefined)))
@@ -67,10 +19,34 @@
         (loop (+ i 1) (run))
         result)))
 
+(define (run-benchmark name count ok? run-maker . args)
+  (display (format "~%;;  ~a (x~a)~%~!" (pad-space name 7) count))
+  (let ((run (apply run-maker args)))
+      (if warmup
+          (run-bench name 1 ok? run))
+      (let ((result (time (run-bench name count ok? run))))
+        (and (not (ok? result)) (display (format "~%;; wrong result: ~s~%~!" result))))
+      (display (format ";;  ----------------------------------------------------------------~!"))
+      (unspecified)))
+
 (define load-bench-n-run
   (lambda (name)
     (load (string-append name ".scm"))
     (main)))
+
+(define call-with-output-file/truncate call-with-output-file)
+
+(define fatal-error
+  (lambda x
+    (display (format "fatal-error: ~s" x))
+    (exit 1)))
+
+(define pad-space
+  (lambda (str n)
+    (let ((pad (- n (string-length str))))
+      (if (<= pad 0)
+          str
+          (string-append str " "))))) ;(make-string pad #\space))))))
 
 (define-syntax time-bench
   (lambda (x)
@@ -127,62 +103,11 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-#!compatible
-
-(format #t "\n\n;;  Waiting for codegen queue empty ...~%~!")
-(wait-codegen-idle)
-
-(format #t "\n\n;;  GABRIEL\n")
-(time-bench browse 600)
-(time-bench cpstak 80)
-;(time-bench ctak 25)
-(time-bench dderiv 160000)
-(time-bench deriv 320000)
-(time-bench destruc 100)
-(time-bench diviter 200000)
-(time-bench divrec 140000)
-;(time-bench puzzle 24)
-(time-bench tak 1000)
-(time-bench takl 70)
-(time-bench triangl 2)
-
-(format #t "\n\n;;  ARITHMETIC\n")
-(time-bench fft 400)
-(time-bench fib 1)
-;(time-bench fibc 200)
-(time-bench fibfp 1)
-(time-bench mbrot 20)
-(time-bench nucleic 2)
-(time-bench pnpoly 40000)
-(time-bench sum 10000)
-(time-bench sumfp 1200)
-
-(format #t "\n\n;;  MISCELLANEOUS\n")
-(time-bench ack 3)
-(time-bench boyer 10)
-(time-bench nboyer 1)
-(time-bench conform 8)
-(time-bench earley 60)
-(time-bench graphs 20)
-(time-bench mazefun 200)
-(time-bench nqueens 450)
-(time-bench paraffins 100)
-(time-bench peval 20)
-(time-bench ray 1)
-(time-bench scheme 3000)
+(time-bench conform 1)
 
 (newline)
 (newline)
-
-(format #t "JIT code generation statistics~%")
-(display-codegen-statistics)
-(format #t "Heap memory statistics~%")
-(display-heap-statistics)
-
-(if filename
-    (call-with-output-file/truncate
-      filename
-      (lambda (port)
-        (format port "~a" (get-output-string output-port)))))
 
 (exit)
+
+; cd bench; ../build/nanos --script run-nanos-only-one.scm

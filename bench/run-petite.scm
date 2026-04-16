@@ -4,6 +4,7 @@
 (define filename "bench.petite.out")
 
 (source-directories '("./gambit-benchmarks"))
+(define undefine (lambda (x) x))
 
 (define output-port (open-output-string))
 

@@ -341,6 +341,42 @@ SUBR subr_exact_to_inexact(scm_obj_t self, scm_obj_t a1) {
   }
 }
 
+SUBR subr_inexact_to_exact(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) return a1;
+  if (is_flonum(a1)) {
+    return make_fixnum((intptr_t)std::round(flonum(a1)));
+  }
+  throw std::runtime_error("inexact->exact: number expected");
+}
+
+SUBR subr_positive_p(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) {
+    return fixnum(a1) > 0 ? scm_true : scm_false;
+  } else if (is_flonum(a1)) {
+    return flonum(a1) > 0.0 ? scm_true : scm_false;
+  } else {
+    throw std::runtime_error("positive?: number expected");
+  }
+}
+
+SUBR subr_negative_p(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) {
+    return fixnum(a1) < 0 ? scm_true : scm_false;
+  } else if (is_flonum(a1)) {
+    return flonum(a1) < 0.0 ? scm_true : scm_false;
+  } else {
+    throw std::runtime_error("negative?: number expected");
+  }
+}
+
+SUBR subr_round(scm_obj_t self, scm_obj_t a1) {
+  if (is_fixnum(a1)) return a1;
+  if (is_flonum(a1)) {
+    return make_flonum(std::round(flonum(a1)));
+  }
+  throw std::runtime_error("round: number expected");
+}
+
 SUBR subr_odd_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return (fixnum(a1) & 1) ? scm_true : scm_false;
   throw std::runtime_error("odd?: integer expected");
@@ -349,6 +385,32 @@ SUBR subr_odd_p(scm_obj_t self, scm_obj_t a1) {
 SUBR subr_even_p(scm_obj_t self, scm_obj_t a1) {
   if (is_fixnum(a1)) return (fixnum(a1) & 1) == 0 ? scm_true : scm_false;
   throw std::runtime_error("even?: integer expected");
+}
+
+SUBR subr_sqrt(scm_obj_t self, scm_obj_t a1) { return make_flonum(std::sqrt(val_double(a1))); }
+
+SUBR subr_sin(scm_obj_t self, scm_obj_t a1) { return make_flonum(std::sin(val_double(a1))); }
+
+SUBR subr_cos(scm_obj_t self, scm_obj_t a1) { return make_flonum(std::cos(val_double(a1))); }
+
+SUBR subr_tan(scm_obj_t self, scm_obj_t a1) { return make_flonum(std::tan(val_double(a1))); }
+
+SUBR subr_atan(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc == 1) return make_flonum(std::atan(val_double(argv[0])));
+  if (argc == 2) return make_flonum(std::atan2(val_double(argv[0]), val_double(argv[1])));
+  throw std::runtime_error("atan: 1 or 2 arguments expected");
+}
+
+SUBR subr_modulo(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  if (!is_fixnum(a1) || !is_fixnum(a2)) {
+    throw std::runtime_error("modulo: integers expected");
+  }
+  intptr_t v1 = fixnum(a1);
+  intptr_t v2 = fixnum(a2);
+  if (v2 == 0) throw std::runtime_error("modulo: division by zero");
+  intptr_t r = v1 % v2;
+  if (r != 0 && (r ^ v2) < 0) r += v2;
+  return make_fixnum(r);
 }
 
 // ============================================================================
@@ -376,6 +438,16 @@ void init_subr_arith() {
   reg("remainder", (void*)subr_remainder, 2, 0);
   reg("quotient", (void*)subr_quotient, 2, 0);
   reg("exact->inexact", (void*)subr_exact_to_inexact, 1, 0);
+  reg("inexact->exact", (void*)subr_inexact_to_exact, 1, 0);
+  reg("positive?", (void*)subr_positive_p, 1, 0);
+  reg("negative?", (void*)subr_negative_p, 1, 0);
+  reg("round", (void*)subr_round, 1, 0);
   reg("odd?", (void*)subr_odd_p, 1, 0);
   reg("even?", (void*)subr_even_p, 1, 0);
+  reg("sqrt", (void*)subr_sqrt, 1, 0);
+  reg("sin", (void*)subr_sin, 1, 0);
+  reg("cos", (void*)subr_cos, 1, 0);
+  reg("tan", (void*)subr_tan, 1, 0);
+  reg("atan", (void*)subr_atan, 1, 1);
+  reg("modulo", (void*)subr_modulo, 2, 0);
 }

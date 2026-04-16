@@ -201,4 +201,54 @@ void codegen_t::init_opcode_map() {
   no_gc_code_set.insert((void*)subr_cdddadr);
   no_gc_code_set.insert((void*)subr_cddddar);
   no_gc_code_set.insert((void*)subr_cdddddr);
+
+  // Higher-order functions that call their closure argument(s) but never store
+  // them on the heap.  A closure passed to any of these as an argument is
+  // therefore non-escaping from the GC's perspective.
+  //
+  // Inclusion criteria:
+  //   - The function applies its proc/predicate/comparator argument to list /
+  //     vector / string elements without retaining it beyond the call.
+  //   - Notably excluded: call/cc (continuation captures the stack),
+  //     dynamic-wind (stores thunks in the dynamic-wind record).
+  //
+  // R7RS list / vector / string traversal
+  auto intern_safe = [&](const char* name) {
+    scm_obj_t sym = make_symbol(name);
+    if (!context::is_gc_protected(sym)) context::gc_protect(sym);
+    proc_arg_safe_callees.insert(sym);
+  };
+
+  intern_safe("map");
+  intern_safe("for-each");
+  intern_safe("filter");
+  intern_safe("filter-map");    // SRFI-1
+  intern_safe("partition");
+  intern_safe("remove");
+  intern_safe("find");
+  intern_safe("for-all");       // SRFI-1 / R7RS-small
+  intern_safe("every");         // SRFI-1 alias
+  intern_safe("exists");        // SRFI-1 / R7RS-large
+  intern_safe("any");           // SRFI-1 alias
+  intern_safe("fold");          // SRFI-1
+  intern_safe("fold-right");    // SRFI-1
+  intern_safe("fold-left");     // R7RS-large / SRFI-1
+  intern_safe("reduce");        // SRFI-1
+  intern_safe("reduce-right");  // SRFI-1
+  intern_safe("count");         // SRFI-1
+  intern_safe("append-map");    // SRFI-1
+  intern_safe("flat-map");      // common alias
+  intern_safe("filter-fold");
+  intern_safe("list-sort");     // R7RS / SRFI-132
+  intern_safe("sort");          // common
+  intern_safe("sort!");         // in-place sort — predicate not stored
+  intern_safe("vector-map");    // R7RS
+  intern_safe("vector-for-each"); // R7RS
+  intern_safe("string-for-each"); // R7RS
+  intern_safe("string-map");      // R7RS
+  intern_safe("vector-sort");     // SRFI-132
+  intern_safe("vector-sort!");    // SRFI-132
+  intern_safe("vector-stable-sort");   // SRFI-132
+  intern_safe("vector-stable-sort!"); // SRFI-132
+  intern_safe("iota");          // SRFI-1 (no proc, but harmless)
 }

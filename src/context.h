@@ -50,11 +50,19 @@ class scoped_gc_protect {
   scoped_gc_protect(const scoped_gc_protect&) = delete;
   scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
   scm_obj_t m_obj;
+  bool m_protected;
 
  public:
-  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { context::gc_protect(obj); }
+  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) {
+    if (context::is_gc_protected(obj)) {
+      m_protected = false;
+    } else {
+      context::gc_protect(obj);
+      m_protected = true;
+    }
+  }
   ~scoped_gc_protect() {
-    context::gc_unprotect(m_obj);
+    if (m_protected) context::gc_unprotect(m_obj);
     m_obj = (scm_obj_t) nullptr;
   }
 };
@@ -62,14 +70,26 @@ class scoped_gc_protect {
 class scoped_gc_protect_vector {
   scoped_gc_protect_vector(const scoped_gc_protect_vector&) = delete;
   scoped_gc_protect_vector& operator=(const scoped_gc_protect_vector&) = delete;
-  std::vector<scm_obj_t> m_objs;
+  std::vector<scm_obj_t> m_obj_vec;
+  std::vector<bool> m_protected_vec;
 
  public:
-  scoped_gc_protect_vector(const std::vector<scm_obj_t>& objs) : m_objs(objs) {
-    for (scm_obj_t obj : m_objs) context::gc_protect(obj);
+  scoped_gc_protect_vector(const std::vector<scm_obj_t>& objs) : m_obj_vec(objs) {
+    for (scm_obj_t obj : m_obj_vec) {
+      if (context::is_gc_protected(obj)) {
+        m_protected_vec.push_back(false);
+      } else {
+        context::gc_protect(obj);
+        m_protected_vec.push_back(true);
+      }
+    }
   }
   ~scoped_gc_protect_vector() {
-    for (scm_obj_t obj : m_objs) context::gc_unprotect(obj);
+    for (size_t i = 0; i < m_obj_vec.size(); ++i) {
+      if (m_protected_vec[i]) {
+        context::gc_unprotect(m_obj_vec[i]);
+      }
+    }
   }
 };
 

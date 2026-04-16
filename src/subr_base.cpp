@@ -474,7 +474,7 @@ SUBR subr_vector_length(scm_obj_t self, scm_obj_t a1) {
 
 // vector-ref  - R6RS 11.13
 SUBR subr_vector_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  if (!is_vector(a1)) throw std::runtime_error("vector-ref: first argument must be a vector");
+  if (!is_vector(a1)) throw std::runtime_error("vector-ref: first argument must be a vector: " + to_string(a1) + " " + to_string(a2));
   if (!is_fixnum(a2)) throw std::runtime_error("vector-ref: second argument must be an exact integer");
   intptr_t n = fixnum(a2);
   int sz = vector_nsize(a1);
@@ -529,10 +529,71 @@ SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 }
 
 // string=?  - R6RS 11.12
-SUBR subr_string_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  if (!is_string(a1)) throw std::runtime_error("string=?: arguments must be strings");
-  if (!is_string(a2)) throw std::runtime_error("string=?: arguments must be strings");
-  return strcmp((const char*)string_name(a1), (const char*)string_name(a2)) == 0 ? scm_true : scm_false;
+SUBR subr_string_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string=?: arguments must be strings");
+  const char* first = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string=?: arguments must be strings");
+    if (strcmp(first, (const char*)string_name(argv[i])) != 0) return scm_false;
+  }
+  return scm_true;
+}
+
+// string<?  - R6RS 11.12
+SUBR subr_string_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string<?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string<?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string<?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcmp(prev, cur) >= 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string>?  - R6RS 11.12
+SUBR subr_string_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string>?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string>?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string>?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcmp(prev, cur) <= 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string<=?  - R6RS 11.12
+SUBR subr_string_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string<=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string<=?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string<=?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcmp(prev, cur) > 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string>=?  - R6RS 11.12
+SUBR subr_string_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string>=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string>=?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string>=?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcmp(prev, cur) < 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
 }
 
 // string-append  - R6RS 11.12
@@ -669,9 +730,71 @@ SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]) {
 static inline uint32_t char_ucs4(scm_obj_t x) { return (uint32_t)((uintptr_t)x >> 32); }
 
 // char=?  - R6RS 11.11
-SUBR subr_char_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  if (!is_char(a1) || !is_char(a2)) throw std::runtime_error("char=?: arguments must be characters");
-  return char_ucs4(a1) == char_ucs4(a2) ? scm_true : scm_false;
+SUBR subr_char_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char=?: arguments must be characters");
+  uint32_t first = char_ucs4(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char=?: arguments must be characters");
+    if (char_ucs4(argv[i]) != first) return scm_false;
+  }
+  return scm_true;
+}
+
+// char<?  - R6RS 11.11
+SUBR subr_char_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char<?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char<?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char<?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (prev >= cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char>?  - R6RS 11.11
+SUBR subr_char_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char>?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char>?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char>?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (prev <= cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char<=?  - R6RS 11.11
+SUBR subr_char_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char<=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char<=?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char<=?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (prev > cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char>=?  - R6RS 11.11
+SUBR subr_char_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char>=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char>=?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char>=?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (prev < cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
 }
 
 // char-numeric?  - R6RS 11.11
@@ -679,6 +802,276 @@ SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1) {
   if (!is_char(a1)) throw std::runtime_error("char-numeric?: argument must be a character");
   uint32_t c = char_ucs4(a1);
   return (c >= '0' && c <= '9') ? scm_true : scm_false;
+}
+
+// char-alphabetic?  - R6RS 11.11
+SUBR subr_char_alphabetic_p(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-alphabetic?: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) ? scm_true : scm_false;
+}
+
+// char-whitespace?  - R6RS 11.11
+SUBR subr_char_whitespace_p(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-whitespace?: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  return (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') ? scm_true : scm_false;
+}
+
+// char-upper-case?  - R6RS 11.11
+SUBR subr_char_upper_case_p(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-upper-case?: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  return (c >= 'A' && c <= 'Z') ? scm_true : scm_false;
+}
+
+// char-lower-case?  - R6RS 11.11
+SUBR subr_char_lower_case_p(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-lower-case?: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  return (c >= 'a' && c <= 'z') ? scm_true : scm_false;
+}
+
+// char->integer  - R6RS 11.11
+SUBR subr_char_to_integer(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char->integer: argument must be a character");
+  return make_fixnum((intptr_t)char_ucs4(a1));
+}
+
+// integer->char  - R6RS 11.11
+SUBR subr_integer_to_char(scm_obj_t self, scm_obj_t a1) {
+  if (!is_fixnum(a1)) throw std::runtime_error("integer->char: argument must be an exact non-negative integer");
+  intptr_t n = fixnum(a1);
+  if (n < 0) throw std::runtime_error("integer->char: argument must be non-negative");
+  return make_char((uint32_t)n);
+}
+
+// char-upcase  - R6RS 11.11
+SUBR subr_char_upcase(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-upcase: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
+  return make_char(c);
+}
+
+// char-downcase  - R6RS 11.11
+SUBR subr_char_downcase(scm_obj_t self, scm_obj_t a1) {
+  if (!is_char(a1)) throw std::runtime_error("char-downcase: argument must be a character");
+  uint32_t c = char_ucs4(a1);
+  if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+  return make_char(c);
+}
+
+// char-ci=?  - R6RS 11.11 (case-insensitive)
+SUBR subr_char_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char-ci=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char-ci=?: arguments must be characters");
+  uint32_t first = char_ucs4(argv[0]);
+  if (first >= 'A' && first <= 'Z') first = first - 'A' + 'a';
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char-ci=?: arguments must be characters");
+    uint32_t c = char_ucs4(argv[i]);
+    if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+    if (c != first) return scm_false;
+  }
+  return scm_true;
+}
+
+// char-ci<?  - R6RS 11.11
+SUBR subr_char_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char-ci<?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char-ci<?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  if (prev >= 'A' && prev <= 'Z') prev = prev - 'A' + 'a';
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char-ci<?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (cur >= 'A' && cur <= 'Z') cur = cur - 'A' + 'a';
+    if (prev >= cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char-ci>?  - R6RS 11.11
+SUBR subr_char_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char-ci>?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char-ci>?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  if (prev >= 'A' && prev <= 'Z') prev = prev - 'A' + 'a';
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char-ci>?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (cur >= 'A' && cur <= 'Z') cur = cur - 'A' + 'a';
+    if (prev <= cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char-ci<=?  - R6RS 11.11
+SUBR subr_char_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char-ci<=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char-ci<=?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  if (prev >= 'A' && prev <= 'Z') prev = prev - 'A' + 'a';
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char-ci<=?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (cur >= 'A' && cur <= 'Z') cur = cur - 'A' + 'a';
+    if (prev > cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// char-ci>=?  - R6RS 11.11
+SUBR subr_char_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("char-ci>=?: too few arguments");
+  if (!is_char(argv[0])) throw std::runtime_error("char-ci>=?: arguments must be characters");
+  uint32_t prev = char_ucs4(argv[0]);
+  if (prev >= 'A' && prev <= 'Z') prev = prev - 'A' + 'a';
+  for (int i = 1; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("char-ci>=?: arguments must be characters");
+    uint32_t cur = char_ucs4(argv[i]);
+    if (cur >= 'A' && cur <= 'Z') cur = cur - 'A' + 'a';
+    if (prev < cur) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// ============================================================================
+// Strings (additional)  - R6RS 11.12
+// ============================================================================
+
+// make-string  - R6RS 11.12
+SUBR subr_make_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("make-string: wrong number of arguments");
+  if (!is_fixnum(argv[0])) throw std::runtime_error("make-string: first argument must be an exact integer");
+  intptr_t n = fixnum(argv[0]);
+  if (n < 0) throw std::runtime_error("make-string: length must be non-negative");
+  char fill = ' ';
+  if (argc == 2) {
+    if (!is_char(argv[1])) throw std::runtime_error("make-string: second argument must be a character");
+    uint32_t c = char_ucs4(argv[1]);
+    if (c > 127) throw std::runtime_error("make-string: non-ASCII fill character not supported");
+    fill = (char)c;
+  }
+  std::string buf((size_t)n, fill);
+  return make_string(buf.c_str());
+}
+
+// string  - R6RS 11.12
+SUBR subr_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  std::string buf;
+  for (int i = 0; i < argc; i++) {
+    if (!is_char(argv[i])) throw std::runtime_error("string: arguments must be characters");
+    uint32_t c = char_ucs4(argv[i]);
+    if (c > 127) throw std::runtime_error("string: non-ASCII character not supported");
+    buf += (char)c;
+  }
+  return make_string(buf.c_str());
+}
+
+// string->list  - R6RS 11.12
+SUBR subr_string_to_list(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("string->list: argument must be a string");
+  const char* s = (const char*)string_name(a1);
+  scm_obj_t result = scm_nil;
+  int len = (int)strlen(s);
+  for (int i = len - 1; i >= 0; i--) result = make_cons(make_char((uint32_t)(unsigned char)s[i]), result);
+  return result;
+}
+
+// list->string  - R6RS 11.12
+SUBR subr_list_to_string(scm_obj_t self, scm_obj_t a1) {
+  std::string buf;
+  scm_obj_t cur = a1;
+  while (is_cons(cur)) {
+    scm_obj_t c = cons_car(cur);
+    if (!is_char(c)) throw std::runtime_error("list->string: list must contain only characters");
+    uint32_t ucs4 = char_ucs4(c);
+    if (ucs4 > 127) throw std::runtime_error("list->string: non-ASCII character not supported");
+    buf += (char)ucs4;
+    cur = cons_cdr(cur);
+  }
+  if (cur != scm_nil) throw std::runtime_error("list->string: argument must be a proper list");
+  return make_string(buf.c_str());
+}
+
+// string-copy  - R6RS 11.12
+SUBR subr_string_copy(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("string-copy: argument must be a string");
+  return make_string((const char*)string_name(a1));
+}
+
+// string-ci=?  - R6RS 11.12
+SUBR subr_string_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string-ci=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string-ci=?: arguments must be strings");
+  const char* first = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string-ci=?: arguments must be strings");
+    if (strcasecmp(first, (const char*)string_name(argv[i])) != 0) return scm_false;
+  }
+  return scm_true;
+}
+
+// string-ci<?  - R6RS 11.12
+SUBR subr_string_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string-ci<?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string-ci<?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string-ci<?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcasecmp(prev, cur) >= 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string-ci>?  - R6RS 11.12
+SUBR subr_string_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string-ci>?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string-ci>?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string-ci>?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcasecmp(prev, cur) <= 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string-ci<=?  - R6RS 11.12
+SUBR subr_string_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string-ci<=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string-ci<=?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string-ci<=?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcasecmp(prev, cur) > 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
+}
+
+// string-ci>=?  - R6RS 11.12
+SUBR subr_string_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 2) throw std::runtime_error("string-ci>=?: too few arguments");
+  if (!is_string(argv[0])) throw std::runtime_error("string-ci>=?: arguments must be strings");
+  const char* prev = (const char*)string_name(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    if (!is_string(argv[i])) throw std::runtime_error("string-ci>=?: arguments must be strings");
+    const char* cur = (const char*)string_name(argv[i]);
+    if (strcasecmp(prev, cur) < 0) return scm_false;
+    prev = cur;
+  }
+  return scm_true;
 }
 
 // ============================================================================
@@ -897,15 +1290,46 @@ void init_subr_base() {
   // strings & characters
   reg("string-length", (void*)subr_string_length, 1, 0);
   reg("string-ref", (void*)subr_string_ref, 2, 0);
-  reg("string=?", (void*)subr_string_eq, 2, 0);
+  reg("string=?", (void*)subr_string_eq, 2, 1);
+  reg("string<?", (void*)subr_string_lt, 2, 1);
+  reg("string>?", (void*)subr_string_gt, 2, 1);
+  reg("string<=?", (void*)subr_string_le, 2, 1);
+  reg("string>=?", (void*)subr_string_ge, 2, 1);
   reg("string-append", (void*)subr_string_append, 0, 1);
   reg("substring", (void*)subr_substring, 3, 0);
   reg("symbol->string", (void*)subr_symbol_to_string, 1, 0);
   reg("string->symbol", (void*)subr_string_to_symbol, 1, 0);
   reg("number->string", (void*)subr_number_to_string, 1, 1);
   reg("string->number", (void*)subr_string_to_number, 1, 1);
-  reg("char=?", (void*)subr_char_eq, 2, 0);
+  reg("char=?", (void*)subr_char_eq, 2, 1);
+  reg("char<?", (void*)subr_char_lt, 2, 1);
+  reg("char>?", (void*)subr_char_gt, 2, 1);
+  reg("char<=?", (void*)subr_char_le, 2, 1);
+  reg("char>=?", (void*)subr_char_ge, 2, 1);
   reg("char-numeric?", (void*)subr_char_numeric_p, 1, 0);
+  reg("char-alphabetic?", (void*)subr_char_alphabetic_p, 1, 0);
+  reg("char-whitespace?", (void*)subr_char_whitespace_p, 1, 0);
+  reg("char-upper-case?", (void*)subr_char_upper_case_p, 1, 0);
+  reg("char-lower-case?", (void*)subr_char_lower_case_p, 1, 0);
+  reg("char->integer", (void*)subr_char_to_integer, 1, 0);
+  reg("integer->char", (void*)subr_integer_to_char, 1, 0);
+  reg("char-upcase", (void*)subr_char_upcase, 1, 0);
+  reg("char-downcase", (void*)subr_char_downcase, 1, 0);
+  reg("char-ci=?", (void*)subr_char_ci_eq, 2, 1);
+  reg("char-ci<?", (void*)subr_char_ci_lt, 2, 1);
+  reg("char-ci>?", (void*)subr_char_ci_gt, 2, 1);
+  reg("char-ci<=?", (void*)subr_char_ci_le, 2, 1);
+  reg("char-ci>=?", (void*)subr_char_ci_ge, 2, 1);
+  reg("make-string", (void*)subr_make_string, 1, 1);
+  reg("string", (void*)subr_string, 0, 1);
+  reg("string->list", (void*)subr_string_to_list, 1, 0);
+  reg("list->string", (void*)subr_list_to_string, 1, 0);
+  reg("string-copy", (void*)subr_string_copy, 1, 0);
+  reg("string-ci=?", (void*)subr_string_ci_eq, 2, 1);
+  reg("string-ci<?", (void*)subr_string_ci_lt, 2, 1);
+  reg("string-ci>?", (void*)subr_string_ci_gt, 2, 1);
+  reg("string-ci<=?", (void*)subr_string_ci_le, 2, 1);
+  reg("string-ci>=?", (void*)subr_string_ci_ge, 2, 1);
 
   // control flow
   reg("apply", (void*)subr_apply, 0, 1);

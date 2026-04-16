@@ -6,6 +6,7 @@
 (import (rnrs) (sagittarius))
 
 (add-load-path "./gambit-benchmarks")
+(define undefine (lambda (x) x))
 (define exact->inexact inexact)
 (define inexact->exact exact)
 

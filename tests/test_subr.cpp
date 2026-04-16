@@ -55,14 +55,22 @@ SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
 SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1);
 SUBR subr_string_length(scm_obj_t self, scm_obj_t a1);
 SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_string_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_string_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_le(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
 SUBR subr_symbol_to_string(scm_obj_t self, scm_obj_t a1);
 SUBR subr_string_to_symbol(scm_obj_t self, scm_obj_t a1);
 SUBR subr_number_to_string(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_eq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_char_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_le(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1);
@@ -186,9 +194,20 @@ static bool some_test_failed = false;
 #define PRED2_TRUE(fn, a, b)  ASSERT_TRUE(fn(scm_nil, a, b) == scm_true)
 #define PRED2_FALSE(fn, a, b) ASSERT_TRUE(fn(scm_nil, a, b) == scm_false)
 
+// Call a variadic predicate
+#define PRED_VAR_TRUE(fn, ...)  ASSERT_TRUE(call_subr_variadic(fn, {__VA_ARGS__}) == scm_true)
+#define PRED_VAR_FALSE(fn, ...) ASSERT_TRUE(call_subr_variadic(fn, {__VA_ARGS__}) == scm_false)
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+typedef scm_obj_t (*subr_proc_variadic_t)(scm_obj_t self, int argc, scm_obj_t argv[]);
+
+static scm_obj_t call_subr_variadic(subr_proc_variadic_t fn, std::initializer_list<scm_obj_t> args) {
+  std::vector<scm_obj_t> v(args);
+  return fn(scm_nil, (int)v.size(), v.data());
+}
 
 // Dummy closure used for procedure? tests
 static scm_obj_t dummy_closure() { return make_closure(nullptr, 0, 0, 0, nullptr, 0); }
@@ -671,17 +690,35 @@ void test_string_ref() {
   ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(1)) == make_char('e'));
 }
 
-// ---------------------------------------------------------------------------
-// string=?  — R6RS §9.14
-// ---------------------------------------------------------------------------
+void test_string_compare() {
+  printf("--- string comparison (string=?, string<?, string<=?, string>?, string>=?) ---\n");
+  // string=?
+  PRED_VAR_TRUE(subr_string_eq, make_string(""), make_string(""));
+  PRED_VAR_TRUE(subr_string_eq, make_string("abc"), make_string("abc"));
+  PRED_VAR_TRUE(subr_string_eq, make_string("abc"), make_string("abc"), make_string("abc"));
+  PRED_VAR_FALSE(subr_string_eq, make_string("abc"), make_string("ABC"));
+  PRED_VAR_FALSE(subr_string_eq, make_string("abc"), make_string("abc"), make_string("ABC"));
 
-void test_string_eq() {
-  printf("--- string=? ---\n");
-  PRED2_TRUE(subr_string_eq, make_string(""), make_string(""));
-  PRED2_TRUE(subr_string_eq, make_string("abc"), make_string("abc"));
-  PRED2_FALSE(subr_string_eq, make_string("abc"), make_string("ABC"));
-  PRED2_FALSE(subr_string_eq, make_string("hello"), make_string("world"));
-  PRED2_FALSE(subr_string_eq, make_string("a"), make_string("ab"));
+  // string<?
+  PRED_VAR_TRUE(subr_string_lt, make_string("a"), make_string("b"), make_string("c"));
+  PRED_VAR_FALSE(subr_string_lt, make_string("a"), make_string("a"));
+  PRED_VAR_FALSE(subr_string_lt, make_string("b"), make_string("a"));
+  PRED_VAR_FALSE(subr_string_lt, make_string("a"), make_string("b"), make_string("b"));
+
+  // string<=?
+  PRED_VAR_TRUE(subr_string_le, make_string("a"), make_string("b"), make_string("c"));
+  PRED_VAR_TRUE(subr_string_le, make_string("a"), make_string("a"), make_string("b"));
+  PRED_VAR_FALSE(subr_string_le, make_string("b"), make_string("a"));
+
+  // string>?
+  PRED_VAR_TRUE(subr_string_gt, make_string("c"), make_string("b"), make_string("a"));
+  PRED_VAR_FALSE(subr_string_gt, make_string("a"), make_string("a"));
+  PRED_VAR_FALSE(subr_string_gt, make_string("a"), make_string("b"));
+
+  // string>=?
+  PRED_VAR_TRUE(subr_string_ge, make_string("c"), make_string("b"), make_string("a"));
+  PRED_VAR_TRUE(subr_string_ge, make_string("b"), make_string("b"), make_string("a"));
+  PRED_VAR_FALSE(subr_string_ge, make_string("a"), make_string("b"));
 }
 
 // ---------------------------------------------------------------------------
@@ -832,13 +869,32 @@ void test_string_to_number() {
 // char=?  — R6RS §9.13
 // ---------------------------------------------------------------------------
 
-void test_char_eq() {
-  printf("--- char=? ---\n");
-  PRED2_TRUE(subr_char_eq, make_char('a'), make_char('a'));
-  PRED2_TRUE(subr_char_eq, make_char(0), make_char(0));
-  PRED2_TRUE(subr_char_eq, make_char(0x1F600), make_char(0x1F600));
-  PRED2_FALSE(subr_char_eq, make_char('a'), make_char('b'));
-  PRED2_FALSE(subr_char_eq, make_char('A'), make_char('a'));
+void test_char_compare() {
+  printf("--- character comparison (char=?, char<?, char<=?, char>?, char>=?) ---\n");
+  // char=?
+  PRED_VAR_TRUE(subr_char_eq, make_char('a'), make_char('a'));
+  PRED_VAR_TRUE(subr_char_eq, make_char('z'), make_char('z'), make_char('z'));
+  PRED_VAR_FALSE(subr_char_eq, make_char('a'), make_char('A'));
+
+  // char<?
+  PRED_VAR_TRUE(subr_char_lt, make_char('a'), make_char('b'), make_char('c'));
+  PRED_VAR_FALSE(subr_char_lt, make_char('a'), make_char('a'));
+  PRED_VAR_FALSE(subr_char_lt, make_char('b'), make_char('a'));
+
+  // char<=?
+  PRED_VAR_TRUE(subr_char_le, make_char('a'), make_char('b'), make_char('c'));
+  PRED_VAR_TRUE(subr_char_le, make_char('a'), make_char('a'), make_char('b'));
+  PRED_VAR_FALSE(subr_char_le, make_char('b'), make_char('a'));
+
+  // char>?
+  PRED_VAR_TRUE(subr_char_gt, make_char('c'), make_char('b'), make_char('a'));
+  PRED_VAR_FALSE(subr_char_gt, make_char('a'), make_char('a'));
+  PRED_VAR_FALSE(subr_char_gt, make_char('a'), make_char('b'));
+
+  // char>=?
+  PRED_VAR_TRUE(subr_char_ge, make_char('c'), make_char('b'), make_char('a'));
+  PRED_VAR_TRUE(subr_char_ge, make_char('b'), make_char('b'), make_char('a'));
+  PRED_VAR_FALSE(subr_char_ge, make_char('a'), make_char('b'));
 }
 
 // ---------------------------------------------------------------------------
@@ -1761,13 +1817,13 @@ int main(int argc, char** argv) {
   test_vector();
   test_string_length();
   test_string_ref();
-  test_string_eq();
+  test_string_compare();
   test_string_append();
   test_substring();
   test_symbol_string_conv();
   test_number_to_string();
   test_string_to_number();
-  test_char_eq();
+  test_char_compare();
   test_char_numeric_p();
   test_max();
   test_pairs_lists_extra();

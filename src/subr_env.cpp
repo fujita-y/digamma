@@ -164,6 +164,20 @@ SUBR subr_interaction_environment(scm_obj_t self) { return context::s_interactio
 // system-environment
 SUBR subr_system_environment(scm_obj_t self) { return context::s_system_environment; }
 
+// undefine  - nanos specific
+// (undefine name) - removes a macro or variable binding for 'name' from the
+// current environment only.
+// Useful to undo define-syntax or define without leaving stale bindings.
+SUBR subr_undefine(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("undefine: argument must be a symbol");
+  scm_obj_t env = context::s_current_environment;
+  if (!is_environment(env)) return scm_unspecified;
+  scm_environment_rec_t* env_rec = (scm_environment_rec_t*)to_address(env);
+  hashtable_delete(env_rec->macros, a1);
+  hashtable_delete(env_rec->variables, a1);
+  return scm_unspecified;
+}
+
 // lookup-process-environment
 SUBR subr_lookup_process_environment(scm_obj_t self, scm_obj_t a1) {
   if (!is_string(a1)) throw std::runtime_error("lookup-process-environment: argument must be a string");
@@ -192,4 +206,5 @@ void init_subr_env() {
   reg("interaction-environment", (void*)subr_interaction_environment, 0, 0);
   reg("system-environment", (void*)subr_system_environment, 0, 0);
   reg("lookup-process-environment", (void*)subr_lookup_process_environment, 1, 0);
+  reg("undefine", (void*)subr_undefine, 1, 0);
 }
