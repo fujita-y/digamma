@@ -34,6 +34,8 @@ void codegen_t::init_opcode_map() {
   }
 
   // initialize code_ptr dispatch maps
+  nullary_code_map[(void*)subr_unspecified] = &codegen_t::emit_unspecified_subr;
+
   unary_code_map[(void*)subr_car] = &codegen_t::emit_car_subr;
   unary_code_map[(void*)subr_cdr] = &codegen_t::emit_cdr_subr;
   unary_code_map[(void*)subr_not] = &codegen_t::emit_not_subr;

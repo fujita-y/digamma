@@ -70,7 +70,6 @@ struct Instruction {
   // (cell_aliases stayed empty during the escape scan).  Safe to stack-allocate
   // because the struct cannot be accessed after the creating frame returns.
   bool stack_alloc = false;
-
 };
 
 // ============================================================================
@@ -169,6 +168,7 @@ class codegen_t {
   bridge_func_t cached_call_closure_bridge = nullptr;
 
   std::unordered_map<scm_obj_t, Opcode> opcode_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> nullary_code_map;
   std::unordered_map<void*, void (codegen_t::*)(bool)> unary_code_map;
   std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
   std::unordered_map<void*, void (codegen_t::*)(bool)> ternary_code_map;
@@ -200,6 +200,7 @@ class codegen_t {
   void phase2a_analyze_closure_labels();
   void phase2b_analyze_no_escape();
   void phase2c_analyze_safepoints();
+  void phase2d_analyze_cell_stack_alloc();
   void phase3_create_functions();
   void phase4_generate_code();
   void phase5_optimize_and_verify();
@@ -280,6 +281,7 @@ class codegen_t {
   // --------------------------------------------------------------------------
   //  Inline primitives
   // --------------------------------------------------------------------------
+  void emit_unspecified_subr(bool is_tail);
   void emit_null_p_subr(bool is_tail);
   void emit_pair_p_subr(bool is_tail);
   void emit_tc6_predicate(int tc6_num, bool is_tail);
@@ -301,6 +303,8 @@ class codegen_t {
   void emit_tuple_ref_subr(bool is_tail);
   void emit_tuple_set_subr(bool is_tail);
 
+  void emit_write_barrier(llvm::Value* value);
+
   // --------------------------------------------------------------------------
   //  IR helpers — types, values, utilities
   // --------------------------------------------------------------------------
@@ -317,7 +321,6 @@ class codegen_t {
   void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
 
   llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);
-  void emitWriteBarrier(llvm::Value* value);
 
   llvm::Function* get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr);
   void add_side_effect_free_attributes(llvm::Function* func);

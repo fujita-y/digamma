@@ -32,7 +32,9 @@ bool is_never_return_aux_helper(const char* name) {
   return false;
 }
 
-extern "C" void c_safepoint(void) {
+extern "C" void c_write_barrier(scm_obj_t obj) { object_heap_t::current()->write_barrier(obj); }
+
+extern "C" __attribute__((flatten)) void c_safepoint(void) {
   if (s_stop_the_world != nullptr) [[likely]] {
     if (*s_stop_the_world) [[unlikely]] {
       object_heap_t::current()->safepoint();
@@ -44,29 +46,62 @@ extern "C" void c_safepoint(void) {
   if (*s_stop_the_world) heap->safepoint();
 }
 
-extern "C" scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[]) {
-  return make_closure(code, argc, rest, nenv, env, 0);
+extern "C" __attribute__((flatten)) scm_obj_t c_make_closure(void* code, int argc, int rest, int nenv, scm_obj_t env[]) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) + (nenv - 1) * sizeof(scm_obj_t));
+  rec->code = code;
+  rec->argc = argc;
+  rec->rest = rest;
+  rec->nenv = nenv;
+  rec->cdecl = 0;
+  for (int i = 0; i < nenv; i++) {
+    rec->env[i] = env[i];
+  }
+  rec->tag = make_tc6_tag(tc6_closure);
+  return tc6_tagged_pointer(rec, tc6_closure);
 }
 
-extern "C" scm_obj_t c_make_closure_s1(void* code, int argc) { return make_closure(code, argc, 0, 0, nullptr, 0); }
+extern "C" __attribute__((flatten)) scm_obj_t c_make_closure_s1(void* code, int argc) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_closure_rec_t* rec = (scm_closure_rec_t*)heap.alloc_collectible(sizeof(scm_closure_rec_t) - sizeof(scm_obj_t));
+  rec->code = code;
+  rec->argc = argc;
+  rec->rest = 0;
+  rec->nenv = 0;
+  rec->cdecl = 0;
+  rec->tag = make_tc6_tag(tc6_closure);
+  return tc6_tagged_pointer(rec, tc6_closure);
+}
 
-extern "C" scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr) { return make_cons(car, cdr); }
+extern "C" __attribute__((flatten)) scm_obj_t c_make_cons(scm_obj_t car, scm_obj_t cdr) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_cons_rec_t* rec = (scm_cons_rec_t*)heap.alloc_cons();
+  rec->cdr = cdr;
+  rec->car = car;
+  return (scm_obj_t)rec;
+}
 
-extern "C" scm_obj_t c_make_cell(scm_obj_t value) { return make_cell(value); }
+extern "C" __attribute__((flatten)) scm_obj_t c_make_cell(scm_obj_t value) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_cell_rec_t* rec = (scm_cell_rec_t*)heap.alloc_cell();
+  rec->value = value;
+  rec->tag = make_tc6_tag(tc6_cell);
+  return tc6_tagged_pointer(rec, tc6_cell);
+}
 
-extern "C" void c_write_barrier(scm_obj_t obj) { object_heap_t::current()->write_barrier(obj); }
-
-extern "C" scm_obj_t c_construct_rest_list(int count, intptr_t argv[]) {
-  if (count <= 0) return scm_nil;
+extern "C" __attribute__((flatten)) scm_obj_t c_construct_rest_list(int count, intptr_t argv[]) {
+  if (count <= 0) [[unlikely]] {
+    return scm_nil;
+  }
   scm_obj_t list = scm_nil;
   for (int i = count - 1; i >= 0; i--) {
-    list = make_cons(argv[i], list);
+    list = c_make_cons(argv[i], list);
   }
   return list;
 }
 
 extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) {
-  if (argc < 1) {
+  if (argc < 1) [[unlikely]] {
     throw std::runtime_error("apply: too few arguments");
   }
 
@@ -82,10 +117,14 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
     args.push_back(cons_car(curr));
     curr = cons_cdr(curr);
   }
-  if (curr != scm_nil) throw std::runtime_error("apply: last argument must be a proper list");
+  if (curr != scm_nil) [[unlikely]] {
+    throw std::runtime_error("apply: last argument must be a proper list");
+  }
 
   codegen_t* cg = codegen_t::current();
-  if (!cg) throw std::runtime_error("apply: JIT not initialized");
+  if (!cg) [[unlikely]] {
+    throw std::runtime_error("apply: JIT not initialized");
+  }
 
   auto bridge = cg->call_closure_bridge();
   return (scm_obj_t)bridge(proc, args.size(), args.data());
@@ -93,7 +132,9 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
 
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {
   codegen_t* cg = codegen_t::current();
-  if (!cg) throw std::runtime_error("c_call_closure_thunk_0: JIT not initialized");
+  if (!cg) [[unlikely]] {
+    throw std::runtime_error("c_call_closure_thunk_0: JIT not initialized");
+  }
   auto bridge = cg->call_closure_bridge();
   return (scm_obj_t)bridge(proc, 0, nullptr);
 }

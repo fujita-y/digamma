@@ -352,7 +352,7 @@ void codegen_t::emit_global_set(const Instruction& inst) {
   // Store the value directly
   BL.CreateStore(val, val_ptr);
 
-  emitWriteBarrier(val);
+  emit_write_barrier(val);
 }
 
 // Load global variable value into register
@@ -639,6 +639,16 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       void* code_ptr = closure_rec->code;
 
       std::string label_name = (const char*)symbol_name(inst.closure_label);
+
+      // inline nullary primitives
+      if (inst.argc == 0) {
+        auto it = nullary_code_map.find(code_ptr);
+        if (it != nullary_code_map.end()) {
+          // std::cout << "inline nullary primitive: " << label_name << std::endl;
+          (this->*(it->second))(is_tail);
+          return;
+        }
+      }
 
       // inline unary primitives
       if (inst.argc == 1) {
@@ -1174,7 +1184,7 @@ void codegen_t::emit_closure_set(const Instruction& inst) {
   BL.CreateStore(val, val_ptr);
 
   // Write barrier — skipped for no-escape closures (GC cannot observe them)
-  if (!inst.no_escape) emitWriteBarrier(val);
+  if (!inst.no_escape) emit_write_barrier(val);
 }
 
 // Load current closure object into register
@@ -1241,7 +1251,7 @@ void codegen_t::emit_closure_cell_set(const Instruction& inst) {
   BL.CreateStore(val, value_ptr_typed);
 
   // Write barrier — skipped for no-escape closures (GC cannot observe them)
-  if (!inst.no_escape) emitWriteBarrier(val);
+  if (!inst.no_escape) emit_write_barrier(val);
 }
 
 // Unbox cell in source register to destination register
@@ -1280,21 +1290,55 @@ void codegen_t::emit_reg_cell_set(const Instruction& inst) {
   BL.CreateStore(val, value_ptr_typed);
 
   // Write barrier — skipped for no-escape closures (GC cannot observe them)
-  if (!inst.no_escape) emitWriteBarrier(val);
+  if (!inst.no_escape) emit_write_barrier(val);
 }
 
 // Create a cell from register value and store in the same register
 void codegen_t::emit_make_cell(const Instruction& inst) {
-  // Get or create c_make_cell external function
+  if (inst.rn1 < 0) {
+    fatal("%s:%u codegen: make-cell missing register operand", __FILE__, __LINE__);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stack-alloc fast path: only reaches here when phase2d determined the cell
+  // is exclusively captured by a single stack_alloc closure, so the struct
+  // cannot be accessed after the creating frame returns.
+  // -------------------------------------------------------------------------
+  if (inst.stack_alloc) {
+    // Alloca in the entry block so the lifetime equals the enclosing function call.
+    llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
+    llvm::AllocaInst* raw = TmpB.CreateAlloca(BL.getInt8Ty(), createInt32Constant(CT, (int)sizeof(scm_cell_rec_t)), "cell_stack");
+    raw->setAlignment(llvm::Align(8));  // required: low 3 bits must be 0 for tagging
+
+    // Write tag word: make_tc6_tag(tc6_cell) = (9<<8)|0x06
+    BL.CreateStore(createInt64Constant(CT, make_tc6_tag(tc6_cell)), raw);
+
+    // Write value field with the current register value.
+    llvm::Value* val = get_reg(inst.rn1);
+    llvm::Value* val_field = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw, CELL_VALUE_FIELD_OFFSET);
+    BL.CreateStore(val, val_field);
+
+    // Compute the tagged scm_obj_t pointer.
+    // Non-TBI: tagged = ptr | 0x02
+    // TBI:     tagged = ptr | 0x02 | (tc6_cell << 57)
+#if USE_TBI
+    constexpr uint64_t kTagMask = 0x02ULL | ((uint64_t)tc6_cell << 57);
+#else
+    constexpr uint64_t kTagMask = 0x02ULL;
+#endif
+    llvm::Value* raw_int = BL.CreatePtrToInt(raw, BL.getInt64Ty(), "cell_addr");
+    llvm::Value* tagged = BL.CreateOr(raw_int, createInt64Constant(CT, kTagMask), "cell_tagged");
+    set_reg(inst.rn1, tagged);
+    return;
+  }
+
+  // Regular heap-allocated path via c_make_cell.
   llvm::Type* intptrTy = this->getInt64Type();
   std::vector<llvm::Type*> argTypes = {intptrTy};
   llvm::FunctionType* ft = llvm::FunctionType::get(intptrTy, argTypes, false);
   llvm::Function* make_cell_func = get_or_create_external_function("c_make_cell", ft, (void*)&c_make_cell);
 
   // Get value from register
-  if (inst.rn1 < 0) {
-    fatal("%s:%u codegen: make-cell missing register operand", __FILE__, __LINE__);
-  }
   llvm::Value* val = get_reg(inst.rn1);
 
   // Call c_make_cell

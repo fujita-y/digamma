@@ -586,7 +586,8 @@ void codegen_t::emit_vector_ref_subr(bool is_tail) {
   llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "vref_err_bb", f);
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "vref_cont_bb", f);
 
-  llvm::Value* vref_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "vref_rot");
+  llvm::Value* vref_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "vref_rot");
   llvm::Value* vref_type_masked = BL.CreateAnd(vref_rot, createInt64Constant(CT, 0x3bf), "vref_type_masked");
   llvm::Value* vref_is_vector = BL.CreateICmpEQ(vref_type_masked, createInt64Constant(CT, 0x100 + tc6_vector), "vref_is_vector");
   BL.CreateCondBr(vref_is_vector, check_idx_bb, err_bb, likely);
@@ -628,7 +629,8 @@ void codegen_t::emit_vector_ref_subr(bool is_tail) {
   // elts pointer at offset 8 in the struct
   llvm::Value* vref_elts_ptr_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 8, "vref_elts_ptr_ptr");
   llvm::Value* vref_elts_addr = BL.CreateAlignedLoad(getInt64Type(), vref_elts_ptr_ptr, llvm::Align(8), "vref_elts_addr");
-  llvm::Value* vref_elem_ptr = BL.CreateInBoundsGEP(getInt64Type(), BL.CreateIntToPtr(vref_elts_addr, getInt64PtrType(), "vref_elts_ptr"), vref_idx_raw, "vref_elem_ptr");
+  llvm::Value* vref_elem_ptr =
+      BL.CreateInBoundsGEP(getInt64Type(), BL.CreateIntToPtr(vref_elts_addr, getInt64PtrType(), "vref_elts_ptr"), vref_idx_raw, "vref_elem_ptr");
   llvm::Value* vref_elem = BL.CreateAlignedLoad(getInt64Type(), vref_elem_ptr, llvm::Align(8), "vref_elem");
   BL.CreateBr(cont_bb);
 
@@ -673,7 +675,8 @@ void codegen_t::emit_vector_set_subr(bool is_tail) {
   llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "vset_err_bb", f);
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "vset_cont_bb", f);
 
-  llvm::Value* vset_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "vset_rot");
+  llvm::Value* vset_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "vset_rot");
   llvm::Value* vset_type_masked = BL.CreateAnd(vset_rot, createInt64Constant(CT, 0x3bf), "vset_type_masked");
   llvm::Value* vset_is_vector = BL.CreateICmpEQ(vset_type_masked, createInt64Constant(CT, 0x100 + tc6_vector), "vset_is_vector");
   BL.CreateCondBr(vset_is_vector, check_idx_bb, err_bb, likely);
@@ -715,8 +718,9 @@ void codegen_t::emit_vector_set_subr(bool is_tail) {
   // elts pointer at offset 8 in the struct
   llvm::Value* vset_elts_ptr_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 8, "vset_elts_ptr_ptr");
   llvm::Value* vset_elts_addr = BL.CreateAlignedLoad(getInt64Type(), vset_elts_ptr_ptr, llvm::Align(8), "vset_elts_addr");
-  llvm::Value* vset_elem_ptr = BL.CreateInBoundsGEP(getInt64Type(), BL.CreateIntToPtr(vset_elts_addr, getInt64PtrType(), "vset_elts_ptr"), vset_idx_raw, "vset_elem_ptr");
-  emitWriteBarrier(arg3);
+  llvm::Value* vset_elem_ptr =
+      BL.CreateInBoundsGEP(getInt64Type(), BL.CreateIntToPtr(vset_elts_addr, getInt64PtrType(), "vset_elts_ptr"), vset_idx_raw, "vset_elem_ptr");
+  emit_write_barrier(arg3);
   BL.CreateAlignedStore(arg3, vset_elem_ptr, llvm::Align(8));
   BL.CreateBr(cont_bb);
 
@@ -737,7 +741,6 @@ void codegen_t::emit_vector_set_subr(bool is_tail) {
     set_reg(0, scm_unspec_val);
   }
 }
-
 
 void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   // arg1 = tuple, arg2 = fixnum index
@@ -769,13 +772,14 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "tref_cont_bb", f);
 
   // --- type check ---
-#if USE_TBI
+  #if USE_TBI
   // TBI: rotate left 7, mask 0x3bf, compare with (0x100 + tc6_tuple)
-  llvm::Value* tref_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tref_rot");
+  llvm::Value* tref_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tref_rot");
   llvm::Value* tref_type_masked = BL.CreateAnd(tref_rot, createInt64Constant(CT, 0x3bf), "tref_type_masked");
   llvm::Value* tref_is_tuple = BL.CreateICmpEQ(tref_type_masked, createInt64Constant(CT, 0x100 + tc6_tuple), "tref_is_tuple");
   BL.CreateCondBr(tref_is_tuple, check_idx_bb, err_bb, likely);
-#else
+  #else
   // non-TBI: heap-object check then tag-word load
   llvm::BasicBlock* check_tup_bb = llvm::BasicBlock::Create(CT, "tref_check_tup_bb", f);
   llvm::Value* tref_lo3 = BL.CreateAnd(arg1, createInt64Constant(CT, 0x07), "tref_lo3");
@@ -786,7 +790,7 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   llvm::Value* tref_tag_masked = BL.CreateAnd(tref_tag_word, createInt64Constant(CT, 0x3f00), "tref_tag_masked");
   llvm::Value* tref_is_tuple = BL.CreateICmpEQ(tref_tag_masked, createInt64Constant(CT, (uintptr_t)tc6_tuple << 8), "tref_is_tuple");
   BL.CreateCondBr(tref_is_tuple, check_idx_bb, err_bb, likely);
-#endif
+  #endif
 
   // --- index bounds check ---
   BL.SetInsertPoint(check_idx_bb);
@@ -826,12 +830,13 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "tref_cont_bb", f);
 
   // --- type check ---
-#if USE_TBI
-  llvm::Value* tref_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tref_rot");
+  #if USE_TBI
+  llvm::Value* tref_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tref_rot");
   llvm::Value* tref_type_masked = BL.CreateAnd(tref_rot, createInt64Constant(CT, 0x3bf), "tref_type_masked");
   llvm::Value* tref_is_tuple = BL.CreateICmpEQ(tref_type_masked, createInt64Constant(CT, 0x100 + tc6_tuple), "tref_is_tuple");
   BL.CreateCondBr(tref_is_tuple, load_bb, err_bb, likely);
-#else
+  #else
   llvm::BasicBlock* check_tup_bb = llvm::BasicBlock::Create(CT, "tref_check_tup_bb", f);
   llvm::Value* tref_lo3 = BL.CreateAnd(arg1, createInt64Constant(CT, 0x07), "tref_lo3");
   llvm::Value* tref_is_heap = BL.CreateICmpEQ(tref_lo3, createInt64Constant(CT, 0x02), "tref_is_heap");
@@ -841,7 +846,7 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   llvm::Value* tref_tag_masked = BL.CreateAnd(tref_tag_word, createInt64Constant(CT, 0x3f00), "tref_tag_masked");
   llvm::Value* tref_is_tuple = BL.CreateICmpEQ(tref_tag_masked, createInt64Constant(CT, (uintptr_t)tc6_tuple << 8), "tref_is_tuple");
   BL.CreateCondBr(tref_is_tuple, load_bb, err_bb, likely);
-#endif
+  #endif
 
   // --- fast path: load elts[idx] at offset 16 (no bounds check) ---
   BL.SetInsertPoint(load_bb);
@@ -899,12 +904,13 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "tset_cont_bb", f);
 
   // --- type check ---
-#if USE_TBI
-  llvm::Value* tset_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tset_rot");
+  #if USE_TBI
+  llvm::Value* tset_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tset_rot");
   llvm::Value* tset_type_masked = BL.CreateAnd(tset_rot, createInt64Constant(CT, 0x3bf), "tset_type_masked");
   llvm::Value* tset_is_tuple = BL.CreateICmpEQ(tset_type_masked, createInt64Constant(CT, 0x100 + tc6_tuple), "tset_is_tuple");
   BL.CreateCondBr(tset_is_tuple, check_idx_bb, err_bb, likely);
-#else
+  #else
   llvm::BasicBlock* check_tup_bb = llvm::BasicBlock::Create(CT, "tset_check_tup_bb", f);
   llvm::Value* tset_lo3 = BL.CreateAnd(arg1, createInt64Constant(CT, 0x07), "tset_lo3");
   llvm::Value* tset_is_heap = BL.CreateICmpEQ(tset_lo3, createInt64Constant(CT, 0x02), "tset_is_heap");
@@ -914,7 +920,7 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   llvm::Value* tset_tag_masked = BL.CreateAnd(tset_tag_word, createInt64Constant(CT, 0x3f00), "tset_tag_masked");
   llvm::Value* tset_is_tuple = BL.CreateICmpEQ(tset_tag_masked, createInt64Constant(CT, (uintptr_t)tc6_tuple << 8), "tset_is_tuple");
   BL.CreateCondBr(tset_is_tuple, check_idx_bb, err_bb, likely);
-#endif
+  #endif
 
   // --- index bounds check ---
   BL.SetInsertPoint(check_idx_bb);
@@ -933,7 +939,7 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   BL.SetInsertPoint(store_bb);
   llvm::Value* tset_elts_base = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 16, "tset_elts_base");
   llvm::Value* tset_elem_ptr = BL.CreateInBoundsGEP(getInt64Type(), tset_elts_base, idx_raw, "tset_elem_ptr");
-  emitWriteBarrier(arg3);
+  emit_write_barrier(arg3);
   BL.CreateAlignedStore(arg3, tset_elem_ptr, llvm::Align(8));
   BL.CreateBr(cont_bb);
 
@@ -955,12 +961,13 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "tset_cont_bb", f);
 
   // --- type check ---
-#if USE_TBI
-  llvm::Value* tset_rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tset_rot");
+  #if USE_TBI
+  llvm::Value* tset_rot =
+      BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg1, arg1, createInt64Constant(CT, 7)}, nullptr, "tset_rot");
   llvm::Value* tset_type_masked = BL.CreateAnd(tset_rot, createInt64Constant(CT, 0x3bf), "tset_type_masked");
   llvm::Value* tset_is_tuple = BL.CreateICmpEQ(tset_type_masked, createInt64Constant(CT, 0x100 + tc6_tuple), "tset_is_tuple");
   BL.CreateCondBr(tset_is_tuple, store_bb, err_bb, likely);
-#else
+  #else
   llvm::BasicBlock* check_tup_bb = llvm::BasicBlock::Create(CT, "tset_check_tup_bb", f);
   llvm::Value* tset_lo3 = BL.CreateAnd(arg1, createInt64Constant(CT, 0x07), "tset_lo3");
   llvm::Value* tset_is_heap = BL.CreateICmpEQ(tset_lo3, createInt64Constant(CT, 0x02), "tset_is_heap");
@@ -970,14 +977,14 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   llvm::Value* tset_tag_masked = BL.CreateAnd(tset_tag_word, createInt64Constant(CT, 0x3f00), "tset_tag_masked");
   llvm::Value* tset_is_tuple = BL.CreateICmpEQ(tset_tag_masked, createInt64Constant(CT, (uintptr_t)tc6_tuple << 8), "tset_is_tuple");
   BL.CreateCondBr(tset_is_tuple, store_bb, err_bb, likely);
-#endif
+  #endif
 
   // --- fast path: store arg3 into elts[idx] at offset 16 (no bounds check) + write barrier ---
   BL.SetInsertPoint(store_bb);
   idx_raw = BL.CreateAShr(arg2, createInt64Constant(CT, 1), "tset_idx_raw");
   llvm::Value* tset_elts_base = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 16, "tset_elts_base");
   llvm::Value* tset_elem_ptr = BL.CreateInBoundsGEP(getInt64Type(), tset_elts_base, idx_raw, "tset_elem_ptr");
-  emitWriteBarrier(arg3);
+  emit_write_barrier(arg3);
   BL.CreateAlignedStore(arg3, tset_elem_ptr, llvm::Align(8));
   BL.CreateBr(cont_bb);
 
@@ -993,6 +1000,16 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   BL.SetInsertPoint(cont_bb);
 #endif  // NDEBUG
 
+  llvm::Value* scm_unspec_val = createInt64Constant(CT, (uint64_t)scm_unspecified);
+  if (is_tail) {
+    BL.CreateRet(scm_unspec_val);
+  } else {
+    set_reg(0, scm_unspec_val);
+  }
+}
+
+void codegen_t::emit_unspecified_subr(bool is_tail) {
+  // (unspecified) — always returns scm_unspecified; no arguments, no side effects.
   llvm::Value* scm_unspec_val = createInt64Constant(CT, (uint64_t)scm_unspecified);
   if (is_tail) {
     BL.CreateRet(scm_unspec_val);

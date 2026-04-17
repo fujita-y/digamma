@@ -177,6 +177,7 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase2a_analyze_closure_labels();
     phase2b_analyze_no_escape();
     phase2c_analyze_safepoints();
+    phase2d_analyze_cell_stack_alloc();
 #ifndef NDEBUG
     {
       std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
@@ -939,7 +940,7 @@ llvm::Value* codegen_t::getClosureCodePtr(llvm::Value* closure_tagged) {
   return BL.CreateLoad(this->getVoidPtrType(), code_field_ptr, "code_ptr");
 }
 
-void codegen_t::emitWriteBarrier(llvm::Value* value) {
+void codegen_t::emit_write_barrier(llvm::Value* value) {
   llvm::Type* intptrTy = this->getInt64Type();
   llvm::Type* voidTy = llvm::Type::getVoidTy(CT);
   std::vector<llvm::Type*> wbArgTypes = {intptrTy};
@@ -1443,8 +1444,6 @@ void codegen_t::phase2b_analyze_no_escape() {
             break;
           }
 
-
-
           // ---- default ------------------------------------------------------
           default:
             // Any instruction that writes rn1 kills aliases there.
@@ -1468,18 +1467,21 @@ void codegen_t::phase2b_analyze_no_escape() {
     }
 
     // ----------------------------------------------------------------
-    // Second pass: propagate no_escape from MAKE_CLOSURE to store
-    // instructions so that emit_reg_cell_set / emit_closure_set /
-    // emit_closure_cell_set can skip the write barrier.
+    // Second pass: propagate no_escape from MAKE_CLOSURE and stack_alloc
+    // MAKE_CELL to store instructions so that emit_reg_cell_set /
+    // emit_closure_set / emit_closure_cell_set can skip the write barrier.
     //
     // We do a single linear forward sweep per function (conservative:
     // no loop-back edges are considered, but the typical patterns are
     // straight-line code generated for let/letrec).  At each point we
     // maintain the set of registers that currently hold (directly or via
-    // MOV) a value produced by a no_escape MAKE_CLOSURE.
+    // MOV) a value produced by a no_escape MAKE_CLOSURE, or a tagged
+    // pointer to a stack-allocated cell (stack_alloc MAKE_CELL).
     // ----------------------------------------------------------------
     {
       std::unordered_set<int> no_escape_regs;
+      // Registers holding a stack-allocated cell pointer (stack_alloc MAKE_CELL).
+      std::unordered_set<int> stack_cell_regs;
 
       for (auto& inst : func.instructions) {
         switch (inst.op) {
@@ -1488,6 +1490,20 @@ void codegen_t::phase2b_analyze_no_escape() {
               no_escape_regs.insert(inst.rn1);
             else if (inst.rn1 >= 0)
               no_escape_regs.erase(inst.rn1);
+            // MAKE_CLOSURE never produces a cell pointer.
+            if (inst.rn1 >= 0) stack_cell_regs.erase(inst.rn1);
+            break;
+
+          case Opcode::MAKE_CELL:
+            // Stack-allocated cells: treat the cell pointer register as
+            // no_escape so that writes through it skip the write barrier.
+            if (inst.stack_alloc && inst.rn1 >= 0) {
+              stack_cell_regs.insert(inst.rn1);
+              no_escape_regs.erase(inst.rn1);  // cell ptr, not a closure value
+            } else if (inst.rn1 >= 0) {
+              stack_cell_regs.erase(inst.rn1);
+              no_escape_regs.erase(inst.rn1);
+            }
             break;
 
           case Opcode::MOV:
@@ -1497,12 +1513,18 @@ void codegen_t::phase2b_analyze_no_escape() {
                 no_escape_regs.insert(inst.rn1);
               else
                 no_escape_regs.erase(inst.rn1);
+              if (inst.rn2 >= 0 && stack_cell_regs.count(inst.rn2))
+                stack_cell_regs.insert(inst.rn1);
+              else
+                stack_cell_regs.erase(inst.rn1);
             }
             break;
 
           case Opcode::REG_CELL_SET:
             // rn2 is the value being stored into the cell held by rn1.
-            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            // The store is no_escape if the value is no_escape OR if the
+            // cell itself is stack-allocated (rn1 in stack_cell_regs).
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2)) || (inst.rn1 >= 0 && stack_cell_regs.count(inst.rn1));
             break;
 
           case Opcode::CLOSURE_SET:
@@ -1517,10 +1539,146 @@ void codegen_t::phase2b_analyze_no_escape() {
 
           default:
             // Any instruction that writes rn1 kills the tracking for that register.
-            if (inst.rn1 >= 0) no_escape_regs.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              no_escape_regs.erase(inst.rn1);
+              stack_cell_regs.erase(inst.rn1);
+            }
             break;
         }
       }
+    }
+  }
+}
+
+// ============================================================================
+//  Phase 2d: Stack-alloc analysis for MAKE_CELL instructions
+// ============================================================================
+//
+// For each MAKE_CELL instruction, determine if the resulting cell object can
+// be stack-allocated.  A cell is eligible (stack_alloc = true) when:
+//   1. The cell pointer only flows into exactly ONE MAKE_CLOSURE instruction
+//      that itself has stack_alloc = true.
+//   2. The cell pointer never escapes anywhere else:
+//        - not returned (RET with r0 == cell alias)
+//        - not stored to a global (GLOBAL_SET)
+//        - not passed to an unknown callee as an argument
+//        - not captured by a non-stack_alloc closure
+//
+// The analysis is a single linear forward scan per function (conservative:
+// no loop-back edges).  Only the cell pointer register is tracked; the cell's
+// *contents* can be anything — the write barrier is elided by the phase2b
+// no_escape propagation pass once stack_alloc is set here.
+//
+// Constraint: exactly one capturing stack_alloc closure ("exactly-one" rule).
+
+void codegen_t::phase2d_analyze_cell_stack_alloc() {
+  for (auto& func : functions) {
+    const size_t n = func.instructions.size();
+
+    for (size_t mk = 0; mk < n; ++mk) {
+      auto& mk_inst = func.instructions[mk];
+      if (mk_inst.op != Opcode::MAKE_CELL) continue;
+
+      const int cell_reg = mk_inst.rn1;
+      if (cell_reg < 0) continue;
+
+      std::unordered_set<int> aliases;  // registers holding the cell pointer
+      aliases.insert(cell_reg);
+
+      bool escaped = false;
+      int capturing_closures = 0;  // number of stack_alloc closures that captured this cell
+
+      for (size_t i = mk + 1; i < n && !escaped; ++i) {
+        const auto& inst = func.instructions[i];
+
+        switch (inst.op) {
+          // ---- RET ----------------------------------------------------------
+          case Opcode::RET:
+            if (aliases.count(0)) escaped = true;
+            break;
+
+          // ---- MOV ----------------------------------------------------------
+          case Opcode::MOV:
+            if (inst.rn1 >= 0) {
+              if (inst.rn2 >= 0 && aliases.count(inst.rn2))
+                aliases.insert(inst.rn1);
+              else
+                aliases.erase(inst.rn1);
+            }
+            break;
+
+          // ---- MAKE_CELL ----------------------------------------------------
+          case Opcode::MAKE_CELL:
+            // A subsequent MAKE_CELL overwrites the same register — kill alias.
+            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            break;
+
+          // ---- GLOBAL_SET ---------------------------------------------------
+          case Opcode::GLOBAL_SET:
+            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) escaped = true;
+            break;
+
+          // ---- MAKE_CLOSURE -------------------------------------------------
+          case Opcode::MAKE_CLOSURE: {
+            // Check if a cell alias is captured as a free variable.
+            scm_obj_t fi = inst.free_indices;
+            bool cell_captured = false;
+            while (is_cons(fi)) {
+              int r = parse_reg(cons_car(fi));
+              if (r >= 0 && aliases.count(r)) {
+                cell_captured = true;
+                break;
+              }
+              fi = cons_cdr(fi);
+            }
+            if (cell_captured) {
+              if (inst.stack_alloc) {
+                ++capturing_closures;
+                if (capturing_closures > 1) escaped = true;  // exactly-one rule
+              } else {
+                escaped = true;  // cell captured by a non-stack_alloc closure
+              }
+            }
+            // Kill any alias overwritten by this instruction's destination.
+            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            break;
+          }
+
+          // ---- CALL / TAIL_CALL -------------------------------------------
+          case Opcode::CALL:
+          case Opcode::TAIL_CALL:
+            // If a cell alias appears as a call argument to an unknown callee,
+            // the callee might store it and access it after the frame exits.
+            for (int a = 0; a < inst.argc && !escaped; ++a) {
+              if (aliases.count(a)) escaped = true;
+            }
+            // Cell alias in callee position: conservative escape.
+            if (!escaped && inst.rn1 >= 0 && aliases.count(inst.rn1)) escaped = true;
+            // Kill aliases in argument registers consumed by the call.
+            if (inst.op == Opcode::CALL) {
+              for (int a = 0; a < inst.argc; ++a) aliases.erase(a);
+            }
+            break;
+
+          // ---- REG_CELL_SET / REG_CELL_REF ---------------------------------
+          // These use the cell's contents, not the cell pointer itself.
+          // They don't move the cell pointer to another register.
+          case Opcode::REG_CELL_SET:
+          case Opcode::REG_CELL_REF:
+            break;
+
+          // ---- default ------------------------------------------------------
+          default:
+            // Any instruction that writes rn1 kills the alias there.
+            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            break;
+        }
+      }
+
+      // Safe to stack-allocate iff:
+      //   - cell didn't escape, AND
+      //   - exactly one stack_alloc closure captured it.
+      mk_inst.stack_alloc = !escaped && (capturing_closures == 1);
     }
   }
 }
@@ -1541,6 +1699,9 @@ void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) 
     }
     if (inst.op == Opcode::MAKE_CLOSURE) {
       ofs << " ; no_escape: " << (inst.no_escape ? "true" : "false") << " ; stack_alloc: " << (inst.stack_alloc ? " true" : "false");
+    }
+    if (inst.op == Opcode::MAKE_CELL) {
+      ofs << " ; stack_alloc: " << (inst.stack_alloc ? "true" : "false");
     }
     if (inst.op == Opcode::CLOSURE_SET || inst.op == Opcode::CLOSURE_CELL_SET || inst.op == Opcode::REG_CELL_SET) {
       ofs << " ; no_escape: " << (inst.no_escape ? "true" : "false");

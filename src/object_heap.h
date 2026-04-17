@@ -32,7 +32,7 @@ class object_heap_t {
 
   uint64_t m_trip_bytes;
 
-  void* alloc_object(concurrent_slab_t& slab);
+  //  void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void shade(scm_obj_t obj);
   __attribute__((no_sanitize("hwaddress"))) void trace(void* obj);
@@ -42,6 +42,39 @@ class object_heap_t {
   void sweep_symbol_table();
   void delete_private(void* obj);
   void enqueue_root(scm_obj_t obj);
+
+  void* alloc_object(concurrent_slab_t& slab) {
+    m_trip_bytes += slab.m_object_size;
+    if (m_trip_bytes >= m_collect_trip_bytes) [[unlikely]] {
+      m_concurrent_heap.collect();
+    }
+    do {
+      void* obj = slab.new_collectible_object();
+      if (obj) [[likely]] {
+        return obj;
+      }
+    } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
+    fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
+    return NULL;
+  }
+
+  inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
+  {
+    assert(x >= 16);  // (1 << 4)
+    uint32_t n = 0;
+    uint32_t c = 16;
+    x = x - 1;
+    do {
+      uint32_t y = x >> c;
+      if (y != 0) {
+        n = n + c;
+        x = y;
+      }
+      c = c >> 1;
+    } while (c != 0);
+    return n + x - 4;
+  }
+
 #if HPDEBUG
   void consistency_check();
   void validate_concurrent_slab(void* slab);
@@ -66,8 +99,28 @@ class object_heap_t {
   void* alloc_hashtable() { return alloc_object(m_hashtables); }
   void* alloc_environment() { return alloc_object(m_environments); }
   void* alloc_port() { return alloc_object(m_ports); }
-  void* alloc_collectible(size_t size);
   void* alloc_private(size_t size);
+
+  void* alloc_collectible(size_t nsize) {
+    m_trip_bytes += nsize;
+    if (m_trip_bytes >= m_collect_trip_bytes) [[unlikely]] {
+      m_concurrent_heap.collect();
+    }
+    int bucket = bytes_to_bucket(nsize);
+    if (bucket < array_sizeof(m_collectibles)) [[likely]] {
+      do {
+        void* obj = m_collectibles[bucket].new_collectible_object();
+        if (obj) [[likely]] {
+          return obj;
+        }
+      } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
+      fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
+    } else {
+      fatal("%s:%u collectible object over %d bytes not supported but %d bytes requested", __FILE__, __LINE__,
+            1 << (array_sizeof(m_collectibles) + 3), nsize);
+    }
+    return NULL;
+  }
 
   void write_barrier(scm_obj_t obj) {
     if (is_cons(obj)) {

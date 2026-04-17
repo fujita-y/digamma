@@ -12,23 +12,6 @@
 
 thread_local object_heap_t* object_heap_t::s_current;
 
-inline int bytes_to_bucket(uint32_t x)  // see bit.cpp
-{
-  assert(x >= 16);  // (1 << 4)
-  uint32_t n = 0;
-  uint32_t c = 16;
-  x = x - 1;
-  do {
-    uint32_t y = x >> c;
-    if (y != 0) {
-      n = n + c;
-      x = y;
-    }
-    c = c >> 1;
-  } while (c != 0);
-  return n + x - 4;
-}
-
 void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_pool.init(pool_size, init_size);
   m_concurrent_heap.init(&m_concurrent_pool);
@@ -91,34 +74,6 @@ void object_heap_t::destroy() {
   s_current = nullptr;
 }
 
-void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
-  m_trip_bytes += slab.m_object_size;
-  if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
-  do {
-    void* obj = slab.new_collectible_object();
-    if (obj) return obj;
-  } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
-  fatal("fatal: heap memory overflow (%.2fMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024.0 * 1024.0));
-  return NULL;
-}
-
-void* object_heap_t::alloc_collectible(size_t nsize) {
-  m_trip_bytes += nsize;
-  if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
-  int bucket = bytes_to_bucket(nsize);
-  if (bucket < array_sizeof(m_collectibles)) {
-    do {
-      void* obj = m_collectibles[bucket].new_collectible_object();
-      if (obj) return obj;
-    } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
-    fatal("fatal: heap memory overflow (%dMB)\n[exit]\n", m_concurrent_pool.m_pool_size / (1024 * 1024));
-  } else {
-    fatal("%s:%u collectible object over %d bytes not supported but %d bytes requested", __FILE__, __LINE__,
-          1 << (array_sizeof(m_collectibles) + 3), nsize);
-  }
-  return NULL;
-}
-
 void* object_heap_t::alloc_private(size_t size) {
   m_trip_bytes += size;
   if (m_trip_bytes >= m_collect_trip_bytes) m_concurrent_heap.collect();
@@ -173,12 +128,12 @@ void object_heap_t::shade(scm_obj_t obj) {
   }
   if (!is_heap_object(obj)) return;
   void* addr = to_address(obj);
-  // Stack-allocated closures (from the stack_alloc optimization) have a valid
-  // closure tag but live on the mutator stack, not in the GC pool.  The GC
-  // must not try to trace or mark them — they are kept live by the stack frame
-  // and are guaranteed to be dead before any future GC cycle can reach them.
+  // Stack-allocated closures and cells (from the stack_alloc optimization)
+  // have a valid heap tag but live on the mutator stack, not in the GC pool.
+  // The GC must not try to trace or mark them — they are kept live by the
+  // stack frame and are guaranteed to be dead before any future GC cycle.
   if (!m_concurrent_pool.in_pool(addr)) {
-    assert(is_closure(obj));
+    // note: object tag on stack could be overwritten.
     return;
   }
   m_concurrent_heap.shade(addr);
@@ -363,8 +318,8 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
   } else if (is_heap_object(obj)) {
     void* addr = to_address(obj);
     if (!m_concurrent_pool.in_pool(addr)) {
-      assert(is_closure(obj));
-      return;  // stack-allocated object — skip
+      assert(is_closure(obj) || is_cell(obj));  // only closures and cells may be stack-allocated
+      return;                                   // stack-allocated object — skip
     }
     m_concurrent_heap.enqueue_root(addr);
   }
