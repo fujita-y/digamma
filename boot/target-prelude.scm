@@ -208,9 +208,12 @@
             (call-with-port
               (open-file-input-port path)
               (lambda (port)
-                (let loop ((expr (read port)))
-                  (cond ((eof-object? expr) (unspecified))
-                        (else (core-eval expr env) (loop (read port)))))))
+                (let loop ((expr '()))
+                  (let ((obj (read port)))
+                    (cond ((eof-object? obj) 
+                           (core-eval (cons 'begin (reverse expr)) env)
+                           (unspecified))
+                         (else (loop (cons obj expr))))))))
             (assertion-violation 'load (format "file ~s not found in ~s" filename (scheme-load-paths))))))))
 
 (define load-module

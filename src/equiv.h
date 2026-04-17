@@ -10,6 +10,6 @@
 class object_heap_t;
 
 bool eqv_p(scm_obj_t obj1, scm_obj_t obj2);
-bool equal_p(scm_obj_t visited, scm_obj_t lst1, scm_obj_t lst2);
+bool equal_p(scm_obj_t lst1, scm_obj_t lst2);
 
 #endif

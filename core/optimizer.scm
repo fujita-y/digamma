@@ -15,6 +15,7 @@
 ;;=============================================================================
 
 (define global-env (make-eq-hashtable))
+(define global-mutated (make-eq-hashtable))  ;; globals assigned via set!
 (define *inlining-depth* (make-eq-hashtable))
 
 (define *cp0-effort-limit* 100)
@@ -419,7 +420,11 @@
 ;;=============================================================================
 
 (define (optimize-inner expr bound-vars)
-  (cond ((symbol? expr) (if (and (hashtable-contains? global-env expr) (not (memq expr bound-vars))) (hashtable-ref global-env expr #f) expr))
+  (cond ((symbol? expr) (if (and (hashtable-contains? global-env expr)
+                                 (not (memq expr bound-vars))
+                                 (not (hashtable-ref global-mutated expr #f)))
+                            (hashtable-ref global-env expr #f)
+                            expr))
         ((not (pair? expr)) expr)
         ((eq? (car expr) 'quote) expr)
         ((eq? (car expr) 'if) (opt-if expr bound-vars))
@@ -427,7 +432,11 @@
         ((eq? (car expr) 'lambda) (opt-lambda expr bound-vars))
         ((eq? (car expr) 'let) (opt-let expr bound-vars))
         ((eq? (car expr) 'letrec*) (opt-letrec* expr bound-vars))
-        ((eq? (car expr) 'set!) `(set! ,(cadr expr) ,(optimize-inner (caddr expr) bound-vars)))
+        ((eq? (car expr) 'set!)
+         (let ((target (cadr expr)))
+           (unless (memq target bound-vars)
+             (hashtable-set! global-mutated target #t))
+           `(set! ,target ,(optimize-inner (caddr expr) bound-vars))))
         ((eq? (car expr) 'define)
          (let ((var (cadr expr)) (val (optimize-inner (caddr expr) bound-vars)))
            (if (or (not (pair? val)) (eq? (car val) 'quote)) (hashtable-set! global-env var val))
@@ -502,10 +511,52 @@
                   (cons proc args))))
         (cons proc args))))
 
+;; Pre-scan: collect all variables that appear free inside a lambda body.
+;; Such globals must not be substituted with their initial constant value,
+;; because the lambda may be called after the global has been mutated.
+(define (collect-lambda-free-vars! expr top-level-vars)
+  (let walk ((e expr) (inside-lambda? #f) (bound '()))
+    (cond ((symbol? e)
+           (when (and inside-lambda? (memq e top-level-vars) (not (memq e bound)))
+             (hashtable-set! global-mutated e #t)))
+          ((not (pair? e)) #f)
+          ((eq? (car e) 'quote) #f)
+          ((eq? (car e) 'lambda)
+           (let ((params (flatten-params-opt (cadr e)))
+                 (new-bound (append (flatten-params-opt (cadr e)) bound)))
+             (for-each (lambda (x) (walk x #t new-bound)) (cddr e))))
+          ((eq? (car e) 'let)
+           (let ((vars (map car (cadr e))))
+             (for-each (lambda (b) (walk (cadr b) inside-lambda? bound)) (cadr e))
+             (for-each (lambda (x) (walk x inside-lambda? (append vars bound))) (cddr e))))
+          ((eq? (car e) 'letrec*)
+           (let ((vars (map car (cadr e))))
+             (let ((new-bound (append vars bound)))
+               (for-each (lambda (b) (walk (cadr b) inside-lambda? new-bound)) (cadr e))
+               (for-each (lambda (x) (walk x inside-lambda? new-bound)) (cddr e)))))
+          ((eq? (car e) 'define) (walk (caddr e) inside-lambda? bound))
+          ((eq? (car e) 'set!)
+           (when (and (not (memq (cadr e) bound)))
+             (hashtable-set! global-mutated (cadr e) #t))
+           (walk (caddr e) inside-lambda? bound))
+          (else (for-each (lambda (x) (walk x inside-lambda? bound)) e)))))
+
 (define (optimize-once expr) (optimize-inner expr '()))
 #;(define (optimize expr) expr)
 (define (optimize expr)
-  (hashtable-clear! global-env) (hashtable-clear! *inlining-depth*)
+  (hashtable-clear! global-env) (hashtable-clear! global-mutated) (hashtable-clear! *inlining-depth*)
+  ;; Pre-scan: collect all top-level defines, then mark any that appear free
+  ;; inside a lambda as ineligible for constant propagation.
+  (let ((top-level-vars
+         (if (and (pair? expr) (eq? (car expr) 'begin))
+             (fold (lambda (e acc)
+                     (if (and (pair? e) (eq? (car e) 'define))
+                         (cons (cadr e) acc)
+                         acc))
+                   '()
+                   (cdr expr))
+             '())))
+    (collect-lambda-free-vars! expr top-level-vars))
   (let loop ((current expr) (prev '()) (iters 0))
     (if (or (equal? current prev) (>= iters 10)) current
         (loop (optimize-inner current '()) current (+ iters 1)))))

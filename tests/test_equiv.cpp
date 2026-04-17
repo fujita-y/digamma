@@ -5,11 +5,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "../src/context.h"
 #include "../src/core.h"
 #include "../src/equiv.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
-#include "../src/context.h"
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -35,9 +35,7 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
-
 static bool some_test_failed = false;
-
 
 #define ASSERT_TRUE(expr)                       \
   if (!(expr)) {                                \
@@ -92,11 +90,9 @@ void test_equal_list(object_heap_t* heap) {
   scm_obj_t l2 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
   scm_obj_t l3 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(4));
 
-  scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(visited, l1, l2));
+  ASSERT_TRUE(equal_p(l1, l2));
 
-  visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(visited, l1, l3));
+  ASSERT_FALSE(equal_p(l1, l3));
 }
 
 void test_equal_vector(object_heap_t* heap) {
@@ -109,11 +105,9 @@ void test_equal_vector(object_heap_t* heap) {
   elts1[0] = make_fixnum(10);
   elts2[0] = make_fixnum(10);
 
-  scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(visited, v1, v2));
+  ASSERT_TRUE(equal_p(v1, v2));
 
-  visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(visited, v1, v3));
+  ASSERT_FALSE(equal_p(v1, v3));
 }
 
 void test_equal_string(object_heap_t* heap) {
@@ -122,11 +116,9 @@ void test_equal_string(object_heap_t* heap) {
   scm_obj_t s2 = make_string("hello");
   scm_obj_t s3 = make_string("world");
 
-  scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(visited, s1, s2));
+  ASSERT_TRUE(equal_p(s1, s2));
 
-  visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_FALSE(equal_p(visited, s1, s3));
+  ASSERT_FALSE(equal_p(s1, s3));
 }
 
 void test_equal_circular(object_heap_t* heap) {
@@ -146,11 +138,11 @@ void test_equal_circular(object_heap_t* heap) {
 
   scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
 
-  ASSERT_TRUE(equal_p(visited, pair1, pair2));
+  ASSERT_TRUE(equal_p(pair1, pair2));
 
   // Reset visited for next check
   visited = make_hashtable(test_address_hash, test_address_equiv, 16);
-  ASSERT_TRUE(equal_p(visited, pair1, pair3_head));
+  ASSERT_TRUE(equal_p(pair1, pair3_head));
 }
 
 int main(int argc, char** argv) {

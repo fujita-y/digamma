@@ -71,6 +71,43 @@ void nanos_t::destroy() {
 // ============================================================================
 // Execution & REPL
 // ============================================================================
+/*
+void nanos_t::load_script(std::string filename) {
+  if (!filename.empty()) nanos_options::script_file = filename;
+  std::ifstream ifs(nanos_options::script_file);
+  if (!ifs) {
+    puts("Error: failed to open file");
+    return;
+  }
+  reader_t reader(ifs);
+  printer_t printer(std::cout);
+  std::vector<scm_obj_t> lst;
+  bool err = false;
+  while (true) {
+    scm_obj_t obj = reader.read(err);
+    if (err) {
+      std::string msg = reader.get_error_message();
+      std::cout << "read error: " << msg << std::endl;
+      exit(1);
+    }
+    if (obj == scm_eof) break;
+    lst.push_back(obj);
+  }
+  scm_obj_t expr = scm_nil;
+  for (scm_obj_t obj : lst | std::views::reverse) {
+    expr = make_cons(obj, expr);
+  }
+  expr = make_cons(make_symbol("begin"), expr);
+  try {
+    evaluate(expr, printer);
+  } catch (const nanos_exit_t& e) {
+    throw;
+  } catch (const std::exception& e) {
+    std::cerr << "Exception while executing script: " << e.what() << std::endl;
+    exit(1);
+  }
+}
+*/
 
 void nanos_t::load_script(std::string filename) {
   if (!filename.empty()) nanos_options::script_file = filename;

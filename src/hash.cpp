@@ -85,7 +85,7 @@ unsigned int equal_hash(scm_obj_t obj, unsigned int bound) { return obj_hash(obj
 
 bool eqv_equiv(scm_obj_t obj1, scm_obj_t obj2) { return eqv_p(obj1, obj2); }
 
-bool equal_equiv(scm_obj_t obj1, scm_obj_t obj2) { return equal_p(make_hashtable(address_hash, address_equiv, 32), obj1, obj2); }
+bool equal_equiv(scm_obj_t obj1, scm_obj_t obj2) { return equal_p(obj1, obj2); }
 
 unsigned int string_hash(scm_obj_t obj, unsigned int bound) {
   assert(is_string(obj));

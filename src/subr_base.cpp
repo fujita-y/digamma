@@ -280,8 +280,7 @@ SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   scm_obj_t cur = a2;
   while (is_cons(cur)) {
-    scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
-    if (equal_p(visited, a1, cons_car(cur))) return cur;
+    if (equal_p(a1, cons_car(cur))) return cur;
     cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("member: second argument must be a proper list");
@@ -320,8 +319,7 @@ SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   while (is_cons(cur)) {
     scm_obj_t pair = cons_car(cur);
     if (!is_cons(pair)) throw std::runtime_error("assoc: alist must contain pairs");
-    scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
-    if (equal_p(visited, a1, cons_car(pair))) return pair;
+    if (equal_p(a1, cons_car(pair))) return pair;
     cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("assoc: second argument must be a proper list");
@@ -360,10 +358,7 @@ SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return (a1 == a2) ?
 SUBR subr_eqv_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return eqv_p(a1, a2) ? scm_true : scm_false; }
 
 // equal?  - R6RS 11.5
-SUBR subr_equal_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  scm_obj_t visited = make_hashtable(address_hash, address_equiv, 4);
-  return equal_p(visited, a1, a2) ? scm_true : scm_false;
-}
+SUBR subr_equal_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) { return equal_p(a1, a2) ? scm_true : scm_false; }
 
 // exact?  - R6RS 11.7.2
 SUBR subr_exact_p(scm_obj_t self, scm_obj_t a1) {
