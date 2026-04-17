@@ -55,6 +55,7 @@ tuple
 tuple?
 tuple-ref
 tuple-set!
+make-tuple
 time-usage
 current-collect-trip-bytes
 *

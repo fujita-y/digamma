@@ -54,6 +54,9 @@ scm_obj_t make_flonum(double d) {
   return u64;
 }
 
+// Maximum bytes allocatable from a collectible slab (m_collectibles[5] == 512).
+constexpr size_t INTERN_PRIVATE_THRESHOLD = 512;
+
 scm_obj_t make_symbol(const char* name) {
   object_heap_t& heap = *object_heap_t::current();
   {
@@ -61,13 +64,23 @@ scm_obj_t make_symbol(const char* name) {
     auto it = context::s_symbols.find(name);
     if (it != context::s_symbols.end()) return it->second;
   }
-  scm_symbol_rec_t* rec = (scm_symbol_rec_t*)heap.alloc_symbol();
-  rec->tag = make_tc6_tag(tc6_symbol);
-  rec->name = nullptr;
   int n = strlen(name) + 1;
-  uint8_t* datum = (uint8_t*)heap.alloc_private(n);
-  memcpy(datum, name, n);
-  rec->name = datum;
+  scm_symbol_rec_t* rec;
+  // Inline: name stored immediately after the header in a single slab object.
+  size_t bytes = sizeof(scm_symbol_rec_t) + n;
+  if (bytes <= INTERN_PRIVATE_THRESHOLD) {
+    rec = (scm_symbol_rec_t*)heap.alloc_collectible(bytes);
+    rec->tag = make_tc6_tag(tc6_symbol);
+    rec->name = (uint8_t*)((uintptr_t)rec + sizeof(scm_symbol_rec_t));
+    memcpy(rec->name, name, n);
+  } else {
+    rec = (scm_symbol_rec_t*)heap.alloc_symbol();
+    rec->tag = make_tc6_tag(tc6_symbol);
+    rec->name = nullptr;
+    uint8_t* datum = (uint8_t*)heap.alloc_private(n);
+    memcpy(datum, name, n);
+    rec->name = datum;
+  }
   scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
   {
     std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
@@ -80,15 +93,23 @@ scm_obj_t make_symbol(const char* name) {
 
 scm_obj_t make_uninterned_symbol(const char* name) {
   object_heap_t& heap = *object_heap_t::current();
-  scm_symbol_rec_t* rec = (scm_symbol_rec_t*)heap.alloc_symbol();
-  rec->tag = make_tc6_tag(tc6_symbol);
-  rec->name = nullptr;
   int n = strlen(name) + 1;
-  uint8_t* datum = (uint8_t*)heap.alloc_private(n);
-  memcpy(datum, name, n);
-  rec->name = datum;
-  scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
-  return obj;
+  scm_symbol_rec_t* rec;
+  size_t bytes = sizeof(scm_symbol_rec_t) + n;
+  if (bytes <= INTERN_PRIVATE_THRESHOLD) {
+    rec = (scm_symbol_rec_t*)heap.alloc_collectible(bytes);
+    rec->tag = make_tc6_tag(tc6_symbol);
+    rec->name = (uint8_t*)((uintptr_t)rec + sizeof(scm_symbol_rec_t));
+    memcpy(rec->name, name, n);
+  } else {
+    rec = (scm_symbol_rec_t*)heap.alloc_symbol();
+    rec->tag = make_tc6_tag(tc6_symbol);
+    rec->name = nullptr;
+    uint8_t* datum = (uint8_t*)heap.alloc_private(n);
+    memcpy(datum, name, n);
+    rec->name = datum;
+  }
+  return tc6_tagged_pointer(rec, tc6_symbol);
 }
 
 bool is_symbol_interned(scm_obj_t x) {
@@ -106,13 +127,23 @@ uint8_t* symbol_name(scm_obj_t x) {
 
 scm_obj_t make_string(const char* name) {
   object_heap_t& heap = *object_heap_t::current();
-  scm_string_rec_t* rec = (scm_string_rec_t*)heap.alloc_string();
-  rec->tag = make_tc6_tag(tc6_string);
-  rec->name = nullptr;
   int n = strlen(name) + 1;
-  uint8_t* datum = (uint8_t*)heap.alloc_private(n);
-  memcpy(datum, name, n);
-  rec->name = datum;
+  scm_string_rec_t* rec;
+  size_t bytes = sizeof(scm_string_rec_t) + n;
+  if (bytes <= INTERN_PRIVATE_THRESHOLD) {
+    // Inline: name stored immediately after the header in a single slab object.
+    rec = (scm_string_rec_t*)heap.alloc_collectible(bytes);
+    rec->tag = make_tc6_tag(tc6_string);
+    rec->name = (uint8_t*)((uintptr_t)rec + sizeof(scm_string_rec_t));
+    memcpy(rec->name, name, n);
+  } else {
+    rec = (scm_string_rec_t*)heap.alloc_string();
+    rec->tag = make_tc6_tag(tc6_string);
+    rec->name = nullptr;
+    uint8_t* datum = (uint8_t*)heap.alloc_private(n);
+    memcpy(datum, name, n);
+    rec->name = datum;
+  }
   return tc6_tagged_pointer(rec, tc6_string);
 }
 
@@ -121,33 +152,57 @@ uint8_t* string_name(scm_obj_t x) {
   return ((scm_string_rec_t*)to_address(x))->name;
 }
 
+
+
 scm_obj_t make_vector(int nsize, scm_obj_t init) {
   object_heap_t& heap = *object_heap_t::current();
-  scm_vector_rec_t* rec = (scm_vector_rec_t*)heap.alloc_vector();
-  rec->tag = make_tc6_tag(tc6_vector);
-  rec->nsize = 0;
-  rec->elts = nullptr;
-  scm_obj_t* elts = (scm_obj_t*)heap.alloc_private(nsize * sizeof(scm_obj_t));
-  rec->elts = elts;
-  rec->nsize = nsize;
-  for (int i = 0; i < nsize; i++) {
-    elts[i] = init;
+  scm_vector_rec_t* rec;
+  scm_obj_t* elts;
+  size_t bytes = sizeof(scm_vector_rec_t) + (size_t)nsize * sizeof(scm_obj_t);
+  if (bytes <= INTERN_PRIVATE_THRESHOLD) {
+    // Inline: elements live immediately after the header in a single slab object.
+    rec = (scm_vector_rec_t*)heap.alloc_collectible(bytes);
+    rec->tag = make_tc6_tag(tc6_vector);
+    rec->nsize = nsize;
+    elts = (scm_obj_t*)((uintptr_t)rec + sizeof(scm_vector_rec_t));
+    rec->elts = elts;
+  } else {
+    // External: header in m_vectors slab, elements in a private allocation.
+    rec = (scm_vector_rec_t*)heap.alloc_vector();
+    rec->tag = make_tc6_tag(tc6_vector);
+    rec->nsize = 0;
+    rec->elts = nullptr;
+    elts = (scm_obj_t*)heap.alloc_private((size_t)nsize * sizeof(scm_obj_t));
+    rec->elts = elts;
+    rec->nsize = nsize;
   }
+  for (int i = 0; i < nsize; i++) elts[i] = init;
   return tc6_tagged_pointer(rec, tc6_vector);
 }
 
 scm_obj_t make_values(int nsize) {
   object_heap_t& heap = *object_heap_t::current();
-  scm_values_rec_t* rec = (scm_values_rec_t*)heap.alloc_values();
-  rec->tag = make_tc6_tag(tc6_values);
-  rec->nsize = 0;
-  rec->elts = nullptr;
-  scm_obj_t* elts = (scm_obj_t*)heap.alloc_private(nsize * sizeof(scm_obj_t));
-  rec->elts = elts;
-  rec->nsize = nsize;
-  for (int i = 0; i < nsize; i++) {
-    elts[i] = scm_unspecified;
+  scm_values_rec_t* rec;
+  scm_obj_t* elts;
+  size_t bytes = sizeof(scm_values_rec_t) + (size_t)nsize * sizeof(scm_obj_t);
+  if (bytes <= INTERN_PRIVATE_THRESHOLD) {
+    // Inline: elements live immediately after the header in a single slab object.
+    rec = (scm_values_rec_t*)heap.alloc_collectible(bytes);
+    rec->tag = make_tc6_tag(tc6_values);
+    rec->nsize = nsize;
+    elts = (scm_obj_t*)((uintptr_t)rec + sizeof(scm_values_rec_t));
+    rec->elts = elts;
+  } else {
+    // External: header in m_values slab, elements in a private allocation.
+    rec = (scm_values_rec_t*)heap.alloc_values();
+    rec->tag = make_tc6_tag(tc6_values);
+    rec->nsize = 0;
+    rec->elts = nullptr;
+    elts = (scm_obj_t*)heap.alloc_private((size_t)nsize * sizeof(scm_obj_t));
+    rec->elts = elts;
+    rec->nsize = nsize;
   }
+  for (int i = 0; i < nsize; i++) elts[i] = scm_unspecified;
   return tc6_tagged_pointer(rec, tc6_values);
 }
 

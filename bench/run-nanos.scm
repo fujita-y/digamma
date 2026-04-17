@@ -137,6 +137,7 @@
 (time-bench mazefun 200)
 (time-bench nqueens 450)
 (time-bench paraffins 100)
+;(time-bench paraffins-tuple 100)
 (time-bench peval 20)
 (time-bench ray 1)
 (time-bench scheme 3000)

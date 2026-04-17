@@ -50,6 +50,11 @@ void codegen_t::init_opcode_map() {
   binary_code_map[(void*)subr_num_le] = &codegen_t::emit_num_le_subr;
   binary_code_map[(void*)subr_num_ge] = &codegen_t::emit_num_ge_subr;
   binary_code_map[(void*)subr_append] = &codegen_t::emit_append2_subr;
+  binary_code_map[(void*)subr_vector_ref] = &codegen_t::emit_vector_ref_subr;
+  binary_code_map[(void*)subr_tuple_ref] = &codegen_t::emit_tuple_ref_subr;
+
+  ternary_code_map[(void*)subr_vector_set] = &codegen_t::emit_vector_set_subr;
+  ternary_code_map[(void*)subr_tuple_set] = &codegen_t::emit_tuple_set_subr;
 
   tc6_code_map[(void*)subr_symbol_p] = tc6_symbol;
   tc6_code_map[(void*)subr_string_p] = tc6_string;

@@ -1,17 +1,54 @@
-(import-module (core))
-(add-load-path "~/github/digamma/bench/gambit-benchmarks")
+;; chezscheme run-chez.scm
 
 (define warmup #t)
+(define filename "bench.chez.out")
+
+(source-directories '("./gambit-benchmarks"))
+(define undefine (lambda (x) x))
+
+(define output-port (open-output-string))
 
 (define-syntax time
   (syntax-rules ()
     ((_ expr)
-     (destructuring-bind (real-start user-start sys-start) (time-usage)
+     (let ((real-start (real-time)) (cpu-start (cpu-time)))
        (let ((result (apply (lambda () expr) '())))
-         (destructuring-bind (real-end user-end sys-end) (time-usage)
-           (let ((real (- real-end real-start)) (user (- user-end user-start)) (sys (- sys-end sys-start)))
-             (display (format "~%;;~10,6f real ~11,6f user ~11,6f sys~%~!" real user sys))
-             result)))))))
+         (let ((real-end (real-time)) (cpu-end (cpu-time)))
+           (let ((real (* (- real-end real-start) 0.001)) (user (* (- cpu-end cpu-start) 0.001)))
+             (format #t ";;~10,6f real ~11,6f user ~%" real user)
+             (format output-port "\t~s~%" real)))
+         result)))))
+
+(define (run-benchmark name count ok? run-maker . args)
+  (format #t "~%;;  ~a (x~a)~%" (pad-space name 7) count)
+  (format output-port "~s" name)
+  (let ((run (apply run-maker args)))
+      (if warmup (run-bench name 1 ok? run))
+      (let ((result (time (run-bench name count ok? run))))
+        (and (not (ok? result)) (format #t "~%;; wrong result: ~s~%~%" result)))
+      (format #t ";;  ----------------------------------------------------------------")
+      (if #f #f)))
+
+(define call-with-output-file/truncate
+  (lambda (file-name proc)
+    (let ((p (open-file-output-port
+              file-name
+              (file-options no-fail)
+              (buffer-mode block)
+              (native-transcoder))))
+      (call-with-port p proc))))
+
+(define fatal-error
+  (lambda x
+    (format #t "fatal-error: ~s" x)
+    (exit)))
+
+(define pad-space
+  (lambda (str n)
+    (let ((pad (- n (string-length str))))
+      (if (<= pad 0)
+          str
+          (string-append str (make-string pad #\space))))))
 
 (define (run-bench name count ok? run)
   (let loop ((i 0) (result (list 'undefined)))
@@ -19,34 +56,10 @@
         (loop (+ i 1) (run))
         result)))
 
-(define (run-benchmark name count ok? run-maker . args)
-  (display (format "~%;;  ~a (x~a)~%~!" (pad-space name 7) count))
-  (let ((run (apply run-maker args)))
-      (if warmup
-          (run-bench name 1 ok? run))
-      (let ((result (time (run-bench name count ok? run))))
-        (and (not (ok? result)) (display (format "~%;; wrong result: ~s~%~!" result))))
-      (display (format ";;  ----------------------------------------------------------------~!"))
-      (unspecified)))
-
 (define load-bench-n-run
   (lambda (name)
     (load (string-append name ".scm"))
     (main)))
-
-(define call-with-output-file/truncate call-with-output-file)
-
-(define fatal-error
-  (lambda x
-    (display (format "fatal-error: ~s" x))
-    (exit 1)))
-
-(define pad-space
-  (lambda (str n)
-    (let ((pad (- n (string-length str))))
-      (if (<= pad 0)
-          str
-          (string-append str " "))))) ;(make-string pad #\space))))))
 
 (define-syntax time-bench
   (lambda (x)
@@ -103,11 +116,19 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-(time-bench paraffins-tuple 100)
+(compile-profile #t)
+(time-bench scheme 3000)
+(profile-dump-html)
 
 (newline)
 (newline)
+
+(if filename
+    (call-with-output-file/truncate
+      filename
+      (lambda (port)
+        (format port "~a" (get-output-string output-port)))))
 
 (exit)
 
-; cd bench; ../build/nanos --script run-nanos-only-one.scm
+; cd bench; chezscheme run-chez-only-one.scm

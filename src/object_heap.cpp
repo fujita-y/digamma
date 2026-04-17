@@ -65,14 +65,14 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_cons.m_cache_limit = base_cache_limit;
   m_cells.m_cache_limit = base_cache_limit / 4;
   m_flonums.m_cache_limit = base_cache_limit / 8;
-  m_symbols.m_cache_limit = base_cache_limit / 8;
-  m_strings.m_cache_limit = base_cache_limit / 8;
-  m_vectors.m_cache_limit = base_cache_limit / 8;
-  m_values.m_cache_limit = base_cache_limit / 8;
-  m_u8vectors.m_cache_limit = base_cache_limit / 8;
-  m_hashtables.m_cache_limit = base_cache_limit / 8;
-  m_environments.m_cache_limit = base_cache_limit / 8;
-  m_ports.m_cache_limit = base_cache_limit / 8;
+  m_symbols.m_cache_limit = base_cache_limit / 16;
+  m_strings.m_cache_limit = base_cache_limit / 16;
+  m_vectors.m_cache_limit = base_cache_limit / 16;
+  m_values.m_cache_limit = base_cache_limit / 16;
+  m_u8vectors.m_cache_limit = base_cache_limit / 16;
+  m_hashtables.m_cache_limit = base_cache_limit / 16;
+  m_environments.m_cache_limit = base_cache_limit / 16;
+  m_ports.m_cache_limit = base_cache_limit / 16;
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].m_cache_limit = base_cache_limit / 8;
 
   s_current = this;
@@ -283,12 +283,19 @@ void object_heap_t::finalize(void* obj) {
   switch (tc6) {
     case tc6_symbol: {
       scm_symbol_rec_t* rec = (scm_symbol_rec_t*)obj;
-      delete_private(rec->name);
+      // Only free externally-allocated name. Inline names are part of the same
+      // collectible slab and reclaimed automatically by the GC.
+      if (rec->name != (uint8_t*)((uintptr_t)rec + sizeof(scm_symbol_rec_t))) {
+        delete_private(rec->name);
+      }
       return;
     }
     case tc6_string: {
       scm_string_rec_t* rec = (scm_string_rec_t*)obj;
-      delete_private(rec->name);
+      // Same inline check as tc6_symbol above.
+      if (rec->name != (uint8_t*)((uintptr_t)rec + sizeof(scm_string_rec_t))) {
+        delete_private(rec->name);
+      }
       return;
     }
     case tc6_u8vector: {
@@ -303,12 +310,20 @@ void object_heap_t::finalize(void* obj) {
     }
     case tc6_vector: {
       scm_vector_rec_t* rec = (scm_vector_rec_t*)obj;
-      delete_private(rec->elts);
+      // Only free externally-allocated elts. If elts points directly after the
+      // header the elements are inline in the same collectible slab object and
+      // will be reclaimed automatically — no explicit free needed.
+      if (rec->elts != (scm_obj_t*)((uintptr_t)rec + sizeof(scm_vector_rec_t))) {
+        delete_private(rec->elts);
+      }
       return;
     }
     case tc6_values: {
       scm_values_rec_t* rec = (scm_values_rec_t*)obj;
-      delete_private(rec->elts);
+      // Same inline check as tc6_vector above.
+      if (rec->elts != (scm_obj_t*)((uintptr_t)rec + sizeof(scm_values_rec_t))) {
+        delete_private(rec->elts);
+      }
       return;
     }
     case tc6_port: {

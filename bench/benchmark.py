@@ -17,11 +17,11 @@ from collections import defaultdict
 # --- Configuration ---
 IMPLEMENTATIONS = {
     "nanos":   {"command": ["make", "nanos"],   "label": "Nanos"},
-    "guile":   {"command": ["make", "guile"],   "label": "Guile"},
     "ypsilon": {"command": ["make", "ypsilon"], "label": "Ypsilon"},
+    "guile":   {"command": ["make", "guile"],   "label": "Guile"},
 }
 
-NUM_RUNS = 1
+NUM_RUNS = 5
 BENCH_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_FILE = os.path.join(BENCH_DIR, "benchmark_report.html")
 
@@ -407,9 +407,9 @@ def generate_html(averages):
     <script>
         function createBarChart(canvasId, labels, realData, userData, bgColors, borderColors) {{
             const ctx = document.getElementById(canvasId).getContext('2d');
-            // Create lighter versions of bgColors for the real-time bars
-            const realBgColors = bgColors.map(c => c.replace(/[\d.]+\)$/, '0.4)'));
-            const realBorderColors = borderColors.map(c => c.replace(/[\d.]+\)$/, '0.6)'));
+            // Create lighter versions of bgColors for the user-time bars
+            const userBgColors = bgColors.map(c => c.replace(/[\d.]+\)$/, '0.4)'));
+            const userBorderColors = borderColors.map(c => c.replace(/[\d.]+\)$/, '0.6)'));
             new Chart(ctx, {{
                 type: 'bar',
                 data: {{
@@ -418,8 +418,8 @@ def generate_html(averages):
                         {{
                             label: 'Real',
                             data: realData,
-                            backgroundColor: realBgColors,
-                            borderColor: realBorderColors,
+                            backgroundColor: bgColors,
+                            borderColor: borderColors,
                             borderWidth: 1.5,
                             borderRadius: 6,
                             borderSkipped: false,
@@ -427,8 +427,8 @@ def generate_html(averages):
                         {{
                             label: 'User',
                             data: userData,
-                            backgroundColor: bgColors,
-                            borderColor: borderColors,
+                            backgroundColor: userBgColors,
+                            borderColor: userBorderColors,
                             borderWidth: 1.5,
                             borderRadius: 6,
                             borderSkipped: false,

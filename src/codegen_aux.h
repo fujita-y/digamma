@@ -28,6 +28,10 @@ extern "C" scm_obj_t c_num_le(scm_obj_t arg1, scm_obj_t arg2);
 extern "C" scm_obj_t c_num_ge(scm_obj_t arg1, scm_obj_t arg2);
 extern "C" void c_error_car(scm_obj_t obj);
 extern "C" void c_error_cdr(scm_obj_t obj);
+extern "C" void c_error_vector_ref(scm_obj_t vec, scm_obj_t idx);
+extern "C" void c_error_vector_set(scm_obj_t vec, scm_obj_t idx, scm_obj_t val);
+extern "C" void c_error_tuple_ref(scm_obj_t tup, scm_obj_t idx);
+extern "C" void c_error_tuple_set(scm_obj_t tup, scm_obj_t idx, scm_obj_t val);
 extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2);
 
 bool is_side_effect_free_aux_helper(const char* name);

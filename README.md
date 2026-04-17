@@ -1,13 +1,19 @@
 # Digamma
 
-Digamma is an experimental Scheme implementation featuring a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support. Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline written entirely in Scheme.
+Digamma is an experimental Scheme implementation featuring a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support. Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline.
+
+## Benchmarks
+
+Digamma is under development. Full benchmarks are not available at this time.
+
+- [Partial gambit benchmark results on Raspberry Pi 5](bench/benchmark_baseline.html)
 
 ## Key Features
 
 - **LLVM JIT compilation**: Compiles Scheme to native code on-demand via LLVM ORC (JITLink + CompileOnDemand).
 - **Concurrent GC**: Mostly-concurrent mark-sweep collector with slab allocator and write barriers for low-latency execution.
 - **Self-hosted compiler**: Multi-stage pipeline (macro expand → optimize → lambda lift → compile) written in Scheme and cross-compiled into a boot image.
-- **Hygienic macros**: Full `syntax-case` and `syntax-rules` with module-level macro export/import.
+- **Hygienic macros**: `syntax-case` and `syntax-rules` with module-level macro export/import.
 - **First-class continuations**: `call/cc`, escape continuations, and `dynamic-wind` powered by Boost.Context.
 - **Tagged pointers**: 3-bit primary tags with 6-bit type codes; ARM64 TBI for zero-cost tag masking in release builds.
 

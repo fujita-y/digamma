@@ -666,6 +666,16 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           return;
         }
       }
+
+      // inline ternary primitives
+      if (inst.argc == 3) {
+        auto it = ternary_code_map.find(code_ptr);
+        if (it != ternary_code_map.end()) {
+          // std::cout << "inline ternary primitive: " << label_name << std::endl;
+          (this->*(it->second))(is_tail);
+          return;
+        }
+      }
     }
   }
 #endif

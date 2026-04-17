@@ -171,6 +171,7 @@ class codegen_t {
   std::unordered_map<scm_obj_t, Opcode> opcode_map;
   std::unordered_map<void*, void (codegen_t::*)(bool)> unary_code_map;
   std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> ternary_code_map;
   std::unordered_map<void*, int> tc6_code_map;
   std::unordered_set<void*> no_gc_code_set;
   // Symbols of known higher-order functions that call their closure arguments
@@ -295,6 +296,10 @@ class codegen_t {
   void emit_num_le_subr(bool is_tail);
   void emit_num_ge_subr(bool is_tail);
   void emit_append2_subr(bool is_tail);
+  void emit_vector_ref_subr(bool is_tail);
+  void emit_vector_set_subr(bool is_tail);
+  void emit_tuple_ref_subr(bool is_tail);
+  void emit_tuple_set_subr(bool is_tail);
 
   // --------------------------------------------------------------------------
   //  IR helpers — types, values, utilities

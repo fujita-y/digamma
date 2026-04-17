@@ -150,6 +150,19 @@ SUBR subr_tuple(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return t;
 }
 
+// make-tuple  (same signature as R6RS make-vector)
+SUBR subr_make_tuple(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc < 1 || argc > 2) throw std::runtime_error("make-tuple: wrong number of arguments");
+  if (!is_fixnum(argv[0])) throw std::runtime_error("make-tuple: first argument must be an exact integer");
+  intptr_t n = fixnum(argv[0]);
+  if (n < 0) throw std::runtime_error("make-tuple: length must be non-negative");
+  scm_obj_t fill = (argc == 2) ? argv[1] : scm_unspecified;
+  scm_obj_t t = make_tuple((int)n);
+  scm_obj_t* elts = tuple_elts(t);
+  for (int i = 0; i < (int)n; i++) elts[i] = fill;
+  return t;
+}
+
 // tuple-ref
 SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   assert(is_tuple(a1));
@@ -225,6 +238,7 @@ void init_subr_misc() {
   reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
   reg("time-usage", (void*)subr_time_usage, 0, 0);
   reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, 0);
+  reg("make-tuple", (void*)subr_make_tuple, 1, 1);
   reg("tuple", (void*)subr_tuple, 0, 1);
   reg("tuple?", (void*)subr_tuple_p, 1, 0);
   reg("tuple-ref", (void*)subr_tuple_ref, 2, 0);

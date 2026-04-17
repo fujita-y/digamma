@@ -25,6 +25,10 @@ bool is_never_return_aux_helper(const char* name) {
   if (starts_with(name, "c_unbound_variable_error")) return true;
   if (starts_with(name, "c_error_car")) return true;
   if (starts_with(name, "c_error_cdr")) return true;
+  if (starts_with(name, "c_error_vector_ref")) return true;
+  if (starts_with(name, "c_error_vector_set")) return true;
+  if (starts_with(name, "c_error_tuple_ref")) return true;
+  if (starts_with(name, "c_error_tuple_set")) return true;
   return false;
 }
 
@@ -115,6 +119,22 @@ extern "C" void c_unbound_variable_error(const char* name) { throw std::runtime_
 extern "C" void c_error_car(scm_obj_t obj) { throw std::runtime_error("error: car: argument must be a pair: " + to_string(obj)); }
 
 extern "C" void c_error_cdr(scm_obj_t obj) { throw std::runtime_error("error: cdr: argument must be a pair: " + to_string(obj)); }
+
+extern "C" void c_error_vector_ref(scm_obj_t vec, scm_obj_t idx) {
+  throw std::runtime_error("error: vector-ref: bad arguments: " + to_string(vec) + " " + to_string(idx));
+}
+
+extern "C" void c_error_vector_set(scm_obj_t vec, scm_obj_t idx, scm_obj_t val) {
+  throw std::runtime_error("error: vector-set!: bad arguments: " + to_string(vec) + " " + to_string(idx) + " " + to_string(val));
+}
+
+extern "C" void c_error_tuple_ref(scm_obj_t tup, scm_obj_t idx) {
+  throw std::runtime_error("error: tuple-ref: bad arguments: " + to_string(tup) + " " + to_string(idx));
+}
+
+extern "C" void c_error_tuple_set(scm_obj_t tup, scm_obj_t idx, scm_obj_t val) {
+  throw std::runtime_error("error: tuple-set!: bad arguments: " + to_string(tup) + " " + to_string(idx) + " " + to_string(val));
+}
 
 extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2) {
   if (arg1 == scm_nil) [[unlikely]] {
