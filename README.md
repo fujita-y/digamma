@@ -6,7 +6,8 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 
 Digamma is under development. Full benchmarks are not available at this time.
 
-- [Partial gambit benchmark results on Raspberry Pi 5](bench/benchmark_baseline.html)
+- [Partial gambit benchmark results on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html)
+
 
 ## Key Features
 
