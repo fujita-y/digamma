@@ -4,9 +4,10 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 
 ## Benchmarks
 
-Digamma is under development. Full benchmarks are not available at this time.
+- Preliminary results from a partial [Gambit benchmark suite on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html) compare **Nanos** against **Ypsilon 2.0.9** and **Guile 3.0.10**. 
+- Each result is a trimmed average of 7 runs (min/max excluded) reporting wall-clock (real) and CPU (user) time.
 
-- [Partial gambit benchmark results on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html)
+- Nanos records the fastest real time in **23 of 30 benchmarks**, with the remaining 7 going to Guile.
 
 
 ## Key Features
