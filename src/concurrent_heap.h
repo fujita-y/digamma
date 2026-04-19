@@ -23,19 +23,8 @@
 
 class collector_usage_t {
  public:
-  double m_duration;
-  double m_sync1;
-  double m_sync2;
-  double m_pause1;
-  double m_pause2;
-  double m_pause3;
-  int m_shade_queue_hazard;
-  int m_barriered_write;
-  int m_barriered_read;
-  int m_barriered_alloc;
-  int m_expand_mark_stack;
-  bool m_recorded;
-  bool m_synchronized;
+  collector_usage_t() { clear(); }
+
   void clear() {
     m_duration = 0.0;
     m_sync1 = 0.0;
@@ -51,14 +40,26 @@ class collector_usage_t {
     m_recorded = false;
     m_synchronized = false;
   }
-  collector_usage_t() { clear(); }
+
+  double m_duration;
+  double m_sync1;
+  double m_sync2;
+  double m_pause1;
+  double m_pause2;
+  double m_pause3;
+  int m_shade_queue_hazard;
+  int m_barriered_write;
+  int m_barriered_read;
+  int m_barriered_alloc;
+  int m_expand_mark_stack;
+  bool m_recorded;
+  bool m_synchronized;
 };
 
 class concurrent_heap_t {
-  friend class concurrent_slab_t;
-
  public:
   concurrent_heap_t();
+
   void init(concurrent_pool_t* pool);
   void terminate();
   void collect();
@@ -70,6 +71,14 @@ class concurrent_heap_t {
   void enqueue_root(void* obj);
   void write_barrier(void* rhs);
   void safepoint();
+
+  void set_snapshot_root_proc(std::function<void()> callback) { m_snapshot_root_proc = callback; }
+  void set_trace_proc(std::function<void(void* obj)> callback) { m_trace_proc = callback; }
+  void set_finalize_proc(std::function<void(void* obj)> callback) { m_finalize_proc = callback; }
+  void set_clear_trip_bytes_proc(std::function<void(void)> callback) { m_clear_trip_bytes_proc = callback; }
+  void set_update_weak_reference_proc(std::function<void(void)> callback) { m_update_weak_reference_proc = callback; }
+  void set_debug_post_completation_proc(std::function<void(void)> callback) { m_debug_post_completation_proc = callback; }
+  void set_debug_check_slab_proc(std::function<void(void* slab)> callback) { m_debug_check_slab_proc = callback; }
 
   spsc_lockfree_queue_t<void*> m_shade_queue;
   collector_usage_t m_usage;
@@ -84,15 +93,11 @@ class concurrent_heap_t {
   bool m_mutator_stopped;
   bool m_stop_the_world;
 
-  void set_snapshot_root_proc(std::function<void()> callback) { m_snapshot_root_proc = callback; }
-  void set_trace_proc(std::function<void(void* obj)> callback) { m_trace_proc = callback; }
-  void set_finalize_proc(std::function<void(void* obj)> callback) { m_finalize_proc = callback; }
-  void set_clear_trip_bytes_proc(std::function<void(void)> callback) { m_clear_trip_bytes_proc = callback; }
-  void set_update_weak_reference_proc(std::function<void(void)> callback) { m_update_weak_reference_proc = callback; }
-  void set_debug_post_completation_proc(std::function<void(void)> callback) { m_debug_post_completation_proc = callback; }
-  void set_debug_check_slab_proc(std::function<void(void* slab)> callback) { m_debug_check_slab_proc = callback; }
-
  private:
+  friend class concurrent_slab_t;
+
+  static void* collector_thread(void* param);
+
   void snapshot_root() {
     if (!m_snapshot_root_proc) {
       fatal("%s:%u m_snapshot_root_proc undefined", __FILE__, __LINE__);
@@ -130,11 +135,14 @@ class concurrent_heap_t {
     if (m_debug_check_slab_proc) m_debug_check_slab_proc(slab);
   }
 
-  static void* collector_thread(void* param);
   void concurrent_collect();
   void synchronized_collect();
   void concurrent_mark();
   bool synchronized_mark();
+
+  __attribute__((no_sanitize("hwaddress"))) void snapshot_stack();
+  void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
+  void deallocate(void* p) { m_concurrent_pool->deallocate(p); }
 
   std::function<void(void* obj)> m_trace_proc;
   std::function<void(void* obj)> m_finalize_proc;
@@ -151,10 +159,6 @@ class concurrent_heap_t {
   bool m_collector_ready;
   bool m_collector_terminating;
   bool m_alloc_barrier;
-
-  __attribute__((no_sanitize("hwaddress"))) void snapshot_stack();
-  void* allocate(size_t size, bool slab, bool gc) { return m_concurrent_pool->allocate(size, slab, gc); }
-  void deallocate(void* p) { m_concurrent_pool->deallocate(p); }
 };
 
 #endif

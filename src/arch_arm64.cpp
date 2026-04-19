@@ -1,3 +1,5 @@
+// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
 
 #include "core.h"
 #include "arch_arm64.h"
@@ -23,7 +25,9 @@ void capture_arm64_core_state(uint64_t regs[11]) {
 
 uint64_t capture_thread_stack_bottom() {
   static thread_local uint64_t cached = 0;
-  if (cached) [[likely]] return cached;
+  if (cached) [[likely]] {
+    return cached;
+  }
   pthread_attr_t attr;
   pthread_getattr_np(pthread_self(), &attr);
   void* stackaddr;

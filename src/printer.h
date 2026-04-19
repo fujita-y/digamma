@@ -10,17 +10,14 @@
 #include <unordered_map>
 
 class printer_t {
-  std::ostream& out;
-  int m_shared_tag;
-  void scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj);
-  void print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode);
-
  public:
   printer_t(std::ostream& os) : out(os), m_shared_tag(0) {}
+
   void write(scm_obj_t obj);
   void write_ss(scm_obj_t obj);
   void display(scm_obj_t obj);
   void format(int argc, scm_obj_t argv[]);
+  void newline();
 
  private:
   void print_flonum(double d);
@@ -31,6 +28,11 @@ class printer_t {
   void print_bytevector(scm_obj_t obj);
   void print_immediate(scm_obj_t obj);
   void print_char(scm_obj_t obj, bool display_mode);
+  void scan(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj);
+  void print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj_t obj, bool display_mode);
+
+  std::ostream& out;
+  int m_shared_tag;
 };
 
 #endif

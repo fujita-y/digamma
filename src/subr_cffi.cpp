@@ -5,6 +5,7 @@
 #include "object.h"
 #include "codegen.h"
 #include "context.h"
+#include "nanos.h"
 #include "nanos_jit.h"
 #include "object_heap.h"
 #include "subr.h"
@@ -36,7 +37,6 @@ using namespace llvm::sys;
 // Static state
 // ============================================================================
 
-static std::mutex s_codegen_lock;
 static std::unordered_map<std::string, void*> s_callout_cache;
 static std::atomic<int> s_trampoline_uid;
 static std::atomic<int> s_cffi_uid;
@@ -286,14 +286,14 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
   auto it = s_callout_cache.find(cache_key);
   if (it != s_callout_cache.end()) return it->second;
 
-  nanos_jit_t* jit = codegen_t::current()->get_jit();
-
   std::string module_id = generate_uid_string();
   std::string function_id = generate_uid_string();
 
   auto Context = std::make_unique<LLVMContext>();
   LLVMContext& C = *Context;
   auto M = std::make_unique<Module>(module_id, C);
+
+  nanos_jit_t* jit = nanos_t::current()->m_jit.get();
   M->setDataLayout(jit->getDataLayout());
   M->setTargetTriple(jit->getTargetTriple());
 
@@ -356,7 +356,7 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
 // ============================================================================
 
 SUBR subr_codegen_cdecl_callout(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  std::lock_guard<std::mutex> lock(s_codegen_lock);
+  std::lock_guard<std::mutex> lock(nanos_t::current()->m_jit->m_lock);
 
   if (argc != 2 && argc != 3)
     throw std::runtime_error("assertion-violation: codegen-cdecl-callout: wrong number of arguments (expected 2 or 3)");
@@ -426,14 +426,14 @@ extern "C" scm_obj_t c_call_scheme(uintptr_t trampoline_uid, intptr_t argc, ...)
 // ============================================================================
 
 static void* compile_callback_thunk(uintptr_t trampoline_uid, const char* signature) {
-  nanos_jit_t* jit = codegen_t::current()->get_jit();
-
   std::string module_id = generate_uid_string();
   std::string function_id = generate_uid_string();
 
   auto Context = std::make_unique<LLVMContext>();
   LLVMContext& C = *Context;
   auto M = std::make_unique<Module>(module_id, C);
+
+  nanos_jit_t* jit = nanos_t::current()->m_jit.get();
   M->setDataLayout(jit->getDataLayout());
   M->setTargetTriple(jit->getTargetTriple());
 
@@ -496,7 +496,7 @@ static void* compile_callback_thunk(uintptr_t trampoline_uid, const char* signat
 // ============================================================================
 
 SUBR subr_codegen_cdecl_callback(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  std::lock_guard<std::mutex> lock(s_codegen_lock);
+  std::lock_guard<std::mutex> lock(nanos_t::current()->m_jit->m_lock);
   if (!is_closure(a1)) throw std::runtime_error("assertion-violation: codegen-cdecl-callback: argument 1 must be a closure");
   if (!is_string(a2)) throw std::runtime_error("assertion-violation: codegen-cdecl-callback: argument 2 must be a string (signature)");
 

@@ -15,22 +15,9 @@
 #define GCSLABP(tag) (((tag) & (PTAG_SLAB | PTAG_GC)) == (PTAG_SLAB | PTAG_GC))
 
 class concurrent_pool_t {
-  friend class concurrent_heap_t;
-
- private:
-  mutex_t m_lock;
-  uint8_t* m_map;
-  size_t m_map_size;
-  int m_pool_memo;
-  int m_pool_usage;
-  int m_pool_threshold;
-
  public:
-  uint8_t* m_pool;
-  size_t m_pool_size;
-  int m_pool_watermark;
-
   concurrent_pool_t();
+
   void init(size_t pool_size, size_t init_size);
   void destroy();
   void* allocate(size_t size, bool slab, bool gc);
@@ -39,6 +26,20 @@ class concurrent_pool_t {
   bool in_slab(void* obj);
   bool in_pool(void* obj);
   bool is_collectible(void* obj);
+
+  uint8_t* m_pool;
+  size_t m_pool_size;
+  int m_pool_watermark;
+
+ private:
+  friend class concurrent_heap_t;
+
+  mutex_t m_lock;
+  uint8_t* m_map;
+  size_t m_map_size;
+  int m_pool_memo;
+  int m_pool_usage;
+  int m_pool_threshold;
 };
 
 #endif

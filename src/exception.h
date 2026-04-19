@@ -7,15 +7,15 @@
 #include "core.h"
 
 class nanos_exit_t : public std::exception {
- private:
-  int status;
-
  public:
   nanos_exit_t(int status) : status(status) {}
   ~nanos_exit_t() override = default;
-  const char* what() const noexcept override { return "nanos_exit_t"; }
 
+  const char* what() const noexcept override { return "nanos_exit_t"; }
   int get_status() const noexcept { return status; }
+
+ private:
+  int status;
 };
 
 #endif

@@ -1,6 +1,10 @@
+// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
+
 #include "core.h"
 #include "reader.h"
 #include "utf8.h"
+
 #include <cstdarg>
 #include <cstring>
 
@@ -576,7 +580,7 @@ scm_obj_t reader_t::read_char(bool& err) {
     int c;
   } named_chars[] = {
       {"alarm", '\a'}, {"backspace", '\b'}, {"delete", 0x7f}, {"escape", 0x1b}, {"newline", '\n'},
-      {"null", 0},     {"return", '\r'},    {"space", ' '},  {"tab", '\t'},
+      {"null", 0},     {"return", '\r'},    {"space", ' '},   {"tab", '\t'},
   };
 
   for (const auto& nc : named_chars) {

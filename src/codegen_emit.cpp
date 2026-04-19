@@ -38,6 +38,9 @@ void codegen_t::emit_inst(const Instruction& inst) {
     case Opcode::CONST:
       emit_const(inst);
       break;
+    case Opcode::UNSPECIFIED:
+      emit_unspecified(inst);
+      break;
     case Opcode::MOV:
       emit_mov(inst);
       break;
@@ -141,6 +144,14 @@ void codegen_t::emit_safepoint(const Instruction& inst) {
 void codegen_t::emit_const(const Instruction& inst) {
   if (inst.rn1 < 0) return;
   uint64_t val = (uint64_t)inst.opr1;
+  llvm::Value* v = createInt64Constant(CT, val);
+  set_reg(inst.rn1, v);
+}
+
+// Emit an unspecified value to a register
+void codegen_t::emit_unspecified(const Instruction& inst) {
+  if (inst.rn1 < 0) return;
+  uint64_t val = scm_unspecified;
   llvm::Value* v = createInt64Constant(CT, val);
   set_reg(inst.rn1, v);
 }

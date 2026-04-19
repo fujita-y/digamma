@@ -6,6 +6,7 @@
 
 #include "core.h"
 #include "object.h"
+#include "context.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -42,6 +43,7 @@ enum class Opcode {
   GLOBAL_SET,
   GLOBAL_REF,
   SAFEPOINT,
+  UNSPECIFIED,
   UNKNOWN
 };
 
@@ -77,22 +79,21 @@ struct Instruction {
 // ============================================================================
 
 struct compiled_code_t {
-  intptr_t (*func_ptr)(void) = nullptr;
-  llvm::orc::ResourceTrackerSP tracker;
-
+ public:
   compiled_code_t() = default;
   compiled_code_t(intptr_t (*f)(void), llvm::orc::ResourceTrackerSP rt) : func_ptr(f), tracker(std::move(rt)) {}
+  compiled_code_t(const compiled_code_t&) = delete;
+  compiled_code_t(compiled_code_t&& other);
   ~compiled_code_t();
 
-  compiled_code_t(const compiled_code_t&) = delete;
   compiled_code_t& operator=(const compiled_code_t&) = delete;
-
-  compiled_code_t(compiled_code_t&& other);
   compiled_code_t& operator=(compiled_code_t&& other);
 
   intptr_t release_and_run();
-
   operator bool() const { return func_ptr != nullptr; }
+
+  intptr_t (*func_ptr)(void) = nullptr;
+  llvm::orc::ResourceTrackerSP tracker;
 };
 
 // ============================================================================
@@ -100,12 +101,36 @@ struct compiled_code_t {
 // ============================================================================
 
 class codegen_t {
-  friend class ClosureAnalysisTest;
-
  public:
   typedef scm_obj_t (*bridge_func_t)(scm_obj_t, int, scm_obj_t*);
 
+  static codegen_t* current() {
+    assert(context::s_current_codegen);
+    return context::s_current_codegen;
+  }
+
+  codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit);
+
+  compiled_code_t compile(scm_obj_t inst_list);
+  llvm::Function* get_or_create_call_closure_bridge();
+  bridge_func_t call_closure_bridge();
+  void destroy() { context::s_current_codegen = nullptr; }
+
+  // Closure parameters: label symbol -> {fixed_argc, has_rest}
+  std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
+  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
+
+  // Cross-function closure-cell label tracking:
+  //   closure_cell_labels[closure_label][cell_idx] = value_label
+  //     Records the closure label stored in each cell slot of a closure,
+  //     populated when reg-cell-set! writes a known closure into a captured
+  //     cell register (make_closure_free_reg is a local in phase2, scoped
+  //     per function to avoid false cross-function matches).
+  std::unordered_map<scm_obj_t, std::unordered_map<int, scm_obj_t>> closure_cell_labels;
+
  private:
+  friend class ClosureAnalysisTest;
+
   // --------------------------------------------------------------------------
   //  Per-function metadata
   // --------------------------------------------------------------------------
@@ -118,73 +143,6 @@ class codegen_t {
     bool has_rest = false;      // For closures
     scm_obj_t label = scm_nil;  // Closure label or nil for main
   };
-
-  // --------------------------------------------------------------------------
-  //  Static / thread-local state
-  // --------------------------------------------------------------------------
-
-  thread_local static codegen_t* s_current;
-
-  // --------------------------------------------------------------------------
-  //  LLVM infrastructure
-  // --------------------------------------------------------------------------
-
-  std::unique_ptr<llvm::LLVMContext> context_uptr;  // owns the current compilation context
-  std::unique_ptr<llvm::IRBuilder<>> builder;       // in-place builder, recreated per compile()
-  nanos_jit_t* jit;
-
-  llvm::Module* main_module = nullptr;  // current module being compiled
-  std::unique_ptr<llvm::Module> main_module_uptr;
-  llvm::Module* closure_module = nullptr;
-  std::unique_ptr<llvm::Module> closure_module_uptr;
-
-  // --------------------------------------------------------------------------
-  //  Code generation state
-  // --------------------------------------------------------------------------
-
-  llvm::Function* main_function = nullptr;
-  llvm::Function* current_function = nullptr;
-  llvm::Value* current_closure_self = nullptr;  // 'self' argument of the current closure
-
-  std::vector<FunctionInfo> functions;
-  FunctionInfo* current_function_info = nullptr;
-
-  std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca
-  std::unordered_map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
-
-  // --------------------------------------------------------------------------
-  //  Closure metadata
-  // --------------------------------------------------------------------------
-
-  std::unordered_map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
-
-  // --------------------------------------------------------------------------
-  //  Cached values
-  // --------------------------------------------------------------------------
-
-  scm_obj_t cached_symbol_label;
-  scm_obj_t cached_symbol_apply;
-  scm_obj_t cached_symbol_safepoint;
-  bridge_func_t cached_call_closure_bridge = nullptr;
-
-  std::unordered_map<scm_obj_t, Opcode> opcode_map;
-  std::unordered_map<void*, void (codegen_t::*)(bool)> nullary_code_map;
-  std::unordered_map<void*, void (codegen_t::*)(bool)> unary_code_map;
-  std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
-  std::unordered_map<void*, void (codegen_t::*)(bool)> ternary_code_map;
-  std::unordered_map<void*, int> tc6_code_map;
-  std::unordered_set<void*> no_gc_code_set;
-  // Symbols of known higher-order functions that call their closure arguments
-  // but never store them on the heap.  Used by phase2b_analyze_no_escape to
-  // avoid falsely marking a closure as escaped when it is only passed to one
-  // of these safe callees.
-  std::unordered_set<scm_obj_t> proc_arg_safe_callees;
-
-  std::vector<scm_obj_t> gc_protected_objects;
-
-  // --------------------------------------------------------------------------
-  //  Compilation pipeline (phases)
-  // --------------------------------------------------------------------------
 
   // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
   // compile() call, then restores the previous state on destruction.
@@ -220,6 +178,7 @@ class codegen_t {
   void parse_instructions(scm_obj_t inst_list);
   void parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_info, scm_obj_t& current_closure_label);
   void parse_const(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info, scm_obj_t& current_closure_label);
+  void parse_unspecified(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_if(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info);
   void parse_jump(const scm_obj_t& inst_obj, Instruction& inst);
@@ -245,6 +204,7 @@ class codegen_t {
 
   void emit_inst(const Instruction& inst);
   void emit_const(const Instruction& inst);
+  void emit_unspecified(const Instruction& inst);
   void emit_mov(const Instruction& inst);
   void emit_if(const Instruction& inst);
   void emit_jump(const Instruction& inst);
@@ -334,37 +294,61 @@ class codegen_t {
   void dump_instructions(const std::vector<Instruction>& instructions);
 
   // --------------------------------------------------------------------------
-  //  Public interface
+  //  LLVM infrastructure
   // --------------------------------------------------------------------------
 
- public:
-  codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit);
+  std::unique_ptr<llvm::LLVMContext> context_uptr;  // owns the current compilation context
+  std::unique_ptr<llvm::IRBuilder<>> builder;       // in-place builder, recreated per compile()
+  nanos_jit_t* jit;
 
-  compiled_code_t compile(scm_obj_t inst_list);
+  llvm::Module* main_module = nullptr;  // current module being compiled
+  std::unique_ptr<llvm::Module> main_module_uptr;
+  llvm::Module* closure_module = nullptr;
+  std::unique_ptr<llvm::Module> closure_module_uptr;
 
-  llvm::Function* get_or_create_call_closure_bridge();
-  bridge_func_t call_closure_bridge();
+  // --------------------------------------------------------------------------
+  //  Code generation state
+  // --------------------------------------------------------------------------
 
-  nanos_jit_t* get_jit() const { return jit; }
+  llvm::Function* main_function = nullptr;
+  llvm::Function* current_function = nullptr;
+  llvm::Value* current_closure_self = nullptr;  // 'self' argument of the current closure
 
-  // Closure parameters: label symbol -> {fixed_argc, has_rest}
-  std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
-  std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
+  std::vector<FunctionInfo> functions;
+  FunctionInfo* current_function_info = nullptr;
 
-  // Cross-function closure-cell label tracking:
-  //   closure_cell_labels[closure_label][cell_idx] = value_label
-  //     Records the closure label stored in each cell slot of a closure,
-  //     populated when reg-cell-set! writes a known closure into a captured
-  //     cell register (make_closure_free_reg is a local in phase2, scoped
-  //     per function to avoid false cross-function matches).
-  std::unordered_map<scm_obj_t, std::unordered_map<int, scm_obj_t>> closure_cell_labels;
+  std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca
+  std::unordered_map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
 
-  void destroy() { s_current = nullptr; }
+  // --------------------------------------------------------------------------
+  //  Closure metadata
+  // --------------------------------------------------------------------------
 
-  static codegen_t* current() {
-    assert(s_current);
-    return s_current;
-  }
+  std::unordered_map<scm_obj_t, llvm::Function*> function_map;  // label symbol -> llvm function
+
+  // --------------------------------------------------------------------------
+  //  Cached values
+  // --------------------------------------------------------------------------
+
+  scm_obj_t cached_symbol_label;
+  scm_obj_t cached_symbol_apply;
+  scm_obj_t cached_symbol_safepoint;
+  bridge_func_t cached_call_closure_bridge = nullptr;
+
+  std::unordered_map<scm_obj_t, Opcode> opcode_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> nullary_code_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> unary_code_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> binary_code_map;
+  std::unordered_map<void*, void (codegen_t::*)(bool)> ternary_code_map;
+  std::unordered_map<void*, int> tc6_code_map;
+  std::unordered_set<void*> no_gc_code_set;
+  // Symbols of known higher-order functions that call their closure arguments
+  // but never store them on the heap.  Used by phase2b_analyze_no_escape to
+  // avoid falsely marking a closure as escaped when it is only passed to one
+  // of these safe callees.
+  std::unordered_set<scm_obj_t> proc_arg_safe_callees;
+
+  std::vector<scm_obj_t> gc_protected_objects;
 };
 
 #endif

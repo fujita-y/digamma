@@ -7,6 +7,7 @@
 #include "nanos_jit.h"
 #include "nanos_options.h"
 #include "object_heap.h"
+#include "port.h"
 #include "printer.h"
 #include "reader.h"
 
@@ -20,8 +21,6 @@
 
 #define IR_MODE    0
 #define IR_VERBOSE 0
-
-nanos_t* nanos_t::s_current = nullptr;
 
 // ============================================================================
 // Initialization
@@ -54,7 +53,7 @@ void nanos_t::init() {
   context::init();
   init_codegen();
   init_subr();
-  s_current = this;
+  context::s_current_nanos = this;
 }
 
 void nanos_t::destroy() {
@@ -332,9 +331,11 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     puts("\n");
 #else
     scm_obj_t result = call_core_eval(obj);
+    port_get_ostream(context::s_standard_error_port)->flush();
     if (result != scm_unspecified) {
       printer.write(result);
-      puts("\n");
+      printer.newline();
+      port_get_ostream(context::s_standard_output_port)->flush();
     }
 #endif
   } catch (const nanos_exit_t& e) {

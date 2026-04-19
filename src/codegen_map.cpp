@@ -9,6 +9,7 @@
 
 void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("const")] = Opcode::CONST;
+  opcode_map[make_symbol("unspecified")] = Opcode::UNSPECIFIED;
   opcode_map[make_symbol("mov")] = Opcode::MOV;
   opcode_map[make_symbol("if")] = Opcode::IF;
   opcode_map[make_symbol("jump")] = Opcode::JUMP;
@@ -229,7 +230,7 @@ void codegen_t::init_opcode_map() {
   intern_safe("map");
   intern_safe("for-each");
   intern_safe("filter");
-  intern_safe("filter-map");    // SRFI-1
+  intern_safe("filter-map");  // SRFI-1
   intern_safe("partition");
   intern_safe("remove");
   intern_safe("find");
@@ -246,16 +247,16 @@ void codegen_t::init_opcode_map() {
   intern_safe("append-map");    // SRFI-1
   intern_safe("flat-map");      // common alias
   intern_safe("filter-fold");
-  intern_safe("list-sort");     // R7RS / SRFI-132
-  intern_safe("sort");          // common
-  intern_safe("sort!");         // in-place sort — predicate not stored
-  intern_safe("vector-map");    // R7RS
-  intern_safe("vector-for-each"); // R7RS
-  intern_safe("string-for-each"); // R7RS
-  intern_safe("string-map");      // R7RS
-  intern_safe("vector-sort");     // SRFI-132
-  intern_safe("vector-sort!");    // SRFI-132
+  intern_safe("list-sort");            // R7RS / SRFI-132
+  intern_safe("sort");                 // common
+  intern_safe("sort!");                // in-place sort — predicate not stored
+  intern_safe("vector-map");           // R7RS
+  intern_safe("vector-for-each");      // R7RS
+  intern_safe("string-for-each");      // R7RS
+  intern_safe("string-map");           // R7RS
+  intern_safe("vector-sort");          // SRFI-132
+  intern_safe("vector-sort!");         // SRFI-132
   intern_safe("vector-stable-sort");   // SRFI-132
-  intern_safe("vector-stable-sort!"); // SRFI-132
-  intern_safe("iota");          // SRFI-1 (no proc, but harmless)
+  intern_safe("vector-stable-sort!");  // SRFI-132
+  intern_safe("iota");                 // SRFI-1 (no proc, but harmless)
 }

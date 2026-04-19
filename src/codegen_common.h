@@ -6,8 +6,8 @@
 
 #include "core.h"
 #include "object.h"
-#include <llvm/IR/IRBuilder.h>
 
+#include <llvm/IR/IRBuilder.h>
 
 // Constants
 static constexpr int BRIDGE_MAX_ARGS = 8;

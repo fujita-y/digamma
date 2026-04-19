@@ -7,15 +7,7 @@
 #include "core.h"
 
 class mutex_t {
-  mutex_t(const mutex_t&);
-  mutex_t& operator=(const mutex_t&);
-
  public:
-  pthread_mutex_t mutex;
-#if MTDEBUG
-  int lock_count;
-#endif
-
   mutex_t() { /* should be blank */ }
 
   void init(bool recursive = false) {
@@ -72,16 +64,27 @@ class mutex_t {
     }
 #endif
   }
+
+  pthread_mutex_t mutex;
+#if MTDEBUG
+  int lock_count;
+#endif
+
+ private:
+  mutex_t(const mutex_t&);
+  mutex_t& operator=(const mutex_t&);
 };
 
 class scoped_lock {
-  scoped_lock(const scoped_lock&);
-  scoped_lock& operator=(const scoped_lock&);
-  mutex_t& m_lock;
-
  public:
   scoped_lock(mutex_t& lock) : m_lock(lock) { m_lock.lock(); }
   ~scoped_lock() { m_lock.unlock(); }
+
+ private:
+  scoped_lock(const scoped_lock&);
+  scoped_lock& operator=(const scoped_lock&);
+
+  mutex_t& m_lock;
 };
 
 #endif

@@ -8,9 +8,23 @@
 #include "object.h"
 
 class reader_t {
-  std::istream& in;
-  std::vector<int> buffer;
+ public:
+  reader_t(std::istream& is);
 
+  scm_obj_t read(bool& err);
+  std::string get_error_message() const { return error_message; }
+  void report_error(bool& err, const char* fmt, ...);
+
+  static const uint8_t CHAR_INVALID = 0x01;
+  static const uint8_t CHAR_WHITESPACE = 0x02;
+  static const uint8_t CHAR_DELIMITER = 0x04;
+  static const uint8_t CHAR_SYMBOL = 0x08;
+  static const uint8_t CHAR_DIGIT = 0x10;
+  static const uint8_t CHAR_HEX_DIGIT = 0x20;
+
+  static uint8_t s_char_map[256];
+
+ private:
   int transform_char(int c);
   int get_char();
   void unget_char(int c);
@@ -34,22 +48,9 @@ class reader_t {
   scm_obj_t read_unsyntax(bool& err);
   scm_obj_t read_unsyntax_splicing(bool& err);
 
+  std::istream& in;
+  std::vector<int> buffer;
   std::string error_message;
-
- public:
-  static const uint8_t CHAR_INVALID = 0x01;
-  static const uint8_t CHAR_WHITESPACE = 0x02;
-  static const uint8_t CHAR_DELIMITER = 0x04;
-  static const uint8_t CHAR_SYMBOL = 0x08;
-  static const uint8_t CHAR_DIGIT = 0x10;
-  static const uint8_t CHAR_HEX_DIGIT = 0x20;
-
-  static uint8_t s_char_map[256];
-
-  reader_t(std::istream& is);
-  scm_obj_t read(bool& err);
-  std::string get_error_message() const { return error_message; }
-  void report_error(bool& err, const char* fmt, ...);
 };
 
 #endif

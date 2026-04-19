@@ -7,7 +7,7 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 - Preliminary results from a partial [Gambit benchmark suite on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html) compare **Nanos** against **Ypsilon 2.0.9** and **Guile 3.0.10**. 
 - Each result is a trimmed average of 7 runs (min/max excluded) reporting wall-clock (real) and CPU (user) time.
 
-- Nanos records the fastest real time in **23 of 30 benchmarks**, with the remaining 7 going to Guile.
+- Nanos records the fastest real time in **23 of 30 benchmarks**.
 
 
 ## Key Features
@@ -18,6 +18,7 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 - **Hygienic macros**: `syntax-case` and `syntax-rules` with module-level macro export/import.
 - **First-class continuations**: `call/cc`, escape continuations, and `dynamic-wind` powered by Boost.Context.
 - **Tagged pointers**: 3-bit primary tags with 6-bit type codes; ARM64 TBI for zero-cost tag masking in release builds.
+- **C Foreign Function Interface (CFFI)**: Dynamically load shared libraries and invoke C functions directly from Scheme, featuring support for primitive types and C callbacks.
 
 ## Architecture
 
@@ -85,6 +86,14 @@ The macro expander includes a module system (`define-module`, `import-module`) w
 - Import modifiers: `prefix`, `only`, `except`, `rename`
 - Macro export and import across module boundaries
 - Aggregated library definitions
+
+### Foreign Function Interface (CFFI)
+
+The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM ORC. It allows seamless interoperability with native code:
+
+- `load-shared-object` / `lookup-shared-object`: Load dynamic libraries and resolve C symbols.
+- `c-function`: Bind Scheme procedures to C functions with strongly-typed signatures (e.g., `int`, `double`, `void*`, `size_t`).
+- `c-callback`: Create native C function pointers that invoke Scheme closures, enabling integration with C libraries that use callbacks.
 
 ## Requirements
 

@@ -343,6 +343,8 @@ void printer_t::write_ss(scm_obj_t obj) {
   print(&visited, obj, false);
 }
 
+void printer_t::newline() { out << std::endl; }
+
 void printer_t::format(int argc, scm_obj_t argv[]) {
   if (argc < 1) fatal("%s:%u too few arguments", __FILE__, __LINE__);
   const char* fmt = (const char*)string_name(argv[0]);

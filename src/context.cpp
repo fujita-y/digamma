@@ -13,17 +13,17 @@ thread_local scm_obj_t context::s_current_error_port;
 thread_local scm_obj_t context::s_current_environment;
 thread_local scm_obj_t context::s_continuation_captured_retval = scm_undef;
 thread_local scm_obj_t context::s_current_winders = scm_nil;
-
-scm_obj_t context::s_standard_input_port;
-scm_obj_t context::s_standard_output_port;
-scm_obj_t context::s_standard_error_port;
-scm_obj_t context::s_interaction_environment;
-scm_obj_t context::s_system_environment;
-std::unordered_set<scm_obj_t> context::s_literals;
-std::mutex context::s_symbols_mutex;
-std::unordered_map<std::string, scm_obj_t> context::s_symbols;
-std::unordered_set<scm_obj_t> context::s_gc_protected;
-std::vector<scm_obj_t> context::s_trampolines;
+thread_local object_heap_t* context::s_current_object_heap;
+thread_local codegen_t* context::s_current_codegen;
+thread_local nanos_t* context::s_current_nanos;
+thread_local scm_obj_t context::s_standard_input_port;
+thread_local scm_obj_t context::s_standard_output_port;
+thread_local scm_obj_t context::s_standard_error_port;
+thread_local scm_obj_t context::s_interaction_environment;
+thread_local scm_obj_t context::s_system_environment;
+thread_local std::unordered_set<scm_obj_t> context::s_literals;
+thread_local std::unordered_set<scm_obj_t> context::s_gc_protected;
+thread_local std::vector<scm_obj_t> context::s_trampolines;
 
 void context::init() {
   if (object_heap_t::current() == nullptr) {
@@ -44,7 +44,6 @@ void context::destroy() {
   port_finalize((scm_port_rec_t*)to_address(s_standard_input_port));
   port_finalize((scm_port_rec_t*)to_address(s_standard_output_port));
   port_finalize((scm_port_rec_t*)to_address(s_standard_error_port));
-  s_symbols.clear();
   s_literals.clear();
   s_gc_protected.clear();
   s_interaction_environment = scm_undef;

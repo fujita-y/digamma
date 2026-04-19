@@ -6,6 +6,7 @@
 #include "codegen_aux.h"
 #include "codegen_common.h"
 #include "context.h"
+#include "nanos_jit.h"
 #include "printer.h"
 
 #include <cstddef>
@@ -29,7 +30,6 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
 #include <random>
-#include "nanos_jit.h"
 
 #define BL (*builder)
 #define CT (*context_uptr)
@@ -82,8 +82,6 @@ intptr_t compiled_code_t::release_and_run() {
 //  Static / thread-local state
 // ============================================================================
 
-thread_local codegen_t* codegen_t::s_current;
-
 // ============================================================================
 //  Constructor
 // ============================================================================
@@ -97,7 +95,7 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
   if (!context::is_gc_protected(cached_symbol_apply)) context::gc_protect(cached_symbol_apply);
   if (!context::is_gc_protected(cached_symbol_safepoint)) context::gc_protect(cached_symbol_safepoint);
   init_opcode_map();
-  s_current = this;
+  context::s_current_codegen = this;
 }
 
 // ============================================================================
@@ -483,6 +481,8 @@ void codegen_t::phase5_optimize_and_verify() {
 // --------------------------------------------------------------------------
 
 compiled_code_t codegen_t::phase6_finalize() {
+  std::lock_guard<std::mutex> lock(jit->m_lock);
+
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
@@ -611,6 +611,9 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
     case Opcode::CONST:
       parse_const(inst_obj, inst, func_info, current_closure_label);
       break;
+    case Opcode::UNSPECIFIED:
+      parse_unspecified(inst_obj, inst, func_info);
+      break;
     case Opcode::MOV:
       parse_mov(inst_obj, inst, func_info);
       break;
@@ -688,6 +691,11 @@ void codegen_t::parse_const(const scm_obj_t& inst_obj, Instruction& inst, Functi
   if (is_cons(inst.opr1) || is_heap_object(inst.opr1)) {
     context::add_literal(inst.opr1);
   }
+}
+
+void codegen_t::parse_unspecified(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info) {
+  inst.rn1 = parse_reg(operand(inst_obj, 1));
+  updateMaxRegister(inst.rn1, func_info.max_reg);
 }
 
 void codegen_t::parse_mov(const scm_obj_t& inst_obj, Instruction& inst, FunctionInfo& func_info) {

@@ -48,27 +48,10 @@ struct slab_traits_t {  // <- locate to bottom of each slab
 typedef void (*object_iter_proc_t)(void* obj, int size, void* refcon);
 
 class concurrent_slab_t {
-  friend class concurrent_heap_t;
-
- private:
-  concurrent_heap_t* m_concurrent_heap;
-  int m_object_size_shift;
-  int m_cache_count;
-  bool m_finalize;
-  void init_freelist(uint8_t* top, uint8_t* bottom, slab_traits_t* traits);
-  void unload_filled(slab_traits_t* traits);
-  void attach(void* slab);
-  void sweep(void* slab);
-
  public:
-  mutex_t m_lock;
-  slab_traits_t* m_vacant;
-  slab_traits_t* m_occupied;
-  int m_bitmap_size;
-  int m_object_size;
-  int m_cache_limit;
   concurrent_slab_t();
   ~concurrent_slab_t();
+
   bool init(concurrent_heap_t* concurrent_heap, int object_size, bool gc, bool finalize);
   void destroy();
   void* new_collectible_object();
@@ -115,6 +98,26 @@ class concurrent_slab_t {
     *p |= bit;
     return false;
   }
+
+  mutex_t m_lock;
+  slab_traits_t* m_vacant;
+  slab_traits_t* m_occupied;
+  int m_bitmap_size;
+  int m_object_size;
+  int m_cache_limit;
+
+ private:
+  friend class concurrent_heap_t;
+
+  void init_freelist(uint8_t* top, uint8_t* bottom, slab_traits_t* traits);
+  void unload_filled(slab_traits_t* traits);
+  void attach(void* slab);
+  void sweep(void* slab);
+
+  concurrent_heap_t* m_concurrent_heap;
+  int m_object_size_shift;
+  int m_cache_count;
+  bool m_finalize;
 };
 
 #endif

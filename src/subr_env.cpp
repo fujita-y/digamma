@@ -2,11 +2,11 @@
 // See LICENSE file for terms and conditions of use.
 
 #include "core.h"
+#include "object.h"
 #include "context.h"
 #include "hash.h"
 #include "list.h"
 #include "nanos.h"
-#include "object.h"
 #include "object_heap.h"
 #include "subr.h"
 

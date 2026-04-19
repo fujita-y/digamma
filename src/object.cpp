@@ -60,9 +60,9 @@ constexpr size_t INTERN_PRIVATE_THRESHOLD = 512;
 scm_obj_t make_symbol(const char* name) {
   object_heap_t& heap = *object_heap_t::current();
   {
-    std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
-    auto it = context::s_symbols.find(name);
-    if (it != context::s_symbols.end()) return it->second;
+    std::lock_guard<std::mutex> lock(heap.m_symbols_mutex);
+    auto it = heap.m_symbol_map.find(name);
+    if (it != heap.m_symbol_map.end()) return it->second;
   }
   int n = strlen(name) + 1;
   scm_symbol_rec_t* rec;
@@ -83,10 +83,10 @@ scm_obj_t make_symbol(const char* name) {
   }
   scm_obj_t obj = tc6_tagged_pointer(rec, tc6_symbol);
   {
-    std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
-    auto it = context::s_symbols.find(name);
-    if (it != context::s_symbols.end()) return it->second;
-    context::s_symbols[name] = obj;
+    std::lock_guard<std::mutex> lock(heap.m_symbols_mutex);
+    auto it = heap.m_symbol_map.find(name);
+    if (it != heap.m_symbol_map.end()) return it->second;
+    heap.m_symbol_map[name] = obj;
   }
   return obj;
 }
@@ -115,9 +115,9 @@ scm_obj_t make_uninterned_symbol(const char* name) {
 bool is_symbol_interned(scm_obj_t x) {
   if (!is_symbol(x)) fatal("%s:%u internal error: symbol expected.", __FILE__, __LINE__);
   object_heap_t& heap = *object_heap_t::current();
-  std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
-  auto it = context::s_symbols.find((char*)symbol_name(x));
-  return it != context::s_symbols.end();
+  std::lock_guard<std::mutex> lock(heap.m_symbols_mutex);
+  auto it = heap.m_symbol_map.find((char*)symbol_name(x));
+  return it != heap.m_symbol_map.end();
 }
 
 uint8_t* symbol_name(scm_obj_t x) {

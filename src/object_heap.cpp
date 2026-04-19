@@ -10,8 +10,6 @@
 
 #define DEFALUT_COLLECT_TRIP_BYTES (4 * 1024 * 1024)
 
-thread_local object_heap_t* object_heap_t::s_current;
-
 void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_concurrent_pool.init(pool_size, init_size);
   m_concurrent_heap.init(&m_concurrent_pool);
@@ -58,7 +56,7 @@ void object_heap_t::init(size_t pool_size, size_t init_size) {
   m_ports.m_cache_limit = base_cache_limit / 16;
   for (int n = 0; n < array_sizeof(m_collectibles); n++) m_collectibles[n].m_cache_limit = base_cache_limit / 8;
 
-  s_current = this;
+  context::s_current_object_heap = this;
 }
 
 void object_heap_t::destroy() {
@@ -71,7 +69,7 @@ void object_heap_t::destroy() {
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
   }
   m_concurrent_pool.destroy();
-  s_current = nullptr;
+  context::s_current_object_heap = nullptr;
 }
 
 void* object_heap_t::alloc_private(size_t size) {
@@ -106,9 +104,9 @@ void object_heap_t::delete_private(void* obj) {
 }
 
 void object_heap_t::sweep_symbol_table() {
-  std::lock_guard<std::mutex> lock(context::s_symbols_mutex);
-  auto it = context::s_symbols.begin();
-  while (it != context::s_symbols.end()) {
+  std::lock_guard<std::mutex> lock(m_symbols_mutex);
+  auto it = m_symbol_map.begin();
+  while (it != m_symbol_map.end()) {
     scm_obj_t value = it->second;
     assert(is_symbol(value));
     void* p = to_address(value);
@@ -116,7 +114,7 @@ void object_heap_t::sweep_symbol_table() {
     if (traits->owner->state(p)) {
       ++it;
     } else {
-      it = context::s_symbols.erase(it);
+      it = m_symbol_map.erase(it);
     }
   }
 }
@@ -331,7 +329,9 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 void object_heap_t::snapshot_root() {
   for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
   for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
-  for (auto closure : context::s_trampolines) { if (closure) enqueue_root(closure); }
+  for (auto closure : context::s_trampolines) {
+    if (closure) enqueue_root(closure);
+  }
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);

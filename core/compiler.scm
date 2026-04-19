@@ -217,7 +217,7 @@
                      (let ((var (cadr expr)) (val (caddr expr)))
                        (codegen val env next-reg #f ctx)
                        (compiler-ctx-emit! ctx `(global-set! ,var r0))
-                       (compiler-ctx-emit! ctx `(global-ref r0 ,var))
+                       (compiler-ctx-emit! ctx '(unspecified r0))
                        (if tail? (compiler-ctx-emit! ctx `(ret)))))
                     ((eq? (car expr) 'if) (codegen-if expr env next-reg tail? ctx))
                     ((eq? (car expr) 'set!) (codegen-set! expr env next-reg tail? ctx))
@@ -306,7 +306,8 @@
             ((eq? (car binding) 'cl)
              (compiler-ctx-emit! ctx `(closure-cell-set! ,(cdr binding) r0)))
             (else
-             (compiler-ctx-emit! ctx `(global-set! ,var r0))))
+             (compiler-ctx-emit! ctx `(global-set! ,var r0))
+             (compiler-ctx-emit! ctx '(unspecified r0))))
       (if tail? (compiler-ctx-emit! ctx `(ret))))))
 
 (define (codegen-lambda expr env next-reg tail? ctx)
