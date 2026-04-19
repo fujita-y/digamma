@@ -65,7 +65,7 @@ void object_heap_t::destroy() {
   m_concurrent_heap.terminate();
   slab_traits_t* traits = SLAB_TRAITS_OF(m_concurrent_pool.m_pool);
   for (int i = 0; i < m_concurrent_pool.m_pool_watermark; i++) {
-    if (GCSLABP(m_concurrent_pool.m_pool[i])) {
+    if (GCSLABP(m_concurrent_pool.m_pool[i]) && traits->owner != &m_cons) {
       traits->owner->iterate(m_concurrent_pool.m_pool + ((intptr_t)i << SLAB_SIZE_SHIFT), renounce, NULL);
     }
     traits = (slab_traits_t*)((intptr_t)traits + SLAB_SIZE);
@@ -255,7 +255,10 @@ void object_heap_t::finalize(void* obj) {
     }
     case tc6_u8vector: {
       scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
-      delete_private(rec->elts);
+      if (rec->owned) {
+        free(rec->elts);
+        rec->elts = nullptr;
+      }
       return;
     }
     case tc6_hashtable: {
@@ -328,6 +331,7 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 void object_heap_t::snapshot_root() {
   for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
   for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
+  for (auto closure : context::s_trampolines) { if (closure) enqueue_root(closure); }
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);
@@ -343,7 +347,53 @@ void object_heap_t::snapshot_root() {
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }
 
-void object_heap_t::renounce(void* obj, int size, void* refcon) {}
+void object_heap_t::renounce(void* obj, int size, void* refcon) {
+  uintptr_t tc6 = tag_tc6_num(*(scm_tc6_t*)obj);
+
+  switch (tc6) {
+    case tc6_u8vector: {
+      scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)obj;
+      if (rec->owned) {
+        free(rec->elts);
+        rec->elts = nullptr;
+      }
+      return;
+    }
+    case tc6_port: {
+      scm_port_rec_t* rec = (scm_port_rec_t*)obj;
+      port_finalize(rec);
+      return;
+    }
+    case tc6_escape: {
+      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
+      if (rec->uctx) free(rec->uctx);
+      rec->uctx = nullptr;
+      return;
+    }
+    case tc6_continuation: {
+      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
+      if (rec->uctx) free(rec->uctx);
+      if (rec->stack_copy) free(rec->stack_copy);
+      if (rec->shadow_copy) free(rec->shadow_copy);
+      rec->uctx = nullptr;
+      rec->stack_copy = nullptr;
+      rec->shadow_copy = nullptr;
+      return;
+    }
+    case tc6_symbol:
+    case tc6_string:
+    case tc6_hashtable:
+    case tc6_vector:
+    case tc6_values:
+    case tc6_tuple:
+    case tc6_closure:
+    case tc6_long_flonum:
+    case tc6_environment:
+    case tc6_cell:
+      return;
+  }
+  assert(false);
+}
 
 #if HPDEBUG
 void object_heap_t::consistency_check() {}

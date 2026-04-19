@@ -152,8 +152,6 @@ uint8_t* string_name(scm_obj_t x) {
   return ((scm_string_rec_t*)to_address(x))->name;
 }
 
-
-
 scm_obj_t make_vector(int nsize, scm_obj_t init) {
   object_heap_t& heap = *object_heap_t::current();
   scm_vector_rec_t* rec;
@@ -209,13 +207,21 @@ scm_obj_t make_values(int nsize) {
 scm_obj_t make_u8vector(int nsize) {
   object_heap_t& heap = *object_heap_t::current();
   scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)heap.alloc_u8vector(nsize);
-  rec->tag = make_tc6_tag(tc6_u8vector);
-  rec->nsize = 0;
-  rec->elts = nullptr;
-  uint8_t* elts = (uint8_t*)heap.alloc_private(nsize * sizeof(uint8_t));
-  memset(elts, 0, nsize * sizeof(uint8_t));
+  uint8_t* elts = (uint8_t*)calloc(sizeof(uint8_t), nsize);
   rec->elts = elts;
   rec->nsize = nsize;
+  rec->owned = true;
+  rec->tag = make_tc6_tag(tc6_u8vector);
+  return tc6_tagged_pointer(rec, tc6_u8vector);
+}
+
+scm_obj_t make_u8vector_mapping(uint8_t* adrs, int nsize) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_u8vector_rec_t* rec = (scm_u8vector_rec_t*)heap.alloc_u8vector(nsize);
+  rec->elts = adrs;
+  rec->nsize = nsize;
+  rec->owned = false;
+  rec->tag = make_tc6_tag(tc6_u8vector);
   return tc6_tagged_pointer(rec, tc6_u8vector);
 }
 

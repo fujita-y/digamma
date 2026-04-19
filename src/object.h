@@ -133,6 +133,7 @@ struct scm_u8vector_rec_t {
   scm_tc6_t tag;
   uint8_t* elts;
   int nsize;
+  bool owned;
 };
 
 struct hashtable_aux_t {
@@ -278,6 +279,7 @@ scm_obj_t make_string(const char* name);
 scm_obj_t make_vector(int nsize, scm_obj_t init);
 scm_obj_t make_values(int nsize);
 scm_obj_t make_u8vector(int nsize);
+scm_obj_t make_u8vector_mapping(uint8_t* adrs, int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
@@ -296,10 +298,10 @@ double short_flonum_to_double(uint64_t u64);
 
 inline double flonum(scm_obj_t x) {
   assert(is_flonum(x));
-  if (is_short_flonum(x)) {
+  if (is_short_flonum(x)) [[likely]] {
     return short_flonum_to_double((uint64_t)x);
   }
-  if (is_long_flonum(x)) {
+  if (is_long_flonum(x)) [[likely]] {
     scm_long_flonum_rec_t* rec = (scm_long_flonum_rec_t*)to_address(x);
     return rec->value;
   }

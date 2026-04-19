@@ -11,10 +11,16 @@
           raise-continuable
           let-values
           let*-values
-          parameterize)
+          parameterize
+          load-shared-object
+          lookup-shared-object
+          c-function
+          c-function/weak
+          c-callback)
   (import (core base)
           (core pretty-print)
           (core destructuring)
           (core exception)
           (core let-values)
-          (core parameterize)))
+          (core parameterize)
+          (core cffi)))

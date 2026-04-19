@@ -29,6 +29,7 @@ class context {
   static std::mutex s_symbols_mutex;
   static std::unordered_map<std::string, scm_obj_t> s_symbols;
   static std::unordered_set<scm_obj_t> s_gc_protected;
+  static std::vector<scm_obj_t> s_trampolines;
 
   static scm_obj_t environment_macro_ref(scm_obj_t key);
   static scm_obj_t environment_variable_ref(scm_obj_t key);

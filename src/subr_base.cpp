@@ -8,7 +8,6 @@
 #include "context.h"
 #include "continuation.h"
 #include "equiv.h"
-#include "hash.h"
 #include "nanos.h"
 #include "object_heap.h"
 #include "printer.h"

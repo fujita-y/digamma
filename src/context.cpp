@@ -23,6 +23,7 @@ std::unordered_set<scm_obj_t> context::s_literals;
 std::mutex context::s_symbols_mutex;
 std::unordered_map<std::string, scm_obj_t> context::s_symbols;
 std::unordered_set<scm_obj_t> context::s_gc_protected;
+std::vector<scm_obj_t> context::s_trampolines;
 
 void context::init() {
   if (object_heap_t::current() == nullptr) {

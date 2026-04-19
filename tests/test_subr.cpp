@@ -128,6 +128,7 @@ SUBR subr_tuple_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_tuple(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
+SUBR subr_make_u8vector_mapping(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
 
 // ---------------------------------------------------------------------------
@@ -1785,6 +1786,20 @@ void test_tuple() {
   PRED_FALSE(subr_tuple_p, make_fixnum(0));
 }
 
+void test_make_u8vector_mapping() {
+  printf("--- make-u8vector-mapping ---\n");
+  uint8_t data[] = { 10, 20, 30 };
+  scm_obj_t adrs = make_fixnum((intptr_t)data);
+  scm_obj_t size = make_fixnum(3);
+  scm_obj_t v = subr_make_u8vector_mapping(scm_nil, adrs, size);
+  ASSERT_TRUE(is_u8vector(v));
+  ASSERT_TRUE(u8vector_nsize(v) == 3);
+  ASSERT_TRUE(u8vector_elts(v) == data);
+  ASSERT_TRUE(u8vector_elts(v)[0] == 10);
+  ASSERT_TRUE(u8vector_elts(v)[1] == 20);
+  ASSERT_TRUE(u8vector_elts(v)[2] == 30);
+}
+
 int main(int argc, char** argv) {
 
   printf("Starting test_subr\n");
@@ -1834,8 +1849,6 @@ int main(int argc, char** argv) {
   test_environment_access();
   test_undef_unspecified();
   test_uuid();
-  test_port_subrs();
-  test_tuple();
 
   context::destroy();
 

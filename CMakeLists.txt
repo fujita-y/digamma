@@ -167,6 +167,8 @@ set(NANOS_CORE_SOURCES
   src/subr_env.cpp
   src/subr_io.cpp
   src/subr_misc.cpp
+  src/subr_cffi.cpp
+  src/subr_uvector.cpp
   src/object.cpp
   src/object_heap.cpp
   src/list.cpp

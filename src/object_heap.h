@@ -32,7 +32,6 @@ class object_heap_t {
 
   uint64_t m_trip_bytes;
 
-  //  void* alloc_object(concurrent_slab_t& slab);
   static void renounce(void* obj, int size, void* refcon);
   void shade(scm_obj_t obj);
   __attribute__((no_sanitize("hwaddress"))) void trace(void* obj);

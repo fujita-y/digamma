@@ -345,6 +345,8 @@ class codegen_t {
   llvm::Function* get_or_create_call_closure_bridge();
   bridge_func_t call_closure_bridge();
 
+  nanos_jit_t* get_jit() const { return jit; }
+
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
   std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;

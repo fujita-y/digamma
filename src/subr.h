@@ -16,6 +16,8 @@ void init_subr_cxr();
 void init_subr_env();
 void init_subr_io();
 void init_subr_misc();
+void init_subr_cffi();
+void init_subr_uvector();
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);
