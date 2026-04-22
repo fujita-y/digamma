@@ -7,6 +7,7 @@
 #include "bit.h"
 #include "context.h"
 #include "port.h"
+#include "subr.h"
 
 #define DEFALUT_COLLECT_TRIP_BYTES (4 * 1024 * 1024)
 
@@ -217,6 +218,11 @@ void object_heap_t::trace(void* obj) {
       }
       return;
     }
+    case tc6_future: {
+      scm_future_rec_t* rec = (scm_future_rec_t*)obj;
+      shade(rec->closure);
+      return;
+    }
     case tc6_long_flonum:
     case tc6_symbol:
     case tc6_string:
@@ -303,6 +309,12 @@ void object_heap_t::finalize(void* obj) {
       rec->shadow_copy = nullptr;
       return;
     }
+    case tc6_future: {
+      scm_future_rec_t* rec = (scm_future_rec_t*)obj;
+      if (rec->future) delete (boost::fibers::shared_future<scm_obj_t>*)rec->future;
+      rec->future = nullptr;
+      return;
+    }
     case tc6_tuple:
     case tc6_closure:
     case tc6_long_flonum:
@@ -329,9 +341,6 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 void object_heap_t::snapshot_root() {
   for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
   for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
-  for (auto closure : context::s_trampolines) {
-    if (closure) enqueue_root(closure);
-  }
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);
@@ -343,6 +352,10 @@ void object_heap_t::snapshot_root() {
   enqueue_root(context::s_current_input_port);
   enqueue_root(context::s_current_output_port);
   enqueue_root(context::s_current_error_port);
+  for (auto closure : context::s_trampolines) {
+    if (closure) enqueue_root(closure);
+  }
+  scan_fiber_stacks();
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }
@@ -378,6 +391,12 @@ void object_heap_t::renounce(void* obj, int size, void* refcon) {
       rec->uctx = nullptr;
       rec->stack_copy = nullptr;
       rec->shadow_copy = nullptr;
+      return;
+    }
+    case tc6_future: {
+      scm_future_rec_t* rec = (scm_future_rec_t*)obj;
+      if (rec->future) delete (boost::fibers::shared_future<scm_obj_t>*)rec->future;
+      rec->future = nullptr;
       return;
     }
     case tc6_symbol:

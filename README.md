@@ -14,6 +14,7 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 
 - **LLVM JIT compilation**: Compiles Scheme to native code on-demand via LLVM ORC (JITLink + CompileOnDemand).
 - **Concurrent GC**: Mostly-concurrent mark-sweep collector with slab allocator and write barriers for low-latency execution.
+- **Fiber-based concurrency**: Lightweight cooperative multitasking with first-class fibers and futures, integrated with the concurrent garbage collector.
 - **Self-hosted compiler**: Multi-stage pipeline (macro expand → optimize → lambda lift → compile) written in Scheme and cross-compiled into a boot image.
 - **Hygienic macros**: `syntax-case` and `syntax-rules` with module-level macro export/import.
 - **First-class continuations**: `call/cc`, escape continuations, and `dynamic-wind` powered by Boost.Context.
@@ -87,6 +88,24 @@ The macro expander includes a module system (`define-module`, `import-module`) w
 - Macro export and import across module boundaries
 - Aggregated library definitions
 
+### Fibers and Concurrency
+
+Digamma implements lightweight, cooperative multitasking using **fibers** and **futures**, backed by `boost::fibers`. Fibers provide a high-level concurrency model that is fully integrated with the concurrent garbage collector:
+
+- **Cooperative Scheduling**: A custom priority-aware scheduler ensures efficient fiber context switching and fair mutator/GC interaction.
+- **Futures**: Synchronization primitives for retrieving results from concurrent computations.
+- **GC Integration**: Fiber stacks are scanned as part of the garbage collection root set, ensuring memory safety during concurrent execution.
+
+#### Primitives
+
+- `(fiber <thunk>)`: Spawns a new fiber and returns a future object.
+- `(fiber-yield)`: Cooperatively yields the processor to other ready fibers.
+- `(fiber-sleep-for <msec>)`: Suspends the current fiber for the specified number of milliseconds.
+- `(future-get <future>)`: Retrieves the value of a future, blocking the current fiber if the result is not yet available.
+- `(future-wait <future>)`: Blocks the current fiber until the future is ready.
+- `(future-wait-for <future> <msec>)`: Blocks with a timeout; returns `#t` if timed out, `#f` otherwise.
+- `(future? <obj>)`: Returns `#t` if the object is a future.
+
 ### Foreign Function Interface (CFFI)
 
 The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM ORC. It allows seamless interoperability with native code:
@@ -100,7 +119,7 @@ The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM OR
 - **LLVM 22** or later
 - **CMake 3.13.4** or later
 - **vcpkg** (recommended for managing dependencies)
-- **Boost 1.88** or later (specifically `boost_context`)
+- **Boost 1.88** or later (specifically `boost_context` and `boost_fiber`)
 - **replxx** (for interactive REPL)
 - **CLI11** (for command-line argument parsing)
 
@@ -131,6 +150,25 @@ Run the `nanos` executable:
 ```
 
 Use `./nanos --help` for a full list of command-line options.
+
+### Quick Start: Fibers
+
+You can use fibers to run concurrent computations:
+
+```scheme
+(let* ((f1 (fiber (lambda () 
+                    (display "Fiber 1 starting\n")
+                    (fiber-sleep-for 100)
+                    (display "Fiber 1 done\n")
+                    42)))
+       (f2 (fiber (lambda ()
+                    (display "Fiber 2 starting\n")
+                    (fiber-yield)
+                    (display "Fiber 2 done\n")
+                    'done))))
+  (display (list (future-get f1) (future-get f2)))
+  (newline))
+```
 
 ## Testing
 

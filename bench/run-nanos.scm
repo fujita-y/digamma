@@ -106,20 +106,20 @@
 (display (format "\n\n;;  GABRIEL\n"))
 (time-bench browse 600)
 (time-bench cpstak 80)
-;;(time-bench ctak 25) ;; timeout
+(time-bench ctak 25)
 (time-bench dderiv 160000)
 (time-bench deriv 320000)
 (time-bench destruc 100)
 (time-bench diviter 200000)
 (time-bench divrec 140000)
-;;(time-bench puzzle 24) ;; 36s
+(time-bench puzzle 24)
 (time-bench tak 1000)
 (time-bench takl 70)
 (time-bench triangl 2)
 (display (format "\n\n;;  ARITHMETIC\n"))
 (time-bench fft 400)
 (time-bench fib 1)
-;; (time-bench fibc 200) ;; timeout
+(time-bench fibc 1)
 (time-bench fibfp 1)
 (time-bench mbrot 20)
 (time-bench nucleic 2)

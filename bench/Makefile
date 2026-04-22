@@ -1,6 +1,9 @@
 nanos:
 	../build/nanos --script run-nanos.scm
 
+nanos1:
+	../build/nanos --script run-nanos-only-one.scm
+
 ypsilon:
 	ypsilon run-ypsilon.scm
 

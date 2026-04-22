@@ -283,6 +283,15 @@ scm_obj_t make_environment(scm_obj_t name) {
   return tc6_tagged_pointer(rec, tc6_environment);
 }
 
+scm_obj_t make_future(scm_obj_t closure, boost::fibers::shared_future<scm_obj_t>* future) {
+  object_heap_t& heap = *object_heap_t::current();
+  scm_future_rec_t* rec = (scm_future_rec_t*)heap.alloc_collectible(sizeof(scm_future_rec_t));
+  rec->tag = make_tc6_tag(tc6_future);
+  rec->closure = closure;
+  rec->future = future;
+  return tc6_tagged_pointer(rec, tc6_future);
+}
+
 scm_obj_t environment_variables(scm_obj_t x) {
   if (!is_environment(x)) fatal("%s:%u internal error: environment expected.", __FILE__, __LINE__);
   return ((scm_environment_rec_t*)to_address(x))->variables;

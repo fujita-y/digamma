@@ -2,6 +2,7 @@
   "name": "nanos",
   "version": "0.9",
   "dependencies": [
+    "boost-fiber",
     "boost-context",
     "replxx",
     "cli11"

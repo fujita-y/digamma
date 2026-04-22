@@ -7,6 +7,8 @@
 #include "core.h"
 #include "arch_arm64.h"
 
+#include <boost/fiber/fiber.hpp>
+#include <boost/fiber/future.hpp>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
 #include <variant>
@@ -28,10 +30,7 @@
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 0110 .110| scm_unspecified
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 0111 .110| scm_eof
 |.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1000 .110| scm_hash_free
-|.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1001 .110| scm_hash_used
-|.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1010 .110| scm_proc_apply
-|.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1011 .110| scm_proc_callcc
-|.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1100 .110| scm_proc_apply_values
+|.... .... .... .... .... .... .... .... .... .... .... .... .... .... 1001 .110| scm_hash_deleted
 
 */
 
@@ -52,21 +51,7 @@ constexpr uintptr_t tc6_escape = 10;
 constexpr uintptr_t tc6_continuation = 11;
 constexpr uintptr_t tc6_port = 12;
 constexpr uintptr_t tc6_tuple = 13;
-/*
-constexpr uintptr_t tc6_subr = ;
-constexpr uintptr_t tc6_continuation = ;
-constexpr uintptr_t tc6_bignum = ;
-constexpr uintptr_t tc6_subr = ;
-constexpr uintptr_t tc6_gloc = ;
-constexpr uintptr_t tc6_tuple = ;
-constexpr uintptr_t tc6_complex = ;
-constexpr uintptr_t tc6_rational = ;
-constexpr uintptr_t tc6_heapenv = ;
-constexpr uintptr_t tc6_heapcont = ;
-constexpr uintptr_t tc6_weakmapping = ;
-constexpr uintptr_t tc6_weakhashtable = ;
-constexpr uintptr_t tc6_socket = ;
-*/
+constexpr uintptr_t tc6_future = 14;
 
 inline scm_obj_t singleton(uintptr_t val) {
   assert(val >= 2 && val <= 15);
@@ -81,13 +66,6 @@ const scm_obj_t scm_unspecified = singleton(6);
 const scm_obj_t scm_eof = singleton(7);
 const scm_obj_t scm_hash_free = singleton(8);
 const scm_obj_t scm_hash_deleted = singleton(9);
-/*
-const scm_obj_t scm_timeout = singleton(?);
-const scm_obj_t scm_shutdown = singleton(?);
-const scm_obj_t scm_proc_apply = singleton(?);
-const scm_obj_t scm_proc_callcc = singleton(?);
-const scm_obj_t scm_proc_apply_values = singleton(?);
-*/
 
 typedef unsigned int (*hash_proc_t)(scm_obj_t obj, unsigned int bound);
 typedef bool (*equiv_proc_t)(scm_obj_t obj1, scm_obj_t obj2);
@@ -204,6 +182,12 @@ struct scm_tuple_rec_t {
   scm_obj_t elts[1];
 };
 
+struct scm_future_rec_t {
+  scm_tc6_t tag;
+  scm_obj_t closure;
+  boost::fibers::shared_future<scm_obj_t>* future;
+};
+
 inline bool is_cons(scm_obj_t x) { return (x & 0x07) == 0x00; }
 inline bool is_heap_object(scm_obj_t x) { return (x & 0x07) == 0x02; }
 
@@ -264,10 +248,10 @@ inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
 inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
 inline bool is_port(scm_obj_t x) { return is_tc6(x, tc6_port); }
 inline bool is_tuple(scm_obj_t x) { return is_tc6(x, tc6_tuple); }
+inline bool is_future(scm_obj_t x) { return is_tc6(x, tc6_future); }
 
 inline scm_obj_t make_fixnum(int64_t i64) { return (i64 << 1) | 0x01; }
 inline scm_obj_t make_char(uintptr_t ucs4) { return (ucs4 << 32) | 0x16; }
-
 scm_obj_t make_cons(scm_obj_t car, scm_obj_t cdr);
 scm_obj_t make_cell(scm_obj_t value);
 scm_obj_t make_list(int len, ...);
@@ -288,13 +272,19 @@ scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_
                             scm_obj_t winders);
 scm_obj_t make_port(scm_obj_t name);
 scm_obj_t make_tuple(int nsize);
+scm_obj_t make_future(scm_obj_t closure, boost::fibers::shared_future<scm_obj_t>* future);
+
+uint8_t* symbol_name(scm_obj_t x);
+uint8_t* string_name(scm_obj_t x);
+scm_obj_t environment_variables(scm_obj_t x);
+scm_obj_t environment_macros(scm_obj_t x);
+uint8_t* environment_name(scm_obj_t x);
+double short_flonum_to_double(uint64_t u64);
 
 inline intptr_t fixnum(scm_obj_t x) {
   assert(is_fixnum(x));
   return ((intptr_t)x >> 1);
 }
-
-double short_flonum_to_double(uint64_t u64);
 
 inline double flonum(scm_obj_t x) {
   assert(is_flonum(x));
@@ -307,13 +297,6 @@ inline double flonum(scm_obj_t x) {
   }
   return nan("");
 }
-
-uint8_t* symbol_name(scm_obj_t x);
-uint8_t* string_name(scm_obj_t x);
-
-scm_obj_t environment_variables(scm_obj_t x);
-scm_obj_t environment_macros(scm_obj_t x);
-uint8_t* environment_name(scm_obj_t x);
 
 inline int vector_nsize(scm_obj_t x) {
   assert(is_vector(x));

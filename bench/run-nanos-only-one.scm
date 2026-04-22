@@ -103,7 +103,7 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-(time-bench paraffins-tuple 100)
+(time-bench puzzle 24) ;; 36s
 
 (newline)
 (newline)

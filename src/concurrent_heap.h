@@ -21,6 +21,8 @@
 #define ROOT_SNAPSHOT_MODE_EVERYTHING 2
 #define ROOT_SNAPSHOT_MODE_RETRY      3
 
+extern void fiber_set_focus_main(bool enable);
+
 class collector_usage_t {
  public:
   collector_usage_t() { clear(); }
@@ -65,6 +67,7 @@ class concurrent_heap_t {
   void collect();
   __attribute__((no_sanitize("hwaddress"))) void shade(void* obj);
   __attribute__((no_sanitize("hwaddress"))) void* is_live_object(uint64_t addr);
+  void snapshot_memory_range(uint64_t begin, uint64_t end);
   void trace_memory_range(uint64_t begin, uint64_t end);
   void interior_shade(void* ref);
   void dequeue_root();

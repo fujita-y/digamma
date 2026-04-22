@@ -91,6 +91,9 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
       case tc6_port:
         out << std::format("#<port {:#x}>", (uintptr_t)obj);
         return;
+      case tc6_future:
+        out << std::format("#<future {:#x}>", (uintptr_t)obj);
+        return;
       case tc6_tuple:
         if (tuple_nsize(obj) == 0) {
           out << "#<tuple>";

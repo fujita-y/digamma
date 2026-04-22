@@ -28,12 +28,12 @@ OUTPUT_FILE = os.path.join(BENCH_DIR, "benchmark_report.html")
 # Benchmark categories
 CATEGORIES = {
     "GABRIEL": [
-        "browse", "cpstak", "dderiv", "deriv", "destruc",
+        "browse", "cpstak", "ctak", "dderiv", "deriv", "destruc",
         "diviter", "divrec", "tak", "takl", "triangl",
     ],
     "ARITHMETIC": [
-        "fft", "fib", "fibfp", "mbrot", "nucleic",
-        "pnpoly", "sum", "sumfp",
+        "fft", "fib", "fibc", "fibfp", "mbrot", "nucleic",
+        "pnpoly", "puzzle", "sum", "sumfp",
     ],
     "MISCELLANEOUS": [
         "ack", "boyer", "nboyer", "conform", "earley",

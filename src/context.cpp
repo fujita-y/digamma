@@ -24,6 +24,24 @@ thread_local scm_obj_t context::s_system_environment;
 thread_local std::unordered_set<scm_obj_t> context::s_literals;
 thread_local std::unordered_set<scm_obj_t> context::s_gc_protected;
 thread_local std::vector<scm_obj_t> context::s_trampolines;
+thread_local std::vector<context::fiber_stack_info> context::s_fiber_stacks;
+thread_local context::fiber_stack_allocator context::s_fiber_stack_allocator;
+
+boost::context::stack_context context::fiber_stack_allocator::allocate() {
+  auto sctx = m_alloc.allocate();
+  context::s_fiber_stacks.push_back({sctx.sp, sctx.size});
+  return sctx;
+}
+
+void context::fiber_stack_allocator::deallocate(boost::context::stack_context sctx) {
+  for (auto it = context::s_fiber_stacks.begin(); it != context::s_fiber_stacks.end(); ++it) {
+    if (it->stack_bottom == sctx.sp) {
+      context::s_fiber_stacks.erase(it);
+      break;
+    }
+  }
+  m_alloc.deallocate(sctx);
+}
 
 void context::init() {
   if (object_heap_t::current() == nullptr) {

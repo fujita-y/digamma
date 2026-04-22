@@ -1,4 +1,7 @@
 #include "core.h"
+#include <cassert>
+#include <cstdarg>
+#include <dlfcn.h>
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
 #include "codegen.h"
@@ -9,9 +12,6 @@
 #include "nanos_jit.h"
 #include "object_heap.h"
 #include "reader.h"
-#include <dlfcn.h>
-#include <cassert>
-#include <cstdarg>
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -86,7 +86,7 @@ void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
   }
 }
 
-SUBR test_qsort_compare(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+__attribute__((no_sanitize("hwaddress"))) SUBR test_qsort_compare(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   uint32_t* p1 = (uint32_t*)fixnum(a1);
   uint32_t* p2 = (uint32_t*)fixnum(a2);
   if (*p1 == *p2) return make_fixnum(0);
@@ -106,9 +106,9 @@ int main(int argc, char** argv) {
     }
 
     scm_obj_t adrs = make_fixnum((intptr_t)sym_snprintf);
-    scm_obj_t sig1 = make_string("qoooox"); // caller: int(void* size_t void*) unsigned-long double -> q o o o o x
-    scm_obj_t sig2 = make_string("qooo");   // callee: int(void* size_t void*) -> q o o o
-    scm_obj_t args[] = { adrs, sig1, sig2 };
+    scm_obj_t sig1 = make_string("qoooox");  // caller: int(void* size_t void*) unsigned-long double -> q o o o o x
+    scm_obj_t sig2 = make_string("qooo");    // callee: int(void* size_t void*) -> q o o o
+    scm_obj_t args[] = {adrs, sig1, sig2};
     scm_obj_t snprintf_closure = subr_codegen_cdecl_callout(scm_nil, 3, args);
 
     scm_obj_t buf = make_u8vector(32);
@@ -116,13 +116,7 @@ int main(int argc, char** argv) {
 
     scm_obj_t fmt = subr_string_utf8_nul(scm_nil, make_string("%06lu %.3lf"));
 
-    scm_obj_t call_args[] = {
-      buf,
-      make_fixnum(32),
-      fmt,
-      make_fixnum(246),
-      make_flonum(123.4)
-    };
+    scm_obj_t call_args[] = {buf, make_fixnum(32), fmt, make_fixnum(246), make_flonum(123.4)};
 
     codegen_t::bridge_func_t bridge = codegen_t::current()->call_closure_bridge();
     scm_obj_t n = (scm_obj_t)bridge(snprintf_closure, 5, call_args);
@@ -157,7 +151,7 @@ int main(int argc, char** argv) {
 
     scm_obj_t adrs_qsort = make_fixnum((intptr_t)sym_qsort);
     scm_obj_t sig_qsort = make_string("ioqqo");
-    scm_obj_t args_qsort[] = { adrs_qsort, sig_qsort };
+    scm_obj_t args_qsort[] = {adrs_qsort, sig_qsort};
     scm_obj_t qsort_closure = subr_codegen_cdecl_callout(scm_nil, 2, args_qsort);
 
     scm_obj_t nums = make_u8vector(20);
@@ -169,21 +163,16 @@ int main(int argc, char** argv) {
     p[4] = 100;
 
     printf("org: ");
-    for(int i=0; i<5; i++) printf("%d ", p[i]);
+    for (int i = 0; i < 5; i++) printf("%d ", p[i]);
     printf("\n");
 
-    scm_obj_t call_args[] = {
-      nums,
-      make_fixnum(5),
-      make_fixnum(4),
-      cmp_callback_ptr_obj
-    };
+    scm_obj_t call_args[] = {nums, make_fixnum(5), make_fixnum(4), cmp_callback_ptr_obj};
 
     codegen_t::bridge_func_t bridge = codegen_t::current()->call_closure_bridge();
     bridge(qsort_closure, 4, call_args);
 
     printf("sorted: ");
-    for(int i=0; i<5; i++) printf("%d ", p[i]);
+    for (int i = 0; i < 5; i++) printf("%d ", p[i]);
     printf("\n");
 
     if (p[0] != 100000 || p[1] != 10000 || p[2] != 1000 || p[3] != 100 || p[4] != 10) {

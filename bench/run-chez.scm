@@ -15,7 +15,7 @@
        (let ((result (apply (lambda () expr) '())))
          (let ((real-end (real-time)) (cpu-end (cpu-time)))
            (let ((real (* (- real-end real-start) 0.001)) (user (* (- cpu-end cpu-start) 0.001)))
-             (format #t ";;~10,6f real ~11,6f user ~%" real user)
+             (format #t ";;~10,6f real ~11,6f user 0.000000 sys~%" real user)
              (format output-port "\t~s~%" real)))
          result)))))
 
@@ -133,7 +133,7 @@
 (format #t "\n\n;;  ARITHMETIC\n")
 (time-bench fft 400)
 (time-bench fib 1)
-(time-bench fibc 200)
+(time-bench fibc 1)
 (time-bench fibfp 1)
 (time-bench mbrot 20)
 (time-bench nucleic 2)

@@ -64,7 +64,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   endif()
 endif()
 
-find_package(Boost CONFIG REQUIRED COMPONENTS context)
+find_package(Boost CONFIG REQUIRED COMPONENTS context fiber)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
@@ -122,11 +122,15 @@ target_compile_options(nanos_config INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
   $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
+  $<$<CONFIG:RelWithDebInfo>:-mllvm>
+  $<$<CONFIG:RelWithDebInfo>:-hwasan-globals=0>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
   $<$<CONFIG:Debug>:-fno-optimize-sibling-calls>
   $<$<CONFIG:Debug>:-fsanitize=hwaddress>
+  $<$<CONFIG:Debug>:-mllvm>
+  $<$<CONFIG:Debug>:-hwasan-globals=0>
 )
 
 # Define link options
@@ -176,13 +180,14 @@ set(NANOS_CORE_SOURCES
   src/reader.cpp
   src/printer.cpp
   src/utf8.cpp
+  src/subr_fiber.cpp
   src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context replxx::replxx Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber replxx::replxx Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets

@@ -161,6 +161,9 @@ exit
 _expand-syntax-case.145bed32-69c0-4df2-8c06-89f53ab9907f
 _expand-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
 _expand-with-syntax.145bed32-69c0-4df2-8c06-89f53ab9907f
+fiber
+fiber-sleep-for
+fiber-yield
 file-exists?
 filter
 fixnum?
@@ -170,6 +173,10 @@ for-each
 format
 free-identifier=?
 _fresh-suffix.145bed32-69c0-4df2-8c06-89f53ab9907f
+future-get
+future-wait
+future-wait-for
+future?
 generate-temporaries
 gensym
 hashtable->alist

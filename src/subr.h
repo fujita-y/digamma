@@ -18,6 +18,19 @@ void init_subr_io();
 void init_subr_misc();
 void init_subr_cffi();
 void init_subr_uvector();
+void init_subr_fiber();
+void scan_fiber_stacks();
+void fiber_set_focus_main(bool enable);
+void future_finalize(void* p);
+scm_obj_t make_future(scm_obj_t closure, boost::fibers::fiber* f, boost::fibers::shared_future<scm_obj_t>* fut);
+
+SUBR subr_fiber(scm_obj_t self, scm_obj_t closure);
+SUBR subr_fiber_yield(scm_obj_t self);
+SUBR subr_fiber_sleep_for(scm_obj_t self, scm_obj_t msec);
+SUBR subr_future_get(scm_obj_t self, scm_obj_t future_obj);
+SUBR subr_future_wait(scm_obj_t self, scm_obj_t future_obj);
+SUBR subr_future_wait_for(scm_obj_t self, scm_obj_t future_obj, scm_obj_t msec);
+SUBR subr_future_p(scm_obj_t self, scm_obj_t obj);
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);

@@ -3,14 +3,14 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
-#include <algorithm>
-#include <unordered_set>
-#include <vector>
 #include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 
+#include <algorithm>
+#include <boost/fiber/all.hpp>
 #include <time.h>
+#include <vector>
 
 #define DEBUG_CONCURRENT_COLLECT 0
 #define ENSURE_REALTIME          (5.0)  // in msec (1.0 == 0.001sec)
@@ -81,9 +81,7 @@ void* concurrent_heap_t::is_live_object(uint64_t addr) {
 }
 
 void concurrent_heap_t::snapshot_stack() {
-  // Thread-local vector: allocated once per thread, reused across STW pauses.
-  // sort+unique gives the same deduplication as unordered_set with no heap allocation.
-  static thread_local std::vector<uint64_t> raw;
+  std::vector<uint64_t> raw;
 
   uint64_t regs[11];
   capture_arm64_core_state(regs);
@@ -117,20 +115,55 @@ void concurrent_heap_t::snapshot_stack() {
 #endif
 }
 
+// Run on mutator thread
+void concurrent_heap_t::snapshot_memory_range(uint64_t begin, uint64_t end) {
+  assert((begin & 0x7) == 0);
+  assert((end & 0x7) == 0);
+  std::vector<uint64_t> raw;
+
+  size_t n = (end - begin) / sizeof(uint64_t);
+  raw.clear();
+  raw.reserve(n);
+  for (uint64_t addr = begin; addr < end; addr += sizeof(uint64_t)) {
+    raw.push_back(prune_memory_address(*(uint64_t*)addr));
+  }
+  std::sort(raw.begin(), raw.end());
+  auto end_it = std::unique(raw.begin(), raw.end());
+  for (auto it = raw.begin(); it != end_it; ++it) {
+    void* live = is_live_object(*it);
+    if (live) enqueue_root(live);
+  }
+}
+
+// Run on collector thread
 void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
   assert((begin & 0x7) == 0);
   assert((end & 0x7) == 0);
-  std::unordered_set<uint64_t> raw;
+  std::vector<uint64_t> raw;
+
+  size_t n = (end - begin) / sizeof(uint64_t);
+  raw.clear();
+  raw.reserve(n);
   for (uint64_t addr = begin; addr < end; addr += sizeof(uint64_t)) {
-    raw.insert(prune_memory_address(*(uint64_t*)addr));
+    raw.push_back(prune_memory_address(*(uint64_t*)addr));
   }
-  for (const auto& addr : raw) {
-    void* live = is_live_object(addr);
+  std::sort(raw.begin(), raw.end());
+  auto end_it = std::unique(raw.begin(), raw.end());
+  for (auto it = raw.begin(); it != end_it; ++it) {
+    void* live = is_live_object(*it);
     if (live) shade(live);
   }
 }
 
 void concurrent_heap_t::safepoint() {
+  if (m_stop_the_world) {
+    boost::fibers::context* ctx = boost::fibers::context::active();
+    if (ctx->is_context(boost::fibers::type::worker_context)) {
+      fiber_set_focus_main(true);
+      boost::this_fiber::yield();
+      return;
+    }
+  }
   while (m_stop_the_world) {
     switch (m_root_snapshot_mode) {
       case ROOT_SNAPSHOT_MODE_GLOBALS:

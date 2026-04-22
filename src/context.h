@@ -6,10 +6,12 @@
 
 #include "core.h"
 #include "object.h"
+
+#include <boost/context/stack_context.hpp>
+#include <boost/fiber/fixedsize_stack.hpp>
 #include <mutex>
-#include <string>
-#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class object_heap_t;
 class codegen_t;
@@ -50,6 +52,23 @@ class context {
   thread_local static std::unordered_set<scm_obj_t> s_literals;
   thread_local static std::unordered_set<scm_obj_t> s_gc_protected;
   thread_local static std::vector<scm_obj_t> s_trampolines;
+
+  struct fiber_stack_info {
+    void* stack_bottom;
+    size_t stack_size;
+  };
+
+  class fiber_stack_allocator {
+   public:
+    boost::context::stack_context allocate();
+    void deallocate(boost::context::stack_context sctx);
+
+   private:
+    boost::fibers::fixedsize_stack m_alloc;
+  };
+
+  thread_local static std::vector<fiber_stack_info> s_fiber_stacks;
+  thread_local static fiber_stack_allocator s_fiber_stack_allocator;
 };
 
 class scoped_gc_protect {
