@@ -6,10 +6,11 @@
 
 #include "core.h"
 #include "object.h"
-#include <memory>
-#include <string>
 #include "context.h"
 #include "nanos_jit.h"
+
+#include <memory>
+#include <string>
 
 #define SUBR extern "C" scm_obj_t
 

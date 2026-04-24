@@ -1,9 +1,15 @@
-// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
-// See LICENSE file for terms and conditions of use.
-
 #include "core.h"
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <llvm/Support/TargetSelect.h>
 #include <sstream>
+#include "../src/context.h"
+#include "../src/core.h"
+#include "../src/equiv.h"
+#include "../src/object.h"
+#include "../src/object_heap.h"
 #include "codegen.h"
 #include "context.h"
 #include "equiv.h"
@@ -12,24 +18,13 @@
 #include "object_heap.h"
 #include "reader.h"
 
-SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_car(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cdr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cadr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_caddr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_null_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_not(scm_obj_t self, scm_obj_t a1);
-SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_write(scm_obj_t self, scm_obj_t a1);
-SUBR subr_newline(scm_obj_t self);
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+static bool some_test_failed = false;
 
 void fatal(const char* fmt, ...) {
   va_list ap;
@@ -55,14 +50,37 @@ void trace(const char* fmt, ...) {
   va_end(ap);
 }
 
+extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0"; }
+
+namespace test_deriv {
+// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
+
+SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_car(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cdr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cadr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_caddr(scm_obj_t self, scm_obj_t a1);
+SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_null_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_not(scm_obj_t self, scm_obj_t a1);
+SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_write(scm_obj_t self, scm_obj_t a1);
+SUBR subr_newline(scm_obj_t self);
+
 static scm_obj_t codegen_and_run(scm_obj_t inst_list) {
   scoped_gc_protect protect(inst_list);
   compiled_code_t func = codegen_t::current()->compile(inst_list);
   scm_obj_t result = (scm_obj_t)func.release_and_run();
   return result;
 }
-
-static bool some_test_failed = false;
 
 static void c_global_set(scm_obj_t sym, scm_obj_t val) {
   object_heap_t* heap = object_heap_t::current();
@@ -146,7 +164,7 @@ void register_core_primitives() {
   c_global_set(make_symbol("newline"), make_closure((void*)subr_newline, 0, 0, 0, nullptr, 1));
 }
 
-int main(int argc, char** argv) {
+int run_test(int argc, char** argv) {
   printf("Starting test_deriv\n");
   fflush(stdout);
   object_heap_t* heap = new object_heap_t();
@@ -377,5 +395,146 @@ int main(int argc, char** argv) {
   context::destroy();
   heap->destroy();
   delete heap;
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_deriv
+
+namespace test_equiv {
+// Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
+// See LICENSE file for terms and conditions of use.
+
+#define ASSERT_TRUE(expr)                       \
+  if (!(expr)) {                                \
+    printf("\033[31mFAIL: %s\033[0m\n", #expr); \
+    some_test_failed = true;                    \
+  } else {                                      \
+    printf("\033[32mPASS: %s\033[0m\n", #expr); \
+  }
+
+#define ASSERT_FALSE(expr)                         \
+  if ((expr)) {                                    \
+    printf("\033[31mFAIL: !(%s)\033[0m\n", #expr); \
+    some_test_failed = true;                       \
+  } else {                                         \
+    printf("\033[32mPASS: !(%s)\033[0m\n", #expr); \
+  }
+
+unsigned int test_address_hash(scm_obj_t obj, unsigned int bound) {
+  return (((uintptr_t)obj >> 3) * 2654435761U + ((uintptr_t)obj & 7)) % bound;
+}
+
+bool test_address_equiv(scm_obj_t obj1, scm_obj_t obj2) { return obj1 == obj2; }
+
+void test_eqv_simple() {
+  printf("test_eqv_simple\n");
+  ASSERT_TRUE(eqv_p(scm_true, scm_true));
+  ASSERT_FALSE(eqv_p(scm_true, scm_false));
+  ASSERT_TRUE(eqv_p(make_fixnum(123), make_fixnum(123)));
+  ASSERT_FALSE(eqv_p(make_fixnum(123), make_fixnum(124)));
+  ASSERT_TRUE(eqv_p(scm_nil, scm_nil));
+  ASSERT_FALSE(eqv_p(scm_nil, scm_undef));
+}
+
+void test_eqv_flonum() {
+  printf("test_eqv_flonum\n");
+  // Short flonum (if fits)
+  ASSERT_TRUE(eqv_p(make_flonum(1.5), make_flonum(1.5)));
+  ASSERT_FALSE(eqv_p(make_flonum(1.5), make_flonum(1.6)));
+
+  // Long flonum
+  scm_obj_t f1 = make_flonum(1.23e100);
+  scm_obj_t f2 = make_flonum(1.23e100);
+  ASSERT_TRUE(eqv_p(f1, f2));
+  ASSERT_FALSE(eqv_p(f1, make_flonum(1.24e100)));
+
+  ASSERT_TRUE(eqv_p(make_flonum(0.0), make_flonum(-0.0)));
+}
+
+void test_equal_list(object_heap_t* heap) {
+  printf("test_equal_list\n");
+  scm_obj_t l1 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
+  scm_obj_t l2 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
+  scm_obj_t l3 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(4));
+
+  ASSERT_TRUE(equal_p(l1, l2));
+
+  ASSERT_FALSE(equal_p(l1, l3));
+}
+
+void test_equal_vector(object_heap_t* heap) {
+  printf("test_equal_vector\n");
+  scm_obj_t v1 = make_vector(3, make_fixnum(0));
+  scm_obj_t v2 = make_vector(3, make_fixnum(0));
+  scm_obj_t v3 = make_vector(3, make_fixnum(1));
+  scm_obj_t* elts1 = vector_elts(v1);
+  scm_obj_t* elts2 = vector_elts(v2);
+  elts1[0] = make_fixnum(10);
+  elts2[0] = make_fixnum(10);
+
+  ASSERT_TRUE(equal_p(v1, v2));
+
+  ASSERT_FALSE(equal_p(v1, v3));
+}
+
+void test_equal_string(object_heap_t* heap) {
+  printf("test_equal_string\n");
+  scm_obj_t s1 = make_string("hello");
+  scm_obj_t s2 = make_string("hello");
+  scm_obj_t s3 = make_string("world");
+
+  ASSERT_TRUE(equal_p(s1, s2));
+
+  ASSERT_FALSE(equal_p(s1, s3));
+}
+
+void test_equal_circular(object_heap_t* heap) {
+  printf("test_equal_circular\n");
+  // l1 = (1 . #0)
+  scm_obj_t pair1 = make_cons(make_fixnum(1), scm_nil);
+  ((scm_cons_rec_t*)pair1)->cdr = pair1;
+
+  // l2 = (1 . #0)
+  scm_obj_t pair2 = make_cons(make_fixnum(1), scm_nil);
+  ((scm_cons_rec_t*)pair2)->cdr = pair2;
+
+  // l3 = (1 . 1 . #0)
+  scm_obj_t pair3 = make_cons(make_fixnum(1), scm_nil);
+  scm_obj_t pair3_head = make_cons(make_fixnum(1), pair3);
+  ((scm_cons_rec_t*)pair3)->cdr = pair3_head;
+
+  scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
+
+  ASSERT_TRUE(equal_p(pair1, pair2));
+
+  // Reset visited for next check
+  visited = make_hashtable(test_address_hash, test_address_equiv, 16);
+  ASSERT_TRUE(equal_p(pair1, pair3_head));
+}
+
+int run_test(int argc, char** argv) {
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
+
+  test_eqv_simple();
+  test_eqv_flonum();
+
+  test_equal_list(heap);
+  test_equal_vector(heap);
+  test_equal_string(heap);
+  test_equal_circular(heap);
+
+  context::destroy();
+  heap->destroy();
+  delete heap;
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_equiv
+
+int main(int argc, char** argv) {
+  test_deriv::run_test(argc, argv);
+  test_equiv::run_test(argc, argv);
   return some_test_failed ? 1 : 0;
 }

@@ -29,9 +29,9 @@ void codegen_t::init_opcode_map() {
   opcode_map[make_symbol("reg-cell-set!")] = Opcode::REG_CELL_SET;
   opcode_map[make_symbol("make-cell")] = Opcode::MAKE_CELL;
   opcode_map[make_symbol("safepoint")] = Opcode::SAFEPOINT;
-  object_heap_t* heap = object_heap_t::current();
+
   for (const auto& pair : opcode_map) {
-    if (!context::is_gc_protected(pair.first)) context::gc_protect(pair.first);
+    context::add_literal(pair.first);
   }
 
   // initialize code_ptr dispatch maps
@@ -223,7 +223,7 @@ void codegen_t::init_opcode_map() {
   // R7RS list / vector / string traversal
   auto intern_safe = [&](const char* name) {
     scm_obj_t sym = make_symbol(name);
-    if (!context::is_gc_protected(sym)) context::gc_protect(sym);
+    context::add_literal(sym);
     proc_arg_safe_callees.insert(sym);
   };
 

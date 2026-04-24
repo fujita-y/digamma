@@ -21,8 +21,6 @@
 #define ROOT_SNAPSHOT_MODE_EVERYTHING 2
 #define ROOT_SNAPSHOT_MODE_RETRY      3
 
-extern void fiber_set_focus_main(bool enable);
-
 class collector_usage_t {
  public:
   collector_usage_t() { clear(); }

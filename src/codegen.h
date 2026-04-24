@@ -100,6 +100,7 @@ struct compiled_code_t {
 //  codegen_t — bytecode-to-LLVM-IR compiler
 // ============================================================================
 
+
 class codegen_t {
  public:
   typedef scm_obj_t (*bridge_func_t)(scm_obj_t, int, scm_obj_t*);
@@ -119,20 +120,10 @@ class codegen_t {
   // Closure parameters: label symbol -> {fixed_argc, has_rest}
   std::unordered_map<scm_obj_t, std::pair<int, bool>> closure_params;
   std::unordered_map<scm_obj_t, scm_obj_t> global_closure_defs;
-
-  // Cross-function closure-cell label tracking:
-  //   closure_cell_labels[closure_label][cell_idx] = value_label
-  //     Records the closure label stored in each cell slot of a closure,
-  //     populated when reg-cell-set! writes a known closure into a captured
-  //     cell register (make_closure_free_reg is a local in phase2, scoped
-  //     per function to avoid false cross-function matches).
   std::unordered_map<scm_obj_t, std::unordered_map<int, scm_obj_t>> closure_cell_labels;
 
- private:
-  friend class ClosureAnalysisTest;
-
   // --------------------------------------------------------------------------
-  //  Per-function metadata
+  //  Internal phases and state (exposed for testing)
   // --------------------------------------------------------------------------
 
   struct FunctionInfo {
@@ -144,6 +135,13 @@ class codegen_t {
     scm_obj_t label = scm_nil;  // Closure label or nil for main
   };
 
+  void phase0_create_module();
+  void phase1_parse_instructions(scm_obj_t inst_list);
+  void phase2a_analyze_closure_labels();
+
+  std::vector<FunctionInfo> functions;
+
+ private:
   // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
   // compile() call, then restores the previous state on destruction.
   struct CompileScope {
@@ -153,9 +151,6 @@ class codegen_t {
     ~CompileScope();
   };
 
-  void phase0_create_module();
-  void phase1_parse_instructions(scm_obj_t inst_list);
-  void phase2a_analyze_closure_labels();
   void phase2b_analyze_no_escape();
   void phase2c_analyze_safepoints();
   void phase2d_analyze_cell_stack_alloc();
@@ -314,7 +309,6 @@ class codegen_t {
   llvm::Function* current_function = nullptr;
   llvm::Value* current_closure_self = nullptr;  // 'self' argument of the current closure
 
-  std::vector<FunctionInfo> functions;
   FunctionInfo* current_function_info = nullptr;
 
   std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca

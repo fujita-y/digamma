@@ -6,6 +6,7 @@
 #include "arch_arm64.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
+#include "fiber.h"
 
 #include <algorithm>
 #include <boost/fiber/all.hpp>

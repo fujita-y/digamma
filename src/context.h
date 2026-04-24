@@ -9,13 +9,13 @@
 
 #include <boost/context/stack_context.hpp>
 #include <boost/fiber/fixedsize_stack.hpp>
-#include <mutex>
 #include <unordered_set>
 #include <vector>
 
 class object_heap_t;
 class codegen_t;
 class nanos_t;
+class asio_context;
 
 class context {
  public:
@@ -32,7 +32,6 @@ class context {
   static void add_literal(scm_obj_t obj);
   static void gc_protect(scm_obj_t obj);
   static void gc_unprotect(scm_obj_t obj);
-  static bool is_gc_protected(scm_obj_t obj);
 
   thread_local static scm_obj_t s_current_input_port;
   thread_local static scm_obj_t s_current_output_port;
@@ -50,7 +49,7 @@ class context {
   thread_local static scm_obj_t s_interaction_environment;
   thread_local static scm_obj_t s_system_environment;
   thread_local static std::unordered_set<scm_obj_t> s_literals;
-  thread_local static std::unordered_set<scm_obj_t> s_gc_protected;
+  thread_local static std::unordered_multiset<scm_obj_t> s_gc_protected;
   thread_local static std::vector<scm_obj_t> s_trampolines;
 
   struct fiber_stack_info {
@@ -67,59 +66,43 @@ class context {
     boost::fibers::fixedsize_stack m_alloc;
   };
 
+  thread_local static int s_live_fiber_count;
   thread_local static std::vector<fiber_stack_info> s_fiber_stacks;
   thread_local static fiber_stack_allocator s_fiber_stack_allocator;
+  thread_local static asio_context* s_asio_context;
 };
 
 class scoped_gc_protect {
  public:
-  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) {
-    if (context::is_gc_protected(obj)) {
-      m_protected = false;
-    } else {
-      context::gc_protect(obj);
-      m_protected = true;
-    }
-  }
+  scoped_gc_protect(scm_obj_t obj) : m_obj(obj) { context::gc_protect(m_obj); }
   ~scoped_gc_protect() {
-    if (m_protected) context::gc_unprotect(m_obj);
+    context::gc_unprotect(m_obj);
     m_obj = (scm_obj_t) nullptr;
   }
 
  private:
   scoped_gc_protect(const scoped_gc_protect&) = delete;
   scoped_gc_protect& operator=(const scoped_gc_protect&) = delete;
-
   scm_obj_t m_obj;
-  bool m_protected;
 };
 
 class scoped_gc_protect_vector {
  public:
-  scoped_gc_protect_vector(const std::vector<scm_obj_t>& objs) : m_obj_vec(objs) {
-    for (scm_obj_t obj : m_obj_vec) {
-      if (context::is_gc_protected(obj)) {
-        m_protected_vec.push_back(false);
-      } else {
-        context::gc_protect(obj);
-        m_protected_vec.push_back(true);
-      }
+  scoped_gc_protect_vector(const std::vector<scm_obj_t>& objs) : m_objs(objs) {
+    for (scm_obj_t obj : m_objs) {
+      context::gc_protect(obj);
     }
   }
   ~scoped_gc_protect_vector() {
-    for (size_t i = 0; i < m_obj_vec.size(); ++i) {
-      if (m_protected_vec[i]) {
-        context::gc_unprotect(m_obj_vec[i]);
-      }
+    for (size_t i = 0; i < m_objs.size(); ++i) {
+      context::gc_unprotect(m_objs[i]);
     }
   }
 
  private:
   scoped_gc_protect_vector(const scoped_gc_protect_vector&) = delete;
   scoped_gc_protect_vector& operator=(const scoped_gc_protect_vector&) = delete;
-
-  std::vector<scm_obj_t> m_obj_vec;
-  std::vector<bool> m_protected_vec;
+  std::vector<scm_obj_t> m_objs;
 };
 
 #endif

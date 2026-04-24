@@ -1,7 +1,9 @@
-;; tests/test-fiber.scm
-
+;; ==== Combined test file ====
 (define *pass-count* 0)
 (define *fail-count* 0)
+
+;; ==== from test-fiber.scm ====
+;; tests/test-fiber.scm
 
 (define (test name output expected)
   (if (equal? output expected)
@@ -138,6 +140,100 @@
 
 ;; Summary
 (newline)
+
+
+;; ==== from test_put_io.scm ====
+(display "Testing put-char and put-string...")
+(newline)
+
+(define (test-it)
+  (define (check name expected actual)
+    (if (equal? expected actual)
+        (begin (display "PASS: ") (display name) (newline))
+        (begin
+          (display "FAIL: ") (display name) (newline)
+          (display "  expected: ") (write expected) (newline)
+          (display "  actual:   ") (write actual) (newline)
+          (error 'test "failed"))))
+
+  (call-with-values (lambda () (open-string-output-port))
+    (lambda (p extract)
+      (put-char p #\a)
+      (put-char p #\b)
+      (put-char p #\c)
+      (check "put-char basic" "abc" (extract))))
+
+  (call-with-values (lambda () (open-string-output-port))
+    (lambda (p extract)
+      (put-string p "hello")
+      (check "put-string basic" "hello" (extract))))
+
+  (call-with-values (lambda () (open-string-output-port))
+    (lambda (p extract)
+      (put-string p "hello world" 6)
+      (check "put-string start" "world" (extract))))
+
+  (call-with-values (lambda () (open-string-output-port))
+    (lambda (p extract)
+      (put-string p "hello world" 0 5)
+      (check "put-string start/count" "hello" (extract))))
+
+  (call-with-values (lambda () (open-string-output-port))
+    (lambda (p extract)
+      (put-char p #\λ)
+      (check "put-char unicode" "λ" (extract))))
+  
+  (display "All put tests passed!")
+  (newline))
+
+(test-it)
+
+
+;; ==== from test_write_ss.scm ====
+; test_write_ss.scm — SRFI-38 write/ss tests
+
+(define (check label result expected)
+  (if (string=? result expected)
+      (begin (display "PASS: ") (display label) (newline))
+      (begin (display "FAIL: ") (display label)
+             (display " got: ") (write result)
+             (display " expected: ") (write expected) (newline))))
+
+(define (capture-write-ss expr)
+  (call-with-values
+    open-string-output-port
+    (lambda (port extract)
+      (write/ss expr port)
+      (extract))))
+
+; Test 1: simple list
+(check "simple list" (capture-write-ss '(1 2 3)) "(1 2 3)")
+
+; Test 2: vector no sharing
+(check "vector no sharing" (capture-write-ss '#(1 2 3)) "#(1 2 3)")
+
+; Test 3: shared cons
+(let ((x (list 1 2)))
+  (check "shared cons" (capture-write-ss (list x x)) "(#0=(1 2) #0#)"))
+
+; Test 4: shared cons in vector
+(let ((x (list 'a 'b)))
+  (check "shared in vector" (capture-write-ss (vector x x)) "#(#0=(a b) #0#)"))
+
+; Test 5: circular list (1 . #0#)
+(let ((x (list 1)))
+  (set-cdr! x x)
+  (check "circular list" (capture-write-ss x) "#0=(1 . #0#)"))
+
+; Test 6: shared string
+(let ((s "hello"))
+  (check "shared string" (capture-write-ss (list s s)) "(#0=\"hello\" #0#)"))
+
+(display "done") (newline)
+
+
+
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
     (begin (display "ALL TESTS PASSED.\n") (exit 0))
     (begin (display "FAILED ") (display *fail-count*) (display " TESTS.\n") (exit 1)))

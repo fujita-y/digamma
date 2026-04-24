@@ -283,11 +283,11 @@ scm_obj_t make_environment(scm_obj_t name) {
   return tc6_tagged_pointer(rec, tc6_environment);
 }
 
-scm_obj_t make_future(scm_obj_t closure, boost::fibers::shared_future<scm_obj_t>* future) {
+scm_obj_t make_future(scm_obj_t provider, boost::fibers::shared_future<scm_obj_t>* future) {
   object_heap_t& heap = *object_heap_t::current();
   scm_future_rec_t* rec = (scm_future_rec_t*)heap.alloc_collectible(sizeof(scm_future_rec_t));
   rec->tag = make_tc6_tag(tc6_future);
-  rec->closure = closure;
+  rec->datum = provider;
   rec->future = future;
   return tc6_tagged_pointer(rec, tc6_future);
 }
@@ -350,11 +350,11 @@ scm_obj_t make_port(scm_obj_t name) {
   scm_port_rec_t* rec = (scm_port_rec_t*)heap.alloc_port();
   rec->tag = make_tc6_tag(tc6_port);
   rec->name = name;
-  rec->aux = nullptr;
-  port_aux_t* aux = new port_aux_t;
-  rec->aux = aux;
-  rec->aux->stream = std::monostate{};
-  rec->aux->owned = false;
+  rec->istream = nullptr;
+  rec->ostream = nullptr;
+  rec->iostream = nullptr;
+  rec->asio_stream = nullptr;
+  rec->fd = -1;
   return tc6_tagged_pointer(rec, tc6_port);
 }
 

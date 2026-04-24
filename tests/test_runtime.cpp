@@ -1,23 +1,400 @@
+#include "core.h"
+#include "object.h"
+#include <cassert>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <dlfcn.h>
+#include <initializer_list>
+#include <llvm/Support/TargetSelect.h>
+#include <sanitizer/hwasan_interface.h>
+#include <sstream>
+#include <vector>
+#include "../src/codegen.h"
+#include "../src/codegen_aux.h"
+#include "../src/context.h"
+#include "../src/continuation.h"
+#include "../src/object.h"
+#include "../src/object_heap.h"
+#include "../src/port.h"
+#include "codegen.h"
+#include "context.h"
+#include "continuation.h"
+#include "equiv.h"
+#include "hash.h"
+#include "nanos.h"
+#include "nanos_jit.h"
+#include "object_heap.h"
+#include "reader.h"
+
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+static bool some_test_failed = false;
+
+void fatal(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+void warning(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "\n");
+}
+
+void trace(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+}
+
+extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0"; }
+
+namespace test_call_cc {
+
+static bool test_return_normally() {
+  auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
+  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
+  scm_obj_t result = subr_call_cc(scm_undef, proc);
+  if (result != make_fixnum(42)) {
+    printf("\033[31m###### call/cc normal return failed\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcall/cc normal return passed\033[0m\n");
+  return true;
+}
+
+static bool test_invoke_continuation() {
+  auto invoke_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    scm_obj_t cont = argv[0];
+    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
+    return c_apply_helper(cont, 1, args);
+  };
+  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
+  scm_obj_t result = subr_call_cc(scm_undef, proc);
+  if (result != make_fixnum(100)) {
+    printf("\033[31m###### call/cc invoke failed\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcall/cc invoke continuation passed\033[0m\n");
+  return true;
+}
+
+static bool test_multishot() {
+  static int count = 0;
+  static scm_obj_t global_cont = scm_undef;
+
+  auto multishot_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    global_cont = argv[0];
+    context::gc_protect(global_cont);
+    return make_fixnum(count++);
+  };
+
+  scm_obj_t proc = make_closure((void*)*+(multishot_proc), 0, 1, 0, nullptr, 1);
+  printf("test_multishot: calling call/cc (initial)\n");
+  fflush(stdout);
+  scm_obj_t result = subr_call_cc(scm_undef, proc);
+  printf("test_multishot: call/cc returned result=%ld, count=%d\n", is_fixnum(result) ? fixnum(result) : -1, count);
+  fflush(stdout);
+
+  if (count < 3) {
+    printf("test_multishot: incrementing count and invoking global_cont (count=%d -> %d)\n", count, count + 1);
+    fflush(stdout);
+    int next_val = count++;  // Increment AFTER return
+    scm_obj_t args[] = {make_cons(make_fixnum(next_val), scm_nil)};
+    c_apply_helper(global_cont, 1, args);
+  }
+
+  if (count == 3 && result == make_fixnum(2)) {
+    printf("\033[32mcall/cc multishot passed\033[0m\n");
+    return true;
+  }
+
+  printf("\033[31m###### call/cc multishot failed (count=%d, result=%ld)\033[0m\n", count, is_fixnum(result) ? fixnum(result) : -1);
+  some_test_failed = true;
+  return false;
+}
+
+#ifdef __has_feature
+  #if __has_feature(hwaddress_sanitizer)
+
+  #endif
+#endif
+
+int run_test(int argc, char** argv) {
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
+  context::init();
+
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  codegen_t* codegen = nullptr;
+  {
+    auto jit_expected = nanos_jit_t::Create();
+    if (!jit_expected) exit(1);
+    auto jit = std::move(*jit_expected);
+    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+    codegen = new codegen_t(std::move(ts_ctx), jit.get());
+
+    test_return_normally();
+    test_invoke_continuation();
+    test_multishot();
+  }
+  codegen->destroy();
+  delete codegen;
+
+  context::destroy();
+  heap->destroy();
+  delete heap;
+  puts("all test done");
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_call_cc
+
+namespace test_call_ec {
+
+static bool test_return_normally() {
+  auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
+
+  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
+  scm_obj_t result = subr_call_ec(scm_undef, proc);
+
+  if (result != make_fixnum(42)) {
+    printf("\033[31m###### call/ec normal return failed\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcall/ec normal return passed\033[0m\n");
+  return true;
+}
+
+static bool test_invoke_continuation() {
+  auto invoke_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    scm_obj_t cont = argv[0];
+    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
+    return c_apply_helper(cont, 1, args);
+  };
+
+  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
+  scm_obj_t result = subr_call_ec(scm_undef, proc);
+
+  if (result != make_fixnum(100)) {
+    printf("\033[31m###### call/ec invoke passed\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcall/ec invoke continuation passed\033[0m\n");
+  return true;
+}
+
+static bool test_double_invoke_fails() {
+  auto invoke_twice_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    scm_obj_t cont = argv[0];
+    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
+    c_apply_helper(cont, 1, args);
+    return make_fixnum(999);
+  };
+
+  scm_obj_t proc = make_closure((void*)*+(invoke_twice_proc), 0, 1, 0, nullptr, 1);
+  scm_obj_t result = subr_call_ec(scm_undef, proc);
+
+  if (result != make_fixnum(100)) {
+    printf("\033[31m###### call/ec double invoke failed\033[0m\n");
+    some_test_failed = true;
+    return false;
+  }
+  printf("\033[32mcall/ec double invoke passed\033[0m\n");
+  return true;
+}
+
+#ifdef __has_feature
+  #if __has_feature(hwaddress_sanitizer)
+
+  #endif
+#endif
+
+static void c_global_set(scm_obj_t key, scm_obj_t value) {
+  assert(is_symbol(key));
+  context::environment_variable_set(key, value);
+}
+
+int run_test(int argc, char** argv) {
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
+  heap->m_collect_trip_bytes = 1024 * 512;
+
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  {
+    auto jit_expected = nanos_jit_t::Create();
+    if (!jit_expected) {
+      fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
+      exit(1);
+    }
+    auto jit = std::move(*jit_expected);
+
+    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+
+    codegen_t cg(std::move(ts_ctx), jit.get());
+
+    scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, 1);
+    c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
+
+    test_return_normally();
+    test_invoke_continuation();
+    test_double_invoke_fails();
+  }
+
+  context::destroy();
+  heap->destroy();
+  delete heap;
+
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_call_ec
+
+namespace test_dynamic_wind {
+
+static int pre_count = 0;
+static int value_count = 0;
+static int post_count = 0;
+
+static scm_obj_t subr_pre(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  pre_count++;
+  return scm_unspecified;
+}
+
+static scm_obj_t subr_post(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  post_count++;
+  return scm_unspecified;
+}
+
+static bool test_basic_dynamic_wind() {
+  pre_count = 0;
+  value_count = 0;
+  post_count = 0;
+
+  auto value_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    value_count++;
+    return make_fixnum(42);
+  };
+
+  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, 1);
+  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, 1);
+  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, 1);
+
+  scm_obj_t result = subr_dynamic_wind(scm_undef, pre, value, post);
+
+  if (result == make_fixnum(42) && pre_count == 1 && value_count == 1 && post_count == 1) {
+    printf("\033[32mdynamic-wind basic passed\033[0m\n");
+    return true;
+  }
+  printf("\033[31m###### dynamic-wind basic failed (pre=%d, value=%d, post=%d)\033[0m\n", pre_count, value_count, post_count);
+  some_test_failed = true;
+  return false;
+}
+
+static bool test_dynamic_wind_with_call_cc() {
+  pre_count = 0;
+  value_count = 0;
+  post_count = 0;
+  static scm_obj_t captured_cont = scm_undef;
+
+  auto value_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+    value_count++;
+    auto callcc_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
+      captured_cont = argv[0];
+      context::gc_protect(captured_cont);
+      return make_fixnum(100);
+    };
+    scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, 1);
+    return subr_call_cc(scm_undef, p);
+  };
+
+  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, 1);
+  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, 1);
+  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, 1);
+
+  scm_obj_t result = subr_dynamic_wind(scm_undef, pre, value, post);
+
+  if (result == make_fixnum(100)) {
+    if (pre_count == 1 && post_count == 1) {
+      printf("Initial dynamic-wind finished. Invoking continuation.\n");
+      scm_obj_t args[] = {make_cons(make_fixnum(200), scm_nil)};
+      c_apply_helper(captured_cont, 1, args);
+      // Unreachable!
+      fatal("unreachable");
+    }
+  } else if (result == make_fixnum(200)) {
+    if (pre_count == 2 && post_count == 2) {
+      printf("\033[32mdynamic-wind with call/cc passed\033[0m\n");
+      return true;
+    }
+  }
+
+  printf("\033[31m###### dynamic-wind with call/cc failed (pre=%d, post=%d, result=0x%lx)\033[0m\n", pre_count, post_count,
+         (unsigned long)result);
+  some_test_failed = true;
+  return false;
+}
+
+#ifdef __has_feature
+  #if __has_feature(hwaddress_sanitizer)
+
+  #endif
+#endif
+
+int run_test(int argc, char** argv) {
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
+  context::init();
+
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  auto jit_expected = nanos_jit_t::Create();
+  if (!jit_expected) exit(1);
+  auto jit = std::move(*jit_expected);
+  auto ts_ctx = std::make_unique<llvm::LLVMContext>();
+  codegen_t* cg = new codegen_t(std::move(ts_ctx), jit.get());
+
+  test_basic_dynamic_wind();
+  test_dynamic_wind_with_call_cc();
+
+  delete cg;
+  context::destroy();
+  heap->destroy();
+  delete heap;
+
+  puts("all test done");
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_dynamic_wind
+
+namespace test_subr {
 // Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
 // Direct tests for predicate subrs in nanos_subr.cpp.
 // Each test calls the subr C function directly and checks the result
 // against the R6RS specification.
-
-#include "core.h"
-#include "object.h"
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <initializer_list>
-#include <vector>
-#include "../src/port.h"
-#include "context.h"
-#include "continuation.h"
-#include "object_heap.h"
-
 
 // ---------------------------------------------------------------------------
 // Subr declarations (extern "C" via SUBR macro)
@@ -130,42 +507,13 @@ SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
 SUBR subr_make_u8vector_mapping(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
-
 // ---------------------------------------------------------------------------
 // Required stubs
 // ---------------------------------------------------------------------------
 
-void fatal(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  fprintf(stderr, "\n");
-  exit(1);
-}
-
-void warning(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  fprintf(stderr, "\n");
-}
-
-void trace(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-}
-
 // ---------------------------------------------------------------------------
 // Test infrastructure
 // ---------------------------------------------------------------------------
-
-
-static bool some_test_failed = false;
-
 
 #define ASSERT_TRUE(expr)                         \
   do {                                            \
@@ -188,12 +536,12 @@ static bool some_test_failed = false;
   } while (0)
 
 // Convenience: call a 1-arg predicate and check it returns scm_true
-#define PRED_TRUE(fn, arg)    ASSERT_TRUE(fn(scm_nil, arg) == scm_true)
-#define PRED_FALSE(fn, arg)   ASSERT_TRUE(fn(scm_nil, arg) == scm_false)
+#define PRED_TRUE(fn, arg)      ASSERT_TRUE(fn(scm_nil, arg) == scm_true)
+#define PRED_FALSE(fn, arg)     ASSERT_TRUE(fn(scm_nil, arg) == scm_false)
 
 // Call a 2-arg predicate
-#define PRED2_TRUE(fn, a, b)  ASSERT_TRUE(fn(scm_nil, a, b) == scm_true)
-#define PRED2_FALSE(fn, a, b) ASSERT_TRUE(fn(scm_nil, a, b) == scm_false)
+#define PRED2_TRUE(fn, a, b)    ASSERT_TRUE(fn(scm_nil, a, b) == scm_true)
+#define PRED2_FALSE(fn, a, b)   ASSERT_TRUE(fn(scm_nil, a, b) == scm_false)
 
 // Call a variadic predicate
 #define PRED_VAR_TRUE(fn, ...)  ASSERT_TRUE(call_subr_variadic(fn, {__VA_ARGS__}) == scm_true)
@@ -1788,7 +2136,7 @@ void test_tuple() {
 
 void test_make_u8vector_mapping() {
   printf("--- make-u8vector-mapping ---\n");
-  uint8_t data[] = { 10, 20, 30 };
+  uint8_t data[] = {10, 20, 30};
   scm_obj_t adrs = make_fixnum((intptr_t)data);
   scm_obj_t size = make_fixnum(3);
   scm_obj_t v = subr_make_u8vector_mapping(scm_nil, adrs, size);
@@ -1800,8 +2148,7 @@ void test_make_u8vector_mapping() {
   ASSERT_TRUE(u8vector_elts(v)[2] == 30);
 }
 
-int main(int argc, char** argv) {
-
+int run_test(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
 
@@ -1861,4 +2208,166 @@ int main(int argc, char** argv) {
   }
   printf("\033[32mAll tests passed\033[0m\n");
   return 0;
+}
+
+}  // namespace test_subr
+
+namespace test_cffi {
+
+SUBR subr_codegen_cdecl_callout(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_codegen_cdecl_callback(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_string_utf8_nul(scm_obj_t self, scm_obj_t a1);
+
+#define ASSERT_TRUE(expr)                         \
+  do {                                            \
+    if (!(expr)) {                                \
+      printf("\033[31mFAIL: %s\033[0m\n", #expr); \
+      some_test_failed = true;                    \
+    } else {                                      \
+      printf("\033[32mPASS: %s\033[0m\n", #expr); \
+    }                                             \
+  } while (0)
+
+class CodegenTest {
+ public:
+  nanos_t* nanos;
+  CodegenTest() {
+    nanos = new nanos_t();
+    nanos->init();
+  }
+  ~CodegenTest() {
+    nanos->destroy();
+    delete nanos;
+  }
+};
+
+void run_test(const char* name, std::function<bool(CodegenTest&)> test) {
+  printf("Running test: %s\n", name);
+  fflush(stdout);
+  CodegenTest env;
+  try {
+    if (test(env)) {
+      printf("\033[32m%s passed\033[0m\n", name);
+      fflush(stdout);
+    } else {
+      printf("\033[31m###### %s failed\033[0m\n", name);
+      some_test_failed = true;
+      fflush(stdout);
+    }
+  } catch (const std::exception& e) {
+    printf("\033[31m###### %s failed with exception: %s\033[0m\n", name, e.what());
+    some_test_failed = true;
+    fflush(stdout);
+  }
+}
+
+__attribute__((no_sanitize("hwaddress"))) SUBR test_qsort_compare(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  uint32_t* p1 = (uint32_t*)fixnum(a1);
+  uint32_t* p2 = (uint32_t*)fixnum(a2);
+  if (*p1 == *p2) return make_fixnum(0);
+  if (*p1 < *p2) return make_fixnum(1);
+  return make_fixnum(-1);
+}
+
+int run_test(int argc, char** argv) {
+  printf("Starting test_cffi\n");
+  fflush(stdout);
+
+  run_test("TestCFFI_snprintf", [](CodegenTest& env) -> bool {
+    void* sym_snprintf = dlsym(RTLD_DEFAULT, "snprintf");
+    if (!sym_snprintf) {
+      printf("snprintf not found!\n");
+      return false;
+    }
+
+    scm_obj_t adrs = make_fixnum((intptr_t)sym_snprintf);
+    scm_obj_t sig1 = make_string("qoooox");  // caller: int(void* size_t void*) unsigned-long double -> q o o o o x
+    scm_obj_t sig2 = make_string("qooo");    // callee: int(void* size_t void*) -> q o o o
+    scm_obj_t args[] = {adrs, sig1, sig2};
+    scm_obj_t snprintf_closure = subr_codegen_cdecl_callout(scm_nil, 3, args);
+
+    scm_obj_t buf = make_u8vector(32);
+    memset(u8vector_elts(buf), 0, 32);
+
+    scm_obj_t fmt = subr_string_utf8_nul(scm_nil, make_string("%06lu %.3lf"));
+
+    scm_obj_t call_args[] = {buf, make_fixnum(32), fmt, make_fixnum(246), make_flonum(123.4)};
+
+    codegen_t::bridge_func_t bridge = codegen_t::current()->call_closure_bridge();
+    scm_obj_t n = (scm_obj_t)bridge(snprintf_closure, 5, call_args);
+
+    if (!is_fixnum(n) || fixnum(n) <= 0) {
+      printf("snprintf failed or returned non-fixnum\n");
+      return false;
+    }
+
+    const char* result_str = (const char*)u8vector_elts(buf);
+    printf("pos: %ld\n", fixnum(n));
+    printf("result: %s\n", result_str);
+
+    if (strcmp(result_str, "000246 123.400") != 0) {
+      printf("snprintf output mismatch! expected: '000246 123.400'\n");
+      return false;
+    }
+
+    return true;
+  });
+
+  run_test("TestCFFI_qsort", [](CodegenTest& env) -> bool {
+    scm_obj_t comp_closure = make_closure((void*)test_qsort_compare, 2, 0, 0, nullptr, 0);
+    scm_obj_t sig_cmp = make_string("qoo");
+    scm_obj_t cmp_callback_ptr_obj = subr_codegen_cdecl_callback(scm_nil, comp_closure, sig_cmp);
+
+    void* sym_qsort = dlsym(RTLD_DEFAULT, "qsort");
+    if (!sym_qsort) {
+      printf("qsort not found!\n");
+      return false;
+    }
+
+    scm_obj_t adrs_qsort = make_fixnum((intptr_t)sym_qsort);
+    scm_obj_t sig_qsort = make_string("ioqqo");
+    scm_obj_t args_qsort[] = {adrs_qsort, sig_qsort};
+    scm_obj_t qsort_closure = subr_codegen_cdecl_callout(scm_nil, 2, args_qsort);
+
+    scm_obj_t nums = make_u8vector(20);
+    uint32_t* p = (uint32_t*)u8vector_elts(nums);
+    p[0] = 10000;
+    p[1] = 1000;
+    p[2] = 10;
+    p[3] = 100000;
+    p[4] = 100;
+
+    printf("org: ");
+    for (int i = 0; i < 5; i++) printf("%d ", p[i]);
+    printf("\n");
+
+    scm_obj_t call_args[] = {nums, make_fixnum(5), make_fixnum(4), cmp_callback_ptr_obj};
+
+    codegen_t::bridge_func_t bridge = codegen_t::current()->call_closure_bridge();
+    bridge(qsort_closure, 4, call_args);
+
+    printf("sorted: ");
+    for (int i = 0; i < 5; i++) printf("%d ", p[i]);
+    printf("\n");
+
+    if (p[0] != 100000 || p[1] != 10000 || p[2] != 1000 || p[3] != 100 || p[4] != 10) {
+      printf("qsort array is not sorted as expected!\n");
+      return false;
+    }
+
+    return true;
+  });
+
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_cffi
+
+int main(int argc, char** argv) {
+  test_call_cc::run_test(argc, argv);
+  test_call_ec::run_test(argc, argv);
+  test_dynamic_wind::run_test(argc, argv);
+  test_subr::run_test(argc, argv);
+  test_cffi::run_test(argc, argv);
+  return some_test_failed ? 1 : 0;
 }

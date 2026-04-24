@@ -6,8 +6,6 @@
 
 #include "core.h"
 
-#include <mutex>
-
 #include <llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h>
 #include <llvm/ExecutionEngine/Orc/CompileOnDemandLayer.h>
 #include <llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h>
@@ -19,6 +17,7 @@
 #include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/SelfExecutorProcessControl.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
+#include <mutex>
 
 class nanos_jit_t {
  public:

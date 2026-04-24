@@ -4,6 +4,7 @@
   "dependencies": [
     "boost-fiber",
     "boost-context",
+    "boost-iostreams",
     "replxx",
     "cli11"
   ]

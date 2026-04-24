@@ -91,9 +91,9 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
   cached_symbol_label = make_symbol("label");
   cached_symbol_apply = make_symbol("apply");
   cached_symbol_safepoint = make_symbol("safepoint");
-  if (!context::is_gc_protected(cached_symbol_label)) context::gc_protect(cached_symbol_label);
-  if (!context::is_gc_protected(cached_symbol_apply)) context::gc_protect(cached_symbol_apply);
-  if (!context::is_gc_protected(cached_symbol_safepoint)) context::gc_protect(cached_symbol_safepoint);
+  context::add_literal(cached_symbol_label);
+  context::add_literal(cached_symbol_apply);
+  context::add_literal(cached_symbol_safepoint);
   init_opcode_map();
   context::s_current_codegen = this;
 }

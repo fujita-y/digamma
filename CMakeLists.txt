@@ -64,7 +64,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   endif()
 endif()
 
-find_package(Boost CONFIG REQUIRED COMPONENTS context fiber)
+find_package(Boost CONFIG REQUIRED COMPONENTS context fiber iostreams)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
@@ -147,7 +147,9 @@ target_link_options(nanos_config INTERFACE
 
 set(NANOS_CORE_SOURCES
   src/arch_arm64.cpp
+  src/asio.cpp
   src/bit.cpp
+  src/fiber.cpp
   src/codegen.cpp
   src/codegen_aux.cpp
   src/codegen_emit.cpp
@@ -181,13 +183,14 @@ set(NANOS_CORE_SOURCES
   src/printer.cpp
   src/utf8.cpp
   src/subr_fiber.cpp
+  src/subr_asio.cpp
   src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber replxx::replxx Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets
@@ -230,26 +233,8 @@ macro(add_nanos_test test_name test_source)
   )
 endmacro()
 
-add_nanos_test(test_object tests/test_object.cpp)
-add_nanos_test(test_gc tests/test_gc.cpp)
-add_nanos_test(test_printer tests/test_printer.cpp)
-add_nanos_test(test_port tests/test_port.cpp)
-add_nanos_test(test_reader tests/test_reader.cpp)
-add_nanos_test(test_r7rs tests/test_r7rs.cpp)
-add_nanos_test(test_radix tests/test_radix.cpp)
-add_nanos_test(test_hash tests/test_hash.cpp)
-add_nanos_test(test_symbol tests/test_symbol.cpp)
-add_nanos_test(test_closure_analysis tests/test_closure_analysis.cpp)
-add_nanos_test(test_codegen tests/test_codegen.cpp)
-add_nanos_test(test_closure_patterns tests/test_closure_patterns.cpp)
-add_nanos_test(test_apply_patterns tests/test_apply_patterns.cpp)
-add_nanos_test(test_deriv tests/test_deriv.cpp)
-add_nanos_test(test_equiv tests/test_equiv.cpp)
-add_nanos_test(test_call_ec tests/test_call_ec.cpp)
-add_nanos_test(test_call_cc tests/test_call_cc.cpp)
-add_nanos_test(test_dynamic_wind tests/test_dynamic_wind.cpp)
-add_nanos_test(test_subr tests/test_subr.cpp)
-add_nanos_test(test_list tests/test_list.cpp)
-add_nanos_test(test_arith tests/test_arith.cpp)
-add_nanos_test(test_codegen_aux tests/test_codegen_aux.cpp)
-add_nanos_test(test_cffi tests/test_cffi.cpp)
+add_nanos_test(test_core tests/test_core.cpp)
+add_nanos_test(test_io tests/test_io.cpp)
+add_nanos_test(test_compiler tests/test_compiler.cpp)
+add_nanos_test(test_runtime tests/test_runtime.cpp)
+add_nanos_test(test_eval tests/test_eval.cpp)

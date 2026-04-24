@@ -6,8 +6,8 @@
 #include "object_heap.h"
 #include "bit.h"
 #include "context.h"
+#include "fiber.h"
 #include "port.h"
-#include "subr.h"
 
 #define DEFALUT_COLLECT_TRIP_BYTES (4 * 1024 * 1024)
 
@@ -220,7 +220,7 @@ void object_heap_t::trace(void* obj) {
     }
     case tc6_future: {
       scm_future_rec_t* rec = (scm_future_rec_t*)obj;
-      shade(rec->closure);
+      shade(rec->datum);
       return;
     }
     case tc6_long_flonum:
@@ -355,7 +355,7 @@ void object_heap_t::snapshot_root() {
   for (auto closure : context::s_trampolines) {
     if (closure) enqueue_root(closure);
   }
-  scan_fiber_stacks();
+  fiber_scan_stacks();
 }
 
 void object_heap_t::update_weak_reference() { sweep_symbol_table(); }

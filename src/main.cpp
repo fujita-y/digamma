@@ -1,12 +1,18 @@
 #include "core.h"
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "exception.h"
+#include "fiber.h"
 #include "nanos.h"
 #include "nanos_options.h"
 
+#include "asio.h"  // include after nanos.h due to CR1 macro conflict
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 int main(int argc, char** argv) {
+  context::s_asio_context = new asio_context();
+  fiber_init_scheduler();
   nanos_options::parse(argc, argv);
   nanos_t* nanos = new nanos_t();
   nanos->init();
@@ -24,6 +30,7 @@ int main(int argc, char** argv) {
   }
   nanos->destroy();
   delete nanos;
+  delete context::s_asio_context;
   return status;
 }
 

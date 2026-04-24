@@ -31,9 +31,9 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
   ExitOnError ExitOnErr;
   ObjectLayer->addPlugin(ExitOnErr(EHFrameRegistrationPlugin::Create(*this->ES)));
   MainJD.addGenerator(cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(this->DL.getGlobalPrefix())));
-#ifndef NDEBUG
-  CompileLayer->setNotifyCompiled([](MaterializationResponsibility &R, ThreadSafeModule TSM) { errs() << "generating native code...\n"; });
-#endif
+  // #ifndef NDEBUG
+  //   CompileLayer->setNotifyCompiled([](MaterializationResponsibility &R, ThreadSafeModule TSM) { errs() << "generating native code...\n"; });
+  // #endif
 }
 
 nanos_jit_t::~nanos_jit_t() {

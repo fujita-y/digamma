@@ -6,12 +6,13 @@
 
 #include "core.h"
 #include "arch_arm64.h"
+#include "boost/asio/posix/stream_descriptor.hpp"
 
 #include <boost/fiber/fiber.hpp>
 #include <boost/fiber/future.hpp>
 #include <sanitizer/hwasan_interface.h>
 #include <ucontext.h>
-#include <variant>
+
 /*
 
 |<                                fixnum 63bit                                >1| fixnum
@@ -164,16 +165,14 @@ struct scm_continuation_rec_t {
   size_t stack_size;
 };
 
-struct port_aux_t {
-  std::variant<std::monostate, std::ostream*, std::istream*, std::iostream*, std::ofstream*, std::ifstream*, std::fstream*, std::stringstream*>
-      stream;
-  bool owned;
-};
-
 struct scm_port_rec_t {
   scm_tc6_t tag;
   scm_obj_t name;
-  port_aux_t* aux;
+  std::istream* istream;
+  std::ostream* ostream;
+  std::iostream* iostream;
+  boost::asio::posix::stream_descriptor* asio_stream;
+  int fd;
 };
 
 struct scm_tuple_rec_t {
@@ -184,7 +183,7 @@ struct scm_tuple_rec_t {
 
 struct scm_future_rec_t {
   scm_tc6_t tag;
-  scm_obj_t closure;
+  scm_obj_t datum;
   boost::fibers::shared_future<scm_obj_t>* future;
 };
 

@@ -19,7 +19,7 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # Iterate over all test files
-for test_file in test-*.scm; do
+for test_file in test_*.scm; do
     echo "Running $test_file..."
     
     # Run the test and capture output

@@ -3,6 +3,7 @@
 #include "codegen.h"
 #include "context.h"
 #include "exception.h"
+#include "fiber.h"
 #include "hash.h"
 #include "nanos_jit.h"
 #include "nanos_options.h"
@@ -252,7 +253,11 @@ void nanos_t::run() {
   }
 
   std::string input_buffer;
-  while (repl(*rx, input_buffer, printer));
+  while (repl(*rx, input_buffer, printer)) {
+    while (fiber_live_count() > 0) {
+      boost::this_fiber::sleep_for(std::chrono::microseconds(60));
+    }
+  }
 }
 
 static void add_history(replxx::Replxx& rx, const std::string& line) {
@@ -331,11 +336,11 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
     puts("\n");
 #else
     scm_obj_t result = call_core_eval(obj);
-    port_get_ostream(context::s_standard_error_port)->flush();
+    if (auto out = port_get_ostream(context::s_standard_error_port)) out->flush();
     if (result != scm_unspecified) {
       printer.write(result);
       printer.newline();
-      port_get_ostream(context::s_standard_output_port)->flush();
+      if (auto out = port_get_ostream(context::s_standard_output_port)) out->flush();
     }
 #endif
   } catch (const nanos_exit_t& e) {

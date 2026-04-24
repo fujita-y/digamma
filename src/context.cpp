@@ -22,10 +22,12 @@ thread_local scm_obj_t context::s_standard_error_port;
 thread_local scm_obj_t context::s_interaction_environment;
 thread_local scm_obj_t context::s_system_environment;
 thread_local std::unordered_set<scm_obj_t> context::s_literals;
-thread_local std::unordered_set<scm_obj_t> context::s_gc_protected;
+thread_local std::unordered_multiset<scm_obj_t> context::s_gc_protected;
 thread_local std::vector<scm_obj_t> context::s_trampolines;
 thread_local std::vector<context::fiber_stack_info> context::s_fiber_stacks;
 thread_local context::fiber_stack_allocator context::s_fiber_stack_allocator;
+thread_local int context::s_live_fiber_count;
+thread_local asio_context* context::s_asio_context;
 
 boost::context::stack_context context::fiber_stack_allocator::allocate() {
   auto sctx = m_alloc.allocate();
@@ -152,7 +154,7 @@ void context::add_literal(scm_obj_t obj) {
 void context::gc_protect(scm_obj_t obj) {
   if (is_cons(obj) || is_heap_object(obj)) {
     if (s_gc_protected.contains(obj)) {
-      fatal("%s:%u gc_protect called on already protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
+      warning("%s:%u gc_protect called on already protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
     }
     object_heap_t::current()->write_barrier(obj);
     s_gc_protected.insert(obj);
@@ -162,15 +164,11 @@ void context::gc_protect(scm_obj_t obj) {
 void context::gc_unprotect(scm_obj_t obj) {
   if (is_cons(obj) || is_heap_object(obj)) {
     if (!s_gc_protected.contains(obj)) {
-      fatal("%s:%u gc_unprotect called on non-protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
+      warning("%s:%u gc_unprotect called on non-protected object %s", __FILE__, __LINE__, to_string(obj).c_str());
     }
-    s_gc_protected.erase(obj);
+    auto it = s_gc_protected.find(obj);
+    if (it != s_gc_protected.end()) {
+      s_gc_protected.erase(it);
+    }
   }
-}
-
-bool context::is_gc_protected(scm_obj_t obj) {
-  if (is_cons(obj) || is_heap_object(obj)) {
-    return s_gc_protected.contains(obj);
-  }
-  return true;
 }

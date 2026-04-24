@@ -106,6 +106,17 @@ Digamma implements lightweight, cooperative multitasking using **fibers** and **
 - `(future-wait-for <future> <msec>)`: Blocks with a timeout; returns `#t` if timed out, `#f` otherwise.
 - `(future? <obj>)`: Returns `#t` if the object is a future.
 
+### Asynchronous I/O
+
+Digamma provides non-blocking, fiber-aware I/O using **Boost.Asio**. Operation completion is integrated directly into the fiber scheduler (Round Robin pattern), allowing fibers to suspend while waiting for I/O and resume automatically when data is available:
+
+- **Seamless Integration**: Asio's `io_context` is polled directly by the fiber scheduler's `suspend_until()` hook, ensuring that I/O completion handlers run inline on the main thread and fulfill futures immediately.
+- **Future-based I/O**: Asynchronous I/O primitives return **future** objects, enabling clean, non-blocking code using standard fiber synchronization.
+
+#### Primitives
+
+- `(get-bytevector-n-async <port> <n>)`: Initiates an asynchronous read of at most *n* bytes from the specified input port. Returns a future that will be fulfilled with a bytevector containing the data read, or EOF.
+
 ### Foreign Function Interface (CFFI)
 
 The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM ORC. It allows seamless interoperability with native code:
@@ -119,7 +130,7 @@ The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM OR
 - **LLVM 22** or later
 - **CMake 3.13.4** or later
 - **vcpkg** (recommended for managing dependencies)
-- **Boost 1.88** or later (specifically `boost_context` and `boost_fiber`)
+- **Boost 1.88** or later (specifically `boost_context`, `boost_fiber`, and `boost_asio`)
 - **replxx** (for interactive REPL)
 - **CLI11** (for command-line argument parsing)
 

@@ -179,6 +179,8 @@ future-wait-for
 future?
 generate-temporaries
 gensym
+get-bytevector-n 
+get-bytevector-n-async
 hashtable->alist
 hashtable-clear!
 hashtable-contains?
@@ -249,6 +251,7 @@ procedure?
 proper-list?
 put-char
 put-string
+put-string-async
 quotient
 read
 real?

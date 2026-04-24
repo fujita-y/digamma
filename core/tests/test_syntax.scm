@@ -1,8 +1,14 @@
-;; test_syntax_rules.scm
-;; Test suite for the R6RS/R7RS macro expansion system.
+;; Consolidated tests for test_syntax.scm
 
 (define *pass-count* 0)
 (define *fail-count* 0)
+
+;; =============================================================================
+;; test_syntax_rules.scm
+;; =============================================================================
+;; test_syntax_rules.scm
+;; Test suite for the R6RS/R7RS macro expansion system.
+
 
 (define (test name expr expected)
   (let ((result (macroexpand expr 'strip)))
@@ -701,6 +707,700 @@
            '(1 ()))
 
 (newline)
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+
+;; =============================================================================
+;; test_syntax_case.scm
+;; =============================================================================
+;; test_syntax_case.scm
+;; Test suite for syntax-case and related R6RS features.
+
+(copy-environment-variables! (system-environment) (current-environment) '(expand-syntax-case make-syntax-object strip-renames))
+
+
+(define (test name output expected)
+  (if (equal? output expected)
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
+      (begin
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display name) (newline)
+        (display "  Expected: ") (write expected) (newline)
+        (display "  Actual:   ") (write output) (newline))))
+
+;; =============================================================================
+;; Section 1: Standalone expansion tests
+;; =============================================================================
+(display "\n>>> Section 1: Standalone expansion tests\n")
+
+;; Test basic matching
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '()
+                                   '(((name val ...) #t (syntax (name val ...))))
+                                   (current-environment))))
+  (test "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
+
+;; Test ellipsis expansion
+(let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
+       (result (expand-syntax-case input '()
+                                   '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
+                                   (current-environment))))
+  (test "ellipsis-expansion" (strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
+
+;; Test fenders
+(let* ((input (make-syntax-object '(foo 1 2 3) '()))
+       (result (expand-syntax-case input '()
+                                   '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
+                                     ((name val ...) #t 'not-empty))
+                                   (current-environment))))
+  (test "fender-false" result 'not-empty))
+
+;; =============================================================================
+;; Section 2: Integrated macro expansion tests
+;; =============================================================================
+(display "\n>>> Section 2: Integrated macro expansion tests\n")
+
+;; Define a macro using syntax-case
+(macroexpand
+ '(define-syntax reverse-params
+    (lambda (x)
+      (syntax-case x ()
+        ((_ a b c) (syntax (list c b a)))))))
+
+(test "integrated-syntax-case"
+      (macroexpand '(reverse-params 1 2 3) 'strip)
+      '(list 3 2 1))
+
+;; R6RS 'or' macro
+(macroexpand
+ '(define-syntax r6rs-or
+    (lambda (x)
+      (syntax-case x ()
+        [(_) (syntax #f)]
+        [(_ e) (syntax e)]
+        [(_ e1 e2 e3 ...)
+         (syntax (let ([t e1])
+                   (if t t (r6rs-or e2 e3 ...))))]))))
+
+(test "r6rs-or-zero"
+      (macroexpand '(r6rs-or) 'strip)
+      '#f)
+
+(test "r6rs-or-one"
+      (macroexpand '(r6rs-or 1) 'strip)
+      '1)
+
+(test "r6rs-or-many"
+      (macroexpand '(r6rs-or 1 2 3) 'strip)
+      '(let ((t 1)) (if t t (let ((t 2)) (if t t 3)))))
+
+;; R6RS p.car (identifier macro)
+(macroexpand
+ '(define-syntax p.car
+    (lambda (x)
+      (syntax-case x ()
+        [(_ . rest) (syntax ((car p) . rest))]
+        [_ (syntax (car p))]))))
+
+(test "identifier-macro-call"
+      (macroexpand '(p.car 1 2) 'strip)
+      '((car p) 1 2))
+
+(test "identifier-macro-ref"
+      (macroexpand 'p.car 'strip)
+      '(car p))
+
+;; R6RS 'let' with duplicate detection
+(define (unique-ids? ls)
+  (or (null? ls)
+      (and (let loop ((x (car ls)) (rest (cdr ls)))
+             (or (null? rest)
+                 (and (not (bound-identifier=? x (car rest)))
+                      (loop x (cdr rest)))))
+           (unique-ids? (cdr ls)))))
+
+(macroexpand
+ '(define-syntax r6rs-let
+    (lambda (x)
+      (syntax-case x ()
+        ((_ ((i v) ...) e1 e2 ...)
+         (if (unique-ids? (syntax (i ...)))
+             (syntax ((lambda (i ...) e1 e2 ...) v ...))
+             (error "duplicate identifiers")))))))
+
+(test "r6rs-let-basic"
+      (macroexpand '(r6rs-let ((x 1) (y 2)) (+ x y)) 'strip)
+      '((lambda (x y) (+ x y)) 1 2))
+
+;; R6RS 'rec' macro
+(macroexpand
+ '(define-syntax rec
+    (lambda (x)
+      (syntax-case x ()
+        [(_ x e)
+         (identifier? (syntax x))
+         (syntax (letrec ([x e]) x))]))))
+
+(test "r6rs-rec-fact"
+      (macroexpand
+       '(map (rec fact
+                  (lambda (n)
+                    (if (= n 0)
+                        1
+                        (* n (fact (- n 1))))))
+             '(1 2 3 4 5))
+       'strip)
+      '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) fact)
+            '(1 2 3 4 5)))
+
+;; Anaphoric IF (aif)
+(macroexpand
+ '(define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test true false)
+         (with-syntax ((it (datum->syntax (syntax test) (string->symbol "it"))))
+           (syntax (let ((it test))
+                     (if it true false)))))))))
+
+(test "aif-test"
+      (macroexpand '(aif (assoc 'a '((a . 1))) (cdr it) #f) 'strip)
+      '(let ((it (assoc (quote a) (quote ((a . 1)))))) (if it (cdr it) #f)))
+
+;; Simple define-struct
+(macroexpand
+ '(define-syntax define-struct
+    (lambda (x)
+      (syntax-case x ()
+        ((_ name (field ...))
+         (with-syntax ((make-name (datum->syntax (syntax name)
+                                                 (string->symbol
+                                                  (string-append "make-"
+                                                                 (symbol->string
+                                                                  (syntax->datum (syntax name)))))))
+                       (name? (datum->syntax (syntax name)
+                                             (string->symbol
+                                              (string-append (symbol->string
+                                                              (syntax->datum (syntax name))) "?")))))
+           (syntax (begin
+                     (define (make-name field ...) (list (quote name) field ...))
+                     (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name))))))))))))
+
+(test "define-struct-expansion"
+      (macroexpand '(define-struct point (x y)) 'strip)
+      '(begin
+         (define make-point (lambda (x y) (list 'point x y)))
+         (define point? (lambda (obj) (if (pair? obj) (eq? (car obj) 'point) #f)))))
+
+;; Stringify macro for constant testing
+(macroexpand
+ '(define-syntax stringify
+    (lambda (x)
+      (syntax-case x ()
+        ((_ n)
+         (syntax (number->string n)))))))
+
+(test "stringify-constant"
+      (macroexpand '(stringify 100) 'strip)
+      '(number->string 100))
+
+;; Stringify macro for symbol testing
+(macroexpand
+ '(define-syntax stringify-sym
+    (lambda (x)
+      (syntax-case x ()
+        ((_ n)
+         (syntax (symbol->string n)))))))
+
+(test "stringify-symbl"
+      (macroexpand '(stringify-sym 'hoge) 'strip)
+      '(symbol->string 'hoge))
+
+;; with-syntax with ellipsis
+(macroexpand
+ '(define-syntax list-to-vars
+    (lambda (x)
+      (syntax-case x ()
+        ((_ (vals ...))
+         (with-syntax (((v ...) (syntax (vals ...))))
+           (syntax (list v ...))))))))
+
+(test "with-syntax-ellipsis"
+      (macroexpand '(list-to-vars (1 2 3)) 'strip)
+      '(list 1 2 3))
+
+;; Nested with-syntax dependencies
+(macroexpand
+ '(define-syntax nested-with
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (with-syntax ((a (syntax val)))
+           (with-syntax ((b (datum->syntax (syntax a) 'inner-sym)))
+             (syntax (list a b)))))))))
+
+(test "with-syntax-nested"
+      (macroexpand '(nested-with 99) 'strip)
+      '(list 99 inner-sym))
+
+;; quasisyntax test
+(macroexpand
+ '(define-syntax test-quasisyntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (quasisyntax (list (unsyntax (syntax val)) (unsyntax (+ (syntax->datum (syntax val)) 1)))))))))
+
+(test "quasisyntax-basic"
+      (macroexpand '(test-quasisyntax 10) 'strip)
+      '(list 10 11))
+
+;; quasisyntax with unsyntax-splicing
+(macroexpand
+ '(define-syntax test-unsyntax-splicing
+    (lambda (x)
+      (syntax-case x ()
+        ((_ vals)
+         (quasisyntax (list (unsyntax-splicing (syntax->datum (syntax vals))))))))))
+
+(test "quasisyntax-splicing"
+      (macroexpand '(test-unsyntax-splicing (1 2 3)) 'strip)
+      '(list 1 2 3))
+
+;; Nested quasisyntax
+(macroexpand
+ '(define-syntax nested-quasisyntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (quasisyntax (list (unsyntax (quasisyntax (list (unsyntax (syntax val))))))))))))
+
+(test "quasisyntax-nested"
+      (macroexpand '(nested-quasisyntax 42) 'strip)
+      '(list (list 42)))
+
+;; generate-temporaries test
+(macroexpand
+ '(define-syntax test-gen-temp
+    (lambda (x)
+      (syntax-case x ()
+        ((_ x ...)
+         (let ((temps (generate-temporaries (syntax (x ...)))))
+           (with-syntax (((t ...) temps))
+             (syntax (list t ...)))))))))
+
+(test "generate-temporaries"
+      (let ((res (macroexpand '(test-gen-temp a b))))
+        (and (list? res) (= (length res) 3) (eq? (car res) 'list)
+             (symbol? (cadr res)) (symbol? (caddr res))
+             (not (eq? (cadr res) (caddr res)))))
+      #t)
+
+;; syntax->datum in macro body
+(macroexpand
+ '(define-syntax test-syntax-datum
+    (lambda (x)
+      (syntax-case x ()
+        ((_ a b c)
+         (let ((lst (syntax->datum (syntax (a b c)))))
+           (with-syntax ((res (list->vector lst)))
+             (syntax (quote res)))))))))
+
+(test "syntax->datum-in-macro"
+      (macroexpand '(test-syntax-datum 1 2 3) 'strip)
+      ''#(1 2 3))
+
+;; datum->syntax test
+(macroexpand
+ '(define-syntax test-datum-syntax
+    (lambda (x)
+      (syntax-case x ()
+        ((_ name val)
+         (with-syntax ((new-name (datum->syntax (syntax name)
+                                                (string->symbol (string-append "prefix-"
+                                                                               (symbol->string (syntax->datum (syntax name))))))))
+           (syntax (define new-name val))))))))
+
+(test "datum->syntax-test"
+      (macroexpand '(test-datum-syntax foo 42) 'strip)
+      '(define prefix-foo 42))
+
+;; tailmatch test (Backtracking ellipsis + Improper list)
+(macroexpand
+ '(define-syntax tailmatch1
+    (lambda (x)
+      (syntax-case x ()
+        ((_ first ... last . rest)
+         (syntax rest))))))
+
+(test "tailmatch-greedy-backtracking1"
+      (macroexpand '(tailmatch1 1 2 3 . 4) 'strip)
+      '4)
+
+(macroexpand
+ '(define-syntax tailmatch2
+    (lambda (x)
+      (syntax-case x ()
+        ((_ first ... . rest)
+         (syntax rest))))))
+
+(test "tailmatch2-greedy-backtracking2"
+      (macroexpand '(tailmatch2 1 2 3 . 4) 'strip)
+      '4)
+
+;; local-definition-test
+(macroexpand
+ '(define-syntax local-definition-test
+    (lambda (x)
+      (define list-to-string
+        (lambda (lst)
+          (if (pair? lst) "ok" (error 'list-to-string "list expected"))))
+      (syntax-case x ()
+        ((_ ret name (args ...))
+         (let ((signature (list-to-string (syntax->datum (syntax (ret args ...))))))
+            (with-syntax ((signature signature))
+              (syntax signature))))))))
+
+(test "local-definition-test"
+      (macroexpand '(local-definition-test int hoge (int int)) 'strip)
+      "ok")
+
+;; bound-identifier=? test
+(macroexpand
+ '(define-syntax test-bound-id
+    (lambda (x)
+      (syntax-case x ()
+        ((_ id)
+         (let* ((introduced (datum->syntax (syntax here) 'x))
+                (res1 (bound-identifier=? (syntax id) introduced))
+                (res2 (bound-identifier=? introduced introduced)))
+           (with-syntax ((res1 res1) (res2 res2))
+             (syntax (list res1 res2)))))))))
+
+(test "bound-identifier=? test"
+      (macroexpand '(test-bound-id x) 'strip)
+      '(list #f #t))
+
+;; =============================================================================
+;; Section 3: Definition by syntax-case
+;; =============================================================================
+(display "\n>>> Section 3: Definition by syntax-case\n")
+
+;; Helper for eval tests (from test_syntax_rules.scm)
+(define (test-eval expected expr msg)
+  (let ((expanded (core-eval (macroexpand expr) (current-environment))))
+    (if (equal? expected expanded)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display msg) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display msg) (newline)
+          (display "  Expected: ") (display expected) (newline)
+          (display "  Actual:   ") (display expanded) (newline)))))
+
+(define (test-eval-strip expected expr msg)
+  (let ((expanded (core-eval (macroexpand expr 'strip) (current-environment))))
+    (if (equal? expected expanded)
+        (begin 
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display msg) (newline))
+        (begin 
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display msg) (newline)
+          (display "  Expected: ") (display expected) (newline)
+          (display "  Actual:   ") (display expanded) (newline)))))
+
+;; Define syntax-rules using syntax-case (shadowing core syntax-rules)
+(macroexpand
+ '(define-syntax syntax-rules
+    (lambda (x)
+      (syntax-case x (lambda syntax-case syntax)
+        ((_ (k ...) ((keyword . pattern) template) ...)
+         (syntax (lambda (x)
+             (syntax-case x (k ...)
+               ((dummy . pattern) (syntax template)) ...))))))))
+
+;; Pitfall 3.1
+(test-eval 4
+      '(let-syntax ((foo
+                     (syntax-rules ()
+                       ((_ expr) (+ expr 1)))))
+         (let ((+ *))
+           (foo 3)))
+      "Pitfall 3.1: Hygiene with shadowed global operator")
+
+;; Pitfall 3.2
+(test-eval 2
+      '(let-syntax ((foo (syntax-rules ()
+                           ((_ var) (define var 1)))))
+         (let ((x 2))
+           (begin (define foo +))
+           (cond (else (foo x)))
+           x))
+      "Pitfall 3.2: let-syntax inside let with begin and cond")
+
+;; Pitfall 3.3
+(test-eval 1
+      '(let ((x 1))
+         (let-syntax
+             ((foo (syntax-rules ()
+                     ((_ y) (let-syntax
+                                ((bar (syntax-rules ()
+                                        ((_) (let ((x 2)) y)))))
+                              (bar))))))
+           (foo x)))
+      "Pitfall 3.3: Nested let-syntax hygiene")
+
+;; Pitfall 3.4
+(test-eval 1
+      '(let-syntax ((x (syntax-rules ()))) 1)
+      "Pitfall 3.4: let-syntax with no clauses")
+
+;; Pitfall 8.1
+(test-eval -1
+      '(let - ((n (- 1))) n)
+      "Pitfall 8.1: named let with name -")
+
+;; Pitfall 8.3 (R6RS)
+(test-eval-strip 2
+      '(let ((x 1))
+         (let-syntax ((foo (syntax-rules () ((_) 2))))
+           (define x (foo))
+           3)
+         x)
+      "Pitfall 8.3: let-syntax and local define")
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+
+;; =============================================================================
+;; test_hygiene.scm
+;; =============================================================================
+;; test_hygiene.scm
+;; Comprehensive hygiene tests for the macro expansion system.
+
+;; --- Test Helper Functions ---
+
+
+(define (test name expr expected)
+  (let ((result (macroexpand expr 'strip)))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
+
+(define (test-no-capture name expr introduced-id)
+  (let ((expanded (macroexpand expr)))
+    ;; We expect something like (let ((x.1 ...)) ...) where x.1 != x
+    (define (find-id e id)
+      (cond ((eq? e id) #t)
+            ((pair? e) (or (find-id (car e) id) (find-id (cdr e) id)))
+            (else #f)))
+    (if (find-id expanded introduced-id)
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name)
+          (display " (Identifier '") (display introduced-id) (display "' was captured)")
+          (newline))
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline)))))
+
+;; =============================================================================
+;; Section 1: Basic Variable Capture
+;; =============================================================================
+(display "\n>>> Section 1: Basic Variable Capture\n")
+
+;; The swap! macro introduces 'tmp'.
+(macroexpand '(define-syntax swap!
+                (syntax-rules ()
+                  ((_ a b)
+                   (let ((tmp a))
+                     (set! a b)
+                     (set! b tmp))))))
+
+(test-no-capture "swap! avoids capturing user's 'tmp'"
+                 '(let ((tmp 1) (other 2)) (swap! tmp other))
+                 'tmp)
+
+(macroexpand '(define-syntax capture-test
+                (syntax-rules ()
+                  ((_ x) (let ((y 1)) x)))))
+
+(test "capture-test preserves outer 'y'"
+      '(let ((y 2)) (capture-test y))
+      '(let ((y 2)) (let ((y 1)) y)))
+
+;; =============================================================================
+;; Section 2: Shadowing Global Operators
+;; =============================================================================
+(display "\n>>> Section 2: Shadowing Global Operators\n")
+
+;; A macro that uses 'list' should use the global 'list' even if shadowed locally.
+(macroexpand '(define-syntax make-list
+                (syntax-rules ()
+                  ((_ x y) (list x y)))))
+
+(test "Macro uses global 'list' despite local shadowing"
+      '(let ((list (lambda (a b) 'captured)))
+         (make-list 1 2))
+      '(let ((list (lambda (a b) 'captured)))
+         (list 1 2)))
+
+;; Same for 'if'
+(macroexpand '(define-syntax my-if
+                (syntax-rules ()
+                  ((_ t a b) (if t a b)))))
+
+(test "Macro uses global 'if' despite local shadowing"
+      '(let ((if (lambda (t a b) 'captured)))
+         (my-if #t 1 2))
+      '(let ((if (lambda (t a b) 'captured)))
+         (if #t 1 2)))
+
+;; =============================================================================
+;; Section 3: Nested Macros (The Blue/Red Macro)
+;; =============================================================================
+(display "\n>>> Section 3: Nested Macros (The Blue/Red Macro)\n")
+
+;; Al Petrofsky's blue macro test.
+(macroexpand '(define-syntax blue
+                (syntax-rules ()
+                  ((blue x)
+                   (let-syntax ((red (syntax-rules ()
+                                       ((red y) (list x y)))))
+                     (red 'z))))))
+
+(test "Blue/Red nested macro hygiene"
+      '(let ((list (lambda (x y) 'captured)))
+         (blue 'w))
+      '(let ((list (lambda (x y) 'captured)))
+         (list 'w 'z)))
+
+;; =============================================================================
+;; Section 4: Local Macros and Scoping
+;; =============================================================================
+(display "\n>>> Section 4: Local Macros and Scoping\n")
+
+(test "Local macro captures variable at definition site (Chibi test)"
+      '(let ((x 1))
+         (let-syntax ((get-x (syntax-rules () ((_) x))))
+           (let ((x 2))
+             (get-x))))
+      '(let ((x 1)) (let ((x 2)) x)))
+
+;; =============================================================================
+;; Section 5: Shadowing Core Forms as Macros
+;; =============================================================================
+(display "\n>>> Section 5: Shadowing Core Forms as Macros\n")
+
+;; What if we shadow 'lambda' with a macro?
+(macroexpand '(define-syntax my-lambda
+                (syntax-rules ()
+                  ((_ (v) body) (lambda (v) body)))))
+
+(test "my-lambda uses core lambda even if 'lambda' is a local macro"
+      '(let-syntax ((lambda (syntax-rules () ((_ args body) 'captured))))
+         ((my-lambda (x) x) 1))
+      '((lambda (x) x) 1))
+
+;; =============================================================================
+;; Section 6: Identifier Macros
+;; =============================================================================
+(display "\n>>> Section 6: Identifier Macros\n")
+
+(environment-macro-set! 'it (lambda (expr) 'expanded-it))
+
+(test "Identifier macro 'it' is shadowed by local binding"
+      '(let ((it 1)) it)
+      '(let ((it 1)) it))
+
+(test "Identifier macro 'it' expands when not shadowed"
+      '(let ((x 1)) it)
+      '(let ((x 1)) expanded-it))
+
+;; =============================================================================
+;; Section 7: Integrated Components (syntax-case + quasisyntax + quasiquote)
+;; =============================================================================
+(display "\n>>> Section 7: Integrated Components (syntax-case + quasisyntax + quasiquote)\n")
+
+;; Test 1: syntax-case + quasisyntax + quasiquote simple unquote
+(macroexpand
+ '(define-syntax integrated-qq
+    (lambda (x)
+      (syntax-case x ()
+        ((_ val)
+         (quasisyntax
+          (let ((tmp (unsyntax (syntax val))))
+            `(result ,tmp))))))))
+
+(test "integrated-qq simple unquote"
+      '(integrated-qq 42)
+      '(let ((tmp 42)) (list 'result tmp)))
+
+;; Test 2: syntax-case + quasisyntax + quasiquote splicing
+(macroexpand
+ '(define-syntax integrated-splice
+    (lambda (x)
+      (syntax-case x ()
+        ((_ (vals ...))
+         (quasisyntax
+          (let ((tmp (list (unsyntax-splicing (syntax (vals ...))))))
+            `(items ,@tmp end))))))))
+
+(newline)
+(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
+
+;; =============================================================================
+;; test_letrec_star_expansion.scm
+;; =============================================================================
+;; test_letrec_star_expansion.scm
+
+
+(define (test name output expected)
+  (if (equal? output expected)
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
+      (begin
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display name) (newline)
+        (display "  Expected: ") (write expected) (newline)
+        (display "  Actual:   ") (write output) (newline))))
+
+(display "Testing letrec* expansion...\n")
+
+;; letrec* should now be preserved as a core form, not desugared to let/set!
+(let* ((expr '(letrec* ((a 1) (b (+ a 1))) (list a b)))
+       (expanded (macroexpand expr 'strip)))
+  (display "Expanded: ") (write expanded) (newline)
+  (test "letrec* preserved as core form"
+        expanded
+        '(letrec* ((a 1) (b (+ a 1)))
+           (list a b))))
+
+;; Internal defines should now expand to letrec* core form
+(let* ((expr '(let () (define (f x) (if (= x 0) 1 (* x (f (- x 1))))) (f 5)))
+       (expanded (macroexpand expr 'strip)))
+  (display "Expanded internal define: ") (write expanded) (newline)
+  (test "internal define expansion to letrec*"
+        expanded
+        '(let ()
+           (letrec* ((f (lambda (x) (if (= x 0) 1 (* x (f (- x 1)))))))
+             (f 5)))))
+
+(display "All letrec* expansion tests done.\n")
+
+
+
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)

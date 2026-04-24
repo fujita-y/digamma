@@ -1,9 +1,11 @@
+;; ==== Combined test file ====
+(define *pass-count* 0)
+(define *fail-count* 0)
+
+;; ==== from test-syntax.scm ====
 ;; tests/test-syntax.scm
 
 (copy-environment-variables! (system-environment) (current-environment) '(make-syntax-object strip-renames expand-syntax-case))
-
-(define *pass-count* 0)
-(define *fail-count* 0)
 
 (define (test name expr expected)
   (let ((result (macroexpand expr 'strip)))
@@ -821,585 +823,86 @@
 
 (newline)
 (newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
-(if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
-    (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)(display "\n>>> Section 1: Standalone expansion tests\n")
+#|
+./build/nanos --boot boot/core.ir --script tests/test-syntax.scm
+|#
+
+
+;; ==== from test-mini-stress.scm ====
+(define (test-equal name output expected)
+  (if (equal? output expected)
+      (begin 
+        (set! *pass-count* (+ *pass-count* 1))
+        (display "PASS: ") (display name) (newline))
+      (begin
+        (set! *fail-count* (+ *fail-count* 1))
+        (display "FAIL: ") (display name) (newline)
+        (display "  Expected: ") (write expected) (newline)
+        (display "  Actual:   ") (write output) (newline))))
+
+;; Minimal stress test - just the ??!apply substitution with 2 vars
+(define-syntax ??!apply
+  (syntax-rules (??!lambda)
+    ((_ (??!lambda (bound-var . other-bound-vars) body) oval . other-ovals)
+     (letrec-syntax ((subs
+                      (syntax-rules (??! bound-var ??!lambda)
+                        ((_ val k (??! bound-var)) (appl k val))
+                        ((_ val k (??!lambda bvars int-body))
+                         (subs-in-lambda val bvars (k bvars) int-body))
+                        ((_ val k (x)) (subs val (recon-pair val k ()) x))
+                        ((_ val k (x . y)) (subs val (subsed-cdr val k x) y))
+                        ((_ val k x) (appl k x))))
+                     (subsed-cdr
+                       (syntax-rules ()
+                         ((_ val k x new-y)
+                          (subs val (recon-pair val k new-y) x))))
+                     (recon-pair
+                       (syntax-rules ()
+                         ((_ val k new-y new-x) (appl k (new-x . new-y)))))
+                     (subs-in-lambda
+                       (syntax-rules (bound-var)
+                         ((_ val () kp int-body)
+                          (subs val (recon-l kp ()) int-body))
+                         ((_ val (bound-var . obvars) (k bvars) int-body)
+                          (appl k (??!lambda bvars int-body)))
+                         ((_ val (obvar . obvars) kp int-body)
+                          (subs-in-lambda val obvars kp int-body))))
+                     (recon-l
+                       (syntax-rules ()
+                         ((_ (k bvars) () result)
+                          (appl k (??!lambda bvars result)))))
+                     (appl
+                      (syntax-rules ()
+                        ((_ (a b c d) result) (a b c d result))
+                        ((_ (a b c) result) (a b c result))))
+                     (finish
+                       (syntax-rules ()
+                         ((_ () () exp) exp)
+                         ((_ rem-bvars rem-ovals exps)
+                          (??!apply (??!lambda rem-bvars exps) . rem-ovals)))))
+       (subs oval (finish other-bound-vars other-ovals) body)))))
+
+(define-syntax ?cons (syntax-rules () ((_ x y k) (??!apply k (x . y)))))
+(define-syntax ?car (syntax-rules () ((_ (x . y) k) (??!apply k x))))
+(define-syntax ?cdr (syntax-rules () ((_ (x . y) k) (??!apply k y))))
+(define-syntax ?null? (syntax-rules () ((_ () k) (??!apply k #t)) ((_ x k) (??!apply k #f))))
+(define-syntax ?ifnull? (syntax-rules () ((_ () kt kf) (??!apply kt #t)) ((_ x kt kf) (??!apply kf #f))))
+
+;; Simple test: build and test a pair
+(define ans #f)
+(?cons hello world (??!lambda (x) (set! ans (quote (??! x)))))
+
+(test-equal "check output pair" ans '(hello . world))
 
-;; Test basic matching
-(let* ((input (make-syntax-object '(foo 1 2 3) '()))
-       (result (expand-syntax-case input '()
-                                   '(((name val ...) #t (syntax (name val ...))))
-                                   (current-environment))))
-  (test-eq "basic-syntax-case" (syntax->datum result) '(foo 1 2 3)))
-
-;; Test ellipsis expansion
-(let* ((input (make-syntax-object '(test-let ((x 1) (y 2)) + x y) '()))
-       (result (expand-syntax-case input '()
-                                   '(((test-let ((var val) ...) body ...) #t (syntax (list (list 'var val) ... 'body ...))))
-                                   (current-environment))))
-  (test-eq "ellipsis-expansion" (strip-renames (syntax->datum result)) '(list (list 'x 1) (list 'y 2) '+ 'x 'y)))
-
-;; Test fenders
-(let* ((input (make-syntax-object '(foo 1 2 3) '()))
-       (result (expand-syntax-case input '()
-                                   '(((name val ...) (null? (syntax->datum (syntax (val ...)))) 'empty)
-                                     ((name val ...) #t 'not-empty))
-                                   (current-environment))))
-  (test-eq "fender-false" result 'not-empty))
-
-;; =============================================================================
-;; Section 2: Integrated macro expansion tests
-;; =============================================================================
-(display "\n>>> Section 2: Integrated macro expansion tests\n")
-
-;; Define a macro using syntax-case
-(macroexpand
- '(define-syntax reverse-params
-    (lambda (x)
-      (syntax-case x ()
-        ((_ a b c) (syntax (list c b a)))))))
-
-(test-eq "integrated-syntax-case"
-      (macroexpand '(reverse-params 1 2 3) 'strip)
-      '(list 3 2 1))
-
-;; R6RS 'or' macro
-(macroexpand
- '(define-syntax r6rs-or
-    (lambda (x)
-      (syntax-case x ()
-        [(_) (syntax #f)]
-        [(_ e) (syntax e)]
-        [(_ e1 e2 e3 ...)
-         (syntax (let ([t e1])
-                   (if t t (r6rs-or e2 e3 ...))))]))))
-
-(test-eq "r6rs-or-zero"
-      (macroexpand '(r6rs-or) 'strip)
-      '#f)
-
-(test-eq "r6rs-or-one"
-      (macroexpand '(r6rs-or 1) 'strip)
-      '1)
-
-(test-eq "r6rs-or-many"
-      (macroexpand '(r6rs-or 1 2 3) 'strip)
-      '(let ((t 1)) (if t t (let ((t 2)) (if t t 3)))))
-
-;; R6RS p.car (identifier macro)
-(macroexpand
- '(define-syntax p.car
-    (lambda (x)
-      (syntax-case x ()
-        [(_ . rest) (syntax ((car p) . rest))]
-        [_ (syntax (car p))]))))
-
-(test-eq "identifier-macro-call"
-      (macroexpand '(p.car 1 2) 'strip)
-      '((car p) 1 2))
-
-(test-eq "identifier-macro-ref"
-      (macroexpand 'p.car 'strip)
-      '(car p))
-
-;; R6RS 'let' with duplicate detection
-(define (unique-ids? ls)
-  (or (null? ls)
-      (and (let loop ((x (car ls)) (rest (cdr ls)))
-             (or (null? rest)
-                 (and (not (bound-identifier=? x (car rest)))
-                      (loop x (cdr rest)))))
-           (unique-ids? (cdr ls)))))
-
-(macroexpand
- '(define-syntax r6rs-let
-    (lambda (x)
-      (syntax-case x ()
-        ((_ ((i v) ...) e1 e2 ...)
-         (if (unique-ids? (syntax (i ...)))
-             (syntax ((lambda (i ...) e1 e2 ...) v ...))
-             (error "duplicate identifiers")))))))
-
-(test-eq "r6rs-let-basic"
-      (macroexpand '(r6rs-let ((x 1) (y 2)) (+ x y)) 'strip)
-      '((lambda (x y) (+ x y)) 1 2))
-
-;; R6RS 'rec' macro
-(macroexpand
- '(define-syntax rec
-    (lambda (x)
-      (syntax-case x ()
-        [(_ x e)
-         (identifier? (syntax x))
-         (syntax (letrec ([x e]) x))]))))
-
-(test-eq "r6rs-rec-fact"
-      (macroexpand
-       '(map (rec fact
-                  (lambda (n)
-                    (if (= n 0)
-                        1
-                        (* n (fact (- n 1))))))
-             '(1 2 3 4 5))
-       'strip)
-      '(map (letrec* ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1)))))))
-              fact)
-            '(1 2 3 4 5)))
-
-;; Anaphoric IF (aif)
-(macroexpand
- '(define-syntax aif
-    (lambda (x)
-      (syntax-case x ()
-        ((_ test true false)
-         (with-syntax ((it (datum->syntax (syntax test) (string->symbol "it"))))
-           (syntax (let ((it test))
-                     (if it true false)))))))))
-
-(test-eq "aif-test"
-      (macroexpand '(aif (assoc 'a '((a . 1))) (cdr it) #f) 'strip)
-      '(let ((it (assoc (quote a) (quote ((a . 1)))))) (if it (cdr it) #f)))
-
-;; Simple define-struct
-(macroexpand
- '(define-syntax define-struct
-    (lambda (x)
-      (syntax-case x ()
-        ((_ name (field ...))
-         (with-syntax ((make-name (datum->syntax (syntax name)
-                                                 (string->symbol
-                                                  (string-append "make-"
-                                                                 (symbol->string
-                                                                  (syntax->datum (syntax name)))))))
-                       (name? (datum->syntax (syntax name)
-                                             (string->symbol
-                                              (string-append (symbol->string
-                                                              (syntax->datum (syntax name))) "?")))))
-           (syntax (begin
-                     (define (make-name field ...) (list (quote name) field ...))
-                     (define (name? obj) (and (pair? obj) (eq? (car obj) (quote name))))))))))))
-
-(test-eq "define-struct-expansion"
-      (macroexpand '(define-struct point (x y)) 'strip)
-      '(begin
-         (define make-point (lambda (x y) (list 'point x y)))
-         (define point? (lambda (obj) (if (pair? obj) (eq? (car obj) 'point) #f)))))
-
-;; Stringify macro for constant testing
-(macroexpand
- '(define-syntax stringify
-    (lambda (x)
-      (syntax-case x ()
-        ((_ n)
-         (syntax (number->string n)))))))
-
-(test-eq "stringify-constant"
-      (macroexpand '(stringify 100) 'strip)
-      '(number->string 100))
-
-;; Stringify macro for symbol testing
-(macroexpand
- '(define-syntax stringify-sym
-    (lambda (x)
-      (syntax-case x ()
-        ((_ n)
-         (syntax (symbol->string n)))))))
-
-(test-eq "stringify-symbl"
-      (macroexpand '(stringify-sym 'hoge) 'strip)
-      '(symbol->string 'hoge))
-
-;; with-syntax with ellipsis
-(macroexpand
- '(define-syntax list-to-vars
-    (lambda (x)
-      (syntax-case x ()
-        ((_ (vals ...))
-         (with-syntax (((v ...) (syntax (vals ...))))
-           (syntax (list v ...))))))))
-
-(test-eq "with-syntax-ellipsis"
-      (macroexpand '(list-to-vars (1 2 3)) 'strip)
-      '(list 1 2 3))
-
-;; Nested with-syntax dependencies
-(macroexpand
- '(define-syntax nested-with
-    (lambda (x)
-      (syntax-case x ()
-        ((_ val)
-         (with-syntax ((a (syntax val)))
-           (with-syntax ((b (datum->syntax (syntax a) 'inner-sym)))
-             (syntax (list a b)))))))))
-
-(test-eq "with-syntax-nested"
-      (macroexpand '(nested-with 99) 'strip)
-      '(list 99 inner-sym))
-
-;; quasisyntax test
-(macroexpand
- '(define-syntax test-quasisyntax
-    (lambda (x)
-      (syntax-case x ()
-        ((_ val)
-         (quasisyntax (list (unsyntax (syntax val)) (unsyntax (+ (syntax->datum (syntax val)) 1)))))))))
-
-(test-eq "quasisyntax-basic"
-      (macroexpand '(test-quasisyntax 10) 'strip)
-      '(list 10 11))
-
-;; quasisyntax with unsyntax-splicing
-(macroexpand
- '(define-syntax test-unsyntax-splicing
-    (lambda (x)
-      (syntax-case x ()
-        ((_ vals)
-         (quasisyntax (list (unsyntax-splicing (syntax->datum (syntax vals))))))))))
-
-(test-eq "quasisyntax-splicing"
-      (macroexpand '(test-unsyntax-splicing (1 2 3)) 'strip)
-      '(list 1 2 3))
-
-;; Nested quasisyntax
-(macroexpand
- '(define-syntax nested-quasisyntax
-    (lambda (x)
-      (syntax-case x ()
-        ((_ val)
-         (quasisyntax (list (unsyntax (quasisyntax (list (unsyntax (syntax val))))))))))))
-
-(test-eq "quasisyntax-nested"
-      (macroexpand '(nested-quasisyntax 42) 'strip)
-      '(list (list 42)))
-
-;; generate-temporaries test
-(macroexpand
- '(define-syntax test-gen-temp
-    (lambda (x)
-      (syntax-case x ()
-        ((_ x ...)
-         (let ((temps (generate-temporaries (syntax (x ...)))))
-           (with-syntax (((t ...) temps))
-             (syntax (list t ...)))))))))
-
-(test-eq "generate-temporaries"
-      (let ((res (macroexpand '(test-gen-temp a b))))
-        (and (list? res) (= (length res) 3) (eq? (car res) 'list)
-             (symbol? (cadr res)) (symbol? (caddr res))
-             (not (eq? (cadr res) (caddr res)))))
-      #t)
-
-;; syntax->datum in macro body
-(macroexpand
- '(define-syntax test-syntax-datum
-    (lambda (x)
-      (syntax-case x ()
-        ((_ a b c)
-         (let ((lst (syntax->datum (syntax (a b c)))))
-           (with-syntax ((res (list->vector lst)))
-             (syntax (quote res)))))))))
-
-(test-eq "syntax->datum-in-macro"
-      (macroexpand '(test-syntax-datum 1 2 3) 'strip)
-      ''#(1 2 3))
-
-;; datum->syntax test
-(macroexpand
- '(define-syntax test-datum-syntax
-    (lambda (x)
-      (syntax-case x ()
-        ((_ name val)
-         (with-syntax ((new-name (datum->syntax (syntax name)
-                                                (string->symbol (string-append "prefix-"
-                                                                               (symbol->string (syntax->datum (syntax name))))))))
-           (syntax (define new-name val))))))))
-
-(test-eq "datum->syntax-test"
-      (macroexpand '(test-datum-syntax foo 42) 'strip)
-      '(define prefix-foo 42))
-
-;; tailmatch test (Backtracking ellipsis + Improper list)
-(macroexpand
- '(define-syntax tailmatch1
-    (lambda (x)
-      (syntax-case x ()
-        ((_ first ... last . rest)
-         (syntax rest))))))
-
-(test-eq "tailmatch-greedy-backtracking1"
-      (macroexpand '(tailmatch1 1 2 3 . 4) 'strip)
-      '4)
-
-(macroexpand
- '(define-syntax tailmatch2
-    (lambda (x)
-      (syntax-case x ()
-        ((_ first ... . rest)
-         (syntax rest))))))
-
-(test-eq "tailmatch2-greedy-backtracking2"
-      (macroexpand '(tailmatch2 1 2 3 . 4) 'strip)
-      '4)
-
-;; local-definition-test
-(macroexpand
- '(define-syntax local-definition-test
-    (lambda (x)
-      (define list-to-string
-        (lambda (lst)
-          (if (pair? lst) "ok" (error 'list-to-string "list expected"))))
-      (syntax-case x ()
-        ((_ ret name (args ...))
-         (let ((signature (list-to-string (syntax->datum (syntax (ret args ...))))))
-            (with-syntax ((signature signature))
-              (syntax signature))))))))
-
-(test-eq "local-definition-test"
-      (macroexpand '(local-definition-test int hoge (int int)) 'strip)
-      "ok")
-
-;; bound-identifier=? test
-(macroexpand
- '(define-syntax test-bound-id
-    (lambda (x)
-      (syntax-case x ()
-        ((_ id)
-         (let* ((introduced (datum->syntax (syntax here) 'x))
-                (res1 (bound-identifier=? (syntax id) introduced))
-                (res2 (bound-identifier=? introduced introduced)))
-           (with-syntax ((res1 res1) (res2 res2))
-             (syntax (list res1 res2)))))))))
-
-(test-eq "bound-identifier=? test"
-      (macroexpand '(test-bound-id x) 'strip)
-      '(list #f #t))
-
-;; =============================================================================
-;; Section 3: Definition by syntax-case
-;; =============================================================================
-(display "\n>>> Section 3: Definition by syntax-case\n")
-
-;; Helper for eval tests (from test_syntax_rules.scm)
-(define (test-eval-sc expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr) (current-environment))))
-    (if (equal? expected expanded)
-        (begin
-          (set! *pass-count* (+ *pass-count* 1))
-          (display "PASS: ") (display msg) (newline))
-        (begin
-          (set! *fail-count* (+ *fail-count* 1))
-          (display "FAIL: ") (display msg) (newline)
-          (display "  Expected: ") (display expected) (newline)
-          (display "  Actual:   ") (display expanded) (newline)))))
-
-(define (test-eval-strip-sc expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr 'strip) (current-environment))))
-    (if (equal? expected expanded)
-        (begin 
-          (set! *pass-count* (+ *pass-count* 1))
-          (display "PASS: ") (display msg) (newline))
-        (begin 
-          (set! *fail-count* (+ *fail-count* 1))
-          (display "FAIL: ") (display msg) (newline)
-          (display "  Expected: ") (display expected) (newline)
-          (display "  Actual:   ") (display expanded) (newline)))))
-
-;; Define syntax-rules using syntax-case (shadowing core syntax-rules)
-(macroexpand
- '(define-syntax syntax-rules
-    (lambda (x)
-      (syntax-case x (lambda syntax-case syntax)
-        ((_ (k ...) ((keyword . pattern) template) ...)
-         (syntax (lambda (x)
-             (syntax-case x (k ...)
-               ((dummy . pattern) (syntax template)) ...))))))))
-
-;; Pitfall 3.1
-(test-eval-sc 4
-      '(let-syntax ((foo
-                     (syntax-rules ()
-                       ((_ expr) (+ expr 1)))))
-         (let ((+ *))
-           (foo 3)))
-      "Pitfall 3.1: Hygiene with shadowed global operator")
-
-;; Pitfall 3.2
-(test-eval-sc 2
-      '(let-syntax ((foo (syntax-rules ()
-                           ((_ var) (define var 1)))))
-         (let ((x 2))
-           (begin (define foo +))
-           (cond (else (foo x)))
-           x))
-      "Pitfall 3.2: let-syntax inside let with begin and cond")
-
-;; Pitfall 3.3
-(test-eval-sc 1
-      '(let ((x 1))
-         (let-syntax
-             ((foo (syntax-rules ()
-                     ((_ y) (let-syntax
-                                ((bar (syntax-rules ()
-                                        ((_) (let ((x 2)) y)))))
-                              (bar))))))
-           (foo x)))
-      "Pitfall 3.3: Nested let-syntax hygiene")
-
-;; Pitfall 3.4
-(test-eval-sc 1
-      '(let-syntax ((x (syntax-rules ()))) 1)
-      "Pitfall 3.4: let-syntax with no clauses")
-
-;; Pitfall 8.1
-(test-eval-sc -1
-      '(let - ((n (- 1))) n)
-      "Pitfall 8.1: named let with name -")
-
-;; Pitfall 8.3 (R6RS)
-(test-eval-strip-sc 2
-      '(let ((x 1))
-         (let-syntax ((foo (syntax-rules () ((_) 2))))
-           (define x (foo))
-           3)
-         x)
-      "Pitfall 8.3: let-syntax and local define")
-
-(newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
-(if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
-    (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)(display "\n>>> Section 1: Variable Transformers\n")
-
-(macroexpand
- '(define-syntax var-trans
-    (make-variable-transformer
-     (lambda (x)
-       (syntax-case x (set!)
-         ((set! _ val) (syntax (display (list 'setting val))))
-         ((_ . rest) (syntax (list 1 . rest)))
-         (_ (syntax 1)))))))
-
-(test-eq "var-trans-ref" (macroexpand 'var-trans 'strip) 1)
-(test-eq "var-trans-call" (macroexpand '(var-trans 2 3) 'strip) '(list 1 2 3))
-(test-eq "var-trans-set" (macroexpand '(set! var-trans 10) 'strip) '(display (list 'setting 10)))
-
-;; =============================================================================
-;; Section 2: identifier-syntax
-;; =============================================================================
-(display "\n>>> Section 2: identifier-syntax\n")
-
-(macroexpand
- '(define-syntax id-test
-    (identifier-syntax 42)))
-
-(test-eq "id-syntax-ref" (macroexpand 'id-test 'strip) 42)
-(test-eq "id-syntax-call" (macroexpand '(id-test 1 2) 'strip) '(42 1 2))
-
-(macroexpand
- '(define-syntax p.car
-    (identifier-syntax
-     (p.car (car p))
-     ((set! p.car val) (set-car! p val)))))
-
-(test-eq "id-syntax-set-ref" (macroexpand 'p.car 'strip) '(car p))
-(test-eq "id-syntax-set-set" (macroexpand '(set! p.car 99) 'strip) '(set-car! p 99))
-
-(macroexpand
- '(define-syntax nested-id
-    (identifier-syntax
-     (nested-id (inner-macro))
-     ((set! nested-id val) (set-inner! val)))))
-
-(test-eq "nested-id-set" (macroexpand '(set! nested-id 7) 'strip) '(set-inner! 7))
-
-;; =============================================================================
-;; Section 3: free-identifier=? tests
-;; =============================================================================
-(display "\n>>> Section 3: free-identifier=? tests\n")
-
-(macroexpand
- '(define-syntax check-else
-    (lambda (x)
-      (syntax-case x (else)
-        ((_ else) (syntax 'is-else))
-        ((_ x) (syntax 'not-else))))))
-
-(test-eq "free-id-else-match" (macroexpand '(check-else else) 'strip) ''is-else)
-(test-eq "free-id-else-non-match" (macroexpand '(check-else other) 'strip) ''not-else)
-
-(newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
-(if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
-    (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)(display "\n>>> Section 1: R7RS syntax-rules Features\n")
-
-(macroexpand
- '(define-syntax nested-rules
-    (syntax-rules ()
-      ((_ (x ...))
-       (let-syntax ((inner (syntax-rules dots ()
-                             ((_ a dots) (list x ... a dots)))))
-         (inner 1 2 3))))))
-
-(test-eq "nested-rules-ellipses" (macroexpand '(nested-rules (a b)) 'strip) '(list a b 1 2 3))
-
-(macroexpand
- '(define-syntax lit-shadow
-    (syntax-rules (=>)
-      ((_ a => b) (list 'match a b))
-      ((_ a b c) (list 'no-match a b c)))))
-
-(test-eq "lit-shadow-match" (macroexpand '(lit-shadow 1 => 2) 'strip) '(list 'match 1 2))
-
-(test-eq "lit-shadow-no-match"
-      (macroexpand '(let ((=> #f)) (lit-shadow 1 => 2)) 'strip)
-      '(let ((=> #f)) (list 'no-match 1 => 2)))
-
-(macroexpand
- '(define-syntax improper-elli
-    (syntax-rules ()
-      ((_ (a ... . b)) (list (list a ...) b)))))
-
-(test-eq "improper-elli-match" (macroexpand '(improper-elli (1 2 3 . 4)) 'strip) '(list (list 1 2 3) 4))
-
-(macroexpand
- '(define-syntax vec-nest
-    (syntax-rules ()
-      ((_ #((a b) ...)) (list (list a b) ...)))))
-
-(test-eq "vec-nest-match" (macroexpand '(vec-nest #((1 2) (3 4))) 'strip) '(list (list 1 2) (list 3 4)))
-
-(macroexpand
- '(define-syntax custom-elli
-    (syntax-rules ::: ()
-      ((_ a :::) (list a :::)))))
-
-(test-eq "custom-elli-match" (macroexpand '(custom-elli 1 2 3) 'strip) '(list 1 2 3))
-
-(newline)
-(display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
-(if (= *fail-count* 0)
-    (display "ALL TESTS PASSED.\n")
-    (begin
-      (display "FAILED ") (display *fail-count*) (display " TESTS.\n")))
-(newline)
 ;; =============================================================================
 ;; Summary
 ;; =============================================================================
 (newline)
 (newline)
+
+
+
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
     (begin (display "ALL TESTS PASSED.\n") (exit 0))
     (begin (display "FAILED ") (display *fail-count*) (display " TESTS.\n") (exit 1)))
-
-#|
-./build/nanos --boot boot/core.ir --script tests/test-syntax.scm
-|#

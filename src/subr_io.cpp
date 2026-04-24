@@ -25,6 +25,7 @@
 
 SUBR subr_put_char(scm_obj_t self, scm_obj_t port, scm_obj_t ch) {
   if (!is_port(port)) throw std::runtime_error("put-char: first argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("put-char: first argument must be an output port");
   if (!is_char(ch)) throw std::runtime_error("put-char: second argument must be a character");
   return port_put_char(port, ch);
 }
@@ -34,6 +35,7 @@ SUBR subr_put_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
   scm_obj_t port = argv[0];
   scm_obj_t str = argv[1];
   if (!is_port(port)) throw std::runtime_error("put-string: first argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("put-string: first argument must be an output port");
   if (!is_string(str)) throw std::runtime_error("put-string: second argument must be a string");
 
   const uint8_t* s = (const uint8_t*)string_name(str);
@@ -69,6 +71,7 @@ SUBR subr_put_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return context::s_current_input_port;
   if (is_port(argv[0])) {
+    if (!is_input_port(argv[0])) throw std::runtime_error("current-input-port: argument must be an input port");
     object_heap_t::current()->write_barrier(argv[0]);
     context::s_current_input_port = argv[0];
     return scm_unspecified;
@@ -79,6 +82,7 @@ SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return context::s_current_output_port;
   if (is_port(argv[0])) {
+    if (!is_output_port(argv[0])) throw std::runtime_error("current-output-port: argument must be an output port");
     object_heap_t::current()->write_barrier(argv[0]);
     context::s_current_output_port = argv[0];
     return scm_unspecified;
@@ -89,6 +93,7 @@ SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
 SUBR subr_current_error_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return context::s_current_error_port;
   if (is_port(argv[0])) {
+    if (!is_output_port(argv[0])) throw std::runtime_error("current-error-port: argument must be an output port");
     object_heap_t::current()->write_barrier(argv[0]);
     context::s_current_error_port = argv[0];
     return scm_unspecified;
@@ -111,8 +116,8 @@ SUBR subr_write(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 2) throw std::runtime_error("write: wrong number of arguments");
   scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
   if (!is_port(port)) throw std::runtime_error("write: argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("write: argument must be an output port");
   std::ostream* os = port_get_ostream(port);
-  if (os == nullptr) throw std::runtime_error("write: argument must be an output port");
   printer_t(*os).write(argv[0]);
   return scm_unspecified;
 }
@@ -122,8 +127,8 @@ SUBR subr_write_ss(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 2) throw std::runtime_error("write/ss: wrong number of arguments");
   scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
   if (!is_port(port)) throw std::runtime_error("write/ss: argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("write/ss: argument must be an output port");
   std::ostream* os = port_get_ostream(port);
-  if (os == nullptr) throw std::runtime_error("write/ss: argument must be an output port");
   printer_t(*os).write_ss(argv[0]);
   return scm_unspecified;
 }
@@ -133,8 +138,8 @@ SUBR subr_display(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 2) throw std::runtime_error("display: wrong number of arguments");
   scm_obj_t port = (argc == 2) ? argv[1] : context::s_current_output_port;
   if (!is_port(port)) throw std::runtime_error("display: argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("display: argument must be an output port");
   std::ostream* os = port_get_ostream(port);
-  if (os == nullptr) throw std::runtime_error("display: argument must be an output port");
   printer_t(*os).display(argv[0]);
   return scm_unspecified;
 }
@@ -154,8 +159,8 @@ SUBR subr_newline(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc > 1) throw std::runtime_error("newline: wrong number of arguments");
   scm_obj_t port = (argc == 1) ? argv[0] : context::s_current_output_port;
   if (!is_port(port)) throw std::runtime_error("newline: argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("newline: argument must be an output port");
   std::ostream* os = port_get_ostream(port);
-  if (os == nullptr) throw std::runtime_error("newline: argument must be an output port");
   *os << std::endl;
   return scm_unspecified;
 }
@@ -165,6 +170,7 @@ SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc == 0) return port_flush_output(context::s_current_output_port);
   if (argc == 1) {
     if (!is_port(argv[0])) throw std::runtime_error("flush-output-port: argument must be a port");
+    if (!is_output_port(argv[0])) throw std::runtime_error("flush-output-port: argument must be an output port");
     return port_flush_output(argv[0]);
   }
   throw std::runtime_error("flush-output-port: wrong number of arguments");
@@ -219,8 +225,8 @@ SUBR subr_read(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc > 1) throw std::runtime_error("read: wrong number of arguments");
   scm_obj_t port = (argc == 1) ? argv[0] : context::s_current_input_port;
   if (!is_port(port)) throw std::runtime_error("read: argument must be a port");
+  if (!is_input_port(port)) throw std::runtime_error("read: argument must be an input port");
   std::istream* is = port_get_istream(port);
-  if (is == nullptr) throw std::runtime_error("read: argument must be an input port");
 
   reader_t reader(*is);
   bool err = false;
@@ -229,6 +235,18 @@ SUBR subr_read(scm_obj_t self, int argc, scm_obj_t argv[]) {
     throw std::runtime_error("read: " + reader.get_error_message());
   }
   return obj;
+}
+
+// get-bytevector-n - R6RS 8.2.9
+SUBR subr_get_bytevector_n(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
+  scm_obj_t port = a1;
+  scm_obj_t n = a2;
+  if (!is_port(port)) throw std::runtime_error("get-bytevector-n: first argument must be a port");
+  if (!is_input_port(port)) throw std::runtime_error("get-bytevector-n: first argument must be an input port");
+  if (!is_fixnum(n)) throw std::runtime_error("get-bytevector-n: second argument must be a fixnum");
+  int count = fixnum(n);
+  if (count < 0) throw std::runtime_error("get-bytevector-n: count must be non-negative");
+  return port_get_bytes_n(port, count);
 }
 
 void init_subr_io() {
@@ -252,6 +270,7 @@ void init_subr_io() {
   reg("close-port", (void*)subr_close_port, 1, 0);
   reg("eof-object?", (void*)subr_eof_object_p, 1, 0);
   reg("read", (void*)subr_read, 0, 1);
+  reg("get-bytevector-n", (void*)subr_get_bytevector_n, 2, 0);
   reg("current-input-port", (void*)subr_current_input_port, 0, 1);
   reg("current-output-port", (void*)subr_current_output_port, 0, 1);
   reg("current-error-port", (void*)subr_current_error_port, 0, 1);
