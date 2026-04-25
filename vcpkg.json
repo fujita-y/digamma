@@ -5,6 +5,8 @@
     "boost-fiber",
     "boost-context",
     "boost-iostreams",
+    "boost-beast",
+    "openssl",
     "replxx",
     "cli11"
   ]

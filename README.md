@@ -67,7 +67,7 @@ Source → Macro Expand → Optimize → Lambda Lift → Compile → LLVM IR →
 
 4. **Compilation** (`core/compiler.scm`): Emits a register-based IR with closure conversion, free variable analysis, and cell-based boxing for mutated and forward-referenced variables. The compiler emits `letrec*` as a first-class core form with selective cell boxing — only variables that are mutated or forward-referenced by lambda initializers require cells; all others use direct register access.
 
-5. **Code generation** (`src/codegen.cpp`, `src/codegen_emit.cpp`): Translates the IR to LLVM IR, handling closure creation, tail calls, global references, cell operations, and safepoint insertion. Uses LLVM ORC (JITLink + CompileOnDemand) for lazy compilation.
+5. **Code generation** (`src/codegen.cpp`, `src/codegen_emit.cpp`, `src/codegen_inline.cpp`, `src/codegen_aux.cpp`, `src/codegen_map.cpp`): Translates the IR to LLVM IR, handling closure creation, tail calls, global references, cell operations, safepoint insertion, and inlined primitives. Escape and stack-allocation analyses (`phase2b`–`phase2d`) elide write barriers and heap allocations for short-lived closures. Uses LLVM ORC (JITLink + CompileOnDemand) for lazy compilation.
 
 ### Continuations
 
@@ -106,16 +106,19 @@ Digamma implements lightweight, cooperative multitasking using **fibers** and **
 - `(future-wait-for <future> <msec>)`: Blocks with a timeout; returns `#t` if timed out, `#f` otherwise.
 - `(future? <obj>)`: Returns `#t` if the object is a future.
 
-### Asynchronous I/O
+### Asynchronous I/O and Networking
 
-Digamma provides non-blocking, fiber-aware I/O using **Boost.Asio**. Operation completion is integrated directly into the fiber scheduler (Round Robin pattern), allowing fibers to suspend while waiting for I/O and resume automatically when data is available:
+Digamma provides non-blocking, fiber-aware I/O and HTTP capabilities using **Boost.Asio** and **Boost.Beast**. Operation completion is integrated directly into the fiber scheduler (Round Robin pattern), allowing fibers to suspend while waiting for I/O and resume automatically when data is available:
 
 - **Seamless Integration**: Asio's `io_context` is polled directly by the fiber scheduler's `suspend_until()` hook, ensuring that I/O completion handlers run inline on the main thread and fulfill futures immediately.
-- **Future-based I/O**: Asynchronous I/O primitives return **future** objects, enabling clean, non-blocking code using standard fiber synchronization.
+- **Future-based I/O**: Asynchronous networking primitives return **future** objects, enabling clean, non-blocking code using standard fiber synchronization.
 
 #### Primitives
 
 - `(get-bytevector-n-async <port> <n>)`: Initiates an asynchronous read of at most *n* bytes from the specified input port. Returns a future that will be fulfilled with a bytevector containing the data read, or EOF.
+- `(https-get <url> <port>)`: Performs a fiber-aware, non-blocking HTTPS GET request. The calling fiber suspends while the network request is in flight. Returns the response body as a string.
+- `(https-get-async <url> <port>)`: Initiates an asynchronous HTTPS GET request on a detached fiber. Returns a future that will be fulfilled with the response body as a string.
+
 
 ### Foreign Function Interface (CFFI)
 
@@ -130,7 +133,8 @@ The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM OR
 - **LLVM 22** or later
 - **CMake 3.13.4** or later
 - **vcpkg** (recommended for managing dependencies)
-- **Boost 1.88** or later (specifically `boost_context`, `boost_fiber`, and `boost_asio`)
+- **Boost 1.88** or later (specifically `boost_context`, `boost_fiber`, `boost_asio`, and `boost_beast`)
+- **OpenSSL** (for TLS support in HTTPS networking)
 - **replxx** (for interactive REPL)
 - **CLI11** (for command-line argument parsing)
 
@@ -184,10 +188,16 @@ You can use fibers to run concurrent computations:
 ## Testing
 
 ```bash
-cd build && ctest                    # C++ unit tests (20 tests)
-cd .. && tests/run_tests.sh          # Scheme integration tests
-cd core/tests && ./run_tests.sh      # Core compiler tests
+cd build && ctest                    # C++ unit tests (5 test executables)
+cd .. && tests/run_tests.sh          # Scheme integration tests (3 suites)
+cd core/tests && ./run_tests.sh      # Core compiler tests (4 suites)
 ```
+
+The C++ test suite (`tests/`) is organised into five executables: `test_core` (object model and GC), `test_io` (port and I/O primitives), `test_compiler` (code-generation pipeline), `test_runtime` (evaluator and runtime behaviour), and `test_eval` (end-to-end evaluation).
+
+The Scheme integration suite (`tests/`) covers the module system (`test_modules.scm`), macro and syntax forms (`test_syntax.scm`), and system/environment primitives (`test_system.scm`).
+
+The core compiler suite (`core/tests/`) exercises macro expansion (`test_macroexpand.scm`), full syntax-rules/syntax-case semantics (`test_syntax.scm`), the compiler output (`test_compiler.scm`), and core language forms (`test_core.scm`).
 
 ## Acknowledgments
 

@@ -68,9 +68,6 @@ class priority_scheduler : public boost::fibers::algo::algorithm {
     if (context::s_asio_context) {
       auto& ctx = context::s_asio_context->ctx;
 
-      // Restart in case a previous stop() drained the context.
-      if (ctx.stopped()) ctx.restart();
-
       // 1. Drain all immediately-ready completions.
       ctx.poll();
 

@@ -68,6 +68,7 @@ find_package(Boost CONFIG REQUIRED COMPONENTS context fiber iostreams)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # ==============================================================================
 # Compiler Configuration
@@ -184,13 +185,14 @@ set(NANOS_CORE_SOURCES
   src/utf8.cpp
   src/subr_fiber.cpp
   src/subr_asio.cpp
+  src/subr_net.cpp
   src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads -pthread -ldl)
 
 # ==============================================================================
 # Targets

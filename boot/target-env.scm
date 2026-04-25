@@ -189,6 +189,8 @@ hashtable-entries
 hashtable-ref
 hashtable-set!
 hashtable?
+https-get
+https-get-async
 identifier?
 inexact->exact
 inexact?

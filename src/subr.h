@@ -20,6 +20,7 @@ void init_subr_cffi();
 void init_subr_uvector();
 void init_subr_fiber();
 void init_subr_asio();
+void init_subr_net();
 
 SUBR subr_fiber(scm_obj_t self, scm_obj_t closure);
 SUBR subr_fiber_yield(scm_obj_t self);
@@ -30,6 +31,9 @@ SUBR subr_future_wait_for(scm_obj_t self, scm_obj_t future_obj, scm_obj_t msec);
 SUBR subr_future_p(scm_obj_t self, scm_obj_t obj);
 
 SUBR subr_put_string_async(scm_obj_t self, scm_obj_t port, scm_obj_t str);
+
+SUBR subr_https_get(scm_obj_t self, scm_obj_t url, scm_obj_t port);
+SUBR subr_https_get_async(scm_obj_t self, scm_obj_t url, scm_obj_t port);
 
 SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);

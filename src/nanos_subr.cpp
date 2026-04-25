@@ -33,4 +33,5 @@ void nanos_t::init_subr() {
   init_subr_uvector();
   init_subr_fiber();
   init_subr_asio();
+  init_subr_net();
 }

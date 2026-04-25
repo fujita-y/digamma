@@ -15,8 +15,8 @@
 class asio_context {
  public:
   boost::asio::io_context ctx;
-
-  asio_context() = default;
+  boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
+  asio_context() : work_guard(boost::asio::make_work_guard(ctx)) {}
   ~asio_context() { ctx.stop(); }
 };
 
