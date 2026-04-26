@@ -12,6 +12,8 @@
 #include "printer.h"
 #include "reader.h"
 
+#include "asio.h"  // include after nanos.h due to CR1 macro conflict
+
 #include <fstream>
 #include <iostream>
 #include <llvm/Support/TargetSelect.h>
@@ -19,6 +21,7 @@
 #include <replxx.hxx>
 #include <sstream>
 #include <string>
+#include <mutex>
 
 #define IR_MODE    0
 #define IR_VERBOSE 0
@@ -28,9 +31,12 @@
 // ============================================================================
 
 void nanos_t::init_codegen() {
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  llvm::InitializeNativeTargetAsmParser();
+  static std::once_flag llvm_init_flag;
+  std::call_once(llvm_init_flag, []() {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+  });
 
   auto jit_expected = nanos_jit_t::Create();
   if (!jit_expected) {
@@ -43,6 +49,11 @@ void nanos_t::init_codegen() {
 }
 
 void nanos_t::init() {
+  m_boot_file = nanos_options::boot_file;
+  m_env_name = nanos_options::env_name;
+  m_script_file = nanos_options::script_file;
+  m_load_paths = nanos_options::load_paths;
+
   object_heap_t* heap = new object_heap_t();
 #ifndef NDEBUG
   // debug build
@@ -51,19 +62,23 @@ void nanos_t::init() {
   // release build
   heap->init((size_t)DEFAULT_HEAP_LIMIT * 1024 * 1024, 4 * 1024 * 1024);
 #endif
+
   context::init();
+  context::s_asio_context = new asio_context();
+  init_fiber_scheduler();
   init_codegen();
   init_subr();
   context::s_current_nanos = this;
 }
 
 void nanos_t::destroy() {
+  delete context::s_asio_context;
   m_jit.reset();
   codegen_t* codegen = codegen_t::current();
   codegen->destroy();
   delete codegen;
-  context::destroy();
   object_heap_t* heap = object_heap_t::current();
+  context::destroy();
   heap->destroy();
   delete heap;
 }
@@ -110,8 +125,8 @@ void nanos_t::load_script(std::string filename) {
 */
 
 void nanos_t::load_script(std::string filename) {
-  if (!filename.empty()) nanos_options::script_file = filename;
-  std::ifstream ifs(nanos_options::script_file);
+  if (!filename.empty()) m_script_file = filename;
+  std::ifstream ifs(m_script_file);
   if (!ifs) {
     puts("Error: failed to open file");
     return;
@@ -142,8 +157,8 @@ void nanos_t::load_script(std::string filename) {
 }
 
 void nanos_t::load_ir(std::string filename) {
-  if (!filename.empty()) nanos_options::boot_file = filename;
-  std::ifstream ifs(nanos_options::boot_file);
+  if (!filename.empty()) m_boot_file = filename;
+  std::ifstream ifs(m_boot_file);
   if (!ifs) {
     puts("Error: failed to open file");
     return;
@@ -224,32 +239,32 @@ void nanos_t::run() {
 #else
   puts(";; USE_TBI == 0");
 #endif
-  std::cout << ";; boot_file: " << nanos_options::boot_file << std::endl;
-  std::cout << ";; script_file: " << nanos_options::script_file << std::endl;
+  std::cout << ";; boot_file: " << m_boot_file << std::endl;
+  std::cout << ";; script_file: " << m_script_file << std::endl;
 
   printer_t printer(std::cout);
   auto rx = std::make_unique<replxx::Replxx>();
   rx->install_window_change_handler();
 
-  if (!nanos_options::boot_file.empty()) {
-    load_ir(nanos_options::boot_file);
+  if (!m_boot_file.empty()) {
+    load_ir(m_boot_file);
   }
 
-  if (nanos_options::env_name == "interaction") {
+  if (m_env_name == "interaction") {
     context::s_current_environment = context::s_interaction_environment;
-  } else if (nanos_options::env_name == "system") {
+  } else if (m_env_name == "system") {
     context::s_current_environment = context::s_system_environment;
   } else {
     throw std::runtime_error("Invalid environment name");
   }
   std::cout << ";; environment: " << std::string((char*)environment_name(context::s_current_environment)) << std::endl;
 
-  for (const auto& path : nanos_options::load_paths | std::views::reverse) {
+  for (const auto& path : m_load_paths | std::views::reverse) {
     call_add_load_path(make_string(path.c_str()));
   }
 
-  if (!nanos_options::script_file.empty()) {
-    load_script(nanos_options::script_file);
+  if (!m_script_file.empty()) {
+    load_script(m_script_file);
   }
 
   std::string input_buffer;

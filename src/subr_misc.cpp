@@ -11,13 +11,17 @@
 #include "list.h"
 #include "object_heap.h"
 #include "subr.h"
+#include "uniq_id.h"
 
+#include <atomic>
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <random>
+#include <string>
 #include <sys/time.h>
 
 // fixnum?  - Nanos extension
@@ -50,38 +54,15 @@ SUBR subr_safepoint(scm_obj_t self) {
 }
 
 SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  static int gensym_counter = 1;
   if (argc > 1) throw std::runtime_error("gensym: too many arguments");
   if (argc == 1 && !is_string(argv[0])) throw std::runtime_error("gensym: argument must be a string");
-  const char* prefix = (argc == 0) ? "gensym" : (const char*)string_name(argv[0]);
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  char buf[128];
-  snprintf(buf, sizeof(buf), "%s_%x%x%x", prefix, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec, (unsigned int)gensym_counter++);
-  return make_uninterned_symbol(buf);
+  const char* prefix = (argc == 0) ? "g" : (const char*)string_name(argv[0]);
+  std::string name = std::format("{}_{}", prefix, generate_process_unique_suffix());
+  return make_uninterned_symbol(name.c_str());
 }
 
 SUBR subr_uuid(scm_obj_t self) {
-  static thread_local std::random_device rd;
-  static thread_local std::mt19937 gen(rd());
-  std::uniform_int_distribution<> dis(0, 15);
-  std::uniform_int_distribution<> dis_variant(8, 11);
-
-  char buf[37];
-  const char* hex = "0123456789abcdef";
-  for (int i = 0; i < 36; i++) {
-    if (i == 8 || i == 13 || i == 18 || i == 23) {
-      buf[i] = '-';
-    } else if (i == 14) {
-      buf[i] = '4';  // Version 4
-    } else if (i == 19) {
-      buf[i] = hex[dis_variant(gen)];  // Variant: 8, 9, a, or b
-    } else {
-      buf[i] = hex[dis(gen)];
-    }
-  }
-  buf[36] = '\0';
-  return make_string(buf);
+  return make_string(generate_uuid().c_str());
 }
 
 SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {

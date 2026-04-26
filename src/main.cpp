@@ -1,19 +1,14 @@
 #include "core.h"
 #include "exception.h"
-#include "fiber.h"
 #include "nanos.h"
 #include "nanos_options.h"
-
-#include "asio.h"  // include after nanos.h due to CR1 macro conflict
+#include "uniq_id.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char** argv) {
-  context::s_asio_context = new asio_context();
-  fiber_init_scheduler();
-  nanos_options::parse(argc, argv);
+static int nanos_thread() {
   nanos_t* nanos = new nanos_t();
   nanos->init();
   int status = 0;
@@ -30,8 +25,14 @@ int main(int argc, char** argv) {
   }
   nanos->destroy();
   delete nanos;
-  delete context::s_asio_context;
   return status;
+}
+
+int main(int argc, char** argv) {
+  nanos_options::parse(argc, argv);
+  std::future<int> root = std::async(&nanos_thread);
+  root.get();
+  return 0;
 }
 
 void fatal(const char* fmt, ...) {

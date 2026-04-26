@@ -569,33 +569,35 @@ codegen_t::bridge_func_t codegen_t::call_closure_bridge() {
   }
 
   // Compile the bridge in its own fresh context, cleanly isolated from any
-  // surrounding compilation. CompileScope saves & restores context_uptr.
-  {
-    CompileScope scope(*this);
+  // surrounding compilation.
+  auto saved_ctx = std::move(this->context_uptr);
+  auto saved_builder = std::move(this->builder);
 
-    auto* saved_main_func = main_function;
-    auto saved_builder_ip = BL.saveIP();
+  this->context_uptr = std::make_unique<llvm::LLVMContext>();
+  this->builder = std::make_unique<llvm::IRBuilder<>>(*this->context_uptr);
 
-    main_module_uptr = std::make_unique<llvm::Module>("bridge_module", CT);
-    main_module = main_module_uptr.get();
-    configure_module(*main_module);
+  auto* saved_main_func = main_function;
 
-    (void)get_or_create_call_closure_bridge();
+  main_module_uptr = std::make_unique<llvm::Module>("bridge_module", CT);
+  main_module = main_module_uptr.get();
+  configure_module(*main_module);
 
-    optimize_module(*main_module);
-    // Move context into ThreadSafeContext owned by the JIT.
-    // CompileScope::~CompileScope will restore the previous context.
-    llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
-    auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), std::move(tsc));
+  (void)get_or_create_call_closure_bridge();
 
-    if (auto err = jit->addIRModule(std::move(tsm))) {
-      fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
-    }
+  optimize_module(*main_module);
+  // Move context into ThreadSafeContext owned by the JIT.
+  llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
+  auto tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), std::move(tsc));
 
-    main_module = nullptr;
-    main_function = saved_main_func;
-    BL.restoreIP(saved_builder_ip);
-  }  // ~CompileScope restores context_uptr and builder
+  if (auto err = jit->addIRModule(std::move(tsm))) {
+    fatal("%s:%u codegen: failed to add bridge module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
+  }
+
+  main_module = nullptr;
+  main_function = saved_main_func;
+
+  this->context_uptr = std::move(saved_ctx);
+  this->builder = std::move(saved_builder);
 
   sym = jit->lookup(name);
   if (!sym) {

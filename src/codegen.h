@@ -142,14 +142,7 @@ class codegen_t {
   std::vector<FunctionInfo> functions;
 
  private:
-  // RAII helper: swaps in a fresh LLVMContext+IRBuilder for the duration of a
-  // compile() call, then restores the previous state on destruction.
-  struct CompileScope {
-    codegen_t& self;
-    std::unique_ptr<llvm::LLVMContext> saved_ctx;
-    CompileScope(codegen_t& self);
-    ~CompileScope();
-  };
+
 
   void phase2b_analyze_no_escape();
   void phase2c_analyze_safepoints();

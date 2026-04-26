@@ -47,11 +47,10 @@ SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2,
       if (is_closure(val)) {
         hashtable_set(dst->variables, key, make_cell(val));
       } else {
-        hashtable_set(dst->variables, key, cell);
+        throw std::runtime_error("copy-environment-variables!: variable contains other than closure: " + std::string((char*)symbol_name(key)));
       }
     } else {
-      std::string msg = "copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key));
-      throw std::runtime_error(msg);
+      throw std::runtime_error("copy-environment-variables!: symbol not found in source environment: " + std::string((char*)symbol_name(key)));
     }
     cur = cons_cdr(cur);
   }

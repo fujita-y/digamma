@@ -46,6 +46,12 @@ for test_file in test_*.scm; do
         exit 1
     fi
 
+    if echo "$OUTPUT" | grep -q "exception"; then
+        echo "--------------------------------------"
+        echo -e "${RED}ERROR: Exception detected in $test_file${NC}"
+        exit 1
+    fi
+
     TOTAL=$((TOTAL + 1))
     echo "Done with $test_file"
     echo "--------------------------------------"

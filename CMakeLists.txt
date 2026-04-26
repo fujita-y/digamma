@@ -183,6 +183,7 @@ set(NANOS_CORE_SOURCES
   src/reader.cpp
   src/printer.cpp
   src/utf8.cpp
+  src/uniq_id.cpp
   src/subr_fiber.cpp
   src/subr_asio.cpp
   src/subr_net.cpp

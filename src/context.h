@@ -11,6 +11,8 @@
 #include <boost/fiber/fixedsize_stack.hpp>
 #include <unordered_set>
 #include <vector>
+#include <unordered_map>
+#include <string>
 
 class object_heap_t;
 class codegen_t;
@@ -51,6 +53,9 @@ class context {
   thread_local static std::unordered_set<scm_obj_t> s_literals;
   thread_local static std::unordered_multiset<scm_obj_t> s_gc_protected;
   thread_local static std::vector<scm_obj_t> s_trampolines;
+  thread_local static int s_trampoline_uid;
+  thread_local static int s_cffi_uid;
+  thread_local static std::unordered_map<std::string, void*> s_callout_cache;
 
   struct fiber_stack_info {
     void* stack_bottom;

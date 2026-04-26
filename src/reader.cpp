@@ -11,14 +11,16 @@
 uint8_t reader_t::s_char_map[256];
 
 static bool s_char_map_initialized = []() {
-  memset(reader_t::s_char_map, 0, 256);
+  uint8_t cmap[256];
+  memset(cmap, 0, 256);
   for (int i = 0; i < 256; ++i) {
-    if (isspace(i)) reader_t::s_char_map[i] |= reader_t::CHAR_WHITESPACE;
-    if (isdigit(i)) reader_t::s_char_map[i] |= reader_t::CHAR_DIGIT;
-    if (isxdigit(i)) reader_t::s_char_map[i] |= reader_t::CHAR_HEX_DIGIT;
-    if (isalnum(i) || strchr("!$%&*+-./:<=>?@^_~", i)) reader_t::s_char_map[i] |= reader_t::CHAR_SYMBOL;
-    if (strchr("()[]\";#", i)) reader_t::s_char_map[i] |= reader_t::CHAR_DELIMITER;
+    if (isspace(i)) cmap[i] |= reader_t::CHAR_WHITESPACE;
+    if (isdigit(i)) cmap[i] |= reader_t::CHAR_DIGIT;
+    if (isxdigit(i)) cmap[i] |= reader_t::CHAR_HEX_DIGIT;
+    if (isalnum(i) || strchr("!$%&*+-./:<=>?@^_~", i)) cmap[i] |= reader_t::CHAR_SYMBOL;
+    if (strchr("()[]\";#", i)) cmap[i] |= reader_t::CHAR_DELIMITER;
   }
+  memcpy(reader_t::s_char_map, cmap, sizeof(cmap));
   return true;
 }();
 

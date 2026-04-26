@@ -36,5 +36,6 @@ extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2);
 
 bool is_side_effect_free_aux_helper(const char* name);
 bool is_never_return_aux_helper(const char* name);
+void reset_safepoint_cache();  // clears the thread_local s_stop_the_world cache
 
 #endif  // CODEGEN_AUX_H_INCLUDED

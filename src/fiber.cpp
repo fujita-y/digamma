@@ -99,6 +99,15 @@ class priority_scheduler : public boost::fibers::algo::algorithm {
   void notify() noexcept override {}
 };
 
+void init_fiber_scheduler() {
+  // boost::fibers::use_scheduling_algorithm is per-thread: each OS thread that
+  // hosts a nanos_t instance must install its own scheduler.  Do NOT guard this
+  // with once_flag — that would silently leave every thread after the first
+  // running with Boost's default round-robin scheduler, breaking
+  // fiber_set_focus_main() and the Asio suspend_until() integration.
+  boost::fibers::use_scheduling_algorithm<priority_scheduler>();
+}
+
 void fiber_set_focus_main(bool enable) {
   auto* sched = boost::fibers::context::active()->get_scheduler();
   auto* priority = dynamic_cast<priority_scheduler*>(sched);
@@ -115,5 +124,3 @@ void fiber_scan_stacks() {
 }
 
 int fiber_live_count() { return context::s_live_fiber_count; }
-
-void fiber_init_scheduler() { boost::fibers::use_scheduling_algorithm<priority_scheduler>(); }

@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "context.h"
+#include "codegen_aux.h"
 #include "hash.h"
 #include "object_heap.h"
 #include "port.h"
@@ -28,6 +29,9 @@ thread_local std::vector<context::fiber_stack_info> context::s_fiber_stacks;
 thread_local context::fiber_stack_allocator context::s_fiber_stack_allocator;
 thread_local int context::s_live_fiber_count;
 thread_local asio_context* context::s_asio_context;
+thread_local int context::s_trampoline_uid;
+thread_local int context::s_cffi_uid;
+thread_local std::unordered_map<std::string, void*> context::s_callout_cache;
 
 boost::context::stack_context context::fiber_stack_allocator::allocate() {
   auto sctx = m_alloc.allocate();
@@ -49,6 +53,16 @@ void context::init() {
   if (object_heap_t::current() == nullptr) {
     fatal("%s:%u context::init() called before object_heap_t::init()", __FILE__, __LINE__);
   }
+
+  reset_safepoint_cache();  // clear dangling heap pointer from any prior instance
+  s_literals.clear();
+  s_gc_protected.clear();
+  s_trampolines.clear();
+  s_trampoline_uid = 0;
+  s_cffi_uid = 0;
+  s_callout_cache.clear();
+  s_fiber_stacks.clear();
+  s_live_fiber_count = 0;
   s_standard_input_port = port_standard_input();
   s_standard_output_port = port_standard_output();
   s_standard_error_port = port_standard_error();
@@ -58,9 +72,15 @@ void context::init() {
   s_interaction_environment = make_environment(make_symbol("interaction-environment"));
   s_system_environment = make_environment(make_symbol("system-environment"));
   s_current_environment = s_system_environment;
+  s_continuation_captured_retval = scm_undef;
+  s_current_winders = scm_nil;
+  s_current_codegen = nullptr;
+  s_current_nanos = nullptr;
+  s_asio_context = nullptr;
 }
 
 void context::destroy() {
+  reset_safepoint_cache();
   port_finalize((scm_port_rec_t*)to_address(s_standard_input_port));
   port_finalize((scm_port_rec_t*)to_address(s_standard_output_port));
   port_finalize((scm_port_rec_t*)to_address(s_standard_error_port));
@@ -75,6 +95,18 @@ void context::destroy() {
   s_current_input_port = scm_undef;
   s_current_output_port = scm_undef;
   s_current_error_port = scm_undef;
+  s_continuation_captured_retval = scm_undef;
+  s_current_winders = scm_nil;
+  s_current_object_heap = nullptr;
+  s_current_codegen = nullptr;
+  s_current_nanos = nullptr;
+  s_trampolines.clear();
+  s_trampoline_uid = 0;
+  s_cffi_uid = 0;
+  s_callout_cache.clear();
+  s_live_fiber_count = 0;
+  s_fiber_stacks.clear();
+  s_asio_context = nullptr;
 }
 
 void context::environment_macro_set(scm_obj_t key, scm_obj_t value) {

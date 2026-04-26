@@ -21,11 +21,11 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/TargetParser/Host.h>
 
-#include <atomic>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <dlfcn.h>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
@@ -34,19 +34,11 @@ using namespace llvm::orc;
 using namespace llvm::sys;
 
 // ============================================================================
-// Static state
-// ============================================================================
-
-static std::unordered_map<std::string, void*> s_callout_cache;
-static std::atomic<int> s_trampoline_uid;
-static std::atomic<int> s_cffi_uid;
-
-// ============================================================================
 // Helpers
 // ============================================================================
 
-static std::string generate_uid_string() {
-  int id = s_cffi_uid.fetch_add(1, std::memory_order_relaxed);
+static std::string generate_cffi_uid_string() {
+  int id = context::s_cffi_uid++;
   return "cffi_" + std::format("{:06}", id);
 }
 
@@ -283,11 +275,12 @@ static void* finalize_jit_module(nanos_jit_t* jit, std::unique_ptr<Module> M, st
 static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature, const char* callee_signature) {
   char cache_key[512];
   snprintf(cache_key, sizeof(cache_key), "%s:%s:%p", caller_signature, callee_signature, (void*)adrs);
-  auto it = s_callout_cache.find(cache_key);
-  if (it != s_callout_cache.end()) return it->second;
 
-  std::string module_id = generate_uid_string();
-  std::string function_id = generate_uid_string();
+  auto it = context::s_callout_cache.find(cache_key);
+  if (it != context::s_callout_cache.end()) return it->second;
+
+  std::string module_id = generate_cffi_uid_string();
+  std::string function_id = generate_cffi_uid_string();
 
   auto Context = std::make_unique<LLVMContext>();
   LLVMContext& C = *Context;
@@ -341,7 +334,7 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
   }
 
   void* ptr = finalize_jit_module(jit, std::move(M), std::move(Context), function_id, "codegen-cdecl-callout");
-  s_callout_cache[cache_key] = ptr;
+  context::s_callout_cache[cache_key] = ptr;
   return ptr;
 }
 
@@ -426,8 +419,8 @@ extern "C" scm_obj_t c_call_scheme(uintptr_t trampoline_uid, intptr_t argc, ...)
 // ============================================================================
 
 static void* compile_callback_thunk(uintptr_t trampoline_uid, const char* signature) {
-  std::string module_id = generate_uid_string();
-  std::string function_id = generate_uid_string();
+  std::string module_id = generate_cffi_uid_string();
+  std::string function_id = generate_cffi_uid_string();
 
   auto Context = std::make_unique<LLVMContext>();
   LLVMContext& C = *Context;
@@ -502,7 +495,7 @@ SUBR subr_codegen_cdecl_callback(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 
   scm_obj_t closure = a1;
   const char* signature = (const char*)string_name(a2);
-  int uid = s_trampoline_uid.fetch_add(1);
+  int uid = context::s_trampoline_uid++;
 
   // Register the closure in the trampoline table.
   object_heap_t::current()->write_barrier(closure);

@@ -6,7 +6,8 @@
 
 #include "core.h"
 
-void fiber_init_scheduler();
+void init_fiber_scheduler();
+
 void fiber_set_focus_main(bool enable);
 void fiber_scan_stacks();
 int fiber_live_count();

@@ -10,6 +10,8 @@
 
 static thread_local bool* s_stop_the_world = nullptr;
 
+void reset_safepoint_cache() { s_stop_the_world = nullptr; }
+
 static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
 
 bool is_side_effect_free_aux_helper(const char* name) {

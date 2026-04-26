@@ -285,7 +285,7 @@ static bool test_async_operations() {
 
 int run_test(int argc, char** argv) {
   // Install the Asio-aware scheduler so suspend_until() polls the io_context.
-  fiber_init_scheduler();
+  init_fiber_scheduler();
 
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
@@ -424,22 +424,22 @@ static bool run_tests() {
 int run_test(int argc, char** argv) {
   // Round-robin pattern: the custom scheduler must be installed so that
   // suspend_until() polls the io_context when all fibers are waiting.
-  fiber_init_scheduler();
-
-  context::s_asio_context = new asio_context();
+  init_fiber_scheduler();
 
   object_heap_t* heap = new object_heap_t();
   heap->init(1024 * 1024 * 2, 1024 * 1024);
   context::init();
 
+  context::s_asio_context = new asio_context();
+
   bool success = run_tests();
+
+  delete context::s_asio_context;
+  context::s_asio_context = nullptr;
 
   context::destroy();
   heap->destroy();
   delete heap;
-
-  delete context::s_asio_context;
-  context::s_asio_context = nullptr;
 
   if (success) {
     printf("\033[32masync port test passed\033[0m\n");

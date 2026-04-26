@@ -8,18 +8,22 @@
 #include "context.h"
 #include "nanos_jit.h"
 #include "printer.h"
+#include "uniq_id.h"
 
 #include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/OptimizationLevel.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
 #include <llvm/Transforms/Scalar/ADCE.h>
@@ -29,7 +33,6 @@
 #include <llvm/Transforms/Scalar/SROA.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/SimplifyCFGOptions.h>
-#include <random>
 
 #define BL (*builder)
 #define CT (*context_uptr)
@@ -102,20 +105,7 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
 //  Compilation pipeline (phases)
 // ============================================================================
 
-// --------------------------------------------------------------------------
-//  CompileScope RAII
-// --------------------------------------------------------------------------
 
-codegen_t::CompileScope::CompileScope(codegen_t& self) : self(self), saved_ctx(std::move(self.context_uptr)) {
-  self.context_uptr = std::make_unique<llvm::LLVMContext>();
-  self.builder = std::make_unique<llvm::IRBuilder<>>(*self.context_uptr);
-}
-
-codegen_t::CompileScope::~CompileScope() {
-  self.builder.reset();
-  self.context_uptr = std::move(saved_ctx);
-  if (self.context_uptr) self.builder = std::make_unique<llvm::IRBuilder<>>(*self.context_uptr);
-}
 
 // --------------------------------------------------------------------------
 //  configure_module helper
@@ -128,18 +118,7 @@ void codegen_t::configure_module(llvm::Module& M) {
   M.setPIELevel(llvm::PIELevel::Large);
 }
 
-std::string codegen_t::generate_unique_suffix() {
-  static std::mutex rng_mutex;
-  static int counter = 0;
-  static std::mt19937 gen(std::random_device{}());
-  static std::uniform_int_distribution<uint32_t> distrib(0, UINT32_MAX);
-  std::lock_guard<std::mutex> lock(rng_mutex);
-  uint32_t val = distrib(gen);
-  counter++;
-  std::stringstream ss;
-  ss << std::hex << std::setw(8) << std::setfill('0') << val << "_" << counter << "_" << std::this_thread::get_id();
-  return ss.str();
-}
+std::string codegen_t::generate_unique_suffix() { return generate_process_unique_suffix(); }
 
 // --------------------------------------------------------------------------
 //  compile() — top-level entry point
@@ -168,7 +147,12 @@ void codegen_t::reset_compile_state() {
 }
 
 compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
-  CompileScope scope(*this);
+  auto saved_ctx = std::move(this->context_uptr);
+  auto saved_builder = std::move(this->builder);
+
+  this->context_uptr = std::make_unique<llvm::LLVMContext>();
+  this->builder = std::make_unique<llvm::IRBuilder<>>(*this->context_uptr);
+
   try {
     phase0_create_module();
     phase1_parse_instructions(inst_list);
@@ -178,7 +162,8 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase2d_analyze_cell_stack_alloc();
 #ifndef NDEBUG
     {
-      std::ofstream ofs("/tmp/nanos.ins", std::ios::trunc);
+      std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+      std::ofstream ofs("/tmp/nanos_" + tid_suffix + ".ins", std::ios::trunc);
     }
     for (const auto& func : functions) {
       dump_instructions(func.instructions);
@@ -191,9 +176,15 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
 
     for (scm_obj_t obj : gc_protected_objects) context::gc_unprotect(obj);
     gc_protected_objects.clear();
+
+    this->context_uptr = std::move(saved_ctx);
+    this->builder = std::move(saved_builder);
+
     return code;
   } catch (...) {
     reset_compile_state();
+    this->context_uptr = std::move(saved_ctx);
+    this->builder = std::move(saved_builder);
     throw;
   }
 }
@@ -451,8 +442,10 @@ void codegen_t::phase5_optimize_and_verify() {
   // Dump IR to file for debugging and inspection
 #ifndef NDEBUG
   {
+    // Use thread-local suffix to avoid interleaved writes from concurrent instances.
+    std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
     std::error_code EC;
-    llvm::raw_fd_ostream dest("/tmp/nanos_main.ll", EC, llvm::sys::fs::OF_None);
+    llvm::raw_fd_ostream dest("/tmp/nanos_main_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_None);
     if (EC) {
       llvm::errs() << "Could not open file: " << EC.message() << "\n";
     } else {
@@ -464,8 +457,9 @@ void codegen_t::phase5_optimize_and_verify() {
   if (functions.size() > 1) {
 #ifndef NDEBUG
     {
+      std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
       std::error_code EC;
-      llvm::raw_fd_ostream dest2("/tmp/nanos_closures.ll", EC, llvm::sys::fs::OF_None);
+      llvm::raw_fd_ostream dest2("/tmp/nanos_closures_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_None);
       if (EC) {
         llvm::errs() << "Could not open file: " << EC.message() << "\n";
       } else {
@@ -486,20 +480,32 @@ compiled_code_t codegen_t::phase6_finalize() {
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
-  // Build a ThreadSafeContext from our owned LLVMContext and hand it off to
-  // the JIT along with the modules. After this point context_uptr is empty;
-  // CompileScope::~CompileScope will restore the previous context.
-  llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
+  // Both modules were built in the same LLVMContext (context_uptr).
+  // To avoid serialization bottlenecks and deadlocks in the multi-threaded COD JIT,
+  // we decouple them by cloning the closure module into its own fresh context via bitcode.
 
   if (functions.size() > 1) {
-    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(closure_module_uptr), tsc);
+    // 1. Serialize closure_module to bitcode in-memory
+    llvm::SmallVector<char, 0> bitcode;
+    llvm::raw_svector_ostream bitcode_stream(bitcode);
+    llvm::WriteBitcodeToFile(*closure_module_uptr, bitcode_stream);
+
+    // 2. Parse bitcode into a completely new, isolated LLVMContext
+    auto fresh_ctx = std::make_unique<llvm::LLVMContext>();
+    auto memory_buffer = llvm::MemoryBuffer::getMemBuffer(llvm::StringRef(bitcode.data(), bitcode.size()), "closure_bitcode", false);
+    auto parsed_module = cantFail(llvm::parseBitcodeFile(*memory_buffer, *fresh_ctx));
+
+    // 3. Wrap in an independent ThreadSafeContext & ThreadSafeModule
+    llvm::orc::ThreadSafeContext fresh_tsc(std::move(fresh_ctx));
+    auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(parsed_module), fresh_tsc);
 
     if (auto err = jit->addIRModule(std::move(clo_tsm))) {
       fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
     }
   }
 
-  // Create explicit tracker for main module
+  // The main module takes exclusive ownership of the original context_uptr
+  llvm::orc::ThreadSafeContext tsc(std::move(context_uptr));
   auto rt = jit->getMainJITDylib().createResourceTracker();
   auto main_tsm = llvm::orc::ThreadSafeModule(std::move(main_module_uptr), tsc);
 
@@ -964,12 +970,17 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
     func->setDSOLocal(true);
     if (is_side_effect_free_aux_helper(name)) add_side_effect_free_attributes(func);
     if (is_never_return_aux_helper(name)) add_never_return_attributes(func);
-    // Register the symbol with the JIT's main dylib via absoluteSymbols
+    // Register the symbol with the JIT's main dylib via absoluteSymbols.
+    // Lock jit->m_lock so concurrent codegen instances on different threads
+    // don't race on the shared JIT dylib's internal state.
     llvm::orc::SymbolMap symbols;
     symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
                                            llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable};
-    if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
-      llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
+    {
+      std::lock_guard<std::mutex> lock(jit->m_lock);
+      if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
+        llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
+      }
     }
   }
   return func;
@@ -1692,7 +1703,8 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
 }
 
 void codegen_t::dump_instructions(const std::vector<Instruction>& instructions) {
-  std::ofstream ofs("/tmp/nanos.ins", std::ios::app);
+  std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+  std::ofstream ofs("/tmp/nanos_" + tid_suffix + ".ins", std::ios::app);
   if (!ofs.is_open()) return;
   printer_t printer(ofs);
   for (const auto& inst : instructions) {
