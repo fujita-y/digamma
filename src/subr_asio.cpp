@@ -26,10 +26,10 @@ SUBR subr_get_bytevector_n_async(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 }
 
 void init_subr_asio() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("put-string-async", (void*)subr_put_string_async, 2, 0);
-  reg("get-bytevector-n-async", (void*)subr_get_bytevector_n_async, 2, 0);
+  reg("put-string-async", (void*)subr_put_string_async, 2, false);
+  reg("get-bytevector-n-async", (void*)subr_get_bytevector_n_async, 2, false);
 }

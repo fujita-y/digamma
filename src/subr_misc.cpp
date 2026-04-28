@@ -200,29 +200,29 @@ SUBR subr_current_collect_trip_bytes(scm_obj_t self, int argc, scm_obj_t argv[])
 // ============================================================================
 
 void init_subr_misc() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("fixnum?", (void*)subr_fixnum_p, 1, 0);
-  reg("undefined", (void*)subr_undefined, 0, 0);
-  reg("unspecified", (void*)subr_unspecified, 0, 0);
-  reg("undefined?", (void*)subr_undefined_p, 1, 0);
-  reg("unspecified?", (void*)subr_unspecified_p, 1, 0);
-  reg("collect", (void*)subr_collect, 0, 0);
-  reg("safepoint", (void*)subr_safepoint, 0, 0);
-  reg("gensym", (void*)subr_gensym, 0, 1);
-  reg("uuid", (void*)subr_uuid, 0, 0);
-  reg("exit", (void*)subr_exit, 0, 1);
-  reg("continuation?", (void*)subr_continuation_p, 1, 0);
-  reg("codegen-and-run", (void*)subr_codegen_and_run, 1, 0);
-  reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, 0);
-  reg("time-usage", (void*)subr_time_usage, 0, 0);
-  reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, 0);
-  reg("make-tuple", (void*)subr_make_tuple, 1, 1);
-  reg("tuple", (void*)subr_tuple, 0, 1);
-  reg("tuple?", (void*)subr_tuple_p, 1, 0);
-  reg("tuple-ref", (void*)subr_tuple_ref, 2, 0);
-  reg("tuple-set!", (void*)subr_tuple_set, 3, 0);
-  reg("current-collect-trip-bytes", (void*)subr_current_collect_trip_bytes, 0, 1);
+  reg("fixnum?", (void*)subr_fixnum_p, 1, false);
+  reg("undefined", (void*)subr_undefined, 0, false);
+  reg("unspecified", (void*)subr_unspecified, 0, false);
+  reg("undefined?", (void*)subr_undefined_p, 1, false);
+  reg("unspecified?", (void*)subr_unspecified_p, 1, false);
+  reg("collect", (void*)subr_collect, 0, false);
+  reg("safepoint", (void*)subr_safepoint, 0, false);
+  reg("gensym", (void*)subr_gensym, 0, true);
+  reg("uuid", (void*)subr_uuid, 0, false);
+  reg("exit", (void*)subr_exit, 0, true);
+  reg("continuation?", (void*)subr_continuation_p, 1, false);
+  reg("codegen-and-run", (void*)subr_codegen_and_run, 1, false);
+  reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, false);
+  reg("time-usage", (void*)subr_time_usage, 0, false);
+  reg("with-cpp-exception-handler", (void*)subr_with_cpp_exception_handler, 2, false);
+  reg("make-tuple", (void*)subr_make_tuple, 1, true);
+  reg("tuple", (void*)subr_tuple, 0, true);
+  reg("tuple?", (void*)subr_tuple_p, 1, false);
+  reg("tuple-ref", (void*)subr_tuple_ref, 2, false);
+  reg("tuple-set!", (void*)subr_tuple_set, 3, false);
+  reg("current-collect-trip-bytes", (void*)subr_current_collect_trip_bytes, 0, true);
 }

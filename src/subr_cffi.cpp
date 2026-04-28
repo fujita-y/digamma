@@ -585,13 +585,13 @@ SUBR subr_string_utf8_nul(scm_obj_t self, scm_obj_t a1) {
 }
 
 void init_subr_cffi() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("codegen-cdecl-callout", (void*)subr_codegen_cdecl_callout, 2, 1);
-  reg("codegen-cdecl-callback", (void*)subr_codegen_cdecl_callback, 2, 0);
-  reg("load-shared-object", (void*)subr_load_shared_object, 0, 1);
-  reg("lookup-shared-object", (void*)subr_lookup_shared_object, 1, 1);
-  reg("string->utf8/nul", (void*)subr_string_utf8_nul, 1, 0);
+  reg("codegen-cdecl-callout", (void*)subr_codegen_cdecl_callout, 2, true);
+  reg("codegen-cdecl-callback", (void*)subr_codegen_cdecl_callback, 2, false);
+  reg("load-shared-object", (void*)subr_load_shared_object, 0, true);
+  reg("lookup-shared-object", (void*)subr_lookup_shared_object, 1, true);
+  reg("string->utf8/nul", (void*)subr_string_utf8_nul, 1, false);
 }

@@ -8,6 +8,11 @@
     "boost-beast",
     "openssl",
     "replxx",
-    "cli11"
+    "cli11",
+    "asio-grpc",
+    {
+      "name": "google-cloud-cpp",
+      "features": ["aiplatform"]
+    }
   ]
 }

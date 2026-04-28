@@ -69,6 +69,8 @@ find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(google_cloud_cpp_aiplatform CONFIG REQUIRED)
+find_package(asio-grpc CONFIG REQUIRED)
 
 # ==============================================================================
 # Compiler Configuration
@@ -115,6 +117,7 @@ target_compile_definitions(nanos_config INTERFACE
 # Define compile options
 target_compile_options(nanos_config INTERFACE
   -Werror
+  -Wno-error=deprecated-declarations
   $<$<CONFIG:Release>:-fexceptions>
   $<$<CONFIG:Release>:-funwind-tables>
   $<$<CONFIG:Release>:-flto>
@@ -187,13 +190,14 @@ set(NANOS_CORE_SOURCES
   src/subr_fiber.cpp
   src/subr_asio.cpp
   src/subr_net.cpp
+  src/subr_vertex.cpp
   src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform asio-grpc::asio-grpc -pthread -ldl)
 
 # ==============================================================================
 # Targets
@@ -202,7 +206,7 @@ set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber B
 # --- Core Library ---
 # Object library for core sources shared across all executables
 add_library(nanos_core OBJECT ${NANOS_CORE_SOURCES})
-target_link_libraries(nanos_core PUBLIC nanos_config)
+target_link_libraries(nanos_core PUBLIC nanos_config ${NANOS_LINK_LIBRARIES})
 
 # --- Main Executable ---
 add_executable(nanos src/main.cpp)

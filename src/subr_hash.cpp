@@ -165,20 +165,20 @@ SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1) {
 // ============================================================================
 
 void init_subr_hash() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("hashtable?", (void*)subr_hashtable_p, 1, 0);
-  reg("equal-hash", (void*)subr_equal_hash, 1, 0);
-  reg("make-eq-hashtable", (void*)subr_make_eq_hashtable, 0, 1);
-  reg("make-eqv-hashtable", (void*)subr_make_eqv_hashtable, 0, 1);
-  reg("make-equal-hashtable", (void*)subr_make_equal_hashtable, 0, 1);
-  reg("hashtable-ref", (void*)subr_hashtable_ref, 2, 1);
-  reg("hashtable-set!", (void*)subr_hashtable_set, 3, 0);
-  reg("hashtable-delete!", (void*)subr_hashtable_delete, 2, 0);
-  reg("hashtable-contains?", (void*)subr_hashtable_contains, 2, 0);
-  reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, 0);
-  reg("hashtable-entries", (void*)subr_hashtable_entries, 1, 0);
-  reg("hashtable->alist", (void*)subr_hashtable_alist, 1, 0);
+  reg("hashtable?", (void*)subr_hashtable_p, 1, false);
+  reg("equal-hash", (void*)subr_equal_hash, 1, false);
+  reg("make-eq-hashtable", (void*)subr_make_eq_hashtable, 0, true);
+  reg("make-eqv-hashtable", (void*)subr_make_eqv_hashtable, 0, true);
+  reg("make-equal-hashtable", (void*)subr_make_equal_hashtable, 0, true);
+  reg("hashtable-ref", (void*)subr_hashtable_ref, 2, true);
+  reg("hashtable-set!", (void*)subr_hashtable_set, 3, false);
+  reg("hashtable-delete!", (void*)subr_hashtable_delete, 2, false);
+  reg("hashtable-contains?", (void*)subr_hashtable_contains, 2, false);
+  reg("hashtable-clear!", (void*)subr_hashtable_clear, 1, false);
+  reg("hashtable-entries", (void*)subr_hashtable_entries, 1, false);
+  reg("hashtable->alist", (void*)subr_hashtable_alist, 1, false);
 }

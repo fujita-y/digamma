@@ -250,31 +250,31 @@ SUBR subr_get_bytevector_n(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 }
 
 void init_subr_io() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("write", (void*)subr_write, 1, 1);
-  reg("write/ss", (void*)subr_write_ss, 1, 1);
-  reg("write-with-shared-structure", (void*)subr_write_ss, 1, 1);
-  reg("display", (void*)subr_display, 1, 1);
-  reg("newline", (void*)subr_newline, 0, 1);
-  reg("put-char", (void*)subr_put_char, 2, 0);
-  reg("put-string", (void*)subr_put_string, 2, 1);
-  reg("format", (void*)subr_format, 1, 1);
-  reg("flush-output-port", (void*)subr_flush_output_port, 0, 1);
-  reg("open-file-input-port", (void*)subr_open_file_input_port, 1, 0);
-  reg("open-file-output-port", (void*)subr_open_file_output_port, 1, 0);
-  reg("file-exists?", (void*)subr_file_exists_p, 1, 0);
-  reg("open-string-output-port", (void*)subr_open_string_output_port, 0, 0);
-  reg("close-port", (void*)subr_close_port, 1, 0);
-  reg("eof-object?", (void*)subr_eof_object_p, 1, 0);
-  reg("read", (void*)subr_read, 0, 1);
-  reg("get-bytevector-n", (void*)subr_get_bytevector_n, 2, 0);
-  reg("current-input-port", (void*)subr_current_input_port, 0, 1);
-  reg("current-output-port", (void*)subr_current_output_port, 0, 1);
-  reg("current-error-port", (void*)subr_current_error_port, 0, 1);
-  reg("standard-input-port", (void*)subr_standard_input_port, 0, 0);
-  reg("standard-output-port", (void*)subr_standard_output_port, 0, 0);
-  reg("standard-error-port", (void*)subr_standard_error_port, 0, 0);
+  reg("write", (void*)subr_write, 1, true);
+  reg("write/ss", (void*)subr_write_ss, 1, true);
+  reg("write-with-shared-structure", (void*)subr_write_ss, 1, true);
+  reg("display", (void*)subr_display, 1, true);
+  reg("newline", (void*)subr_newline, 0, true);
+  reg("put-char", (void*)subr_put_char, 2, false);
+  reg("put-string", (void*)subr_put_string, 2, true);
+  reg("format", (void*)subr_format, 1, true);
+  reg("flush-output-port", (void*)subr_flush_output_port, 0, true);
+  reg("open-file-input-port", (void*)subr_open_file_input_port, 1, false);
+  reg("open-file-output-port", (void*)subr_open_file_output_port, 1, false);
+  reg("file-exists?", (void*)subr_file_exists_p, 1, false);
+  reg("open-string-output-port", (void*)subr_open_string_output_port, 0, false);
+  reg("close-port", (void*)subr_close_port, 1, false);
+  reg("eof-object?", (void*)subr_eof_object_p, 1, false);
+  reg("read", (void*)subr_read, 0, true);
+  reg("get-bytevector-n", (void*)subr_get_bytevector_n, 2, false);
+  reg("current-input-port", (void*)subr_current_input_port, 0, true);
+  reg("current-output-port", (void*)subr_current_output_port, 0, true);
+  reg("current-error-port", (void*)subr_current_error_port, 0, true);
+  reg("standard-input-port", (void*)subr_standard_input_port, 0, false);
+  reg("standard-output-port", (void*)subr_standard_output_port, 0, false);
+  reg("standard-error-port", (void*)subr_standard_error_port, 0, false);
 }

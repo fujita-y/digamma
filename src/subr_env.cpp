@@ -186,24 +186,24 @@ SUBR subr_lookup_process_environment(scm_obj_t self, scm_obj_t a1) {
 }
 
 void init_subr_env() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("make-environment", (void*)subr_make_environment, 1, 0);
-  reg("copy-environment-variables!", (void*)subr_copy_environment_variables, 3, 0);
-  reg("copy-environment-macros!", (void*)subr_copy_environment_macros, 3, 0);
-  reg("environment-macros", (void*)subr_environment_macros, 1, 0);
-  reg("environment-variables", (void*)subr_environment_variables, 1, 0);
-  reg("current-environment", (void*)subr_current_environment, 0, 1);
-  reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, 0);
-  reg("environment-macro-ref", (void*)subr_environment_macro_ref, 1, 0);
-  reg("environment-macro-contains?", (void*)subr_environment_macro_contains, 1, 0);
-  reg("environment-variable-set!", (void*)subr_environment_variable_set, 2, 0);
-  reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, 0);
-  reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, 0);
-  reg("interaction-environment", (void*)subr_interaction_environment, 0, 0);
-  reg("system-environment", (void*)subr_system_environment, 0, 0);
-  reg("lookup-process-environment", (void*)subr_lookup_process_environment, 1, 0);
-  reg("undefine", (void*)subr_undefine, 1, 0);
+  reg("make-environment", (void*)subr_make_environment, 1, false);
+  reg("copy-environment-variables!", (void*)subr_copy_environment_variables, 3, false);
+  reg("copy-environment-macros!", (void*)subr_copy_environment_macros, 3, false);
+  reg("environment-macros", (void*)subr_environment_macros, 1, false);
+  reg("environment-variables", (void*)subr_environment_variables, 1, false);
+  reg("current-environment", (void*)subr_current_environment, 0, true);
+  reg("environment-macro-set!", (void*)subr_environment_macro_set, 2, false);
+  reg("environment-macro-ref", (void*)subr_environment_macro_ref, 1, false);
+  reg("environment-macro-contains?", (void*)subr_environment_macro_contains, 1, false);
+  reg("environment-variable-set!", (void*)subr_environment_variable_set, 2, false);
+  reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, false);
+  reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, false);
+  reg("interaction-environment", (void*)subr_interaction_environment, 0, false);
+  reg("system-environment", (void*)subr_system_environment, 0, false);
+  reg("lookup-process-environment", (void*)subr_lookup_process_environment, 1, false);
+  reg("undefine", (void*)subr_undefine, 1, false);
 }

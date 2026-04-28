@@ -116,18 +116,18 @@ SUBR subr_u8vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3)
 }
 
 void init_subr_uvector() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("u8vector?", (void*)subr_u8vector_p, 1, 0);
-  reg("make-u8vector", (void*)subr_make_u8vector, 1, 1);
-  reg("make-u8vector-mapping", (void*)subr_make_u8vector_mapping, 2, 0);
-  reg("u8vector-length", (void*)subr_u8vector_length, 1, 0);
-  reg("u8vector-ref", (void*)subr_u8vector_ref, 2, 0);
-  reg("u8vector-uint32-ref", (void*)subr_u8vector_uint32_ref, 2, 0);
-  reg("u8vector-int32-ref", (void*)subr_u8vector_int32_ref, 2, 0);
-  reg("u8vector-uint32-set!", (void*)subr_u8vector_uint32_set, 3, 0);
-  reg("u8vector-int32-set!", (void*)subr_u8vector_int32_set, 3, 0);
-  reg("u8vector-set!", (void*)subr_u8vector_set, 3, 0);
+  reg("u8vector?", (void*)subr_u8vector_p, 1, false);
+  reg("make-u8vector", (void*)subr_make_u8vector, 1, true);
+  reg("make-u8vector-mapping", (void*)subr_make_u8vector_mapping, 2, false);
+  reg("u8vector-length", (void*)subr_u8vector_length, 1, false);
+  reg("u8vector-ref", (void*)subr_u8vector_ref, 2, false);
+  reg("u8vector-uint32-ref", (void*)subr_u8vector_uint32_ref, 2, false);
+  reg("u8vector-int32-ref", (void*)subr_u8vector_int32_ref, 2, false);
+  reg("u8vector-uint32-set!", (void*)subr_u8vector_uint32_set, 3, false);
+  reg("u8vector-int32-set!", (void*)subr_u8vector_int32_set, 3, false);
+  reg("u8vector-set!", (void*)subr_u8vector_set, 3, false);
 }

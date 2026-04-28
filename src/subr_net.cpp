@@ -18,6 +18,7 @@
 #include "core.h"
 #include "object.h"
 #include "context.h"
+#include "fiber.h"
 #include "subr.h"
 
 #include "asio.h"
@@ -39,25 +40,6 @@ namespace http = boost::beast::http;
 using error_code = boost::system::error_code;
 
 // ---------------------------------------------------------------------------
-// unwind_guard
-//
-// RAII wrapper used in detached fiber tasks to ensure the GC root placed on
-// a future object is always released and the live-fiber counter is always
-// decremented, regardless of whether the task returns normally or throws.
-// ---------------------------------------------------------------------------
-class unwind_guard {
- public:
-  explicit unwind_guard(scm_obj_t obj) : m_obj(obj) {}
-  ~unwind_guard() {
-    context::gc_unprotect(m_obj);
-    context::s_live_fiber_count--;
-  }
-
- private:
-  unwind_guard(const unwind_guard&) = delete;
-  unwind_guard& operator=(const unwind_guard&) = delete;
-  scm_obj_t m_obj;
-};
 
 // ---------------------------------------------------------------------------
 // fiber_await
@@ -216,7 +198,7 @@ SUBR subr_https_get_async(scm_obj_t self, scm_obj_t url_obj, scm_obj_t port_obj)
   context::gc_protect(future_obj);
 
   auto task = boost::fibers::packaged_task<scm_obj_t()>([future_obj, host, port]() mutable -> scm_obj_t {
-    unwind_guard guard(future_obj);
+    fiber_unwind_guard guard(future_obj);
 
     return make_string(https_get_impl(host, port).c_str());
     // Any exception propagates into the future automatically.
@@ -235,10 +217,10 @@ SUBR subr_https_get_async(scm_obj_t self, scm_obj_t url_obj, scm_obj_t port_obj)
 // init_subr_net — register network subrs in the Scheme environment
 // ---------------------------------------------------------------------------
 void init_subr_net() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("https-get", (void*)subr_https_get, 2, 0);
-  reg("https-get-async", (void*)subr_https_get_async, 2, 0);
+  reg("https-get", (void*)subr_https_get, 2, false);
+  reg("https-get-async", (void*)subr_https_get_async, 2, false);
 }

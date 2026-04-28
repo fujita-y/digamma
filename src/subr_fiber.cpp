@@ -99,15 +99,15 @@ SUBR subr_fiber_yield(scm_obj_t self) {
 }
 
 void init_subr_fiber() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("fiber", (void*)subr_fiber, 1, 0);
-  reg("fiber-yield", (void*)subr_fiber_yield, 0, 0);
-  reg("fiber-sleep-for", (void*)subr_fiber_sleep_for, 1, 0);
-  reg("future-get", (void*)subr_future_get, 1, 0);
-  reg("future-wait", (void*)subr_future_wait, 1, 0);
-  reg("future-wait-for", (void*)subr_future_wait_for, 2, 0);
-  reg("future?", (void*)subr_future_p, 1, 0);
+  reg("fiber", (void*)subr_fiber, 1, false);
+  reg("fiber-yield", (void*)subr_fiber_yield, 0, false);
+  reg("fiber-sleep-for", (void*)subr_fiber_sleep_for, 1, false);
+  reg("future-get", (void*)subr_future_get, 1, false);
+  reg("future-wait", (void*)subr_future_wait, 1, false);
+  reg("future-wait-for", (void*)subr_future_wait_for, 2, false);
+  reg("future?", (void*)subr_future_p, 1, false);
 }

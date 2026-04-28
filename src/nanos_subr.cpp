@@ -18,8 +18,8 @@
 // ============================================================================
 
 void nanos_t::init_subr() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
   init_subr_base();
@@ -34,4 +34,5 @@ void nanos_t::init_subr() {
   init_subr_fiber();
   init_subr_asio();
   init_subr_net();
+  init_subr_vertex();
 }

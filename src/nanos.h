@@ -33,10 +33,7 @@ class nanos_t {
 
   std::unique_ptr<nanos_jit_t> m_jit;
 
-  std::string m_boot_file;
-  std::string m_env_name;
-  std::string m_script_file;
-  std::vector<std::string> m_load_paths;
+
 
  private:
   void init_subr();

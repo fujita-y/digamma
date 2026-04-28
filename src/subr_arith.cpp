@@ -418,36 +418,36 @@ SUBR subr_modulo(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
 // ============================================================================
 
 void init_subr_arith() {
-  auto reg = [](const char* name, void* func, int req, int opt) {
-    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt, 0, nullptr, 1));
+  auto reg = [](const char* name, void* func, int req, bool opt) {
+    context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
   // arithmetic
-  reg("+", (void*)subr_num_add, 0, 1);
-  reg("-", (void*)subr_num_sub, 1, 1);
-  reg("*", (void*)subr_num_mul, 0, 1);
-  reg("/", (void*)subr_num_div, 1, 1);
+  reg("+", (void*)subr_num_add, 0, true);
+  reg("-", (void*)subr_num_sub, 1, true);
+  reg("*", (void*)subr_num_mul, 0, true);
+  reg("/", (void*)subr_num_div, 1, true);
 
   // numeric comparisons
-  reg("=", (void*)subr_num_eq, 2, 1);
-  reg("<", (void*)subr_num_lt, 2, 1);
-  reg(">", (void*)subr_num_gt, 2, 1);
-  reg("<=", (void*)subr_num_le, 2, 1);
-  reg(">=", (void*)subr_num_ge, 2, 1);
-  reg("zero?", (void*)subr_zero_p, 1, 0);
-  reg("remainder", (void*)subr_remainder, 2, 0);
-  reg("quotient", (void*)subr_quotient, 2, 0);
-  reg("exact->inexact", (void*)subr_exact_to_inexact, 1, 0);
-  reg("inexact->exact", (void*)subr_inexact_to_exact, 1, 0);
-  reg("positive?", (void*)subr_positive_p, 1, 0);
-  reg("negative?", (void*)subr_negative_p, 1, 0);
-  reg("round", (void*)subr_round, 1, 0);
-  reg("odd?", (void*)subr_odd_p, 1, 0);
-  reg("even?", (void*)subr_even_p, 1, 0);
-  reg("sqrt", (void*)subr_sqrt, 1, 0);
-  reg("sin", (void*)subr_sin, 1, 0);
-  reg("cos", (void*)subr_cos, 1, 0);
-  reg("tan", (void*)subr_tan, 1, 0);
-  reg("atan", (void*)subr_atan, 1, 1);
-  reg("modulo", (void*)subr_modulo, 2, 0);
+  reg("=", (void*)subr_num_eq, 2, true);
+  reg("<", (void*)subr_num_lt, 2, true);
+  reg(">", (void*)subr_num_gt, 2, true);
+  reg("<=", (void*)subr_num_le, 2, true);
+  reg(">=", (void*)subr_num_ge, 2, true);
+  reg("zero?", (void*)subr_zero_p, 1, false);
+  reg("remainder", (void*)subr_remainder, 2, false);
+  reg("quotient", (void*)subr_quotient, 2, false);
+  reg("exact->inexact", (void*)subr_exact_to_inexact, 1, false);
+  reg("inexact->exact", (void*)subr_inexact_to_exact, 1, false);
+  reg("positive?", (void*)subr_positive_p, 1, false);
+  reg("negative?", (void*)subr_negative_p, 1, false);
+  reg("round", (void*)subr_round, 1, false);
+  reg("odd?", (void*)subr_odd_p, 1, false);
+  reg("even?", (void*)subr_even_p, 1, false);
+  reg("sqrt", (void*)subr_sqrt, 1, false);
+  reg("sin", (void*)subr_sin, 1, false);
+  reg("cos", (void*)subr_cos, 1, false);
+  reg("tan", (void*)subr_tan, 1, false);
+  reg("atan", (void*)subr_atan, 1, true);
+  reg("modulo", (void*)subr_modulo, 2, false);
 }
