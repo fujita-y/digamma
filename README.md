@@ -20,6 +20,7 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 - **First-class continuations**: `call/cc`, escape continuations, and `dynamic-wind` powered by Boost.Context.
 - **Tagged pointers**: 3-bit primary tags with 6-bit type codes; ARM64 TBI for zero-cost tag masking in release builds.
 - **C Foreign Function Interface (CFFI)**: Dynamically load shared libraries and invoke C functions directly from Scheme, featuring support for primitive types and C callbacks.
+- **Fiber-aware gRPC & Vertex AI**: Concurrent access to cloud ML endpoints (Gemini) built on the same Asio/Fiber scheduling primitives for zero mutator blocking.
 
 ## Architecture
 
@@ -119,6 +120,20 @@ Digamma provides non-blocking, fiber-aware I/O and HTTP capabilities using **Boo
 - `(https-get <url> <port>)`: Performs a fiber-aware, non-blocking HTTPS GET request. The calling fiber suspends while the network request is in flight. Returns the response body as a string.
 - `(https-get-async <url> <port>)`: Initiates an asynchronous HTTPS GET request on a detached fiber. Returns a future that will be fulfilled with the response body as a string.
 
+### Vertex AI Integration
+
+Digamma supports machine learning inference via the Google Cloud Vertex AI API. This includes a fully asynchronous, fiber-aware variant built on **gRPC** and **asio-grpc**, allowing AI requests to run concurrently without blocking the main scheduler thread:
+
+- **Cooperative gRPC**: Uses the `asio-grpc` library to poll the gRPC `CompletionQueue` and execute completions inline with the fiber scheduling loop.
+- **Non-blocking access**: Scheme code can dispatch concurrent Vertex AI generation calls that yield processing until response arrival.
+
+#### Primitives
+
+- `(vertex-generate-content prompt [model] [location] [project-id])`: Synchronous content generation call.
+- `(vertex-generate-content-async prompt [model] [location] [project-id])`: Initiates a non-blocking call via gRPC, returning a future.
+
+> [!NOTE]
+> Requires setting the `GOOGLE_CLOUD_PROJECT` environment variable or providing it explicitly as the fourth argument. The default model is `gemini-2.5-flash`.
 
 ### Foreign Function Interface (CFFI)
 
@@ -137,6 +152,8 @@ The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM OR
 - **OpenSSL** (for TLS support in HTTPS networking)
 - **replxx** (for interactive REPL)
 - **CLI11** (for command-line argument parsing)
+- **google-cloud-cpp** (specifically `aiplatform` feature)
+- **asio-grpc** (for asynchronous gRPC execution on Asio event loops)
 
 ## Building
 
