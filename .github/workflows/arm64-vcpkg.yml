@@ -54,6 +54,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++-22 \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_PREFIX_PATH="build/vcpkg_installed/arm64-linux" \
+            -DCMAKE_IGNORE_PREFIX_PATH="/usr/lib/aarch64-linux-gnu;/usr/lib" \
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release
 
