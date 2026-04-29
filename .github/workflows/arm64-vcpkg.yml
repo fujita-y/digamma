@@ -35,6 +35,14 @@ jobs:
             ./vcpkg/bootstrap-vcpkg.sh
           fi
 
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_PREFIX_PATH="build/vcpkg_installed/arm64-linux" \
+            -DVCPKG_TARGET_TRIPLET=arm64-linux \
+            -DCMAKE_BUILD_TYPE=Release
+
       - name: Install LLVM 22
         run: |
           sudo apt-get update
@@ -45,18 +53,6 @@ jobs:
           sudo ./llvm.sh 22
           # (Optional) Install additional LLVM 22 components if needed
           sudo apt-get install -y clang-22 lld-22 llvm-22-dev
-
-      - name: Configure CMake
-        run: |
-          # Point CMake to use the newly installed Clang 22
-          cmake -B build \
-            -DCMAKE_C_COMPILER=clang-22 \
-            -DCMAKE_CXX_COMPILER=clang++-22 \
-            -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
-            -DCMAKE_PREFIX_PATH="build/vcpkg_installed/arm64-linux" \
-            -DCMAKE_IGNORE_PREFIX_PATH="/usr/lib/aarch64-linux-gnu;/usr/lib" \
-            -DVCPKG_TARGET_TRIPLET=arm64-linux \
-            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release --parallel $(nproc)
