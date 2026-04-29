@@ -44,6 +44,15 @@ jobs:
           sudo ./llvm.sh 22
           sudo apt-get install -y clang-22 lld-22 llvm-22-dev
 
+      - name: Make LLVM 22 Default
+        run: |
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100
+          
+          # Optional: Set environment variables for build systems like CMake
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+
       - name: Configure CMake
         run: |
           cmake -B build \
