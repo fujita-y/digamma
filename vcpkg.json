@@ -12,9 +12,10 @@
     "asio-grpc",
     {
       "name": "google-cloud-cpp",
-      "features": ["aiplatform", "dialogflow-cx"]
+      "features": [
+        "aiplatform",
+        "dialogflow-cx"
+      ]
     }
-
-
   ]
 }
