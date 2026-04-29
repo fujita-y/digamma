@@ -21,17 +21,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Install LLVM 22
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget lsb-release software-properties-common gnupg
-          # Download and run the official LLVM setup script for version 22
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 22
-          # (Optional) Install additional LLVM 22 components if needed
-          sudo apt-get install -y clang-22 lld-22 llvm-22-dev
-
       - name: Export GitHub Actions Cache Environment
         uses: actions/github-script@v7
         with:
@@ -45,6 +34,17 @@ jobs:
             git clone https://github.com/microsoft/vcpkg.git
             ./vcpkg/bootstrap-vcpkg.sh
           fi
+
+      - name: Install LLVM 22
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget lsb-release software-properties-common gnupg
+          # Download and run the official LLVM setup script for version 22
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          # (Optional) Install additional LLVM 22 components if needed
+          sudo apt-get install -y clang-22 lld-22 llvm-22-dev
 
       - name: Configure CMake
         run: |
