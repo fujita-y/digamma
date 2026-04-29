@@ -22,6 +22,8 @@ void init_subr_fiber();
 void init_subr_asio();
 void init_subr_net();
 void init_subr_vertex();
+void init_subr_dialogflow();
+
 
 SUBR subr_fiber(scm_obj_t self, scm_obj_t closure);
 SUBR subr_fiber_yield(scm_obj_t self);

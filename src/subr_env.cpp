@@ -5,8 +5,6 @@
 #include "object.h"
 #include "context.h"
 #include "hash.h"
-#include "list.h"
-#include "nanos.h"
 #include "object_heap.h"
 #include "subr.h"
 

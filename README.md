@@ -2,158 +2,178 @@
 
 Digamma is an experimental Scheme implementation featuring a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support. Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline.
 
-## Benchmarks
+## What Makes Digamma Unique
 
-- Preliminary results from a partial [Gambit benchmark suite on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html) compare **Nanos** against **Ypsilon 2.0.9** and **Guile 3.0.10**. 
-- Each result is a trimmed average of 7 runs (min/max excluded) reporting wall-clock (real) and CPU (user) time.
+### 1. Fiber-Native Google Cloud AI Integration
 
-- Nanos records the fastest real time in **23 of 30 benchmarks**.
+Digamma provides **built-in, non-blocking access to Vertex AI (Gemini) and Dialogflow CX** — directly from Scheme, with zero mutator blocking. Unlike typical FFI wrappers that stall the interpreter, every AI call is dispatched through the fiber scheduler using `asio-grpc`, so other fibers keep running while cloud inference is in flight.
 
+#### Vertex AI / Gemini
 
-## Key Features
+```scheme
+;; Synchronous — blocks the current fiber, not the scheduler
+(generate-content "Explain monads in one sentence.")
 
-- **LLVM JIT compilation**: Compiles Scheme to native code on-demand via LLVM ORC (JITLink + CompileOnDemand).
-- **Concurrent GC**: Mostly-concurrent mark-sweep collector with slab allocator and write barriers for low-latency execution.
-- **Fiber-based concurrency**: Lightweight cooperative multitasking with first-class fibers and futures, integrated with the concurrent garbage collector.
-- **Self-hosted compiler**: Multi-stage pipeline (macro expand → optimize → lambda lift → compile) written in Scheme and cross-compiled into a boot image.
-- **Hygienic macros**: `syntax-case` and `syntax-rules` with module-level macro export/import.
-- **First-class continuations**: `call/cc`, escape continuations, and `dynamic-wind` powered by Boost.Context.
-- **Tagged pointers**: 3-bit primary tags with 6-bit type codes; ARM64 TBI for zero-cost tag masking in release builds.
-- **C Foreign Function Interface (CFFI)**: Dynamically load shared libraries and invoke C functions directly from Scheme, featuring support for primitive types and C callbacks.
-- **Fiber-aware gRPC & Vertex AI**: Concurrent access to cloud ML endpoints (Gemini) built on the same Asio/Fiber scheduling primitives for zero mutator blocking.
+;; Asynchronous — returns a future immediately; other fibers run concurrently
+(let ((f (generate-content-async "Write a haiku about Scheme.")))
+  (display "Doing other work while waiting...\n")
+  (display (future-get f))
+  (newline))
+```
 
-## Architecture
+**Primitives:**
+- `(vertex-generate-content prompt [model] [location] [project-id])` — synchronous call.
+- `(vertex-generate-content-async prompt [model] [location] [project-id])` → future — non-blocking, fiber-aware.
 
-### Virtual Machine (nanos)
+Default model: `gemini-2.5-flash`. Reads `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` from the environment.
 
-Nanos is a register-based virtual machine that JIT-compiles Scheme to native code through LLVM ORC. Each Scheme expression is compiled on-demand: source code is read, macro-expanded, optimized, and emitted as LLVM IR, which is then compiled to native machine code and executed immediately.
+#### Dialogflow CX
 
-### Object Representation
+```scheme
+;; Dispatch two intents concurrently; no thread management needed
+(let* ((f1 (dialogflow-cx-detect-intent-async "Book a flight" "my-agent-id"))
+       (f2 (dialogflow-cx-detect-intent-async "Cancel order" "my-agent-id")))
+  (display (future-get f1)) (newline)
+  (display (future-get f2)) (newline))
+```
 
-Digamma uses a tagged-pointer representation on 64-bit architectures:
+**Primitives:**
+- `(dialogflow-cx-detect-intent text agent-id [session-id] [location] [project-id] [language-code])` — synchronous.
+- `(dialogflow-cx-detect-intent-async text agent-id [session-id] [location] [project-id] [language-code])` → future — non-blocking.
 
-| Type | Tag |
-|---|---|
-| Fixnum (63-bit) | `.....1` |
-| Cons (pair) | `...000` |
-| Heap object | `...010` with 6-bit type code |
-| Short flonum (61-bit) | `...100` |
+Session IDs are auto-generated (UUID) if not provided.
 
-Heap objects carry a 6-bit type code (`tc6`) supporting symbols, strings, vectors, closures, continuations, ports, hashtables, cells, and more.
+> [!NOTE]
+> Both APIs require setting the `GOOGLE_CLOUD_PROJECT` environment variable (or passing it as an argument). `GOOGLE_CLOUD_LOCATION` defaults to `us-central1`.
 
-On ARM64, the top byte of pointers is used for type tags via hardware TBI (Top Byte Ignore), allowing tagged pointers to be dereferenced without masking in release builds.
+---
 
-### Memory Management
+### 2. Fiber-Based Concurrency and Asynchronous I/O
 
-The garbage collector is a concurrent, mostly-non-moving mark-sweep collector running on a dedicated thread:
+Digamma implements lightweight, cooperative multitasking using **fibers** backed by `boost::fibers`. The fiber scheduler is wired directly into Boost.Asio's `io_context`, so I/O completion handlers run inline without spawning OS threads.
 
-- **Slab allocator**: Fixed-size object pools with per-slab bitmaps for fast allocation and sweep.
-- **Tri-color marking**: Concurrent marking with write barriers and a shade queue for mutator cooperation.
-- **Multi-phase collection**: Three-phase stop-the-world pauses (root snapshot → concurrent mark → final mark) to minimize mutator pause times.
-- **Safepoints**: The mutator cooperates with the collector at safepoints inserted by the compiler.
+```scheme
+(let* ((f1 (fiber (lambda ()
+                    (display "Fiber 1 starting\n")
+                    (fiber-sleep-for 100)
+                    (display "Fiber 1 done\n")
+                    42)))
+       (f2 (fiber (lambda ()
+                    (display "Fiber 2 starting\n")
+                    (fiber-yield)
+                    (display "Fiber 2 done\n")
+                    'done))))
+  (display (list (future-get f1) (future-get f2)))
+  (newline))
+```
 
-### Compiler Pipeline
+**Fiber primitives:**
+- `(fiber <thunk>)` → future — spawns a fiber.
+- `(fiber-yield)` — cooperatively yields.
+- `(fiber-sleep-for <msec>)` — suspends without blocking the scheduler.
+- `(future-get <future>)`, `(future-wait <future>)`, `(future-wait-for <future> <msec>)` — synchronization.
+- `(future? <obj>)` — predicate.
 
-Scheme source is processed through a multi-stage pipeline, implemented in Scheme and cross-compiled to a boot image (`boot/core.ir`):
+**Async networking primitives** (fiber-aware, no thread blocking):
+- `(get-bytevector-n-async <port> <n>)` → future — non-blocking port read.
+- `(https-get <url> <port>)` — blocking HTTPS GET (suspends current fiber).
+- `(https-get-async <url> <port>)` → future — detached fiber HTTPS GET.
+
+---
+
+### 3. LLVM JIT Compilation (On-Demand, per Scheme Expression)
+
+Nanos uses **LLVM ORC** (JITLink + CompileOnDemand) to compile each Scheme expression to native machine code on the fly. The pipeline runs entirely in-process with no ahead-of-time batch step:
 
 ```
 Source → Macro Expand → Optimize → Lambda Lift → Compile → LLVM IR → Native Code
 ```
 
-1. **Macro expansion** (`core/macroexpand.scm`): Full R6RS `syntax-case` and R7RS `syntax-rules` with hygienic renaming, `let-syntax`, `letrec-syntax`, `define-syntax`, and module-level macro export/import.
+Notable code-generation optimizations:
+- **Escape and stack-allocation analysis** (`phase2b`–`phase2d`): elides heap allocation and write barriers for short-lived closures.
+- **Inlined primitives**: common arithmetic, predicate, and list operations emitted as inline LLVM IR.
+- **Tail-call optimization**: proper tail calls via LLVM musttail.
 
-2. **Optimization** (`core/optimizer.scm`): Constant folding, dead code elimination, beta reduction, let-floating, lambda dropping, inlining, unused parameter removal, and pure primitive substitution.
+---
 
-3. **Lambda lifting** (`core/lambda-lift.scm`): Promotes closed-over lambdas from `let` and `letrec*` bindings to top-level definitions, eliminating closure allocation for functions whose free variables are limited to sibling bindings.
+### 4. ARM64 Top Byte Ignore (TBI) Tagged Pointers
 
-4. **Compilation** (`core/compiler.scm`): Emits a register-based IR with closure conversion, free variable analysis, and cell-based boxing for mutated and forward-referenced variables. The compiler emits `letrec*` as a first-class core form with selective cell boxing — only variables that are mutated or forward-referenced by lambda initializers require cells; all others use direct register access.
+On ARM64, Digamma exploits the hardware **Top Byte Ignore** feature to store type tags in the high byte of every pointer. In release builds, tagged pointers can be dereferenced directly — no masking needed, zero runtime cost for tag removal.
 
-5. **Code generation** (`src/codegen.cpp`, `src/codegen_emit.cpp`, `src/codegen_inline.cpp`, `src/codegen_aux.cpp`, `src/codegen_map.cpp`): Translates the IR to LLVM IR, handling closure creation, tail calls, global references, cell operations, safepoint insertion, and inlined primitives. Escape and stack-allocation analyses (`phase2b`–`phase2d`) elide write barriers and heap allocations for short-lived closures. Uses LLVM ORC (JITLink + CompileOnDemand) for lazy compilation.
+| Type | Tag |
+|---|---|
+| Fixnum (63-bit) | `.....1` |
+| Cons (pair) | `...000` |
+| Heap object | `...010` + 6-bit type code |
+| Short flonum (61-bit) | `...100` |
 
-### Continuations
+Heap objects use a 6-bit type code (`tc6`) supporting symbols, strings, vectors, closures, continuations, ports, hashtables, cells, and more.
 
-First-class continuations are implemented using Boost.Context for stack capture and restoration. The implementation supports:
+---
 
-- `call/cc` (full continuations with stack copy)
-- `call-with-escape-continuation` (one-shot escape continuations)
-- `dynamic-wind` for winding/unwinding protection
+### 5. Concurrent Garbage Collector
+
+The GC is a **mostly-concurrent, mark-sweep collector** running on a dedicated thread:
+
+- **Slab allocator**: fixed-size object pools with per-slab bitmaps for fast allocation and sweep.
+- **Tri-color marking**: concurrent marking with write barriers and a shade queue for mutator cooperation.
+- **Multi-phase STW**: three short stop-the-world pauses (root snapshot → concurrent mark → final mark) minimize mutator pause times.
+- **Safepoints**: the compiler inserts cooperative safepoints; fiber stacks are included in the root set.
+
+---
+
+### 6. C Foreign Function Interface (CFFI)
+
+The `(core cffi)` module provides a dynamic C FFI backed by LLVM ORC:
+
+- `load-shared-object` / `lookup-shared-object` — load dynamic libraries and resolve C symbols.
+- `c-function` — bind Scheme procedures to C functions with typed signatures (`int`, `double`, `void*`, `size_t`, …).
+- `c-callback` — create native C function pointers that invoke Scheme closures (enables C callback integration).
+
+---
+
+### 7. Self-Hosted Compiler and Hygienic Macros
+
+The entire compiler pipeline is written in Scheme and cross-compiled into a boot image (`boot/core.ir`):
+
+1. **Macro expansion**: full R6RS `syntax-case` and R7RS `syntax-rules` with hygienic renaming, `let-syntax`, `letrec-syntax`, module-level macro export/import.
+2. **Optimization**: constant folding, dead code elimination, beta reduction, let-floating, lambda dropping, inlining, unused parameter removal, pure primitive substitution.
+3. **Lambda lifting**: promotes closed-over lambdas to top-level definitions where possible.
+4. **Compilation**: register-based IR with closure conversion, free variable analysis, selective cell boxing for mutated/forward-referenced variables.
+
+---
+
+### 8. First-Class Continuations
+
+Full continuations via **Boost.Context** (stack copy/restore):
+
+- `call/cc` — full continuations.
+- `call-with-escape-continuation` — one-shot escape continuations.
+- `dynamic-wind` — winding/unwinding protection.
 
 Continuation objects are GC-managed with memoized live-pointer arrays for efficient tracing.
 
-### Module System
+---
 
-The macro expander includes a module system (`define-module`, `import-module`) with:
+## Benchmarks
 
-- Named exports and renamed exports
-- Import modifiers: `prefix`, `only`, `except`, `rename`
-- Macro export and import across module boundaries
-- Aggregated library definitions
+- Preliminary results from a partial [Gambit benchmark suite on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html) compare **Nanos** against **Ypsilon 2.0.9** and **Guile 3.0.10**.
+- Each result is a trimmed average of 7 runs (min/max excluded) reporting wall-clock (real) and CPU (user) time.
+- Nanos records the fastest real time in **23 of 30 benchmarks**.
 
-### Fibers and Concurrency
-
-Digamma implements lightweight, cooperative multitasking using **fibers** and **futures**, backed by `boost::fibers`. Fibers provide a high-level concurrency model that is fully integrated with the concurrent garbage collector:
-
-- **Cooperative Scheduling**: A custom priority-aware scheduler ensures efficient fiber context switching and fair mutator/GC interaction.
-- **Futures**: Synchronization primitives for retrieving results from concurrent computations.
-- **GC Integration**: Fiber stacks are scanned as part of the garbage collection root set, ensuring memory safety during concurrent execution.
-
-#### Primitives
-
-- `(fiber <thunk>)`: Spawns a new fiber and returns a future object.
-- `(fiber-yield)`: Cooperatively yields the processor to other ready fibers.
-- `(fiber-sleep-for <msec>)`: Suspends the current fiber for the specified number of milliseconds.
-- `(future-get <future>)`: Retrieves the value of a future, blocking the current fiber if the result is not yet available.
-- `(future-wait <future>)`: Blocks the current fiber until the future is ready.
-- `(future-wait-for <future> <msec>)`: Blocks with a timeout; returns `#t` if timed out, `#f` otherwise.
-- `(future? <obj>)`: Returns `#t` if the object is a future.
-
-### Asynchronous I/O and Networking
-
-Digamma provides non-blocking, fiber-aware I/O and HTTP capabilities using **Boost.Asio** and **Boost.Beast**. Operation completion is integrated directly into the fiber scheduler (Round Robin pattern), allowing fibers to suspend while waiting for I/O and resume automatically when data is available:
-
-- **Seamless Integration**: Asio's `io_context` is polled directly by the fiber scheduler's `suspend_until()` hook, ensuring that I/O completion handlers run inline on the main thread and fulfill futures immediately.
-- **Future-based I/O**: Asynchronous networking primitives return **future** objects, enabling clean, non-blocking code using standard fiber synchronization.
-
-#### Primitives
-
-- `(get-bytevector-n-async <port> <n>)`: Initiates an asynchronous read of at most *n* bytes from the specified input port. Returns a future that will be fulfilled with a bytevector containing the data read, or EOF.
-- `(https-get <url> <port>)`: Performs a fiber-aware, non-blocking HTTPS GET request. The calling fiber suspends while the network request is in flight. Returns the response body as a string.
-- `(https-get-async <url> <port>)`: Initiates an asynchronous HTTPS GET request on a detached fiber. Returns a future that will be fulfilled with the response body as a string.
-
-### Vertex AI Integration
-
-Digamma supports machine learning inference via the Google Cloud Vertex AI API. This includes a fully asynchronous, fiber-aware variant built on **gRPC** and **asio-grpc**, allowing AI requests to run concurrently without blocking the main scheduler thread:
-
-- **Cooperative gRPC**: Uses the `asio-grpc` library to poll the gRPC `CompletionQueue` and execute completions inline with the fiber scheduling loop.
-- **Non-blocking access**: Scheme code can dispatch concurrent Vertex AI generation calls that yield processing until response arrival.
-
-#### Primitives
-
-- `(vertex-generate-content prompt [model] [location] [project-id])`: Synchronous content generation call.
-- `(vertex-generate-content-async prompt [model] [location] [project-id])`: Initiates a non-blocking call via gRPC, returning a future.
-
-> [!NOTE]
-> Requires setting the `GOOGLE_CLOUD_PROJECT` environment variable or providing it explicitly as the fourth argument. The default model is `gemini-2.5-flash`.
-
-### Foreign Function Interface (CFFI)
-
-The `(core cffi)` module provides a lightweight, dynamic C FFI backed by LLVM ORC. It allows seamless interoperability with native code:
-
-- `load-shared-object` / `lookup-shared-object`: Load dynamic libraries and resolve C symbols.
-- `c-function`: Bind Scheme procedures to C functions with strongly-typed signatures (e.g., `int`, `double`, `void*`, `size_t`).
-- `c-callback`: Create native C function pointers that invoke Scheme closures, enabling integration with C libraries that use callbacks.
+---
 
 ## Requirements
 
 - **LLVM 22** or later
 - **CMake 3.13.4** or later
 - **vcpkg** (recommended for managing dependencies)
-- **Boost 1.88** or later (specifically `boost_context`, `boost_fiber`, `boost_asio`, and `boost_beast`)
+- **Boost 1.88** or later (`boost_context`, `boost_fiber`, `boost_asio`, `boost_beast`)
 - **OpenSSL** (for TLS support in HTTPS networking)
 - **replxx** (for interactive REPL)
 - **CLI11** (for command-line argument parsing)
-- **google-cloud-cpp** (specifically `aiplatform` feature)
-- **asio-grpc** (for asynchronous gRPC execution on Asio event loops)
+- **google-cloud-cpp** (specifically `aiplatform` and `dialogflow_cx` features)
+- **asio-grpc** (for asynchronous gRPC on Asio event loops)
 
 ## Building
 
@@ -169,7 +189,7 @@ The compiler pipeline is self-hosted: the Scheme files in `core/` are cross-comp
 
 ```bash
 rm boot/core.ir
-ypsilon boot/build-core-ir.scm or gosh boot/build-core-ir.scm
+ypsilon boot/build-core-ir.scm   # or: gosh boot/build-core-ir.scm
 ```
 
 ## Usage
@@ -182,25 +202,6 @@ Run the `nanos` executable:
 ```
 
 Use `./nanos --help` for a full list of command-line options.
-
-### Quick Start: Fibers
-
-You can use fibers to run concurrent computations:
-
-```scheme
-(let* ((f1 (fiber (lambda () 
-                    (display "Fiber 1 starting\n")
-                    (fiber-sleep-for 100)
-                    (display "Fiber 1 done\n")
-                    42)))
-       (f2 (fiber (lambda ()
-                    (display "Fiber 2 starting\n")
-                    (fiber-yield)
-                    (display "Fiber 2 done\n")
-                    'done))))
-  (display (list (future-get f1) (future-get f2)))
-  (newline))
-```
 
 ## Testing
 

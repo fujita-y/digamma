@@ -35,4 +35,6 @@ void nanos_t::init_subr() {
   init_subr_asio();
   init_subr_net();
   init_subr_vertex();
+  init_subr_dialogflow();
+
 }

@@ -70,6 +70,8 @@ find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(google_cloud_cpp_aiplatform CONFIG REQUIRED)
+find_package(google_cloud_cpp_dialogflow_cx CONFIG REQUIRED)
+
 find_package(asio-grpc CONFIG REQUIRED)
 
 # ==============================================================================
@@ -191,13 +193,16 @@ set(NANOS_CORE_SOURCES
   src/subr_asio.cpp
   src/subr_net.cpp
   src/subr_vertex.cpp
+  src/subr_dialogflow.cpp
+
   src/vector.cpp)
 
 # ==============================================================================
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform asio-grpc::asio-grpc -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform google-cloud-cpp::dialogflow_cx asio-grpc::asio-grpc -pthread -ldl)
+
 
 # ==============================================================================
 # Targets

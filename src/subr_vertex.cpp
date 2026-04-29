@@ -94,20 +94,20 @@ static std::shared_ptr<google::cloud::aiplatform::v1::PredictionService::Stub> g
 
 // ---------------------------------------------------------------------------
 
-SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 4) {
-    throw std::runtime_error("vertex-generate-content: wrong number of arguments (expected 1 to 4)");
+    throw std::runtime_error("generate-content: wrong number of arguments (expected 1 to 4)");
   }
 
   if (!is_string(argv[0])) {
-    throw std::runtime_error("vertex-generate-content: first argument must be a string (prompt)");
+    throw std::runtime_error("generate-content: first argument must be a string (prompt)");
   }
   std::string prompt(reinterpret_cast<const char*>(string_name(argv[0])));
 
   std::string model_name = "gemini-1.5-pro";
   if (argc >= 2) {
     if (!is_string(argv[1])) {
-      throw std::runtime_error("vertex-generate-content: second argument must be a string (model)");
+      throw std::runtime_error("generate-content: second argument must be a string (model)");
     }
     model_name = reinterpret_cast<const char*>(string_name(argv[1]));
   }
@@ -115,7 +115,7 @@ SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
   std::string location = "us-central1";
   if (argc >= 3) {
     if (!is_string(argv[2])) {
-      throw std::runtime_error("vertex-generate-content: third argument must be a string (location)");
+      throw std::runtime_error("generate-content: third argument must be a string (location)");
     }
     location = reinterpret_cast<const char*>(string_name(argv[2]));
   } else {
@@ -128,7 +128,7 @@ SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
   std::string project_id = "";
   if (argc >= 4) {
     if (!is_string(argv[3])) {
-      throw std::runtime_error("vertex-generate-content: fourth argument must be a string (project-id)");
+      throw std::runtime_error("generate-content: fourth argument must be a string (project-id)");
     }
     project_id = reinterpret_cast<const char*>(string_name(argv[3]));
   } else {
@@ -136,7 +136,7 @@ SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
     if (env_proj) {
       project_id = env_proj;
     } else {
-      throw std::runtime_error("vertex-generate-content: project-id not provided and GOOGLE_CLOUD_PROJECT environment variable not set");
+      throw std::runtime_error("generate-content: project-id not provided and GOOGLE_CLOUD_PROJECT environment variable not set");
     }
   }
 
@@ -160,7 +160,7 @@ SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
 
     auto response = client->GenerateContent(fully_qualified_model, contents);
     if (!response) {
-      throw std::runtime_error("vertex-generate-content: Vertex AI API call failed: " + response.status().message());
+      throw std::runtime_error("generate-content: Vertex AI API call failed: " + response.status().message());
     }
 
     std::string generated_text = "";
@@ -178,32 +178,32 @@ SUBR subr_vertex_generate_content(scm_obj_t self, int argc, scm_obj_t argv[]) {
     return make_string(generated_text.c_str());
 
   } catch (const std::exception& e) {
-    throw std::runtime_error("vertex-generate-content: " + std::string(e.what()));
+    throw std::runtime_error("generate-content: " + std::string(e.what()));
   }
 }
 
 // ---------------------------------------------------------------------------
-// subr_vertex_generate_content_async — (vertex-generate-content-async prompt [model [location [project]]]) → future
+// subr_generate_content_async — (generate-content-async prompt [model [location [project]]]) → future
 //
 // Returns a Scheme future immediately; a detached fiber calls the synchronous
 // Vertex AI stub on its own stack.  The promise is fulfilled on the main thread
 // via normal fiber scheduling — exactly the same pattern as https-get-async in
 // subr_net.cpp.  No background OS thread or cross-thread post needed.
 // ---------------------------------------------------------------------------
-SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv[]) {
+SUBR subr_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1 || argc > 4) {
-    throw std::runtime_error("vertex-generate-content-async: wrong number of arguments (expected 1 to 4)");
+    throw std::runtime_error("generate-content-async: wrong number of arguments (expected 1 to 4)");
   }
 
   if (!is_string(argv[0])) {
-    throw std::runtime_error("vertex-generate-content-async: first argument must be a string (prompt)");
+    throw std::runtime_error("generate-content-async: first argument must be a string (prompt)");
   }
   std::string prompt(reinterpret_cast<const char*>(string_name(argv[0])));
 
   std::string model_name = "gemini-2.5-flash";
   if (argc >= 2) {
     if (!is_string(argv[1])) {
-      throw std::runtime_error("vertex-generate-content-async: second argument must be a string (model)");
+      throw std::runtime_error("generate-content-async: second argument must be a string (model)");
     }
     model_name = reinterpret_cast<const char*>(string_name(argv[1]));
   }
@@ -211,7 +211,7 @@ SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv
   std::string location = "us-central1";
   if (argc >= 3) {
     if (!is_string(argv[2])) {
-      throw std::runtime_error("vertex-generate-content-async: third argument must be a string (location)");
+      throw std::runtime_error("generate-content-async: third argument must be a string (location)");
     }
     location = reinterpret_cast<const char*>(string_name(argv[2]));
   } else {
@@ -222,7 +222,7 @@ SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv
   std::string project_id;
   if (argc >= 4) {
     if (!is_string(argv[3])) {
-      throw std::runtime_error("vertex-generate-content-async: fourth argument must be a string (project-id)");
+      throw std::runtime_error("generate-content-async: fourth argument must be a string (project-id)");
     }
     project_id = reinterpret_cast<const char*>(string_name(argv[3]));
   } else {
@@ -230,7 +230,7 @@ SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv
     if (env_proj) {
       project_id = env_proj;
     } else {
-      throw std::runtime_error("vertex-generate-content-async: project-id not provided and GOOGLE_CLOUD_PROJECT environment variable not set");
+      throw std::runtime_error("generate-content-async: project-id not provided and GOOGLE_CLOUD_PROJECT environment variable not set");
     }
   }
 
@@ -244,7 +244,7 @@ SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv
   auto task = boost::fibers::packaged_task<scm_obj_t()>([future_obj, prompt, model_name, location, project_id]() mutable -> scm_obj_t {
     fiber_unwind_guard guard(future_obj);
 
-    assert(context::s_asio_context && "vertex-generate-content-async requires an active Asio context");
+    assert(context::s_asio_context && "generate-content-async requires an active Asio context");
 
     // Ensure GrpcContext is running
     get_grpc_context();
@@ -275,7 +275,7 @@ SUBR subr_vertex_generate_content_async(scm_obj_t self, int argc, scm_obj_t argv
     });
 
     if (!status.ok()) {
-      throw std::runtime_error("vertex-generate-content-async: Vertex AI API call failed: " + status.error_message());
+      throw std::runtime_error("generate-content-async: Vertex AI API call failed: " + status.error_message());
     }
 
     std::string generated_text;
@@ -306,6 +306,6 @@ void init_subr_vertex() {
     context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
   };
 
-  reg("vertex-generate-content", (void*)subr_vertex_generate_content, 1, true);
-  reg("vertex-generate-content-async", (void*)subr_vertex_generate_content_async, 1, true);
+  reg("generate-content", (void*)subr_generate_content, 1, true);
+  reg("generate-content-async", (void*)subr_generate_content_async, 1, true);
 }

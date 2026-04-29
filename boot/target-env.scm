@@ -324,8 +324,8 @@ vector-length
 vector-ref
 vector-set!
 vector?
-vertex-generate-content
-vertex-generate-content-async
+generate-content
+generate-content-async
 with-cpp-exception-handler
 write
 write-with-shared-structure
