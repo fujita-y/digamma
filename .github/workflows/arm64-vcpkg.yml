@@ -12,12 +12,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: [actions/checkout@v4](https://github.com)
+        uses: actions/checkout@v4
         with:
           submodules: true # Required if vcpkg is a submodule
 
       - name: Export GitHub Actions Cache Environment
-        uses: [actions/github-script@v7](https://github.com)
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
