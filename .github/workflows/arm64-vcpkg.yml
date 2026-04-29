@@ -8,13 +8,24 @@ jobs:
   build:
     runs-on: ubuntu-24.04-arm # Native GitHub ARM64 runner
     env:
-      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite' # Enables GitHub Actions caching for vcpkg
+      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: true # Required if vcpkg is a submodule
+          submodules: true
+
+      - name: Install LLVM 22
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget lsb-release software-properties-common gnupg
+          # Download and run the official LLVM setup script for version 22
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          # (Optional) Install additional LLVM 22 components if needed
+          sudo apt-get install -y clang-22 lld-22 llvm-22-dev
 
       - name: Export GitHub Actions Cache Environment
         uses: actions/github-script@v7
@@ -23,14 +34,19 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Install vcpkg (if not a submodule)
+      - name: Install vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          ./vcpkg/bootstrap-vcpkg.sh
+          if [ ! -d "vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git
+            ./vcpkg/bootstrap-vcpkg.sh
+          fi
 
       - name: Configure CMake
         run: |
+          # Point CMake to use the newly installed Clang 22
           cmake -B build \
+            -DCMAKE_C_COMPILER=clang-22 \
+            -DCMAKE_CXX_COMPILER=clang++-22 \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release
