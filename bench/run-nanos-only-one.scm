@@ -20,13 +20,15 @@
         result)))
 
 (define (run-benchmark name count ok? run-maker . args)
-  (display (format "~%;;  ~a (x~a)~%~!" (pad-space name 7) count))
+  (display (format "~%;;  ~a (x~a)~!" (pad-space name 7) count))
+	(flush-output-port (current-output-port))
   (let ((run (apply run-maker args)))
       (if warmup
           (run-bench name 1 ok? run))
       (let ((result (time (run-bench name count ok? run))))
         (and (not (ok? result)) (display (format "~%;; wrong result: ~s~%~!" result))))
       (display (format ";;  ----------------------------------------------------------------~!"))
+	    (flush-output-port (current-output-port))
       (unspecified)))
 
 (define load-bench-n-run
@@ -103,8 +105,7 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-(time-bench puzzle 24) ;; 36s
-
+(time-bench browse 600)
 (newline)
 (newline)
 

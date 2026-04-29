@@ -109,18 +109,27 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
 
   scm_obj_t list = argv[argc - 1];  // Last argument must be a list
 
-  std::vector<scm_obj_t> args;
-  for (int i = 0; i < argc - 1; i++) {
-    args.push_back(argv[i]);
-  }
-
+  int list_len = 0;
   scm_obj_t curr = list;
   while (is_cons(curr)) {
-    args.push_back(cons_car(curr));
+    list_len++;
     curr = cons_cdr(curr);
   }
   if (curr != scm_nil) [[unlikely]] {
     throw std::runtime_error("apply: last argument must be a proper list");
+  }
+
+  int total_args = (argc - 1) + list_len;
+  scm_obj_t* args = (total_args == 0) ? nullptr : (scm_obj_t*)alloca(total_args * sizeof(scm_obj_t));
+
+  for (int i = 0; i < argc - 1; i++) {
+    args[i] = argv[i];
+  }
+
+  curr = list;
+  for (int i = argc - 1; i < total_args; i++) {
+    args[i] = cons_car(curr);
+    curr = cons_cdr(curr);
   }
 
   codegen_t* cg = codegen_t::current();
@@ -129,7 +138,7 @@ extern "C" scm_obj_t c_apply_helper(scm_obj_t proc, int argc, scm_obj_t argv[]) 
   }
 
   auto bridge = cg->call_closure_bridge();
-  return (scm_obj_t)bridge(proc, args.size(), args.data());
+  return (scm_obj_t)bridge(proc, total_args, args);
 }
 
 extern "C" scm_obj_t c_call_closure_thunk_0(scm_obj_t proc) {

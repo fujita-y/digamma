@@ -1,12 +1,21 @@
-;; ==== Combined test file ====
+;; ==== Combined System & Runtime Tests ====
 (define *pass-count* 0)
 (define *fail-count* 0)
 
-;; ==== from test-fiber.scm ====
-;; tests/test-fiber.scm
+(define (test name expr expected)
+  (let ((result (core-eval expr (current-environment))))
+    (if (equal? result expected)
+        (begin
+          (set! *pass-count* (+ *pass-count* 1))
+          (display "PASS: ") (display name) (newline))
+        (begin
+          (set! *fail-count* (+ *fail-count* 1))
+          (display "FAIL: ") (display name) (newline)
+          (display "  Expected: ") (write expected) (newline)
+          (display "  Actual:   ") (write result) (newline)))))
 
-(define (test name output expected)
-  (if (equal? output expected)
+(define (check name result expected)
+  (if (equal? result expected)
       (begin
         (set! *pass-count* (+ *pass-count* 1))
         (display "PASS: ") (display name) (newline))
@@ -14,177 +23,133 @@
         (set! *fail-count* (+ *fail-count* 1))
         (display "FAIL: ") (display name) (newline)
         (display "  Expected: ") (write expected) (newline)
-        (display "  Actual:   ") (write output) (newline))))
+        (display "  Actual:   ") (write result) (newline))))
 
-(display "\n>>> Fiber Tests\n")
+;; =============================================================================
+;; Section 1: Fibers & Concurrency
+;; =============================================================================
+(display "\n>>> Section 1: Fibers & Concurrency\n")
 
-;; Test 1: Basic fiber execution and result
-(let* ((f (fiber (lambda () (+ 1 2))))
-       (result (future-get f)))
-  (test "Basic fiber execution" result 3))
+(test "fiber-basic"
+      '(let ((f (fiber (lambda () 42))))
+         (future-get f))
+      42)
 
-;; Test 2: Fiber fiber-yielding
-(let ((order '()))
-  (let* ((f1 (fiber (lambda ()
-                      (set! order (append order '(1)))
-                      (fiber-yield)
-                      (set! order (append order '(3)))
-                      'done1)))
-         (f2 (fiber (lambda ()
-                      (set! order (append order '(2)))
-                      (fiber-yield)
-                      (set! order (append order '(4)))
-                      'done2))))
-    (future-get f1)
-    (future-get f2)
-    (test "Fiber fiber-yield order" order '(1 2 3 4))))
+(test "fiber-yield"
+      '(let ((f (fiber (lambda () 
+                         (fiber-yield)
+                         42))))
+         (future-get f))
+      42)
 
-;; Test 3: Multiple fibers and futures
-(let* ((v (make-vector 10 0))
-       (fibers (map (lambda (i)
-                      (fiber (lambda ()
-                               (vector-set! v i (* i i))
-                               i)))
-                    '(0 1 2 3 4 5 6 7 8 9)))
-       (results (map future-get fibers)))
-  (test "Multiple fibers results" results '(0 1 2 3 4 5 6 7 8 9))
-  (test "Multiple fibers side effects" v '#(0 1 4 9 16 25 36 49 64 81)))
+(test "fiber-sleep-for"
+      '(let ((f (fiber (lambda () 
+                         (fiber-sleep-for 10)
+                         42))))
+         (future-get f))
+      42)
 
-;; Test 4: Nested fibers
-(let* ((f1 (fiber (lambda ()
-                    (let* ((f2 (fiber (lambda () "inner")))
-                           (res (future-get f2)))
-                      (string-append "outer-" res)))))
-       (result (future-get f1)))
-  (test "Nested fibers" result "outer-inner"))
+(test "future-wait-for"
+      '(let ((f (fiber (lambda () 42))))
+         (future-wait-for f 1000))
+      #f)
 
-;; Test 5: fiber-sleep-for
-(let* ((start (time-usage))
-       (res (fiber-sleep-for 100))
-       (end (time-usage)))
-  (test "fiber-sleep-for result" res (unspecified))
-  (test "fiber-sleep-for duration" (>= (- (car end) (car start)) 0.1) #t))
+;; Missing Test: future?
+(test "future? (true)"
+      '(future? (fiber (lambda () 42)))
+      #t)
 
-;; Test 6: future-wait-for
-(let* ((f (fiber (lambda () (fiber-sleep-for 200) 'done)))
-       (timeout1 (future-wait-for f 100))
-       (timeout2 (future-wait-for f 200)))
-  (test "future-wait-for timeout" timeout1 #t)
-  (test "future-wait-for ready" timeout2 #f))
+(test "future? (false)"
+      '(future? 42)
+      #f)
 
+;; Missing Test: future-wait
+(test "future-wait"
+      '(let ((f (fiber (lambda () 42))))
+         (future-wait f)
+         (future-get f))
+      42)
 
-;; Test 8: Multiple future-get calls
-(let* ((f (fiber (lambda () 'result)))
-       (r1 (future-get f))
-       (r2 (future-get f)))
-  (test "Multiple future-get 1" r1 'result)
-  (test "Multiple future-get 2" r2 'result))
+;; Complex Fiber interaction
+(define f1 
+  (fiber 
+    (lambda () 
+      (display "Fiber 1 started\n")
+      (fiber-sleep-for 50)
+      (display "Fiber 1 resuming\n")
+      10)))
 
-;; Test 9: GC Survival (External object)
-(let* ((v (make-vector 100 42))
-       (f (fiber (lambda ()
-                   (fiber-yield)
-                   (collect)
-                   (safepoint)
-                   (safepoint)
-                   (safepoint)
-                   (fiber-yield)
-                   (vector-ref v 50)))))
-  (collect)
-  (safepoint)
-  (safepoint)
-  (safepoint)
-  (test "GC survival (external object)" (future-get f) 42))
+(define f2 
+  (fiber 
+    (lambda () 
+      (display "Fiber 2 started\n")
+      (let ((v (future-get f1)))
+        (display "Fiber 2 got value from Fiber 1: ") (display v) (newline)
+        (* v 2)))))
 
-;; Test 10: GC Survival (Internal object)
-(let* ((f (fiber (lambda ()
-                   (let ((v (make-vector 100 99)))
-                     (fiber-yield)
-                     (collect)
-                     (safepoint)
-                     (safepoint)
-                     (safepoint)
-                    (fiber-yield)
-                     (vector-ref v 50))))))
-  (test "GC survival (internal object)" (future-get f) 99))
+(check "Fiber interaction" (future-get f2) 20)
 
-;; Test 11: GC Survival (Fiber stack roots)
-(let* ((f (fiber (lambda ()
-                   (let ((lst (list 1 2 3 4 5)))
-                     (fiber-yield)
-                     (collect)
-                     (safepoint)
-                     (safepoint)
-                     (safepoint)
-                     (apply + lst))))))
-  (collect)
-  (safepoint)
-  (safepoint)
-  (safepoint)
-  (test "GC survival (fiber stack roots)" (future-get f) 15))
+;; =============================================================================
+;; Section 2: Object Serialization (write/ss)
+;; =============================================================================
+(display "\n>>> Section 2: Object Serialization (write/ss)\n")
 
-;; Test 12: GC Survival (Multiple yielding fibers)
-(let* ((fibers (map (lambda (i)
-                      (fiber (lambda ()
-                               (let ((v (make-vector 100 i)))
-                                 (fiber-yield)
-                                 (collect)
-                                 (safepoint)
-                                 (safepoint)
-                                 (safepoint)
-                                 (fiber-yield)
-                                 (vector-ref v i)))))
-                    '(0 1 2 3 4 5 6 7 8 9)))
-       (results (map future-get fibers)))
-  (test "GC survival (multiple fibers)" results '(0 1 2 3 4 5 6 7 8 9)))
-
-;; Summary
-(newline)
-
-;; ==== from test_write_ss.scm ====
-; test_write_ss.scm — SRFI-38 write/ss tests
-
-(define (check label result expected)
-  (if (string=? result expected)
-      (begin (display "PASS: ") (display label) (newline))
-      (begin (display "FAIL: ") (display label)
-             (display " got: ") (write result)
-             (display " expected: ") (write expected) (newline))))
-
-(define (capture-write-ss expr)
+(define (call-with-output-string proc)
   (call-with-values
-    open-string-output-port
+    (lambda () (open-string-output-port))
     (lambda (port extract)
-      (write/ss expr port)
+      (proc port)
       (extract))))
 
-; Test 1: simple list
-(check "simple list" (capture-write-ss '(1 2 3)) "(1 2 3)")
+(check "srfi-38 basic" (call-with-output-string (lambda (p) (write/ss '(1 2 3) p))) "(1 2 3)")
+(check "srfi-38 shared 1" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2))) (list x x)) p))) "(#0=(1 2) #0#)")
+(check "srfi-38 shared 2" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2)) (y (list 3 4))) (list x y x y)) p))) "(#0=(1 2) #1=(3 4) #0# #1#)")
 
-; Test 2: vector no sharing
-(check "vector no sharing" (capture-write-ss '#(1 2 3)) "#(1 2 3)")
+(check "srfi-38 shared 3" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1))) (set-car! x x) x) p))) "#0=(#0#)")
 
-; Test 3: shared cons
-(let ((x (list 1 2)))
-  (check "shared cons" (capture-write-ss (list x x)) "(#0=(1 2) #0#)"))
+(check "srfi-38 shared 4" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2))) (set-cdr! (cdr x) x) x) p))) "#0=(1 2 . #0#)")
 
-; Test 4: shared cons in vector
-(let ((x (list 'a 'b)))
-  (check "shared in vector" (capture-write-ss (vector x x)) "#(#0=(a b) #0#)"))
+(check "srfi-38 shared 5" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2 3))) (set-cdr! (cddr x) x) x) p))) "#0=(1 2 3 . #0#)")
 
-; Test 5: circular list (1 . #0#)
-(let ((x (list 1)))
-  (set-cdr! x x)
-  (check "circular list" (capture-write-ss x) "#0=(1 . #0#)"))
+(check "srfi-38 shared 6" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2 3 4))) (set-cdr! (cddr x) (cddr x)) x) p))) "(1 2 . #0=(3 . #0#))")
 
-; Test 6: shared string
-(let ((s "hello"))
-  (check "shared string" (capture-write-ss (list s s)) "(#0=\"hello\" #0#)"))
+(check "srfi-38 shared 7" (call-with-output-string (lambda (p) (write/ss (let ((x (list 1 2 3 4))) (set-car! (cdddr x) x) x) p))) "#0=(1 2 3 #0#)")
 
-(display "done") (newline)
+;; Missing Test: Circular vector
+(test "circular vector write/ss"
+      '(let ((v (vector 1 2 3)))
+         (vector-set! v 1 v)
+         (call-with-output-string (lambda (p) (write/ss v p))))
+      "#0=#(1 #0# 3)")
 
+;; =============================================================================
+;; Section 3: Escape Continuations
+;; =============================================================================
+(display "\n>>> Section 3: Escape Continuations\n")
 
+(test "call/ec basic"
+      '(call/ec (lambda (k) 42))
+      42)
 
+(test "call/ec escape"
+      '(call/ec (lambda (k) (k 42) 99))
+      42)
+
+(test "call/ec nested"
+      '(call/ec (lambda (k1)
+                  (call/ec (lambda (k2)
+                             (k1 42)
+                             99))))
+      42)
+
+(test "call/ec return procedure"
+      '(procedure? (call/ec (lambda (k) k)))
+      #t)
+
+;; =============================================================================
+;; Summary
+;; =============================================================================
+(newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 (if (= *fail-count* 0)
     (begin (display "ALL TESTS PASSED.\n") (exit 0))

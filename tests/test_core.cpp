@@ -11,6 +11,7 @@
 #include "../src/list.h"
 #include "../src/object.h"
 #include "../src/object_heap.h"
+#include "../src/equiv.h"
 #include "context.h"
 #include "object_heap.h"
 #include "subr.h"
@@ -876,183 +877,116 @@ int run_test(int argc, char** argv) {
 
 }  // namespace test_symbol
 
-namespace test_arith {
+namespace test_equiv {
 // Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 // See LICENSE file for terms and conditions of use.
 
-// ---------------------------------------------------------------------------
-// Stubs
-// ---------------------------------------------------------------------------
+#define ASSERT_TRUE(expr)                       \
+  if (!(expr)) {                                \
+    printf("\033[31mFAIL: %s\033[0m\n", #expr); \
+    some_test_failed = true;                    \
+  } else {                                      \
+    printf("\033[32mPASS: %s\033[0m\n", #expr); \
+  }
 
-// ---------------------------------------------------------------------------
-// Test infrastructure
-// ---------------------------------------------------------------------------
+#define ASSERT_FALSE(expr)                         \
+  if ((expr)) {                                    \
+    printf("\033[31mFAIL: !(%s)\033[0m\n", #expr); \
+    some_test_failed = true;                       \
+  } else {                                         \
+    printf("\033[32mPASS: !(%s)\033[0m\n", #expr); \
+  }
 
-#define ASSERT_TRUE(expr)                         \
-  do {                                            \
-    if (!(expr)) {                                \
-      printf("\033[31mFAIL: %s\033[0m\n", #expr); \
-      some_test_failed = true;                    \
-    } else {                                      \
-      printf("\033[32mPASS: %s\033[0m\n", #expr); \
-    }                                             \
-  } while (0)
-
-#define ASSERT_FALSE(expr)                           \
-  do {                                               \
-    if ((expr)) {                                    \
-      printf("\033[31mFAIL: !(%s)\033[0m\n", #expr); \
-      some_test_failed = true;                       \
-    } else {                                         \
-      printf("\033[32mPASS: !(%s)\033[0m\n", #expr); \
-    }                                                \
-  } while (0)
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-void test_add() {
-  printf("--- addition (+ ...) ---\n");
-
-  auto add = [](std::vector<scm_obj_t> args) { return subr_num_add(scm_nil, (int)args.size(), args.data()); };
-
-  // (+) -> 0
-  ASSERT_TRUE(add({}) == make_fixnum(0));
-
-  // (+ 5) -> 5
-  ASSERT_TRUE(add({make_fixnum(5)}) == make_fixnum(5));
-
-  // (+ 1 2 3) -> 6
-  ASSERT_TRUE(add({make_fixnum(1), make_fixnum(2), make_fixnum(3)}) == make_fixnum(6));
-
-  // (+ 1.5 2.5) -> 4.0
-  scm_obj_t res = add({make_flonum(1.5), make_flonum(2.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 4.0);
-
-  // Mixed: (+ 1 2.5) -> 3.5
-  res = add({make_fixnum(1), make_flonum(2.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 3.5);
+unsigned int test_address_hash(scm_obj_t obj, unsigned int bound) {
+  return (((uintptr_t)obj >> 3) * 2654435761U + ((uintptr_t)obj & 7)) % bound;
 }
 
-void test_sub() {
-  printf("--- subtraction (- ...) ---\n");
+bool test_address_equiv(scm_obj_t obj1, scm_obj_t obj2) { return obj1 == obj2; }
 
-  auto sub = [](std::vector<scm_obj_t> args) { return subr_num_sub(scm_nil, (int)args.size(), args.data()); };
-
-  // (- 10) -> -10
-  ASSERT_TRUE(sub({make_fixnum(10)}) == make_fixnum(-10));
-
-  // (- 10 3 2) -> 5
-  ASSERT_TRUE(sub({make_fixnum(10), make_fixnum(3), make_fixnum(2)}) == make_fixnum(5));
-
-  // (- 5.5 1.5) -> 4.0
-  scm_obj_t res = sub({make_flonum(5.5), make_flonum(1.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 4.0);
-
-  // Mixed: (- 10 2.5) -> 7.5
-  res = sub({make_fixnum(10), make_flonum(2.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 7.5);
+void test_eqv_simple() {
+  printf("test_eqv_simple\n");
+  ASSERT_TRUE(eqv_p(scm_true, scm_true));
+  ASSERT_FALSE(eqv_p(scm_true, scm_false));
+  ASSERT_TRUE(eqv_p(make_fixnum(123), make_fixnum(123)));
+  ASSERT_FALSE(eqv_p(make_fixnum(123), make_fixnum(124)));
+  ASSERT_TRUE(eqv_p(scm_nil, scm_nil));
+  ASSERT_FALSE(eqv_p(scm_nil, scm_undef));
 }
 
-void test_mul() {
-  printf("--- multiplication (* ...) ---\n");
+void test_eqv_flonum() {
+  printf("test_eqv_flonum\n");
+  // Short flonum (if fits)
+  ASSERT_TRUE(eqv_p(make_flonum(1.5), make_flonum(1.5)));
+  ASSERT_FALSE(eqv_p(make_flonum(1.5), make_flonum(1.6)));
 
-  auto mul = [](std::vector<scm_obj_t> args) { return subr_num_mul(scm_nil, (int)args.size(), args.data()); };
+  // Long flonum
+  scm_obj_t f1 = make_flonum(1.23e100);
+  scm_obj_t f2 = make_flonum(1.23e100);
+  ASSERT_TRUE(eqv_p(f1, f2));
+  ASSERT_FALSE(eqv_p(f1, make_flonum(1.24e100)));
 
-  // (*) -> 1
-  ASSERT_TRUE(mul({}) == make_fixnum(1));
-
-  // (* 5) -> 5
-  ASSERT_TRUE(mul({make_fixnum(5)}) == make_fixnum(5));
-
-  // (* 2 3 4) -> 24
-  ASSERT_TRUE(mul({make_fixnum(2), make_fixnum(3), make_fixnum(4)}) == make_fixnum(24));
-
-  // (* 2.5 4.0) -> 10.0
-  scm_obj_t res = mul({make_flonum(2.5), make_flonum(4.0)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 10.0);
-
-  // Mixed: (* 2 2.5) -> 5.0
-  res = mul({make_fixnum(2), make_flonum(2.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 5.0);
+  ASSERT_TRUE(eqv_p(make_flonum(0.0), make_flonum(-0.0)));
 }
 
-void test_div() {
-  printf("--- division (/ ...) ---\n");
+void test_equal_list(object_heap_t* heap) {
+  printf("test_equal_list\n");
+  scm_obj_t l1 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
+  scm_obj_t l2 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(3));
+  scm_obj_t l3 = make_list(3, make_fixnum(1), make_fixnum(2), make_fixnum(4));
 
-  auto div = [](std::vector<scm_obj_t> args) { return subr_num_div(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(equal_p(l1, l2));
 
-  // (/ 4) -> 1/4 (in this implementation it returns 0 for fixnum 1/4 because it's integer division for fixnums)
-  // Wait, let's check the implementation again.
-  // 168:     return make_fixnum(1 / res_i);
-  // So (/ 4) returns 0.
-  ASSERT_TRUE(div({make_fixnum(4)}) == make_fixnum(0));
-
-  // (/ 24 2 3) -> 4
-  ASSERT_TRUE(div({make_fixnum(24), make_fixnum(2), make_fixnum(3)}) == make_fixnum(4));
-
-  // (/ 10.0 4.0) -> 2.5
-  scm_obj_t res = div({make_flonum(10.0), make_flonum(4.0)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 2.5);
-
-  // Mixed: (/ 10 2.5) -> 4.0
-  res = div({make_fixnum(10), make_flonum(2.5)});
-  ASSERT_TRUE(is_flonum(res));
-  ASSERT_TRUE(flonum(res) == 4.0);
+  ASSERT_FALSE(equal_p(l1, l3));
 }
 
-void test_cmp() {
-  printf("--- comparisons (= < > <= >=) ---\n");
+void test_equal_vector(object_heap_t* heap) {
+  printf("test_equal_vector\n");
+  scm_obj_t v1 = make_vector(3, make_fixnum(0));
+  scm_obj_t v2 = make_vector(3, make_fixnum(0));
+  scm_obj_t v3 = make_vector(3, make_fixnum(1));
+  scm_obj_t* elts1 = vector_elts(v1);
+  scm_obj_t* elts2 = vector_elts(v2);
+  elts1[0] = make_fixnum(10);
+  elts2[0] = make_fixnum(10);
 
-  auto eq = [](std::vector<scm_obj_t> args) { return subr_num_eq(scm_nil, (int)args.size(), args.data()); };
-  auto lt = [](std::vector<scm_obj_t> args) { return subr_num_lt(scm_nil, (int)args.size(), args.data()); };
-  auto gt = [](std::vector<scm_obj_t> args) { return subr_num_gt(scm_nil, (int)args.size(), args.data()); };
-  auto le = [](std::vector<scm_obj_t> args) { return subr_num_le(scm_nil, (int)args.size(), args.data()); };
-  auto ge = [](std::vector<scm_obj_t> args) { return subr_num_ge(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(equal_p(v1, v2));
 
-  // =
-  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5)}) == scm_true);
-  ASSERT_TRUE(eq({make_fixnum(5), make_flonum(5.0)}) == scm_true);
-  ASSERT_TRUE(eq({make_flonum(5.0), make_fixnum(5)}) == scm_true);
-  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(6)}) == scm_false);
-  ASSERT_TRUE(eq({make_fixnum(5), make_flonum(5.1)}) == scm_false);
-  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5), make_fixnum(5)}) == scm_true);
-  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5), make_flonum(5.0)}) == scm_true);
+  ASSERT_FALSE(equal_p(v1, v3));
+}
 
-  // <
-  ASSERT_TRUE(lt({make_fixnum(1), make_fixnum(2), make_fixnum(3)}) == scm_true);
-  ASSERT_TRUE(lt({make_fixnum(1), make_fixnum(3), make_fixnum(2)}) == scm_false);
-  ASSERT_TRUE(lt({make_fixnum(1), make_flonum(1.5), make_fixnum(2)}) == scm_true);
-  ASSERT_TRUE(lt({make_flonum(1.0), make_fixnum(2)}) == scm_true);
-  ASSERT_TRUE(lt({make_fixnum(2), make_flonum(1.0)}) == scm_false);
+void test_equal_string(object_heap_t* heap) {
+  printf("test_equal_string\n");
+  scm_obj_t s1 = make_string("hello");
+  scm_obj_t s2 = make_string("hello");
+  scm_obj_t s3 = make_string("world");
 
-  // >
-  ASSERT_TRUE(gt({make_fixnum(3), make_fixnum(2), make_fixnum(1)}) == scm_true);
-  ASSERT_TRUE(gt({make_fixnum(3), make_fixnum(1), make_fixnum(2)}) == scm_false);
-  ASSERT_TRUE(gt({make_flonum(3.5), make_fixnum(3)}) == scm_true);
-  ASSERT_TRUE(gt({make_fixnum(3), make_flonum(3.5)}) == scm_false);
+  ASSERT_TRUE(equal_p(s1, s2));
 
-  // <=
-  ASSERT_TRUE(le({make_fixnum(1), make_fixnum(2), make_fixnum(2), make_fixnum(3)}) == scm_true);
-  ASSERT_TRUE(le({make_fixnum(1), make_fixnum(3), make_fixnum(2)}) == scm_false);
-  ASSERT_TRUE(le({make_fixnum(2), make_flonum(2.0)}) == scm_true);
-  ASSERT_TRUE(le({make_flonum(2.0), make_fixnum(2)}) == scm_true);
-  ASSERT_TRUE(le({make_fixnum(2), make_flonum(2.1)}) == scm_true);
+  ASSERT_FALSE(equal_p(s1, s3));
+}
 
-  // >=
-  ASSERT_TRUE(ge({make_fixnum(3), make_fixnum(2), make_fixnum(2), make_fixnum(1)}) == scm_true);
-  ASSERT_TRUE(ge({make_fixnum(3), make_fixnum(1), make_fixnum(2)}) == scm_false);
-  ASSERT_TRUE(ge({make_fixnum(2), make_flonum(2.0)}) == scm_true);
-  ASSERT_TRUE(ge({make_flonum(2.0), make_fixnum(2)}) == scm_true);
-  ASSERT_TRUE(ge({make_flonum(2.1), make_fixnum(2)}) == scm_true);
+void test_equal_circular(object_heap_t* heap) {
+  printf("test_equal_circular\n");
+  // l1 = (1 . #0)
+  scm_obj_t pair1 = make_cons(make_fixnum(1), scm_nil);
+  ((scm_cons_rec_t*)pair1)->cdr = pair1;
+
+  // l2 = (1 . #0)
+  scm_obj_t pair2 = make_cons(make_fixnum(1), scm_nil);
+  ((scm_cons_rec_t*)pair2)->cdr = pair2;
+
+  // l3 = (1 . 1 . #0)
+  scm_obj_t pair3 = make_cons(make_fixnum(1), scm_nil);
+  scm_obj_t pair3_head = make_cons(make_fixnum(1), pair3);
+  ((scm_cons_rec_t*)pair3)->cdr = pair3_head;
+
+  scm_obj_t visited = make_hashtable(test_address_hash, test_address_equiv, 16);
+
+  ASSERT_TRUE(equal_p(pair1, pair2));
+
+  // Reset visited for next check
+  visited = make_hashtable(test_address_hash, test_address_equiv, 16);
+  ASSERT_TRUE(equal_p(pair1, pair3_head));
 }
 
 int run_test(int argc, char** argv) {
@@ -1060,26 +994,21 @@ int run_test(int argc, char** argv) {
   heap->init(1024 * 1024 * 2, 1024 * 1024);
   context::init();
 
-  test_add();
-  test_sub();
-  test_mul();
-  test_div();
-  test_cmp();
+  test_eqv_simple();
+  test_eqv_flonum();
+
+  test_equal_list(heap);
+  test_equal_vector(heap);
+  test_equal_string(heap);
+  test_equal_circular(heap);
 
   context::destroy();
   heap->destroy();
   delete heap;
-
-  if (some_test_failed) {
-    printf("\n\033[31mSOME TESTS FAILED\033[0m\n");
-    return 1;
-  } else {
-    printf("\n\033[32mALL TESTS PASSED\033[0m\n");
-    return 0;
-  }
+  return some_test_failed ? 1 : 0;
 }
 
-}  // namespace test_arith
+}  // namespace test_equiv
 
 int main(int argc, char** argv) {
   test_object::run_test(argc, argv);
@@ -1087,6 +1016,8 @@ int main(int argc, char** argv) {
   test_list::run_test(argc, argv);
   test_hash::run_test(argc, argv);
   test_symbol::run_test(argc, argv);
-  test_arith::run_test(argc, argv);
+  test_equiv::run_test(argc, argv);
   return some_test_failed ? 1 : 0;
 }
+
+

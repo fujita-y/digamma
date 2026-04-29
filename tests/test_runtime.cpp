@@ -62,109 +62,6 @@ void trace(const char* fmt, ...) {
 
 extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0"; }
 
-namespace test_call_cc {
-
-static bool test_return_normally() {
-  auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
-  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
-  scm_obj_t result = subr_call_cc(scm_undef, proc);
-  if (result != make_fixnum(42)) {
-    printf("\033[31m###### call/cc normal return failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32mcall/cc normal return passed\033[0m\n");
-  return true;
-}
-
-static bool test_invoke_continuation() {
-  auto invoke_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-    scm_obj_t cont = argv[0];
-    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
-    return c_apply_helper(cont, 1, args);
-  };
-  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
-  scm_obj_t result = subr_call_cc(scm_undef, proc);
-  if (result != make_fixnum(100)) {
-    printf("\033[31m###### call/cc invoke failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32mcall/cc invoke continuation passed\033[0m\n");
-  return true;
-}
-
-static bool test_multishot() {
-  static int count = 0;
-  static scm_obj_t global_cont = scm_undef;
-
-  auto multishot_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-    global_cont = argv[0];
-    context::gc_protect(global_cont);
-    return make_fixnum(count++);
-  };
-
-  scm_obj_t proc = make_closure((void*)*+(multishot_proc), 0, 1, 0, nullptr, 1);
-  printf("test_multishot: calling call/cc (initial)\n");
-  fflush(stdout);
-  scm_obj_t result = subr_call_cc(scm_undef, proc);
-  printf("test_multishot: call/cc returned result=%ld, count=%d\n", is_fixnum(result) ? fixnum(result) : -1, count);
-  fflush(stdout);
-
-  if (count < 3) {
-    printf("test_multishot: incrementing count and invoking global_cont (count=%d -> %d)\n", count, count + 1);
-    fflush(stdout);
-    int next_val = count++;  // Increment AFTER return
-    scm_obj_t args[] = {make_cons(make_fixnum(next_val), scm_nil)};
-    c_apply_helper(global_cont, 1, args);
-  }
-
-  if (count == 3 && result == make_fixnum(2)) {
-    printf("\033[32mcall/cc multishot passed\033[0m\n");
-    return true;
-  }
-
-  printf("\033[31m###### call/cc multishot failed (count=%d, result=%ld)\033[0m\n", count, is_fixnum(result) ? fixnum(result) : -1);
-  some_test_failed = true;
-  return false;
-}
-
-#ifdef __has_feature
-  #if __has_feature(hwaddress_sanitizer)
-
-  #endif
-#endif
-
-int run_test(int argc, char** argv) {
-  object_heap_t* heap = new object_heap_t();
-  heap->init(1024 * 1024 * 64, 1024 * 1024 * 16);
-  context::init();
-
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  codegen_t* codegen = nullptr;
-  {
-    auto jit_expected = nanos_jit_t::Create();
-    if (!jit_expected) exit(1);
-    auto jit = std::move(*jit_expected);
-    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-    codegen = new codegen_t(std::move(ts_ctx), jit.get());
-
-    test_return_normally();
-    test_invoke_continuation();
-    test_multishot();
-  }
-  codegen->destroy();
-  delete codegen;
-
-  context::destroy();
-  heap->destroy();
-  delete heap;
-  puts("all test done");
-  return some_test_failed ? 1 : 0;
-}
-
-}  // namespace test_call_cc
 
 namespace test_call_ec {
 
@@ -311,49 +208,6 @@ static bool test_basic_dynamic_wind() {
   return false;
 }
 
-static bool test_dynamic_wind_with_call_cc() {
-  pre_count = 0;
-  value_count = 0;
-  post_count = 0;
-  static scm_obj_t captured_cont = scm_undef;
-
-  auto value_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-    value_count++;
-    auto callcc_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-      captured_cont = argv[0];
-      context::gc_protect(captured_cont);
-      return make_fixnum(100);
-    };
-    scm_obj_t p = make_closure((void*)*+(callcc_proc), 0, 1, 0, nullptr, 1);
-    return subr_call_cc(scm_undef, p);
-  };
-
-  scm_obj_t pre = make_closure((void*)subr_pre, 0, 0, 0, nullptr, 1);
-  scm_obj_t value = make_closure((void*)*+(value_proc), 0, 0, 0, nullptr, 1);
-  scm_obj_t post = make_closure((void*)subr_post, 0, 0, 0, nullptr, 1);
-
-  scm_obj_t result = subr_dynamic_wind(scm_undef, pre, value, post);
-
-  if (result == make_fixnum(100)) {
-    if (pre_count == 1 && post_count == 1) {
-      printf("Initial dynamic-wind finished. Invoking continuation.\n");
-      scm_obj_t args[] = {make_cons(make_fixnum(200), scm_nil)};
-      c_apply_helper(captured_cont, 1, args);
-      // Unreachable!
-      fatal("unreachable");
-    }
-  } else if (result == make_fixnum(200)) {
-    if (pre_count == 2 && post_count == 2) {
-      printf("\033[32mdynamic-wind with call/cc passed\033[0m\n");
-      return true;
-    }
-  }
-
-  printf("\033[31m###### dynamic-wind with call/cc failed (pre=%d, post=%d, result=0x%lx)\033[0m\n", pre_count, post_count,
-         (unsigned long)result);
-  some_test_failed = true;
-  return false;
-}
 
 #ifdef __has_feature
   #if __has_feature(hwaddress_sanitizer)
@@ -375,7 +229,6 @@ int run_test(int argc, char** argv) {
   codegen_t* cg = new codegen_t(std::move(ts_ctx), jit.get());
 
   test_basic_dynamic_wind();
-  test_dynamic_wind_with_call_cc();
 
   delete cg;
   context::destroy();
@@ -449,13 +302,52 @@ SUBR subr_char_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_char_le(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_char_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_alphabetic_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_whitespace_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_upper_case_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_lower_case_p(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_to_integer(scm_obj_t self, scm_obj_t a1);
+SUBR subr_integer_to_char(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_upcase(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_downcase(scm_obj_t self, scm_obj_t a1);
+SUBR subr_char_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_char_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_make_string(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_to_list(scm_obj_t self, scm_obj_t a1);
+SUBR subr_list_to_string(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_copy(scm_obj_t self, scm_obj_t a1);
+SUBR subr_string_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_string_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_error(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_assertion_violation(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_syntax_violation(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_caar(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cadar(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cddr(scm_obj_t self, scm_obj_t a1);
 SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1);
 SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
+SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_length(scm_obj_t self, scm_obj_t a1);
 SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1);
@@ -1070,6 +962,42 @@ void test_string_compare() {
   PRED_VAR_FALSE(subr_string_ge, make_string("a"), make_string("b"));
 }
 
+void test_string_extra() {
+  printf("--- string extra procedures ---\n");
+  {
+    scm_obj_t args[] = {make_fixnum(3), make_char('a')};
+    scm_obj_t s = subr_make_string(scm_nil, 2, args);
+    ASSERT_TRUE(is_string(s));
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "aaa") == 0);
+  }
+  {
+    scm_obj_t args[] = {make_char('x'), make_char('y')};
+    scm_obj_t s = subr_string(scm_nil, 2, args);
+    ASSERT_TRUE(is_string(s));
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "xy") == 0);
+  }
+  {
+    scm_obj_t s = make_string("abc");
+    scm_obj_t l = subr_string_to_list(scm_nil, s);
+    ASSERT_TRUE(subr_length(scm_nil, l) == make_fixnum(3));
+    ASSERT_TRUE(subr_list_ref(scm_nil, l, make_fixnum(0)) == make_char('a'));
+    scm_obj_t s2 = subr_list_to_string(scm_nil, l);
+    ASSERT_TRUE(strcmp((const char*)string_name(s2), "abc") == 0);
+  }
+  {
+    scm_obj_t s1 = make_string("abc");
+    scm_obj_t s2 = subr_string_copy(scm_nil, s1);
+    ASSERT_TRUE(s1 != s2);
+    ASSERT_TRUE(strcmp((const char*)string_name(s1), (const char*)string_name(s2)) == 0);
+  }
+  PRED_VAR_TRUE(subr_string_ci_eq, make_string("abc"), make_string("ABC"));
+  PRED_VAR_TRUE(subr_string_ci_lt, make_string("ABC"), make_string("abd"));
+  PRED_VAR_TRUE(subr_string_ci_gt, make_string("abd"), make_string("ABC"));
+  PRED_VAR_TRUE(subr_string_ci_le, make_string("abc"), make_string("ABC"));
+  PRED_VAR_TRUE(subr_string_ci_ge, make_string("ABC"), make_string("abc"));
+}
+
+
 // ---------------------------------------------------------------------------
 // string-append  — R6RS §9.14
 // ---------------------------------------------------------------------------
@@ -1260,6 +1188,38 @@ void test_char_numeric_p() {
   PRED_FALSE(subr_char_numeric_p, make_char(':'));  // ':' is one after '9'
 }
 
+void test_char_extra() {
+  printf("--- char extra predicates & conversions ---\n");
+  PRED_TRUE(subr_char_alphabetic_p, make_char('a'));
+  PRED_TRUE(subr_char_alphabetic_p, make_char('Z'));
+  PRED_FALSE(subr_char_alphabetic_p, make_char('0'));
+
+  PRED_TRUE(subr_char_whitespace_p, make_char(' '));
+  PRED_TRUE(subr_char_whitespace_p, make_char('\n'));
+  PRED_FALSE(subr_char_whitespace_p, make_char('a'));
+
+  PRED_TRUE(subr_char_upper_case_p, make_char('A'));
+  PRED_FALSE(subr_char_upper_case_p, make_char('a'));
+
+  PRED_TRUE(subr_char_lower_case_p, make_char('a'));
+  PRED_FALSE(subr_char_lower_case_p, make_char('A'));
+
+  scm_obj_t c2i = subr_char_to_integer(scm_nil, make_char('A'));
+  ASSERT_TRUE(c2i == make_fixnum(65));
+  scm_obj_t i2c = subr_integer_to_char(scm_nil, make_fixnum(65));
+  ASSERT_TRUE(i2c == make_char('A'));
+
+  ASSERT_TRUE(subr_char_upcase(scm_nil, make_char('a')) == make_char('A'));
+  ASSERT_TRUE(subr_char_downcase(scm_nil, make_char('A')) == make_char('a'));
+
+  PRED_VAR_TRUE(subr_char_ci_eq, make_char('a'), make_char('A'));
+  PRED_VAR_TRUE(subr_char_ci_lt, make_char('a'), make_char('B'));
+  PRED_VAR_TRUE(subr_char_ci_gt, make_char('B'), make_char('a'));
+  PRED_VAR_TRUE(subr_char_ci_le, make_char('a'), make_char('A'));
+  PRED_VAR_TRUE(subr_char_ci_ge, make_char('A'), make_char('a'));
+}
+
+
 // ---------------------------------------------------------------------------
 // max  — R6RS §9.9.3.2
 // ---------------------------------------------------------------------------
@@ -1301,6 +1261,39 @@ void test_max() {
   // Negative values
   ASSERT_TRUE(max2(make_fixnum(-3), make_fixnum(-1)) == make_fixnum(-1));
 }
+
+void test_min() {
+  printf("--- min ---\n");
+  auto min1 = [](scm_obj_t a) {
+    scm_obj_t args[] = {a};
+    return subr_min(scm_nil, 1, args);
+  };
+  auto min2 = [](scm_obj_t a, scm_obj_t b) {
+    scm_obj_t args[] = {a, b};
+    return subr_min(scm_nil, 2, args);
+  };
+  auto min3 = [](scm_obj_t a, scm_obj_t b, scm_obj_t c) {
+    scm_obj_t args[] = {a, b, c};
+    return subr_min(scm_nil, 3, args);
+  };
+
+  ASSERT_TRUE(min1(make_fixnum(5)) == make_fixnum(5));
+  ASSERT_TRUE(min2(make_fixnum(3), make_fixnum(7)) == make_fixnum(3));
+  ASSERT_TRUE(min2(make_fixnum(7), make_fixnum(3)) == make_fixnum(3));
+  ASSERT_TRUE(min2(make_fixnum(-1), make_fixnum(0)) == make_fixnum(-1));
+  ASSERT_TRUE(min3(make_fixnum(1), make_fixnum(3), make_fixnum(2)) == make_fixnum(1));
+
+  scm_obj_t r_ff = min2(make_flonum(1.5), make_flonum(2.5));
+  ASSERT_TRUE(is_short_flonum(r_ff) || is_long_flonum(r_ff));
+  ASSERT_TRUE(flonum(r_ff) == 1.5);
+
+  scm_obj_t r_mix = min2(make_fixnum(5), make_flonum(3.0));
+  ASSERT_TRUE(is_short_flonum(r_mix) || is_long_flonum(r_mix));
+  ASSERT_TRUE(flonum(r_mix) == 3.0);
+
+  ASSERT_TRUE(min2(make_fixnum(-3), make_fixnum(-1)) == make_fixnum(-3));
+}
+
 
 // ---------------------------------------------------------------------------
 // pairs & lists (extra)
@@ -1367,6 +1360,40 @@ void test_pairs_lists_extra() {
   scm_obj_t p = make_cons(make_fixnum(10), make_fixnum(20));
   subr_set_car(scm_nil, p, make_fixnum(99));
   ASSERT_TRUE(cons_car(p) == make_fixnum(99));
+  // set-cdr!
+  subr_set_cdr(scm_nil, p, make_fixnum(88));
+  ASSERT_TRUE(cons_cdr(p) == make_fixnum(88));
+
+  // append
+  {
+    scm_obj_t l1 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil));
+    scm_obj_t l2 = make_cons(make_fixnum(3), make_cons(make_fixnum(4), scm_nil));
+    scm_obj_t args[] = {l1, l2};
+    scm_obj_t app = subr_append(scm_nil, 2, args);
+    ASSERT_TRUE(subr_length(scm_nil, app) == make_fixnum(4));
+    ASSERT_TRUE(subr_list_ref(scm_nil, app, make_fixnum(0)) == make_fixnum(1));
+    ASSERT_TRUE(subr_list_ref(scm_nil, app, make_fixnum(3)) == make_fixnum(4));
+  }
+
+  // assv
+  {
+    scm_obj_t alist_v = make_cons(make_cons(make_fixnum(1), make_symbol("a")), 
+                                  make_cons(make_cons(make_flonum(2.0), make_symbol("b")), scm_nil));
+    scm_obj_t av1 = subr_assv(scm_nil, make_fixnum(1), alist_v);
+    ASSERT_TRUE(is_cons(av1) && cons_cdr(av1) == make_symbol("a"));
+    scm_obj_t av2 = subr_assv(scm_nil, make_flonum(2.0), alist_v);
+    ASSERT_TRUE(is_cons(av2) && cons_cdr(av2) == make_symbol("b"));
+  }
+
+  // c...r
+  {
+    ASSERT_TRUE(subr_caar(scm_nil, make_cons(make_cons(make_fixnum(1), make_fixnum(2)), make_fixnum(3))) == make_fixnum(1));
+    ASSERT_TRUE(subr_cadar(scm_nil, make_cons(make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil)), make_fixnum(3))) == make_fixnum(2));
+    
+    scm_obj_t l4 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), make_cons(make_fixnum(3), make_cons(make_fixnum(4), scm_nil))));
+    ASSERT_TRUE(subr_cadddr(scm_nil, l4) == make_fixnum(4));
+    ASSERT_TRUE(cons_car(subr_cdddr(scm_nil, l4)) == make_fixnum(4));
+  }
 
   // list
   {
@@ -2148,6 +2175,121 @@ void test_make_u8vector_mapping() {
   ASSERT_TRUE(u8vector_elts(v)[2] == 30);
 }
 
+void test_add() {
+  printf("--- addition (+ ...) ---\n");
+  auto add = [](std::vector<scm_obj_t> args) { return subr_num_add(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(add({}) == make_fixnum(0));
+  ASSERT_TRUE(add({make_fixnum(5)}) == make_fixnum(5));
+  ASSERT_TRUE(add({make_fixnum(1), make_fixnum(2), make_fixnum(3)}) == make_fixnum(6));
+  scm_obj_t res = add({make_flonum(1.5), make_flonum(2.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 4.0);
+  res = add({make_fixnum(1), make_flonum(2.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 3.5);
+}
+
+void test_sub() {
+  printf("--- subtraction (- ...) ---\n");
+  auto sub = [](std::vector<scm_obj_t> args) { return subr_num_sub(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(sub({make_fixnum(10)}) == make_fixnum(-10));
+  ASSERT_TRUE(sub({make_fixnum(10), make_fixnum(3), make_fixnum(2)}) == make_fixnum(5));
+  scm_obj_t res = sub({make_flonum(5.5), make_flonum(1.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 4.0);
+  res = sub({make_fixnum(10), make_flonum(2.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 7.5);
+}
+
+void test_mul() {
+  printf("--- multiplication (* ...) ---\n");
+  auto mul = [](std::vector<scm_obj_t> args) { return subr_num_mul(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(mul({}) == make_fixnum(1));
+  ASSERT_TRUE(mul({make_fixnum(5)}) == make_fixnum(5));
+  ASSERT_TRUE(mul({make_fixnum(2), make_fixnum(3), make_fixnum(4)}) == make_fixnum(24));
+  scm_obj_t res = mul({make_flonum(2.5), make_flonum(4.0)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 10.0);
+  res = mul({make_fixnum(2), make_flonum(2.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 5.0);
+}
+
+void test_div() {
+  printf("--- division (/ ...) ---\n");
+  auto div = [](std::vector<scm_obj_t> args) { return subr_num_div(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(div({make_fixnum(4)}) == make_fixnum(0));
+  ASSERT_TRUE(div({make_fixnum(24), make_fixnum(2), make_fixnum(3)}) == make_fixnum(4));
+  scm_obj_t res = div({make_flonum(10.0), make_flonum(4.0)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 2.5);
+  res = div({make_fixnum(10), make_flonum(2.5)});
+  ASSERT_TRUE(is_flonum(res));
+  ASSERT_TRUE(flonum(res) == 4.0);
+}
+
+void test_cmp() {
+  printf("--- comparisons (= < > <= >=) ---\n");
+  auto eq = [](std::vector<scm_obj_t> args) { return subr_num_eq(scm_nil, (int)args.size(), args.data()); };
+  auto lt = [](std::vector<scm_obj_t> args) { return subr_num_lt(scm_nil, (int)args.size(), args.data()); };
+  auto gt = [](std::vector<scm_obj_t> args) { return subr_num_gt(scm_nil, (int)args.size(), args.data()); };
+  auto le = [](std::vector<scm_obj_t> args) { return subr_num_le(scm_nil, (int)args.size(), args.data()); };
+  auto ge = [](std::vector<scm_obj_t> args) { return subr_num_ge(scm_nil, (int)args.size(), args.data()); };
+  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5)}) == scm_true);
+  ASSERT_TRUE(eq({make_fixnum(5), make_flonum(5.0)}) == scm_true);
+  ASSERT_TRUE(eq({make_flonum(5.0), make_fixnum(5)}) == scm_true);
+  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(6)}) == scm_false);
+  ASSERT_TRUE(eq({make_fixnum(5), make_flonum(5.1)}) == scm_false);
+  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5), make_fixnum(5)}) == scm_true);
+  ASSERT_TRUE(eq({make_fixnum(5), make_fixnum(5), make_flonum(5.0)}) == scm_true);
+  ASSERT_TRUE(lt({make_fixnum(1), make_fixnum(2), make_fixnum(3)}) == scm_true);
+  ASSERT_TRUE(lt({make_fixnum(1), make_fixnum(3), make_fixnum(2)}) == scm_false);
+  ASSERT_TRUE(lt({make_fixnum(1), make_flonum(1.5), make_fixnum(2)}) == scm_true);
+  ASSERT_TRUE(lt({make_flonum(1.0), make_fixnum(2)}) == scm_true);
+  ASSERT_TRUE(lt({make_fixnum(2), make_flonum(1.0)}) == scm_false);
+  ASSERT_TRUE(gt({make_fixnum(3), make_fixnum(2), make_fixnum(1)}) == scm_true);
+  ASSERT_TRUE(gt({make_fixnum(3), make_fixnum(1), make_fixnum(2)}) == scm_false);
+  ASSERT_TRUE(gt({make_flonum(3.5), make_fixnum(3)}) == scm_true);
+  ASSERT_TRUE(gt({make_fixnum(3), make_flonum(3.5)}) == scm_false);
+  ASSERT_TRUE(le({make_fixnum(1), make_fixnum(2), make_fixnum(2), make_fixnum(3)}) == scm_true);
+  ASSERT_TRUE(le({make_fixnum(1), make_fixnum(3), make_fixnum(2)}) == scm_false);
+  ASSERT_TRUE(le({make_fixnum(2), make_flonum(2.0)}) == scm_true);
+  ASSERT_TRUE(le({make_flonum(2.0), make_fixnum(2)}) == scm_true);
+  ASSERT_TRUE(le({make_fixnum(2), make_flonum(2.1)}) == scm_true);
+  ASSERT_TRUE(ge({make_fixnum(3), make_fixnum(2), make_fixnum(2), make_fixnum(1)}) == scm_true);
+  ASSERT_TRUE(ge({make_fixnum(3), make_fixnum(1), make_fixnum(2)}) == scm_false);
+  ASSERT_TRUE(ge({make_fixnum(2), make_flonum(2.0)}) == scm_true);
+  ASSERT_TRUE(ge({make_flonum(2.0), make_fixnum(2)}) == scm_true);
+  ASSERT_TRUE(ge({make_flonum(2.1), make_fixnum(2)}) == scm_true);
+}
+
+void test_error_procedures() {
+  printf("--- error / assertion-violation / syntax-violation ---\n");
+  try {
+    scm_obj_t args[] = {make_string("test message"), make_fixnum(42)};
+    subr_error(scm_nil, 2, args);
+    ASSERT_TRUE(false);
+  } catch (const std::runtime_error& e) {
+    ASSERT_TRUE(strstr(e.what(), "error: test message 42") != nullptr);
+  }
+  try {
+    scm_obj_t args[] = {make_symbol("who"), make_string("bad arg"), make_fixnum(99)};
+    subr_assertion_violation(scm_nil, 3, args);
+    ASSERT_TRUE(false);
+  } catch (const std::runtime_error& e) {
+    ASSERT_TRUE(strstr(e.what(), "assertion-violation: who: bad arg 99") != nullptr);
+  }
+  try {
+    scm_obj_t args[] = {make_symbol("form"), make_string("bad syntax"), make_symbol("subform")};
+    subr_syntax_violation(scm_nil, 3, args);
+    ASSERT_TRUE(false);
+  } catch (const std::runtime_error& e) {
+    ASSERT_TRUE(strstr(e.what(), "syntax-violation") != nullptr);
+  }
+}
+
+
 int run_test(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -2196,6 +2338,18 @@ int run_test(int argc, char** argv) {
   test_environment_access();
   test_undef_unspecified();
   test_uuid();
+  test_make_u8vector_mapping();
+  test_add();
+  test_sub();
+  test_mul();
+  test_div();
+  test_cmp();
+  test_min();
+  test_char_extra();
+  test_string_extra();
+  test_error_procedures();
+
+
 
   context::destroy();
 
@@ -2364,7 +2518,6 @@ int run_test(int argc, char** argv) {
 }  // namespace test_cffi
 
 int main(int argc, char** argv) {
-  test_call_cc::run_test(argc, argv);
   test_call_ec::run_test(argc, argv);
   test_dynamic_wind::run_test(argc, argv);
   test_subr::run_test(argc, argv);

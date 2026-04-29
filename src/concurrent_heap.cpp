@@ -117,7 +117,7 @@ void concurrent_heap_t::snapshot_stack() {
 }
 
 // Run on mutator thread
-void concurrent_heap_t::snapshot_memory_range(uint64_t begin, uint64_t end) {
+__attribute__((no_sanitize("hwaddress"))) void concurrent_heap_t::snapshot_memory_range(uint64_t begin, uint64_t end) {
   assert((begin & 0x7) == 0);
   assert((end & 0x7) == 0);
   std::vector<uint64_t> raw;
@@ -137,7 +137,7 @@ void concurrent_heap_t::snapshot_memory_range(uint64_t begin, uint64_t end) {
 }
 
 // Run on collector thread
-void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
+__attribute__((no_sanitize("hwaddress"))) void concurrent_heap_t::trace_memory_range(uint64_t begin, uint64_t end) {
   assert((begin & 0x7) == 0);
   assert((end & 0x7) == 0);
   std::vector<uint64_t> raw;

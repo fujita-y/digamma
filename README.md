@@ -2,7 +2,7 @@
 
 Digamma is an experimental Scheme implementation featuring a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support. Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline.
 
-## What Makes Digamma Unique
+## Features
 
 ### 1. Fiber-Native Google Cloud AI Integration
 
@@ -107,7 +107,7 @@ On ARM64, Digamma exploits the hardware **Top Byte Ignore** feature to store typ
 | Heap object | `...010` + 6-bit type code |
 | Short flonum (61-bit) | `...100` |
 
-Heap objects use a 6-bit type code (`tc6`) supporting symbols, strings, vectors, closures, continuations, ports, hashtables, cells, and more.
+Heap objects use a 6-bit type code (`tc6`) supporting symbols, strings, vectors, closures, fibers, ports, hashtables, cells, and more.
 
 ---
 
@@ -140,18 +140,6 @@ The entire compiler pipeline is written in Scheme and cross-compiled into a boot
 2. **Optimization**: constant folding, dead code elimination, beta reduction, let-floating, lambda dropping, inlining, unused parameter removal, pure primitive substitution.
 3. **Lambda lifting**: promotes closed-over lambdas to top-level definitions where possible.
 4. **Compilation**: register-based IR with closure conversion, free variable analysis, selective cell boxing for mutated/forward-referenced variables.
-
----
-
-### 8. First-Class Continuations
-
-Full continuations via **Boost.Context** (stack copy/restore):
-
-- `call/cc` — full continuations.
-- `call-with-escape-continuation` — one-shot escape continuations.
-- `dynamic-wind` — winding/unwinding protection.
-
-Continuation objects are GC-managed with memoized live-pointer arrays for efficient tracing.
 
 ---
 

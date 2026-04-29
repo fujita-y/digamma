@@ -424,7 +424,7 @@ SUBR subr_nan_p(scm_obj_t self, scm_obj_t a1) {
 SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1) { return is_cons(a1) ? scm_true : scm_false; }
 
 // procedure?  - R6RS 11.6
-SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1) { return (is_closure(a1) || is_continuation(a1) || is_escape(a1)) ? scm_true : scm_false; }
+SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1) { return (is_closure(a1) || is_escape(a1)) ? scm_true : scm_false; }
 
 // real?  - R6RS 11.7.2
 SUBR subr_real_p(scm_obj_t self, scm_obj_t a1) { return (is_fixnum(a1) || is_short_flonum(a1) || is_long_flonum(a1)) ? scm_true : scm_false; }
@@ -1327,8 +1327,6 @@ void init_subr_base() {
 
   // control flow
   reg("apply", (void*)subr_apply, 0, true);
-  reg("call/cc", (void*)subr_call_cc, 1, false);
-  reg("call-with-current-continuation", (void*)subr_call_cc, 1, false);
   reg("call/ec", (void*)subr_call_ec, 1, false);
   reg("call-with-escape-continuation", (void*)subr_call_ec, 1, false);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, false);

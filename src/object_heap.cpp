@@ -204,13 +204,6 @@ void object_heap_t::trace(void* obj) {
       shade(rec->retval);
       return;
     }
-    case tc6_continuation: {
-      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-      shade(rec->winders);
-      m_concurrent_heap.trace_memory_range((uint64_t)rec->uctx, (uint64_t)rec->uctx + sizeof(ucontext_t));
-      m_concurrent_heap.trace_memory_range((uint64_t)rec->stack_copy, (uint64_t)rec->stack_copy + rec->stack_size);
-      return;
-    }
     case tc6_tuple: {
       scm_tuple_rec_t* rec = (scm_tuple_rec_t*)obj;
       for (int i = 0; i < rec->nsize; i++) {
@@ -299,16 +292,6 @@ void object_heap_t::finalize(void* obj) {
       rec->uctx = nullptr;
       return;
     }
-    case tc6_continuation: {
-      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-      if (rec->uctx) free(rec->uctx);
-      if (rec->stack_copy) free(rec->stack_copy);
-      if (rec->shadow_copy) free(rec->shadow_copy);
-      rec->uctx = nullptr;
-      rec->stack_copy = nullptr;
-      rec->shadow_copy = nullptr;
-      return;
-    }
     case tc6_future: {
       scm_future_rec_t* rec = (scm_future_rec_t*)obj;
       if (rec->future) delete (boost::fibers::shared_future<scm_obj_t>*)rec->future;
@@ -381,16 +364,6 @@ void object_heap_t::renounce(void* obj, int size, void* refcon) {
       scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
       if (rec->uctx) free(rec->uctx);
       rec->uctx = nullptr;
-      return;
-    }
-    case tc6_continuation: {
-      scm_continuation_rec_t* rec = (scm_continuation_rec_t*)obj;
-      if (rec->uctx) free(rec->uctx);
-      if (rec->stack_copy) free(rec->stack_copy);
-      if (rec->shadow_copy) free(rec->shadow_copy);
-      rec->uctx = nullptr;
-      rec->stack_copy = nullptr;
-      rec->shadow_copy = nullptr;
       return;
     }
     case tc6_future: {

@@ -49,10 +49,9 @@ constexpr uintptr_t tc6_closure = 7;
 constexpr uintptr_t tc6_environment = 8;
 constexpr uintptr_t tc6_cell = 9;
 constexpr uintptr_t tc6_escape = 10;
-constexpr uintptr_t tc6_continuation = 11;
-constexpr uintptr_t tc6_port = 12;
-constexpr uintptr_t tc6_tuple = 13;
-constexpr uintptr_t tc6_future = 14;
+constexpr uintptr_t tc6_port = 11;
+constexpr uintptr_t tc6_tuple = 12;
+constexpr uintptr_t tc6_future = 13;
 
 inline scm_obj_t singleton(uintptr_t val) {
   assert(val >= 2 && val <= 15);
@@ -155,16 +154,6 @@ struct scm_escape_rec_t {
   bool invoked;
 };
 
-struct scm_continuation_rec_t {
-  scm_tc6_t tag;
-  scm_obj_t winders;
-  ucontext_t* uctx;
-  uint8_t* stack_copy;
-  uint8_t* shadow_copy;
-  uint64_t stack_bottom;
-  size_t stack_size;
-};
-
 struct scm_port_rec_t {
   scm_tc6_t tag;
   scm_obj_t name;
@@ -244,7 +233,6 @@ inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
 inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
 inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
 inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
-inline bool is_continuation(scm_obj_t x) { return is_tc6(x, tc6_continuation); }
 inline bool is_port(scm_obj_t x) { return is_tc6(x, tc6_port); }
 inline bool is_tuple(scm_obj_t x) { return is_tc6(x, tc6_tuple); }
 inline bool is_future(scm_obj_t x) { return is_tc6(x, tc6_future); }
@@ -267,8 +255,6 @@ scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
 scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
-scm_obj_t make_continuation(ucontext_t* uctx, size_t stack_size, uint8_t* stack_copy, uint8_t* shadow_copy, uint64_t stack_bottom,
-                            scm_obj_t winders);
 scm_obj_t make_port(scm_obj_t name);
 scm_obj_t make_tuple(int nsize);
 scm_obj_t make_future(scm_obj_t closure, boost::fibers::shared_future<scm_obj_t>* future);

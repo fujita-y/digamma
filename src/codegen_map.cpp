@@ -64,7 +64,6 @@ void codegen_t::init_opcode_map() {
   tc6_code_map[(void*)subr_vector_p] = tc6_vector;
   tc6_code_map[(void*)subr_hashtable_p] = tc6_hashtable;
   tc6_code_map[(void*)subr_tuple_p] = tc6_tuple;
-  tc6_code_map[(void*)subr_continuation_p] = tc6_continuation;
 
   // arithmetic
   no_gc_code_set.insert((void*)subr_num_eq);

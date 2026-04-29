@@ -54,13 +54,12 @@ caddddr
 cadddr
 caddr
 cadr
-call-with-current-continuation
 call-with-input-file
 call-with-output-file
 call-with-port
 call-with-string-output-port
 call-with-values
-call/cc
+call-with-escape-continuation
 call/ec
 car
 cdaaaar
