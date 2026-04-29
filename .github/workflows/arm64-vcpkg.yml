@@ -37,8 +37,6 @@ jobs:
             ./vcpkg/bootstrap-vcpkg.sh
           fi
 
-      # Move LLVM installation BEFORE CMake configuration to ensure any 
-      # find_package(zstd) calls in LLVM/Clang don't conflict later.
       - name: Install LLVM 22
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -48,13 +46,12 @@ jobs:
 
       - name: Configure CMake
         run: |
-          # Use -DCMAKE_IGNORE_PATH to prevent picking up system zstd
-          # Use Manifest Mode (vcpkg.json) if possible for better isolation
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_IGNORE_PATH="/usr/lib/cmake/zstd;/usr/share/cmake/zstd"
+            -DZSTD_DIR="${{ github.workspace }}/build/vcpkg_installed/arm64-linux/share/zstd" \
+            -DCMAKE_IGNORE_PATH="/usr/lib/cmake/zstd;/usr/share/cmake/zstd;/usr/lib/llvm-22/lib/cmake/zstd;/usr/lib/llvm-22/share/cmake/zstd"
 
       - name: Build
         run: cmake --build build --config Release --parallel $(nproc)
