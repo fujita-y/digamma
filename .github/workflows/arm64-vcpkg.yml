@@ -8,9 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-24.04-arm
     env:
-      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
-      # Force CMake to prioritize vcpkg over system libraries
-      CMAKE_PREFIX_PATH: "${{ github.workspace }}/vcpkg_installed/arm64-linux"
+      # Removed 'x-gha' as it is deprecated/removed in newer vcpkg versions
+      VCPKG_BINARY_SOURCES: 'clear' 
+      CC: clang
+      CXX: clang++
 
     steps:
       - name: Checkout code
@@ -23,13 +24,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential curl zip unzip tar
           
-      - name: Export GitHub Actions Cache Environment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-            
       - name: Install vcpkg
         run: |
           if [ ! -d "vcpkg" ]; then
@@ -49,19 +43,18 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100
           
-          # Set environment variables for build systems like CMake
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
-          
       - name: Configure CMake
         run: |
+          # Use CMAKE_DISABLE_FIND_PACKAGE_ZSTD=OFF to let vcpkg handle it
+          # and specifically set the ZSTD_LIBRARY/INCLUDE to vcpkg paths 
+          # to prevent picking up system fragments that cause target redefinition.
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_DIR=/usr/lib/llvm-22/lib/cmake/llvm \
-            -DZSTD_DIR="${{ github.workspace }}/build/vcpkg_installed/arm64-linux/share/zstd" \
-            -DCMAKE_IGNORE_PATH="/usr/lib/cmake/zstd;/usr/share/cmake/zstd;/usr/lib/llvm-22/lib/cmake/zstd;/usr/lib/llvm-22/share/cmake/zstd"
+            -DCMAKE_POLICY_DEFAULT_CMP0074=NEW \
+            -DZstd_ROOT="${{ github.workspace }}/build/vcpkg_installed/arm64-linux"
             
       - name: Build
         run: cmake --build build --config Release --parallel $(nproc)
