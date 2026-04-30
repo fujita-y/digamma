@@ -22,46 +22,47 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential curl zip unzip tar
-
+          
       - name: Export GitHub Actions Cache Environment
         uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
+            
       - name: Install vcpkg
         run: |
           if [ ! -d "vcpkg" ]; then
             git clone https://github.com/microsoft/vcpkg.git
             ./vcpkg/bootstrap-vcpkg.sh
           fi
-
+          
       - name: Install LLVM 22
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 22
           sudo apt-get install -y clang-22 lld-22 llvm-22-dev
-
+          
       - name: Make LLVM 22 Default
         run: |
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100
           
-          # Optional: Set environment variables for build systems like CMake
+          # Set environment variables for build systems like CMake
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
-
+          
       - name: Configure CMake
         run: |
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_DIR=/usr/lib/llvm-22/lib/cmake/llvm \
             -DZSTD_DIR="${{ github.workspace }}/build/vcpkg_installed/arm64-linux/share/zstd" \
             -DCMAKE_IGNORE_PATH="/usr/lib/cmake/zstd;/usr/share/cmake/zstd;/usr/lib/llvm-22/lib/cmake/zstd;/usr/lib/llvm-22/share/cmake/zstd"
-
+            
       - name: Build
         run: cmake --build build --config Release --parallel $(nproc)
 
