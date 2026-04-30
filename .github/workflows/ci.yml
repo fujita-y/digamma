@@ -56,8 +56,7 @@ jobs:
             ninja-build \
             ccache \
             pkg-config \
-            curl zip unzip tar \
-            libzstd-dev
+            curl zip unzip tar
 
       # --- ccache ---
       - name: Cache ccache
