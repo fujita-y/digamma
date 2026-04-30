@@ -33,7 +33,7 @@ Digamma implements lightweight, cooperative multitasking using **fibers** backed
 **Async networking primitives** (fiber-aware, no thread blocking):
 - `(get-bytevector-n-async <port> <n>)` → future — non-blocking port read.
 - `(https-get <url> <port>)` — blocking HTTPS GET (suspends current fiber).
-- `(https-get-async <url> <port>)` → future — detached fiber HTTPS GET.
+- `(https-get-async <url> <port>)` → future — non-blocking HTTPS GET, fiber-aware.
 
 ---
 
@@ -55,8 +55,8 @@ Digamma provides **built-in, non-blocking access to Vertex AI (Gemini) and Dialo
 ```
 
 **Primitives:**
-- `(vertex-generate-content prompt [model] [location] [project-id])` — synchronous call.
-- `(vertex-generate-content-async prompt [model] [location] [project-id])` → future — non-blocking, fiber-aware.
+- `(generate-content prompt [model] [location] [project-id])` — synchronous call.
+- `(generate-content-async prompt [model] [location] [project-id])` → future — non-blocking, fiber-aware.
 
 Default model: `gemini-2.5-flash`. Reads `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` from the environment.
 
