@@ -117,8 +117,8 @@ void fiber_set_focus_main(bool enable) {
 
 void fiber_scan_stacks() {
   for (const auto& info : context::s_fiber_stacks) {
-    uintptr_t bottom = (uintptr_t)info.stack_bottom;
-    uintptr_t top = bottom - info.stack_size;
+    uintptr_t top = (uintptr_t)info.usable_start;
+    uintptr_t bottom = top + info.usable_size;
     object_heap_t::current()->shapshot_memory_range(top, bottom);
   }
 }

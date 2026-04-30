@@ -7,6 +7,7 @@
 #include "hash.h"
 #include "object_heap.h"
 #include "port.h"
+#include <boost/context/stack_traits.hpp>
 
 thread_local scm_obj_t context::s_current_input_port;
 thread_local scm_obj_t context::s_current_output_port;
@@ -35,13 +36,21 @@ thread_local std::unordered_map<std::string, void*> context::s_callout_cache;
 
 boost::context::stack_context context::fiber_stack_allocator::allocate() {
   auto sctx = m_alloc.allocate();
-  context::s_fiber_stacks.push_back({sctx.sp, sctx.size});
+  void* usable_start = static_cast<uint8_t*>(sctx.sp) - sctx.size;
+  size_t usable_size = sctx.size;
+#ifndef NDEBUG
+  size_t pagesize = boost::context::stack_traits::page_size();
+  usable_start = static_cast<uint8_t*>(usable_start) + pagesize;
+  usable_size -= pagesize;
+#endif
+  std::memset(usable_start, 0, usable_size);
+  context::s_fiber_stacks.push_back({sctx.sp, usable_start, usable_size});
   return sctx;
 }
 
 void context::fiber_stack_allocator::deallocate(boost::context::stack_context sctx) {
   for (auto it = context::s_fiber_stacks.begin(); it != context::s_fiber_stacks.end(); ++it) {
-    if (it->stack_bottom == sctx.sp) {
+    if (it->sp == sctx.sp) {
       context::s_fiber_stacks.erase(it);
       break;
     }

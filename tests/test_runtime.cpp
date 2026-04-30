@@ -2161,7 +2161,7 @@ void test_tuple() {
   PRED_FALSE(subr_tuple_p, make_fixnum(0));
 }
 
-void test_make_u8vector_mapping() {
+__attribute__((no_sanitize("hwaddress"))) void test_make_u8vector_mapping() {
   printf("--- make-u8vector-mapping ---\n");
   uint8_t data[] = {10, 20, 30};
   scm_obj_t adrs = make_fixnum((intptr_t)data);

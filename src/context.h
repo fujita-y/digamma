@@ -9,6 +9,9 @@
 
 #include <boost/context/stack_context.hpp>
 #include <boost/fiber/fixedsize_stack.hpp>
+#ifndef NDEBUG
+  #include <boost/fiber/protected_fixedsize_stack.hpp>
+#endif
 #include <unordered_set>
 #include <vector>
 #include <unordered_map>
@@ -58,8 +61,9 @@ class context {
   thread_local static std::unordered_map<std::string, void*> s_callout_cache;
 
   struct fiber_stack_info {
-    void* stack_bottom;
-    size_t stack_size;
+    void* sp;
+    void* usable_start;
+    size_t usable_size;
   };
 
   class fiber_stack_allocator {
@@ -68,7 +72,11 @@ class context {
     void deallocate(boost::context::stack_context sctx);
 
    private:
+#ifdef NDEBUG
     boost::fibers::fixedsize_stack m_alloc;
+#else
+    boost::fibers::protected_fixedsize_stack m_alloc;
+#endif
   };
 
   thread_local static int s_live_fiber_count;

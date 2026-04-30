@@ -76,17 +76,6 @@ static void do_wind(scm_obj_t target_winders) {
     c = cons_cdr(c);
     set_current_winders(c);
   }
-
-  // Wind target from common ancestor
-  auto wind_recursive = [&](auto self, scm_obj_t t) -> void {
-    if (t == common_ancestor) return;
-    self(self, cons_cdr(t));
-    scm_obj_t winder = cons_car(t);
-    scm_obj_t pre = cons_car(winder);
-    c_call_closure_thunk_0(pre);
-    set_current_winders(t);
-  };
-  wind_recursive(wind_recursive, target);
 }
 
 // ============================================================================

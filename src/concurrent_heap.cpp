@@ -93,10 +93,15 @@ void concurrent_heap_t::snapshot_stack() {
   raw.clear();
   raw.reserve(n);  // no-op once capacity is sufficient
 
-  for (int i = 0; i < array_sizeof(regs) - 1; i++) raw.push_back(prune_memory_address(regs[i]));
-  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t))
-    raw.push_back(prune_memory_address(*(uint64_t*)addr));
-
+  for (int i = 0; i < array_sizeof(regs) - 1; i++) {
+    if (regs[i] == 0) continue;
+    raw.push_back(prune_memory_address(regs[i]));
+  }
+  for (uint64_t addr = thread_stack_top; addr < thread_stack_bottom; addr += sizeof(uint64_t)) {
+    uint64_t datum = *(uint64_t*)addr;
+    if (datum == 0) continue;
+    raw.push_back(prune_memory_address(datum));
+  }
   std::sort(raw.begin(), raw.end());
   auto end_it = std::unique(raw.begin(), raw.end());
   for (auto it = raw.begin(); it != end_it; ++it) {
@@ -126,7 +131,9 @@ __attribute__((no_sanitize("hwaddress"))) void concurrent_heap_t::snapshot_memor
   raw.clear();
   raw.reserve(n);
   for (uint64_t addr = begin; addr < end; addr += sizeof(uint64_t)) {
-    raw.push_back(prune_memory_address(*(uint64_t*)addr));
+    uint64_t datum = *(uint64_t*)addr;
+    if (datum == 0) continue;
+    raw.push_back(prune_memory_address(datum));
   }
   std::sort(raw.begin(), raw.end());
   auto end_it = std::unique(raw.begin(), raw.end());
