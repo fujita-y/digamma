@@ -21,7 +21,7 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential curl zip unzip tar
+          sudo apt-get install -y build-essential curl zip unzip tar libzstd-dev
           
       - name: Export GitHub Actions Cache Environment
         uses: actions/github-script@v7
@@ -60,8 +60,7 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=arm64-linux \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_DIR=/usr/lib/llvm-22/lib/cmake/llvm \
-            -DZSTD_DIR="${{ github.workspace }}/build/vcpkg_installed/arm64-linux/share/zstd" \
-            -DCMAKE_IGNORE_PATH="/usr/lib/cmake/zstd;/usr/share/cmake/zstd;/usr/lib/llvm-22/lib/cmake/zstd;/usr/lib/llvm-22/share/cmake/zstd"
+            -Dzstd_DIR=/usr/lib/aarch64-linux-gnu/cmake/zstd
             
       - name: Build
         run: cmake --build build --config Release --parallel $(nproc)
