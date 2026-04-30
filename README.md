@@ -4,7 +4,40 @@ Digamma is an experimental Scheme implementation featuring a self-hosted compile
 
 ## Features
 
-### 1. Fiber-Native Google Cloud AI Integration
+### 1. Fiber-Based Concurrency, Networking, and Asynchronous I/O
+
+Digamma implements lightweight, cooperative multitasking using **fibers** backed by `boost::fibers`. The fiber scheduler is wired directly into Boost.Asio's `io_context`, so I/O completion handlers run inline without spawning OS threads.
+
+```scheme
+(let* ((f1 (fiber (lambda ()
+                    (display "Fiber 1 starting\n")
+                    (fiber-sleep-for 100)
+                    (display "Fiber 1 done\n")
+                    42)))
+       (f2 (fiber (lambda ()
+                    (display "Fiber 2 starting\n")
+                    (fiber-yield)
+                    (display "Fiber 2 done\n")
+                    'done))))
+  (display (list (future-get f1) (future-get f2)))
+  (newline))
+```
+
+**Fiber primitives:**
+- `(fiber <thunk>)` → future — spawns a fiber.
+- `(fiber-yield)` — cooperatively yields.
+- `(fiber-sleep-for <msec>)` — suspends without blocking the scheduler.
+- `(future-get <future>)`, `(future-wait <future>)`, `(future-wait-for <future> <msec>)` — synchronization.
+- `(future? <obj>)` — predicate.
+
+**Async networking primitives** (fiber-aware, no thread blocking):
+- `(get-bytevector-n-async <port> <n>)` → future — non-blocking port read.
+- `(https-get <url> <port>)` — blocking HTTPS GET (suspends current fiber).
+- `(https-get-async <url> <port>)` → future — detached fiber HTTPS GET.
+
+---
+
+### 2. Fiber-Native Google Cloud AI Integration
 
 Digamma provides **built-in, non-blocking access to Vertex AI (Gemini) and Dialogflow CX** — directly from Scheme, with zero mutator blocking. Unlike typical FFI wrappers that stall the interpreter, every AI call is dispatched through the fiber scheduler using `asio-grpc`, so other fibers keep running while cloud inference is in flight.
 
@@ -45,39 +78,6 @@ Session IDs are auto-generated (UUID) if not provided.
 
 > [!NOTE]
 > Both APIs require setting the `GOOGLE_CLOUD_PROJECT` environment variable (or passing it as an argument). `GOOGLE_CLOUD_LOCATION` defaults to `us-central1`.
-
----
-
-### 2. Fiber-Based Concurrency and Asynchronous I/O
-
-Digamma implements lightweight, cooperative multitasking using **fibers** backed by `boost::fibers`. The fiber scheduler is wired directly into Boost.Asio's `io_context`, so I/O completion handlers run inline without spawning OS threads.
-
-```scheme
-(let* ((f1 (fiber (lambda ()
-                    (display "Fiber 1 starting\n")
-                    (fiber-sleep-for 100)
-                    (display "Fiber 1 done\n")
-                    42)))
-       (f2 (fiber (lambda ()
-                    (display "Fiber 2 starting\n")
-                    (fiber-yield)
-                    (display "Fiber 2 done\n")
-                    'done))))
-  (display (list (future-get f1) (future-get f2)))
-  (newline))
-```
-
-**Fiber primitives:**
-- `(fiber <thunk>)` → future — spawns a fiber.
-- `(fiber-yield)` — cooperatively yields.
-- `(fiber-sleep-for <msec>)` — suspends without blocking the scheduler.
-- `(future-get <future>)`, `(future-wait <future>)`, `(future-wait-for <future> <msec>)` — synchronization.
-- `(future? <obj>)` — predicate.
-
-**Async networking primitives** (fiber-aware, no thread blocking):
-- `(get-bytevector-n-async <port> <n>)` → future — non-blocking port read.
-- `(https-get <url> <port>)` — blocking HTTPS GET (suspends current fiber).
-- `(https-get-async <url> <port>)` → future — detached fiber HTTPS GET.
 
 ---
 
