@@ -15,6 +15,7 @@
 #endif
 
 uint64_t capture_thread_stack_bottom();
+
 void capture_arm64_core_state(uint64_t regs[11]);  // x19-x28, sp
 
 #if USE_TBI

@@ -2468,7 +2468,7 @@ int run_test(int argc, char** argv) {
   });
 
   run_test("TestCFFI_qsort", [](CodegenTest& env) -> bool {
-    scm_obj_t comp_closure = make_closure((void*)test_qsort_compare, 2, 0, 0, nullptr, 0);
+    scm_obj_t comp_closure = make_closure((void*)test_qsort_compare, 2, 0, 0, nullptr, 1);
     scm_obj_t sig_cmp = make_string("qoo");
     scm_obj_t cmp_callback_ptr_obj = subr_codegen_cdecl_callback(scm_nil, comp_closure, sig_cmp);
 

@@ -4,23 +4,19 @@
 #include "core.h"
 #include "arch_amd64.h"
 
-// 11 registers total: x19-x28 (10) + SP (1)
-void capture_arm64_core_state(uint64_t regs[11]) {
+// 7 registers total: rbx, rbp, r12, r13, r14, r15 (6 callee-saved) + rsp (1)
+void capture_amd64_core_state(uint64_t regs[7]) {
   __asm__ volatile(
-      // Store General Purpose Pairs (x19-x28)
-      "stp x19, x20, [%0, #0]\n"
-      "stp x21, x22, [%0, #16]\n"
-      "stp x23, x24, [%0, #32]\n"
-      "stp x25, x26, [%0, #48]\n"
-      "stp x27, x28, [%0, #64]\n"
-
-      // Capture Stack Pointer (SP) via scratch register x9
-      "mov x9, sp\n"
-      "str x9, [%0, #80]\n"
-
+      "movq %%rbx, 0(%0)\n"
+      "movq %%rbp, 8(%0)\n"
+      "movq %%r12, 16(%0)\n"
+      "movq %%r13, 24(%0)\n"
+      "movq %%r14, 32(%0)\n"
+      "movq %%r15, 40(%0)\n"
+      "movq %%rsp, 48(%0)\n"
       :
       : "r"(regs)
-      : "x9", "memory");
+      : "memory");
 }
 
 uint64_t capture_thread_stack_bottom() {

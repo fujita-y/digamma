@@ -2,7 +2,7 @@
 // See LICENSE file for terms and conditions of use.
 
 #include "core.h"
-#include "arch_arm64.h"
+#include "arch.h"
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "codegen_common.h"

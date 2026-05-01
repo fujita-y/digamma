@@ -12,6 +12,15 @@
 #include "exception.h"
 #include "object_heap.h"
 
+// Portable helper: returns the current stack pointer value.
+#if defined(__aarch64__)
+  #define CAPTURE_SP(var) __asm__ volatile("mov %0, sp" : "=r"(var))
+#elif defined(__x86_64__)
+  #define CAPTURE_SP(var) __asm__ volatile("movq %%rsp, %0" : "=r"(var))
+#else
+  #error "Unsupported architecture"
+#endif
+
 thread_local static bool s_restored = false;
 
 extern "C" {
@@ -122,7 +131,7 @@ SUBR subr_invoke_escape_continuation(scm_obj_t self, int argc, scm_obj_t argv[])
 
 #if __has_feature(hwaddress_sanitizer) || defined(__SANITIZE_HWADDRESS__)
   void* sp;
-  __asm__ volatile("mov %0, sp" : "=r"(sp));
+  CAPTURE_SP(sp);
   if ((uintptr_t)sp < cont_rec->sp) {
     __hwasan_tag_memory(sp, 0, cont_rec->sp - (uintptr_t)sp);
   }
@@ -137,7 +146,7 @@ __attribute__((no_sanitize("hwaddress"))) SUBR subr_call_ec(scm_obj_t self, scm_
   if (getcontext(&uctx) == 0) {
     if (!s_restored) {
       void* sp;
-      __asm__ volatile("mov %0, sp" : "=r"(sp));
+      CAPTURE_SP(sp);
       scm_obj_t cont_obj = make_escape(&uctx, (uintptr_t)sp, context::s_current_winders);
       scm_escape_rec_t* rec = (scm_escape_rec_t*)to_address(cont_obj);
 

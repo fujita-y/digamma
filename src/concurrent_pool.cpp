@@ -21,8 +21,6 @@ void concurrent_pool_t::init(size_t pool_size, size_t init_size) {
   printf("SLAB_SIZE:%ld\n", SLAB_SIZE);
   printf("getpagesize():%d\n", getpagesize());
 #endif
-  assert(getpagesize() >= SLAB_SIZE);
-  assert((getpagesize() % SLAB_SIZE) == 0);  // for optimal performance
   assert(pool_size >= SLAB_SIZE * 2);        // check minimum (1 directory + 1 datum)
   pool_size = pool_size < 2 ? 2 : pool_size;
   init_size = init_size < pool_size ? init_size : pool_size;

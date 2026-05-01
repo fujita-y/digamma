@@ -5,7 +5,7 @@
 #define OBJECT_H_INCLUDED
 
 #include "core.h"
-#include "arch_arm64.h"
+#include "arch.h"
 #include "boost/asio/posix/stream_descriptor.hpp"
 
 #include <boost/fiber/fiber.hpp>

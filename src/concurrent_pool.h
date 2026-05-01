@@ -2,7 +2,7 @@
 #define CONCURRENT_POOL_H_INCLUDED
 
 #include "core.h"
-#include "arch_arm64.h"
+#include "arch.h"
 #include "concurrent_slab.h"
 #include "mutex.h"
 

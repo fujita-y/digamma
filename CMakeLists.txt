@@ -128,6 +128,16 @@ target_compile_definitions(nanos_config INTERFACE
   $<$<CONFIG:Release>:IS_RELEASE_BUILD>
 )
 
+# Detect host architecture for arch-specific compile options
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  set(NANOS_ARCH "arm64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  set(NANOS_ARCH "amd64")
+else()
+  message(FATAL_ERROR "Unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+message(STATUS "Target architecture: ${NANOS_ARCH}")
+
 # Define compile options
 target_compile_options(nanos_config INTERFACE
   -Werror
@@ -139,24 +149,24 @@ target_compile_options(nanos_config INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
-  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
-  $<$<CONFIG:RelWithDebInfo>:-mllvm>
-  $<$<CONFIG:RelWithDebInfo>:-hwasan-globals=0>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-mllvm>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-hwasan-globals=0>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
   $<$<CONFIG:Debug>:-fno-optimize-sibling-calls>
-  $<$<CONFIG:Debug>:-fsanitize=hwaddress>
-  $<$<CONFIG:Debug>:-mllvm>
-  $<$<CONFIG:Debug>:-hwasan-globals=0>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-mllvm>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-hwasan-globals=0>
 )
 
 # Define link options
 target_link_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-flto>
-  $<$<CONFIG:RelWithDebInfo>:-fsanitize=hwaddress>
-  $<$<CONFIG:Debug>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
 )
 
 # ==============================================================================
@@ -164,7 +174,7 @@ target_link_options(nanos_config INTERFACE
 # ==============================================================================
 
 set(NANOS_CORE_SOURCES
-  src/arch_arm64.cpp
+  src/arch_${NANOS_ARCH}.cpp
   src/asio.cpp
   src/bit.cpp
   src/fiber.cpp

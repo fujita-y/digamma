@@ -3,7 +3,7 @@
 
 #include "core.h"
 #include "concurrent_heap.h"
-#include "arch_arm64.h"
+#include "arch.h"
 #include "concurrent_pool.h"
 #include "concurrent_slab.h"
 #include "fiber.h"
@@ -84,8 +84,8 @@ void* concurrent_heap_t::is_live_object(uint64_t addr) {
 void concurrent_heap_t::snapshot_stack() {
   std::vector<uint64_t> raw;
 
-  uint64_t regs[11];
-  capture_arm64_core_state(regs);
+  uint64_t regs[ARCH_CORE_STATE_REGS];
+  capture_arch_core_state(regs);
   uint64_t thread_stack_top = regs[array_sizeof(regs) - 1];      // last reg is stack pointer
   uint64_t thread_stack_bottom = capture_thread_stack_bottom();  // cached — no syscall after first call
 
@@ -114,7 +114,7 @@ void concurrent_heap_t::snapshot_stack() {
   printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
   printf(";; thread stack top: %p\n", (void*)thread_stack_top);
   printf(";; thread stack size: %ld\n", thread_stack_bottom - thread_stack_top);
-  printf(";; x19-x28: [");
+  printf(";; callee-saved regs: [");
   for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
   printf(";; raw size: %ld\n", end_it - raw.begin());

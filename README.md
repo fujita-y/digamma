@@ -156,7 +156,7 @@ The entire compiler pipeline is written in Scheme and cross-compiled into a boot
 
 ## Requirements
 
-- **LLVM 22** or later
+- **LLVM 21** or later
 - **CMake 3.13.4** or later
 - **vcpkg** (recommended for managing dependencies)
 - **Boost 1.88** or later (`boost_context`, `boost_fiber`, `boost_asio`, `boost_beast`)
