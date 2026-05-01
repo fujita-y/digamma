@@ -1,5 +1,8 @@
 # Digamma
 
+[![CI (LLVM 22)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22.yml)
+[![CI (LLVM 21)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21.yml)
+
 Digamma is an experimental Scheme implementation featuring a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support. Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline.
 
 ## Features
