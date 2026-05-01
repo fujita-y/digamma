@@ -26,11 +26,11 @@ endif()
 find_package(zstd CONFIG QUIET)
 
 # --- LLVM ---
-if(NOT DEFINED LLVM_CONFIG)
-  set(LLVM_CONFIG "llvm-config")
+if(NOT DEFINED LLVM_CONFIG_CMD)
+  set(LLVM_CONFIG_CMD "llvm-config")
 endif()
 execute_process(
-  COMMAND ${LLVM_CONFIG} --cmakedir
+  COMMAND ${LLVM_CONFIG_CMD} --cmakedir
   OUTPUT_VARIABLE llvm_cmakedir
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -51,9 +51,10 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 execute_process(
-  COMMAND ${LLVM_CONFIG} --libs all
-  OUTPUT_VARIABLE llvm_libs
+  COMMAND ${LLVM_CONFIG_CMD} --libs all
+  OUTPUT_VARIABLE llvm_libs_raw
   OUTPUT_STRIP_TRAILING_WHITESPACE)
+separate_arguments(llvm_libs UNIX_COMMAND "${llvm_libs_raw}")
 
 # ==============================================================================
 # Dependencies

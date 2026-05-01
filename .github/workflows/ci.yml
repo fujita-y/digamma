@@ -85,7 +85,7 @@ jobs:
             -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_CONFIG=/usr/bin/llvm-config-${{ env.LLVM_VERSION }}
+            -DLLVM_CONFIG_CMD=/usr/bin/llvm-config-${{ env.LLVM_VERSION }}
 
       - name: Build
         run: cmake --build build --parallel $(nproc)
