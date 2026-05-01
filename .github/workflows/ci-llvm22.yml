@@ -1,4 +1,4 @@
-name: CI
+name: CI (LLVM 22)
 
 on:
   push:
@@ -63,8 +63,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-arm64-${{ github.sha }}
-          restore-keys: ccache-arm64-
+          key: ccache-arm64-llvm22-${{ github.sha }}
+          restore-keys: ccache-arm64-llvm22-
 
       - name: Configure ccache
         run: |

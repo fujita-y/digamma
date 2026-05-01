@@ -1,4 +1,4 @@
-name: CI
+name: CI (LLVM 19)
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
 
     env:
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-      LLVM_VERSION: "22"
+      LLVM_VERSION: "19"
 
     steps:
       - name: Checkout
@@ -28,7 +28,7 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      # --- LLVM 22 ---
+      # --- LLVM 19 ---
       - name: Install LLVM ${{ env.LLVM_VERSION }}
         run: |
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
@@ -63,8 +63,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-arm64-${{ github.sha }}
-          restore-keys: ccache-arm64-
+          key: ccache-arm64-llvm19-${{ github.sha }}
+          restore-keys: ccache-arm64-llvm19-
 
       - name: Configure ccache
         run: |
