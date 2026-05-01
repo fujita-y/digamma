@@ -17,9 +17,20 @@ if(CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
+# --- zstd (must be found before LLVM to prevent target conflict) ---
+# LLVM's CMake config partially imports zstd::libzstd_static from the system.
+# boost_iostreams (via vcpkg) then tries to complete the same export set with
+# zstd::libzstd, causing a "Some (but not all) targets already defined" error.
+# Finding zstd first via vcpkg fully defines all targets, making later finds
+# from LLVM's config a no-op.
+find_package(zstd CONFIG QUIET)
+
 # --- LLVM ---
+if(NOT DEFINED LLVM_CONFIG)
+  set(LLVM_CONFIG "llvm-config")
+endif()
 execute_process(
-  COMMAND llvm-config --cmakedir
+  COMMAND ${LLVM_CONFIG} --cmakedir
   OUTPUT_VARIABLE llvm_cmakedir
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
