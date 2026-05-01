@@ -51,7 +51,7 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 execute_process(
-  COMMAND llvm-config --libs all
+  COMMAND ${LLVM_CONFIG} --libs all
   OUTPUT_VARIABLE llvm_libs
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
