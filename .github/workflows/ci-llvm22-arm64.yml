@@ -1,4 +1,4 @@
-name: CI (LLVM 22)
+name: CI (arm64, llvm22)
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: CI (LLVM 21, amd64)
+name: CI (amd64, llvm21)
 
 on:
   push:
