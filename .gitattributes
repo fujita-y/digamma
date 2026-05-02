@@ -1,0 +1,2 @@
+*.scm linguist-language=Scheme
+*.ir linguist-language=Scheme
