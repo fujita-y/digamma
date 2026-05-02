@@ -684,20 +684,20 @@ static bool test_hashtable() {
   // Test rehash (add more items than capacity)
   for (int i = 0; i < 20; i++) {
     char buf[32];
-    sprintf(buf, "key-%d", i);
+    snprintf(buf, sizeof(buf), "key-%d", i);
     hashtable_set(ht, make_string(buf), make_fixnum(i));
   }
 
   // Delete some items from the expanded table
   for (int i = 0; i < 20; i += 2) {
     char buf[32];
-    sprintf(buf, "key-%d", i);
+    snprintf(buf, sizeof(buf), "key-%d", i);
     hashtable_delete(ht, make_string(buf));
   }
 
   for (int i = 0; i < 20; i++) {
     char buf[32];
-    sprintf(buf, "key-%d", i);
+    snprintf(buf, sizeof(buf), "key-%d", i);
     scm_obj_t val = hashtable_ref(ht, make_string(buf), scm_undef);
     if (i % 2 == 0) {
       if (val != scm_undef) {
