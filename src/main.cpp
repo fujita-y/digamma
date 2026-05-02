@@ -31,8 +31,7 @@ static int nanos_thread() {
 int main(int argc, char** argv) {
   nanos_options::parse(argc, argv);
   std::future<int> root = std::async(&nanos_thread);
-  root.get();
-  return 0;
+  return root.get();
 }
 
 void fatal(const char* fmt, ...) {
