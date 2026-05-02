@@ -7,14 +7,14 @@
 #include "hash.h"
 #include "object_heap.h"
 #include "port.h"
+
 #include <boost/context/stack_traits.hpp>
 
 thread_local scm_obj_t context::s_current_input_port;
 thread_local scm_obj_t context::s_current_output_port;
 thread_local scm_obj_t context::s_current_error_port;
 thread_local scm_obj_t context::s_current_environment;
-thread_local scm_obj_t context::s_continuation_captured_retval = scm_undef;
-thread_local scm_obj_t context::s_current_winders = scm_nil;
+
 thread_local object_heap_t* context::s_current_object_heap;
 thread_local codegen_t* context::s_current_codegen;
 thread_local nanos_t* context::s_current_nanos;
@@ -81,8 +81,7 @@ void context::init() {
   s_interaction_environment = make_environment(make_symbol("interaction-environment"));
   s_system_environment = make_environment(make_symbol("system-environment"));
   s_current_environment = s_system_environment;
-  s_continuation_captured_retval = scm_undef;
-  s_current_winders = scm_nil;
+
   s_current_codegen = nullptr;
   s_current_nanos = nullptr;
   s_asio_context = nullptr;
@@ -104,8 +103,7 @@ void context::destroy() {
   s_current_input_port = scm_undef;
   s_current_output_port = scm_undef;
   s_current_error_port = scm_undef;
-  s_continuation_captured_retval = scm_undef;
-  s_current_winders = scm_nil;
+
   s_current_object_heap = nullptr;
   s_current_codegen = nullptr;
   s_current_nanos = nullptr;

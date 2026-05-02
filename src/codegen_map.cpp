@@ -91,7 +91,8 @@ void codegen_t::init_opcode_map() {
 
   // basic predicates and logic
   no_gc_code_set.insert((void*)subr_boolean_p);
-  no_gc_code_set.insert((void*)subr_continuation_p);
+
+
   no_gc_code_set.insert((void*)subr_char_eq);
   no_gc_code_set.insert((void*)subr_char_numeric_p);
   no_gc_code_set.insert((void*)subr_char_p);

@@ -307,20 +307,6 @@ uint8_t* environment_name(scm_obj_t x) {
   return symbol_name(((scm_environment_rec_t*)to_address(x))->name);
 }
 
-scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders) {
-  object_heap_t& heap = *object_heap_t::current();
-  scm_escape_rec_t* rec = (scm_escape_rec_t*)heap.alloc_collectible(sizeof(scm_escape_rec_t));
-  rec->tag = make_tc6_tag(tc6_escape);
-  rec->invoked = false;
-  rec->retval = scm_undef;
-  rec->uctx = nullptr;
-  rec->sp = sp;
-  rec->winders = winders;
-  rec->uctx = (ucontext_t*)malloc(sizeof(ucontext_t));
-  *rec->uctx = *uctx;
-  return tc6_tagged_pointer(rec, tc6_escape);
-}
-
 
 scm_obj_t make_cell(scm_obj_t value) {
   object_heap_t& heap = *object_heap_t::current();

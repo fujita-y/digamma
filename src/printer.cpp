@@ -79,10 +79,8 @@ void printer_t::print(std::unordered_map<scm_obj_t, scm_obj_t>* visited, scm_obj
       case tc6_cell:
         out << std::format("#<cell {:#x}>", (uintptr_t)obj);
         return;
-      case tc6_escape:
-        out << std::format("#<escape {:#x}>", (uintptr_t)obj);
-        return;
       case tc6_hashtable:
+
         out << std::format("#<hashtable {:#x}>", (uintptr_t)obj);
         return;
       case tc6_port:

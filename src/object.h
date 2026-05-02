@@ -11,7 +11,7 @@
 #include <boost/fiber/fiber.hpp>
 #include <boost/fiber/future.hpp>
 #include <sanitizer/hwasan_interface.h>
-#include <ucontext.h>
+
 
 /*
 
@@ -48,7 +48,7 @@ constexpr uintptr_t tc6_hashtable = 6;
 constexpr uintptr_t tc6_closure = 7;
 constexpr uintptr_t tc6_environment = 8;
 constexpr uintptr_t tc6_cell = 9;
-constexpr uintptr_t tc6_escape = 10;
+
 constexpr uintptr_t tc6_port = 11;
 constexpr uintptr_t tc6_tuple = 12;
 constexpr uintptr_t tc6_future = 13;
@@ -145,14 +145,7 @@ struct scm_environment_rec_t {
   scm_obj_t macros;     // hashtable
 };
 
-struct scm_escape_rec_t {
-  scm_tc6_t tag;
-  scm_obj_t winders;
-  scm_obj_t retval;
-  ucontext_t* uctx;
-  uint64_t sp;
-  bool invoked;
-};
+
 
 struct scm_port_rec_t {
   scm_tc6_t tag;
@@ -232,7 +225,7 @@ inline bool is_hashtable(scm_obj_t x) { return is_tc6(x, tc6_hashtable); }
 inline bool is_closure(scm_obj_t x) { return is_tc6(x, tc6_closure); }
 inline bool is_environment(scm_obj_t x) { return is_tc6(x, tc6_environment); }
 inline bool is_cell(scm_obj_t x) { return is_tc6(x, tc6_cell); }
-inline bool is_escape(scm_obj_t x) { return is_tc6(x, tc6_escape); }
+
 inline bool is_port(scm_obj_t x) { return is_tc6(x, tc6_port); }
 inline bool is_tuple(scm_obj_t x) { return is_tc6(x, tc6_tuple); }
 inline bool is_future(scm_obj_t x) { return is_tc6(x, tc6_future); }
@@ -254,7 +247,7 @@ scm_obj_t make_u8vector_mapping(uint8_t* adrs, int nsize);
 scm_obj_t make_hashtable(hash_proc_t hash, equiv_proc_t equiv, int capacity);
 scm_obj_t make_closure(void* code, int argc, int rest, int nsize, scm_obj_t env[], int cdecl);
 scm_obj_t make_environment(scm_obj_t name);
-scm_obj_t make_escape(ucontext_t* uctx, uintptr_t sp, scm_obj_t winders);
+
 scm_obj_t make_port(scm_obj_t name);
 scm_obj_t make_tuple(int nsize);
 scm_obj_t make_future(scm_obj_t closure, boost::fibers::shared_future<scm_obj_t>* future);

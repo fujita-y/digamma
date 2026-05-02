@@ -12,10 +12,10 @@
 #ifndef NDEBUG
   #include <boost/fiber/protected_fixedsize_stack.hpp>
 #endif
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <unordered_map>
-#include <string>
 
 class object_heap_t;
 class codegen_t;
@@ -42,8 +42,7 @@ class context {
   thread_local static scm_obj_t s_current_output_port;
   thread_local static scm_obj_t s_current_error_port;
   thread_local static scm_obj_t s_current_environment;
-  thread_local static scm_obj_t s_continuation_captured_retval;
-  thread_local static scm_obj_t s_current_winders;
+
   thread_local static object_heap_t* s_current_object_heap;
   thread_local static codegen_t* s_current_codegen;
   thread_local static nanos_t* s_current_nanos;

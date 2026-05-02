@@ -122,29 +122,7 @@
          (call-with-output-string (lambda (p) (write/ss v p))))
       "#0=#(1 #0# 3)")
 
-;; =============================================================================
-;; Section 3: Escape Continuations
-;; =============================================================================
-(display "\n>>> Section 3: Escape Continuations\n")
 
-(test "call/ec basic"
-      '(call/ec (lambda (k) 42))
-      42)
-
-(test "call/ec escape"
-      '(call/ec (lambda (k) (k 42) 99))
-      42)
-
-(test "call/ec nested"
-      '(call/ec (lambda (k1)
-                  (call/ec (lambda (k2)
-                             (k1 42)
-                             99))))
-      42)
-
-(test "call/ec return procedure"
-      '(procedure? (call/ec (lambda (k) k)))
-      #t)
 
 ;; =============================================================================
 ;; Summary

@@ -1,7 +1,9 @@
 #include "core.h"
 #include "object.h"
+#include "subr.h"
 #include <cassert>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -11,28 +13,16 @@
 #include <sanitizer/hwasan_interface.h>
 #include <sstream>
 #include <vector>
-#include "../src/codegen.h"
-#include "../src/codegen_aux.h"
-#include "../src/context.h"
-#include "../src/continuation.h"
-#include "../src/object.h"
-#include "../src/object_heap.h"
-#include "../src/port.h"
 #include "codegen.h"
+#include "codegen_aux.h"
 #include "context.h"
-#include "continuation.h"
 #include "equiv.h"
 #include "hash.h"
 #include "nanos.h"
 #include "nanos_jit.h"
 #include "object_heap.h"
+#include "port.h"
 #include "reader.h"
-
-#include <cstdarg>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
 static bool some_test_failed = false;
 
@@ -61,111 +51,6 @@ void trace(const char* fmt, ...) {
 }
 
 extern "C" const char* __hwasan_default_options() { return "leak_check_at_exit=0"; }
-
-
-namespace test_call_ec {
-
-static bool test_return_normally() {
-  auto dummy_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t { return make_fixnum(42); };
-
-  scm_obj_t proc = make_closure((void*)*+(dummy_proc), 0, 1, 0, nullptr, 1);
-  scm_obj_t result = subr_call_ec(scm_undef, proc);
-
-  if (result != make_fixnum(42)) {
-    printf("\033[31m###### call/ec normal return failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32mcall/ec normal return passed\033[0m\n");
-  return true;
-}
-
-static bool test_invoke_continuation() {
-  auto invoke_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-    scm_obj_t cont = argv[0];
-    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
-    return c_apply_helper(cont, 1, args);
-  };
-
-  scm_obj_t proc = make_closure((void*)*+(invoke_proc), 0, 1, 0, nullptr, 1);
-  scm_obj_t result = subr_call_ec(scm_undef, proc);
-
-  if (result != make_fixnum(100)) {
-    printf("\033[31m###### call/ec invoke passed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32mcall/ec invoke continuation passed\033[0m\n");
-  return true;
-}
-
-static bool test_double_invoke_fails() {
-  auto invoke_twice_proc = [](scm_obj_t self, int argc, scm_obj_t argv[]) -> scm_obj_t {
-    scm_obj_t cont = argv[0];
-    scm_obj_t args[] = {make_cons(make_fixnum(100), scm_nil)};
-    c_apply_helper(cont, 1, args);
-    return make_fixnum(999);
-  };
-
-  scm_obj_t proc = make_closure((void*)*+(invoke_twice_proc), 0, 1, 0, nullptr, 1);
-  scm_obj_t result = subr_call_ec(scm_undef, proc);
-
-  if (result != make_fixnum(100)) {
-    printf("\033[31m###### call/ec double invoke failed\033[0m\n");
-    some_test_failed = true;
-    return false;
-  }
-  printf("\033[32mcall/ec double invoke passed\033[0m\n");
-  return true;
-}
-
-#ifdef __has_feature
-  #if __has_feature(hwaddress_sanitizer)
-
-  #endif
-#endif
-
-static void c_global_set(scm_obj_t key, scm_obj_t value) {
-  assert(is_symbol(key));
-  context::environment_variable_set(key, value);
-}
-
-int run_test(int argc, char** argv) {
-  object_heap_t* heap = new object_heap_t();
-  heap->init(1024 * 1024 * 2, 1024 * 1024);
-  context::init();
-  heap->m_collect_trip_bytes = 1024 * 512;
-
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  {
-    auto jit_expected = nanos_jit_t::Create();
-    if (!jit_expected) {
-      fprintf(stderr, "Could not create LLJIT: %s\n", llvm::toString(jit_expected.takeError()).c_str());
-      exit(1);
-    }
-    auto jit = std::move(*jit_expected);
-
-    auto ts_ctx = std::make_unique<llvm::LLVMContext>();
-
-    codegen_t cg(std::move(ts_ctx), jit.get());
-
-    scm_obj_t scm_subr_call_ec = make_closure((void*)subr_call_ec, 1, 0, 0, nullptr, 1);
-    c_global_set(make_symbol("call/ec"), scm_subr_call_ec);
-
-    test_return_normally();
-    test_invoke_continuation();
-    test_double_invoke_fails();
-  }
-
-  context::destroy();
-  heap->destroy();
-  delete heap;
-
-  return some_test_failed ? 1 : 0;
-}
-
-}  // namespace test_call_ec
 
 namespace test_dynamic_wind {
 
@@ -208,7 +93,6 @@ static bool test_basic_dynamic_wind() {
   return false;
 }
 
-
 #ifdef __has_feature
   #if __has_feature(hwaddress_sanitizer)
 
@@ -248,156 +132,6 @@ namespace test_subr {
 // Direct tests for predicate subrs in nanos_subr.cpp.
 // Each test calls the subr C function directly and checks the result
 // against the R6RS specification.
-
-// ---------------------------------------------------------------------------
-// Subr declarations (extern "C" via SUBR macro)
-// ---------------------------------------------------------------------------
-
-SUBR subr_boolean_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_eqv_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_equal_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_exact_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_inexact_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_infinite_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_integer_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_list_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_null_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_number_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_nan_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_real_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_symbol_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_vector_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_undefined_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_unspecified_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_not(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cons(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-
-// New subrs (vectors, strings, chars, arithmetic)
-SUBR subr_vector(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_vector_length(scm_obj_t self, scm_obj_t a1);
-SUBR subr_vector_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_vector_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
-SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_length(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_string_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_le(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
-SUBR subr_symbol_to_string(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_to_symbol(scm_obj_t self, scm_obj_t a1);
-SUBR subr_number_to_string(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_to_number(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_le(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_numeric_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_alphabetic_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_whitespace_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_upper_case_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_lower_case_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_to_integer(scm_obj_t self, scm_obj_t a1);
-SUBR subr_integer_to_char(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_upcase(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_downcase(scm_obj_t self, scm_obj_t a1);
-SUBR subr_char_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_char_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_make_string(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_to_list(scm_obj_t self, scm_obj_t a1);
-SUBR subr_list_to_string(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_copy(scm_obj_t self, scm_obj_t a1);
-SUBR subr_string_ci_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_ci_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_ci_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_ci_le(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_string_ci_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_error(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_assertion_violation(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_syntax_violation(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_max(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_min(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_add(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_sub(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_mul(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_div(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_lt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_gt(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_le(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_num_ge(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_caar(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cadar(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cadddr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cddr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_cdddr(scm_obj_t self, scm_obj_t a1);
-SUBR subr_set_car(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_set_cdr(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_assv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_length(scm_obj_t self, scm_obj_t a1);
-SUBR subr_list_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_list_to_vector(scm_obj_t self, scm_obj_t a1);
-SUBR subr_memq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_memv(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_member(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_reverse(scm_obj_t self, scm_obj_t a1);
-SUBR subr_list(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_list_transpose(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_list_transpose_plus(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_cons_star(scm_obj_t self, int argc, scm_obj_t argv[]);
-
-// Hashtables
-SUBR subr_hashtable_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_equal_hash(scm_obj_t self, scm_obj_t a1);
-SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_make_eqv_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_make_equal_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_hashtable_ref(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
-SUBR subr_hashtable_delete(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_hashtable_contains(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_hashtable_clear(scm_obj_t self, scm_obj_t a1);
-SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
-SUBR subr_hashtable_alist(scm_obj_t self, scm_obj_t a1);
-SUBR subr_values(scm_obj_t self, int argc, scm_obj_t argv[]);
-// (call-with-values requires JIT bridge; tested in test_codegen)
-
-// Environment access
-SUBR subr_environment_macro_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_environment_macro_ref(scm_obj_t self, scm_obj_t a1);
-SUBR subr_environment_macro_contains(scm_obj_t self, scm_obj_t a1);
-SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
-SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
-SUBR subr_uuid(scm_obj_t self);
-SUBR subr_current_input_port(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_current_output_port(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_current_error_port(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_standard_input_port(scm_obj_t self);
-SUBR subr_standard_output_port(scm_obj_t self);
-SUBR subr_standard_error_port(scm_obj_t self);
-SUBR subr_flush_output_port(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_tuple_p(scm_obj_t self, scm_obj_t a1);
-SUBR subr_tuple(scm_obj_t self, int argc, scm_obj_t argv[]);
-SUBR subr_tuple_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
-SUBR subr_tuple_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
-SUBR subr_make_u8vector_mapping(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 
 // ---------------------------------------------------------------------------
 // Required stubs
@@ -997,7 +731,6 @@ void test_string_extra() {
   PRED_VAR_TRUE(subr_string_ci_ge, make_string("ABC"), make_string("abc"));
 }
 
-
 // ---------------------------------------------------------------------------
 // string-append  — R6RS §9.14
 // ---------------------------------------------------------------------------
@@ -1219,7 +952,6 @@ void test_char_extra() {
   PRED_VAR_TRUE(subr_char_ci_ge, make_char('A'), make_char('a'));
 }
 
-
 // ---------------------------------------------------------------------------
 // max  — R6RS §9.9.3.2
 // ---------------------------------------------------------------------------
@@ -1293,7 +1025,6 @@ void test_min() {
 
   ASSERT_TRUE(min2(make_fixnum(-3), make_fixnum(-1)) == make_fixnum(-3));
 }
-
 
 // ---------------------------------------------------------------------------
 // pairs & lists (extra)
@@ -1377,8 +1108,8 @@ void test_pairs_lists_extra() {
 
   // assv
   {
-    scm_obj_t alist_v = make_cons(make_cons(make_fixnum(1), make_symbol("a")), 
-                                  make_cons(make_cons(make_flonum(2.0), make_symbol("b")), scm_nil));
+    scm_obj_t alist_v =
+        make_cons(make_cons(make_fixnum(1), make_symbol("a")), make_cons(make_cons(make_flonum(2.0), make_symbol("b")), scm_nil));
     scm_obj_t av1 = subr_assv(scm_nil, make_fixnum(1), alist_v);
     ASSERT_TRUE(is_cons(av1) && cons_cdr(av1) == make_symbol("a"));
     scm_obj_t av2 = subr_assv(scm_nil, make_flonum(2.0), alist_v);
@@ -1389,7 +1120,7 @@ void test_pairs_lists_extra() {
   {
     ASSERT_TRUE(subr_caar(scm_nil, make_cons(make_cons(make_fixnum(1), make_fixnum(2)), make_fixnum(3))) == make_fixnum(1));
     ASSERT_TRUE(subr_cadar(scm_nil, make_cons(make_cons(make_fixnum(1), make_cons(make_fixnum(2), scm_nil)), make_fixnum(3))) == make_fixnum(2));
-    
+
     scm_obj_t l4 = make_cons(make_fixnum(1), make_cons(make_fixnum(2), make_cons(make_fixnum(3), make_cons(make_fixnum(4), scm_nil))));
     ASSERT_TRUE(subr_cadddr(scm_nil, l4) == make_fixnum(4));
     ASSERT_TRUE(cons_car(subr_cdddr(scm_nil, l4)) == make_fixnum(4));
@@ -2289,7 +2020,6 @@ void test_error_procedures() {
   }
 }
 
-
 int run_test(int argc, char** argv) {
   printf("Starting test_subr\n");
   fflush(stdout);
@@ -2348,8 +2078,6 @@ int run_test(int argc, char** argv) {
   test_char_extra();
   test_string_extra();
   test_error_procedures();
-
-
 
   context::destroy();
 
@@ -2518,7 +2246,6 @@ int run_test(int argc, char** argv) {
 }  // namespace test_cffi
 
 int main(int argc, char** argv) {
-  test_call_ec::run_test(argc, argv);
   test_dynamic_wind::run_test(argc, argv);
   test_subr::run_test(argc, argv);
   test_cffi::run_test(argc, argv);

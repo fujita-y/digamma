@@ -59,8 +59,6 @@ call-with-output-file
 call-with-port
 call-with-string-output-port
 call-with-values
-call-with-escape-continuation
-call/ec
 car
 cdaaaar
 cdaaadr
@@ -120,7 +118,7 @@ compile
 compile-to-coreform
 cons
 cons*
-continuation?
+
 copy-environment-macros!
 copy-environment-variables!
 core-eval ;;; ####

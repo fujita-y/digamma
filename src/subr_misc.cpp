@@ -5,7 +5,6 @@
 #include "object.h"
 #include "codegen.h"
 #include "context.h"
-#include "continuation.h"
 #include "equiv.h"
 #include "exception.h"
 #include "list.h"
@@ -13,14 +12,12 @@
 #include "subr.h"
 #include "uniq_id.h"
 
-#include <atomic>
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <format>
-#include <random>
 #include <string>
 #include <sys/time.h>
 
@@ -61,9 +58,7 @@ SUBR subr_gensym(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_uninterned_symbol(name.c_str());
 }
 
-SUBR subr_uuid(scm_obj_t self) {
-  return make_string(generate_uuid().c_str());
-}
+SUBR subr_uuid(scm_obj_t self) { return make_string(generate_uuid().c_str()); }
 
 SUBR subr_exit(scm_obj_t self, int argc, scm_obj_t argv[]) {
   int status = 0;
@@ -214,7 +209,6 @@ void init_subr_misc() {
   reg("gensym", (void*)subr_gensym, 0, true);
   reg("uuid", (void*)subr_uuid, 0, false);
   reg("exit", (void*)subr_exit, 0, true);
-  reg("continuation?", (void*)subr_continuation_p, 1, false);
   reg("codegen-and-run", (void*)subr_codegen_and_run, 1, false);
   reg("cyclic-object?", (void*)subr_cyclic_object_p, 1, false);
   reg("time-usage", (void*)subr_time_usage, 0, false);

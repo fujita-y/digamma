@@ -6,7 +6,6 @@
 #include "codegen.h"
 #include "codegen_aux.h"
 #include "context.h"
-#include "continuation.h"
 #include "equiv.h"
 #include "nanos.h"
 #include "object_heap.h"
@@ -424,7 +423,7 @@ SUBR subr_nan_p(scm_obj_t self, scm_obj_t a1) {
 SUBR subr_pair_p(scm_obj_t self, scm_obj_t a1) { return is_cons(a1) ? scm_true : scm_false; }
 
 // procedure?  - R6RS 11.6
-SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1) { return (is_closure(a1) || is_escape(a1)) ? scm_true : scm_false; }
+SUBR subr_procedure_p(scm_obj_t self, scm_obj_t a1) { return is_closure(a1) ? scm_true : scm_false; }
 
 // real?  - R6RS 11.7.2
 SUBR subr_real_p(scm_obj_t self, scm_obj_t a1) { return (is_fixnum(a1) || is_short_flonum(a1) || is_long_flonum(a1)) ? scm_true : scm_false; }
@@ -1214,6 +1213,20 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
   }
 }
 
+// dynamic-wind  - R6RS 11.15
+SUBR subr_dynamic_wind(scm_obj_t self, scm_obj_t pre, scm_obj_t value, scm_obj_t post) {
+  c_call_closure_thunk_0(pre);
+  scm_obj_t res = scm_unspecified;
+  try {
+    res = c_call_closure_thunk_0(value);
+  } catch (...) {
+    c_call_closure_thunk_0(post);
+    throw;
+  }
+  c_call_closure_thunk_0(post);
+  return res;
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -1327,8 +1340,6 @@ void init_subr_base() {
 
   // control flow
   reg("apply", (void*)subr_apply, 0, true);
-  reg("call/ec", (void*)subr_call_ec, 1, false);
-  reg("call-with-escape-continuation", (void*)subr_call_ec, 1, false);
   reg("dynamic-wind", (void*)subr_dynamic_wind, 3, false);
   reg("values", (void*)subr_values, 0, true);
   reg("call-with-values", (void*)subr_call_with_values, 2, false);

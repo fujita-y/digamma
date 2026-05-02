@@ -198,12 +198,7 @@ void object_heap_t::trace(void* obj) {
       }
       return;
     }
-    case tc6_escape: {
-      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-      shade(rec->winders);
-      shade(rec->retval);
-      return;
-    }
+
     case tc6_tuple: {
       scm_tuple_rec_t* rec = (scm_tuple_rec_t*)obj;
       for (int i = 0; i < rec->nsize; i++) {
@@ -286,12 +281,7 @@ void object_heap_t::finalize(void* obj) {
       port_finalize(rec);
       return;
     }
-    case tc6_escape: {
-      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-      if (rec->uctx) free(rec->uctx);
-      rec->uctx = nullptr;
-      return;
-    }
+
     case tc6_future: {
       scm_future_rec_t* rec = (scm_future_rec_t*)obj;
       if (rec->future) delete (boost::fibers::shared_future<scm_obj_t>*)rec->future;
@@ -327,8 +317,6 @@ void object_heap_t::snapshot_root() {
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);
-  enqueue_root(context::s_current_winders);
-  enqueue_root(context::s_continuation_captured_retval);
   enqueue_root(context::s_standard_input_port);
   enqueue_root(context::s_standard_output_port);
   enqueue_root(context::s_standard_error_port);
@@ -360,12 +348,7 @@ void object_heap_t::renounce(void* obj, int size, void* refcon) {
       port_finalize(rec);
       return;
     }
-    case tc6_escape: {
-      scm_escape_rec_t* rec = (scm_escape_rec_t*)obj;
-      if (rec->uctx) free(rec->uctx);
-      rec->uctx = nullptr;
-      return;
-    }
+
     case tc6_future: {
       scm_future_rec_t* rec = (scm_future_rec_t*)obj;
       if (rec->future) delete (boost::fibers::shared_future<scm_obj_t>*)rec->future;
