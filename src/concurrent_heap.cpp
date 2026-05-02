@@ -113,7 +113,7 @@ void concurrent_heap_t::snapshot_stack() {
   printf(";; [safepoint] snapshot mode %d\n", m_root_snapshot_mode);
   printf(";; thread stack bottom: %p\n", (void*)thread_stack_bottom);
   printf(";; thread stack top: %p\n", (void*)thread_stack_top);
-  printf(";; thread stack size: %ld\n", thread_stack_bottom - thread_stack_top);
+  printf(";; thread stack size: %lld\n", (long long)(thread_stack_bottom - thread_stack_top));
   printf(";; callee-saved regs: [");
   for (int i = 0; i < array_sizeof(regs) - 1; i++) printf("%p ", (void*)regs[i]);
   printf("]\n");
