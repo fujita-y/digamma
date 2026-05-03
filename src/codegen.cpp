@@ -105,8 +105,6 @@ codegen_t::codegen_t(std::unique_ptr<llvm::LLVMContext> ctx, nanos_jit_t* jit) :
 //  Compilation pipeline (phases)
 // ============================================================================
 
-
-
 // --------------------------------------------------------------------------
 //  configure_module helper
 // --------------------------------------------------------------------------
@@ -479,8 +477,6 @@ void codegen_t::phase5_optimize_and_verify() {
 // --------------------------------------------------------------------------
 
 compiled_code_t codegen_t::phase6_finalize() {
-  std::lock_guard<std::mutex> lock(jit->m_lock);
-
   // Transfer modules to LLJIT
   std::string main_func_name = main_function->getName().str();
 
@@ -980,11 +976,9 @@ llvm::Function* codegen_t::get_or_create_external_function(const char* name, llv
     llvm::orc::SymbolMap symbols;
     symbols[jit->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(symbol_ptr),
                                            llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable};
-    {
-      std::lock_guard<std::mutex> lock(jit->m_lock);
-      if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
-        llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
-      }
+
+    if (auto err = jit->getMainJITDylib().define(llvm::orc::absoluteSymbols(std::move(symbols)))) {
+      llvm::consumeError(std::move(err));  // Symbol may already be defined from a previous compile
     }
   }
   return func;
@@ -1328,8 +1322,14 @@ void codegen_t::phase2b_analyze_no_escape() {
             auto& pca_t = pending_cell_aliases[true_lbl];
             auto& pa_f = pending_aliases[false_lbl];
             auto& pca_f = pending_cell_aliases[false_lbl];
-            for (int r : aliases) { pa_t.insert(r); pa_f.insert(r); }
-            for (int r : cell_aliases) { pca_t.insert(r); pca_f.insert(r); }
+            for (int r : aliases) {
+              pa_t.insert(r);
+              pa_f.insert(r);
+            }
+            for (int r : cell_aliases) {
+              pca_t.insert(r);
+              pca_f.insert(r);
+            }
             // Keep current aliases for linear fall-through (conservative).
             break;
           }

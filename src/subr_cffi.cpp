@@ -349,8 +349,6 @@ static void* compile_callout_thunk(uintptr_t adrs, const char* caller_signature,
 // ============================================================================
 
 SUBR subr_codegen_cdecl_callout(scm_obj_t self, int argc, scm_obj_t argv[]) {
-  std::lock_guard<std::mutex> lock(nanos_t::current()->m_jit->m_lock);
-
   if (argc != 2 && argc != 3)
     throw std::runtime_error("assertion-violation: codegen-cdecl-callout: wrong number of arguments (expected 2 or 3)");
 
@@ -489,7 +487,6 @@ static void* compile_callback_thunk(uintptr_t trampoline_uid, const char* signat
 // ============================================================================
 
 SUBR subr_codegen_cdecl_callback(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
-  std::lock_guard<std::mutex> lock(nanos_t::current()->m_jit->m_lock);
   if (!is_closure(a1)) throw std::runtime_error("assertion-violation: codegen-cdecl-callback: argument 1 must be a closure");
   if (!is_string(a2)) throw std::runtime_error("assertion-violation: codegen-cdecl-callback: argument 2 must be a string (signature)");
 

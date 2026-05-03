@@ -117,6 +117,7 @@ void codegen_t::emit_safepoint(const Instruction& inst) {
   // Load of the flag
   llvm::LoadInst* load = BL.CreateLoad(BL.getInt8Ty(), poll_val_ptr, "safepoint_poll");
   load->setAlignment(llvm::Align(1));
+  load->setVolatile(true);
 
   // Check if a stop-the-world event is requested (flag != 0)
   llvm::Value* is_requested = BL.CreateICmpNE(load, BL.getInt8(0), "safepoint_requested");

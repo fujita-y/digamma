@@ -17,7 +17,6 @@
 #include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/SelfExecutorProcessControl.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
-#include <mutex>
 
 class nanos_jit_t {
  public:
@@ -34,8 +33,6 @@ class nanos_jit_t {
   llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name) { return Mangle(Name); }
   llvm::Error addIRModule(llvm::orc::ThreadSafeModule TSM, llvm::orc::ResourceTrackerSP RT = nullptr);
   llvm::Expected<llvm::orc::ExecutorAddr> lookup(llvm::StringRef Name);
-
-  std::mutex m_lock;
 
  private:
   static void handleLazyCallThroughError();
