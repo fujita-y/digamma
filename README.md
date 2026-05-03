@@ -14,7 +14,7 @@ While Digamma does not target full RnRS conformance, it provides standard hygien
 
 ### Highlights
 
-| | |
+| Category | Description |
 |---|---|
 | **Runtime** | Fiber-based concurrency with integrated async I/O and networking |
 | **AI** | Native Vertex AI (Gemini) and Dialogflow CX integration via asio-grpc |
@@ -93,10 +93,15 @@ Unlike typical FFI wrappers that stall the interpreter, every AI call is dispatc
   (newline))
 ```
 
+<details>
+<summary><b>Vertex AI primitives</b></summary>
+
 | Primitive | Description |
 |---|---|
 | `(generate-content prompt [model] [location] [project-id])` | Synchronous inference |
 | `(generate-content-async prompt [model] [location] [project-id])` | Non-blocking; returns a future |
+
+</details>
 
 Default model: `gemini-2.5-flash`.
 
@@ -110,10 +115,15 @@ Default model: `gemini-2.5-flash`.
   (display (future-get f2)) (newline))
 ```
 
+<details>
+<summary><b>Dialogflow CX primitives</b></summary>
+
 | Primitive | Description |
 |---|---|
 | `(dialogflow-cx-detect-intent text agent-id [session-id] [location] [project-id] [language-code])` | Synchronous intent detection |
 | `(dialogflow-cx-detect-intent-async text agent-id [session-id] [location] [project-id] [language-code])` | Non-blocking; returns a future |
+
+</details>
 
 Session IDs are auto-generated (UUID) if omitted.
 
@@ -171,11 +181,16 @@ The GC is a **mostly-concurrent, mark-sweep collector** running on a dedicated t
 
 The `(core cffi)` module provides a dynamic C FFI backed by LLVM ORC:
 
+<details>
+<summary><b>FFI primitives</b></summary>
+
 | Primitive | Description |
 |---|---|
 | `load-shared-object` / `lookup-shared-object` | Load dynamic libraries and resolve C symbols |
 | `c-function` | Bind Scheme procedures to C functions with typed signatures (`int`, `double`, `void*`, `size_t`, …) |
 | `c-callback` | Create native C function pointers that invoke Scheme closures |
+
+</details>
 
 ---
 
