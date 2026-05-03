@@ -2,9 +2,7 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define-module (core pretty-print)
-
   (export pretty-print)
-
   (import (core destructuring))
 
 #|
@@ -88,43 +86,43 @@
         (define fits?
           (lambda (w lst)
             (and (>= w 0)
-                (or (null? lst)
-                    (destructuring-match lst
-                      (((_ _ ()) . z) (fits? w z))
-                      (((_ '.&BREAK #\;) . z) #t)
-                      (((_ '.&FLAT #\;) . z) (fits? (- w 1) z))
-                      (((_ _ (? string? s)) . z) (fits? (- w (string-length s)) z))
-                      (((i _ ('.&GROUP . x)) . z) (fits? w `((,i .&FLAT ,x) ,@z)))
-                      (((i m ('.&NEST j . x)) . z) (fits? w `((,(+ i j) ,m ,x) ,@z)))
-                      (((i m (x . y)) . z) (fits? w `((,i ,m ,x) (,i ,m ,y) ,@z))))))))
+                 (or (null? lst)
+                     (destructuring-match lst
+                       (((_ _ ()) . z) (fits? w z))
+                       (((_ '.&BREAK #\;) . z) #t)
+                       (((_ '.&FLAT #\;) . z) (fits? (- w 1) z))
+                       (((_ _ (? string? s)) . z) (fits? (- w (string-length s)) z))
+                       (((i _ ('.&GROUP . x)) . z) (fits? w `((,i .&FLAT ,x) ,@z)))
+                       (((i m ('.&NEST j . x)) . z) (fits? w `((,(+ i j) ,m ,x) ,@z)))
+                       (((i m (x . y)) . z) (fits? w `((,i ,m ,x) (,i ,m ,y) ,@z))))))))
         (define print
           (lambda (w k lst)
             (or (null? lst)
                 (destructuring-match lst
                   (((_ _ ()) . z) (print w k z))
                   (((i '.&BREAK #\;) . z)
-                  (cond ((or (eq? n-more-lines #f) (> n-more-lines 0))
+                   (cond ((or (eq? n-more-lines #f) (> n-more-lines 0))
                           (and n-more-lines (set! n-more-lines (- n-more-lines 1)))
                           (put-char port #\newline)
                           (let loop ((i i)) (and (> i 0) (put-char port #\space) (loop (- i 1))))
                           (print w i z))))
                   (((_ '.&FLAT #\;) . z)
-                  (begin
-                    (put-char port #\space)
-                    (print w (+ k 1) z)))
+                   (begin
+                     (put-char port #\space)
+                     (print w (+ k 1) z)))
                   (((_ _ (? string? s)) . z)
-                  (begin
-                    (put-string port s)
-                    (print w (+ k (string-length s)) z)))
+                   (begin
+                     (put-string port s)
+                     (print w (+ k (string-length s)) z)))
                   (((i _ ('.&GROUP . x)) . z)
-                  (let ((flat `((,i .&FLAT ,x) ,@z)))
-                    (if (fits? (- w k) flat)
-                        (print w k flat)
-                        (print w k `((,i .&BREAK ,x) ,@z)))))
+                   (let ((flat `((,i .&FLAT ,x) ,@z)))
+                     (if (fits? (- w k) flat)
+                         (print w k flat)
+                         (print w k `((,i .&BREAK ,x) ,@z)))))
                   (((i m ('.&NEST j . x)) . z)
-                  (print w k `((,(+ i j) ,m ,x) ,@z)))
+                   (print w k `((,(+ i j) ,m ,x) ,@z)))
                   (((i m (x . y)) . z)
-                  (print w k `((,i ,m ,x) (,i ,m ,y) ,@z)))))))
+                   (print w k `((,i ,m ,x) (,i ,m ,y) ,@z)))))))
         (define symbol->length
           (lambda (obj)
             (string-length (symbol->string obj))))
@@ -132,13 +130,13 @@
           (lambda (lst)
             (cond ((null? lst) '())
                   ((null? (cdr lst))
-                  (list (parse (car lst))))
+                   (list (parse (car lst))))
                   ((and (eq? (car lst) 'unquote) (pair? (cdr lst)) (null? (cddr lst)))
-                  (list "." #\; "," (parse (cadr lst))))
+                   (list "." #\; "," (parse (cadr lst))))
                   ((pair? (cdr lst))
-                  (cons* (parse (car lst)) #\; (parse-list (cdr lst))))
+                   (cons* (parse (car lst)) #\; (parse-list (cdr lst))))
                   (else
-                  (list (parse (car lst)) #\; "." #\; (parse (cdr lst)))))))
+                   (list (parse (car lst)) #\; "." #\; (parse (cdr lst)))))))
         (define parse
           (lambda (obj)
             (cond ((pair? obj)
@@ -210,7 +208,7 @@
                       "#()"
                       `(.&GROUP "#(" (.&NEST 2 ,@(parse-list (vector->list obj))) ")")))
                   (else
-                  (format "~s" obj)))))
+                   (format "~s" obj)))))
 
         (if (cyclic-object? expr)
             (put-string port (format "~w" expr))
@@ -226,4 +224,4 @@
         (put-char port #\newline)
         (flush-output-port port))))
 
-)
+) ;[end]

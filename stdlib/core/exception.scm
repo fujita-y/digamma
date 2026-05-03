@@ -2,9 +2,7 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define-module (core exception)
-
   (export current-exception-handler with-exception-handler raise raise-continuable)
-
   (import (core parameterize))
 
   (define current-exception-handler
@@ -25,4 +23,4 @@
   (define (raise-continuable x) 
     ((current-exception-handler) x))
 
-)
+) ;[end]

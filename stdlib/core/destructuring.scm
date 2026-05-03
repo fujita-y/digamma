@@ -2,18 +2,16 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define-module (core destructuring)
-
   (export destructuring-match destructuring-bind)
-
   (import (core let-values))
 
   (define drop-last-cdr
     (lambda (lst)
       (cond ((null? lst) '())
             (else
-            (let loop ((lst lst))
-              (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
-                      (else '())))))))
+             (let loop ((lst lst))
+               (cond ((pair? lst) (cons (car lst) (loop (cdr lst))))
+                     (else '())))))))
 
   (define drop-last-pair
     (lambda (lst)
@@ -34,9 +32,9 @@
   (define last-cdr
     (lambda (lst)
       (cond ((pair? lst)
-              (let loop ((lst lst))
-                (cond ((pair? (cdr lst)) (loop (cdr lst)))
-                      (else (cdr lst)))))
+             (let loop ((lst lst))
+               (cond ((pair? (cdr lst)) (loop (cdr lst)))
+                     (else (cdr lst)))))
             (else lst))))
 
   (define count-pair
@@ -68,42 +66,42 @@
   (define car+
     (lambda (expr)
       (cond ((and (pair? expr) (hashtable-ref ca---r (car expr) #f))
-            => (lambda (a) (cons a (cdr expr))))
+             => (lambda (a) (cons a (cdr expr))))
             (else (list 'car expr)))))
 
   (define cdr+
     (lambda (expr)
       (cond ((and (pair? expr) (hashtable-ref cd---r (car expr) #f))
-            => (lambda (a) (cons a (cdr expr))))
+             => (lambda (a) (cons a (cdr expr))))
             (else (list 'cdr expr)))))
 
   (define duplicates?
     (lambda (lst)
       (and (pair? lst)
-          (let loop ((head (car lst)) (rest (cdr lst)))
-            (or (memq head rest)
-                (and (pair? rest)
+           (let loop ((head (car lst)) (rest (cdr lst)))
+             (or (memq head rest)
+                 (and (pair? rest)
                       (loop (car rest) (cdr rest))))))))
 
   (define ellipsis-pair?
     (lambda (pat)
       (and (pair? pat)
-          (symbol? (car pat))
-          (pair? (cdr pat))
-          (eq? (cadr pat) '...))))
+           (symbol? (car pat))
+           (pair? (cdr pat))
+           (eq? (cadr pat) '...))))
 
   (define quoted-pair?
     (lambda (pat)
       (and (pair? pat)
-          (eq? (car pat) 'quote)
-          (pair? (cdr pat))
-          (null? (cddr pat)))))
+           (eq? (car pat) 'quote)
+           (pair? (cdr pat))
+           (null? (cddr pat)))))
 
   (define predicate-pair?
     (lambda (pat)
       (and (pair? pat)
-          (eq? (car pat) '?)
-          (pair? (cdr pat)))))
+           (eq? (car pat) '?)
+           (pair? (cdr pat)))))
 
   (define choose-pred
     (lambda (pat)
@@ -115,8 +113,8 @@
     (lambda (lst)
       (let loop ((lst lst) (n 0))
         (cond ((pair? lst)
-              (cond ((predicate-pair? lst) n)
-                    (else (loop (cdr lst) (+ n 1)))))
+               (cond ((predicate-pair? lst) n)
+                     (else (loop (cdr lst) (+ n 1)))))
               (else n)))))
 
   (define memoize-ref
@@ -279,4 +277,4 @@
               (caaar . cdaaar) (caadr . cdaadr) (cadar . cadadar) (caddr . cdaddr) (cdaar . cddaar)
               (cdadr . cddadr) (cddar . cdddar) (cdddr . cddddr)))
 
-)
+) ;[end]
