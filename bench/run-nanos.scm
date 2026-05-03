@@ -20,15 +20,16 @@
         result)))
 
 (define (run-benchmark name count ok? run-maker . args)
-  (display (format "~%;;  ~a (x~a)~!" (pad-space name 7) count))
-	(flush-output-port (current-output-port))
+  (format #t "~%;;  ~a (x~a)~!" (pad-space name 7) count)
   (let ((run (apply run-maker args)))
       (if warmup
           (run-bench name 1 ok? run))
       (let ((result (time (run-bench name count ok? run))))
-        (and (not (ok? result)) (display (format "~%;; wrong result: ~s~%~!" result))))
-      (display (format ";;  ----------------------------------------------------------------~!"))
-	    (flush-output-port (current-output-port))
+        (if (not (ok? result))
+            (begin 
+              (format #t "~%;; wrong result: ~s~%~!" result)
+              (fatal-error name))))
+      (format #t ";;  ----------------------------------------------------------------~!")
       (unspecified)))
 
 (define load-bench-n-run
@@ -40,7 +41,7 @@
 
 (define fatal-error
   (lambda x
-    (display (format "fatal-error: ~s" x))
+    (format #t "fatal-error: ~s~%~!" x)
     (exit 1)))
 
 (define pad-space
@@ -105,7 +106,7 @@
 (define-syntax GENERIC>= (syntax-rules () ((_ . lst) (>= . lst))))
 (define-syntax GENERICexpt (syntax-rules () ((_ x y) (expt x y))))
 
-(display (format "\n\n;;  GABRIEL\n"))
+(format #t "\n\n;;  GABRIEL\n")
 (time-bench browse 600)
 (time-bench cpstak 80)
 (time-bench dderiv 160000)
@@ -116,7 +117,8 @@
 (time-bench tak 1000)
 (time-bench takl 70)
 (time-bench triangl 2)
-(display (format "\n\n;;  ARITHMETIC\n"))
+
+(format #t "\n\n;;  ARITHMETIC\n")
 (time-bench fft 400)
 (time-bench fib 1)
 (time-bench fibfp 1)
@@ -126,7 +128,7 @@
 (time-bench sum 10000)
 (time-bench sumfp 1200)
 
-(display (format "\n\n;;  MISCELLANEOUS\n"))
+(format #t "\n\n;;  MISCELLANEOUS\n")
 (time-bench ack 3)
 (time-bench boyer 10)
 (time-bench nboyer 1)

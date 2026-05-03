@@ -144,14 +144,56 @@ SUBR subr_display(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_unspecified;
 }
 
-// format - SRFI-28
+// format - SRFI-28, SRFI-48
 SUBR subr_format(scm_obj_t self, int argc, scm_obj_t argv[]) {
   if (argc < 1) throw std::runtime_error("format: too few arguments");
-  if (!is_string(argv[0])) throw std::runtime_error("format: first argument must be a string");
-  std::ostringstream oss;
-  printer_t printer(oss);
-  printer.format(argc, argv);
-  return make_string(oss.str().c_str());
+
+  scm_obj_t head = argv[0];
+  scm_obj_t port = scm_undef;
+  int fmt_idx = 0;
+
+  if (head == scm_true) {
+    port = context::s_current_output_port;
+    fmt_idx = 1;
+  } else if (head == scm_false) {
+    port = scm_false;
+    fmt_idx = 1;
+  } else if (is_port(head)) {
+    port = head;
+    fmt_idx = 1;
+  } else if (is_string(head)) {
+    port = scm_false;
+    fmt_idx = 0;
+  } else {
+    throw std::runtime_error("format: first argument must be a port, a boolean, or a format string");
+  }
+
+  if (fmt_idx == 1 && argc < 2) {
+    throw std::runtime_error("format: missing format string");
+  }
+
+  scm_obj_t fmt_str = argv[fmt_idx];
+  if (!is_string(fmt_str)) {
+    throw std::runtime_error("format: format argument must be a string");
+  }
+
+  int format_argc = argc - fmt_idx;
+  scm_obj_t* format_argv = argv + fmt_idx;
+
+  if (port == scm_false) {
+    std::ostringstream oss;
+    printer_t(oss).format(format_argc, format_argv);
+    return make_string(oss.str().c_str());
+  }
+
+  if (!is_output_port(port)) {
+    throw std::runtime_error("format: argument must be an output port");
+  }
+
+  std::ostream* os = port_get_ostream(port);
+  assert(os != nullptr);
+  printer_t(*os).format(format_argc, format_argv);
+  return scm_unspecified;
 }
 
 // newline  - R6RS 8.3

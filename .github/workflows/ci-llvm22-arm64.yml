@@ -102,3 +102,6 @@ jobs:
 
       - name: Run core compiler tests
         run: bash core/tests/run_tests.sh
+
+      - name: Run benchmarks
+        run: build/nanos --boot boot/core.ir --script bench/run-nanos.scm --load-path bench/gambit-benchmarks:stdlib

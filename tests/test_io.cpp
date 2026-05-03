@@ -1212,11 +1212,117 @@ void test_write_ss() {
   delete heap;
 }
 
+void test_subr_format() {
+  std::cout << "Starting subr_format tests..." << std::endl;
+  object_heap_t* heap = new object_heap_t();
+  heap->init(4 * 1024 * 1024, 128 * 1024);
+  context::init();
+
+  // (format "hello ~a" 'world) => "hello world"
+  {
+    scm_obj_t args[2];
+    args[0] = make_string("hello ~a");
+    args[1] = make_symbol("world");
+    scm_obj_t res = subr_format(scm_nil, 2, args);
+    if (!is_string(res) || strcmp((const char*)string_name(res), "hello world") != 0) {
+      std::cerr << "subr_format test 1 failed" << std::endl;
+      assert(false);
+    }
+    std::cout << "subr_format test 1 passed" << std::endl;
+  }
+
+  // (format #f "hello ~a" 'world) => "hello world"
+  {
+    scm_obj_t args[3];
+    args[0] = scm_false;
+    args[1] = make_string("hello ~a");
+    args[2] = make_symbol("world");
+    scm_obj_t res = subr_format(scm_nil, 3, args);
+    if (!is_string(res) || strcmp((const char*)string_name(res), "hello world") != 0) {
+      std::cerr << "subr_format test 2 failed" << std::endl;
+      assert(false);
+    }
+    std::cout << "subr_format test 2 passed" << std::endl;
+  }
+
+  // (format #t "hello ~a" 'world) => scm_unspecified
+  {
+    scm_obj_t args[3];
+    args[0] = scm_true;
+    args[1] = make_string("hello ~a");
+    args[2] = make_symbol("world");
+    scm_obj_t res = subr_format(scm_nil, 3, args);
+    if (res != scm_unspecified) {
+      std::cerr << "subr_format test 3 failed" << std::endl;
+      assert(false);
+    }
+    std::cout << "subr_format test 3 passed" << std::endl;
+  }
+
+  // (format port "hello ~a" 'world)
+  {
+    scm_obj_t port = port_open_string_output_port();
+    scm_obj_t args[3];
+    args[0] = port;
+    args[1] = make_string("hello ~a");
+    args[2] = make_symbol("world");
+    scm_obj_t res = subr_format(scm_nil, 3, args);
+    if (res != scm_unspecified) {
+      std::cerr << "subr_format test 4 failed" << std::endl;
+      assert(false);
+    }
+    scm_obj_t s = port_get_output_string(port);
+    if (!is_string(s) || strcmp((const char*)string_name(s), "hello world") != 0) {
+      std::cerr << "subr_format test 4 output failed" << std::endl;
+      assert(false);
+    }
+    port_close(port);
+    std::cout << "subr_format test 4 passed" << std::endl;
+  }
+
+  // Error cases
+  {
+    // (format #t) - missing format string
+    try {
+      scm_obj_t args[1] = {scm_true};
+      subr_format(scm_nil, 1, args);
+      std::cerr << "subr_format error test 1 failed" << std::endl;
+      assert(false);
+    } catch (const std::runtime_error& e) {
+      if (std::string(e.what()).find("missing format string") == std::string::npos) {
+        std::cerr << "subr_format error test 1 wrong exception: " << e.what() << std::endl;
+        assert(false);
+      }
+    }
+    std::cout << "subr_format error test 1 passed" << std::endl;
+
+    // (format #t 123) - format argument must be a string
+    try {
+      scm_obj_t args[2] = {scm_true, make_fixnum(123)};
+      subr_format(scm_nil, 2, args);
+      std::cerr << "subr_format error test 2 failed" << std::endl;
+      assert(false);
+    } catch (const std::runtime_error& e) {
+      if (std::string(e.what()).find("format argument must be a string") == std::string::npos) {
+        std::cerr << "subr_format error test 2 wrong exception: " << e.what() << std::endl;
+        assert(false);
+      }
+    }
+    std::cout << "subr_format error test 2 passed" << std::endl;
+  }
+
+  std::cout << "subr_format tests passed" << std::endl;
+  context::destroy();
+  heap->destroy();
+  delete heap;
+}
+
 int run_test(int argc, char** argv) {
   test_printer();
   test_format();
   test_display();
   test_write_ss();
+  test_subr_format();
   return 0;
 }
 
