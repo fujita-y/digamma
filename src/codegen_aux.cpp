@@ -15,9 +15,14 @@ void reset_safepoint_cache() { s_stop_the_world = nullptr; }
 static inline bool starts_with(const char* str, const char* prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }
 
 bool is_side_effect_free_aux_helper(const char* name) {
-  // return true if function no need to call if returned value is not used
-  if (starts_with(name, "c_make_closure")) return true;
-  if (starts_with(name, "c_make_cons")) return true;
+  // return true if function no need to call if returned value is not used.
+  // NOTE: c_make_closure, c_make_cons, c_make_cell are NOT listed here even
+  // though their return value is the only observable effect, because marking
+  // them as readOnly allows LLVM to CSE or hoist allocation calls, which
+  // breaks the per-invocation freshness semantics required by the Scheme spec.
+  //  if (starts_with(name, "c_make_closure")) return true;
+  //  if (starts_with(name, "c_make_cons")) return true;
+  //  if (starts_with(name, "c_make_cell")) return true;
   if (starts_with(name, "c_construct_rest_list")) return true;
   return false;
 }

@@ -162,8 +162,10 @@ compiled_code_t codegen_t::compile(scm_obj_t inst_list) {
     phase2d_analyze_cell_stack_alloc();
 #ifndef NDEBUG
     {
+      // Write a separator between compilation batches
       std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
-      std::ofstream ofs("/tmp/nanos_" + tid_suffix + ".ins", std::ios::trunc);
+      std::ofstream ofs("/tmp/nanos_" + tid_suffix + ".ins", std::ios::app);
+      ofs << ";;; === new compilation ===\n";
     }
     for (const auto& func : functions) {
       dump_instructions(func.instructions);
@@ -445,10 +447,11 @@ void codegen_t::phase5_optimize_and_verify() {
     // Use thread-local suffix to avoid interleaved writes from concurrent instances.
     std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
     std::error_code EC;
-    llvm::raw_fd_ostream dest("/tmp/nanos_main_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_None);
+    llvm::raw_fd_ostream dest("/tmp/nanos_main_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_Append);
     if (EC) {
       llvm::errs() << "Could not open file: " << EC.message() << "\n";
     } else {
+      dest << "; === new main compilation ===\n";
       main_module_uptr->print(dest, nullptr);
     }
   }
@@ -459,10 +462,11 @@ void codegen_t::phase5_optimize_and_verify() {
     {
       std::string tid_suffix = std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
       std::error_code EC;
-      llvm::raw_fd_ostream dest2("/tmp/nanos_closures_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_None);
+      llvm::raw_fd_ostream dest2("/tmp/nanos_closures_" + tid_suffix + ".ll", EC, llvm::sys::fs::OF_Append);
       if (EC) {
         llvm::errs() << "Could not open file: " << EC.message() << "\n";
       } else {
+        dest2 << "; === new closures compilation ===\n";
         closure_module_uptr->print(dest2, nullptr);
       }
     }
@@ -1179,6 +1183,15 @@ void codegen_t::phase2a_analyze_closure_labels() {
             } else {
               inst.closure_label = scm_nil;
             }
+            // For a non-tail CALL: the return value overwrites r0, so the
+            // old label at r0 is no longer valid after the call.  Also kill
+            // the argument registers r0..r(argc-1) since they are consumed
+            // by the call and r0 receives the return value.
+            if (inst.op == Opcode::CALL) {
+              for (int a = 0; a <= inst.argc; ++a) {  // r0..r(argc)
+                current_state.regs.erase(a);
+              }
+            }
             break;
           case Opcode::JUMP:
             if (block_entry_states[inst.opr1].merge(current_state)) {
@@ -1270,6 +1283,11 @@ void codegen_t::phase2b_analyze_no_escape() {
       bool cell_aliases_used = false;  // becomes true if closure ever flowed through a heap cell
       bool tail_called = false;        // becomes true if closure is tail-called from creating frame
 
+      // Maps label symbol -> alias sets saved from JUMP/IF instructions pointing to that label.
+      // At each LABEL instruction we merge saved incoming aliases into the current alias sets.
+      std::unordered_map<scm_obj_t, std::unordered_set<int>> pending_aliases;
+      std::unordered_map<scm_obj_t, std::unordered_set<int>> pending_cell_aliases;
+
       for (size_t i = mk + 1; i < n && !escaped; ++i) {
         const auto& inst = insts[i];
 
@@ -1284,6 +1302,56 @@ void codegen_t::phase2b_analyze_no_escape() {
               escaped = true;
             }
             break;
+
+          // ---- JUMP ---------------------------------------------------------
+          case Opcode::JUMP: {
+            // Unconditional jump: save current aliases at the target label, then
+            // clear the current set (code after jump is unreachable via this path).
+            // The saved aliases will be merged when we reach the target label.
+            scm_obj_t target = inst.opr1;
+            auto& pa = pending_aliases[target];
+            auto& pca = pending_cell_aliases[target];
+            for (int r : aliases) pa.insert(r);
+            for (int r : cell_aliases) pca.insert(r);
+            aliases.clear();
+            cell_aliases.clear();
+            break;
+          }
+
+          // ---- IF -----------------------------------------------------------
+          case Opcode::IF: {
+            // Conditional branch: both true and false targets may be reached.
+            // Save current aliases for both targets, keep current set for fall-through.
+            scm_obj_t true_lbl = inst.opr1;
+            scm_obj_t false_lbl = inst.opr2;
+            auto& pa_t = pending_aliases[true_lbl];
+            auto& pca_t = pending_cell_aliases[true_lbl];
+            auto& pa_f = pending_aliases[false_lbl];
+            auto& pca_f = pending_cell_aliases[false_lbl];
+            for (int r : aliases) { pa_t.insert(r); pa_f.insert(r); }
+            for (int r : cell_aliases) { pca_t.insert(r); pca_f.insert(r); }
+            // Keep current aliases for linear fall-through (conservative).
+            break;
+          }
+
+          // ---- LABEL --------------------------------------------------------
+          case Opcode::LABEL: {
+            // Merge any aliases saved from jumps pointing here.
+            scm_obj_t lbl = inst.opr1;
+            auto it_a = pending_aliases.find(lbl);
+            if (it_a != pending_aliases.end()) {
+              for (int r : it_a->second) aliases.insert(r);
+            }
+            auto it_ca = pending_cell_aliases.find(lbl);
+            if (it_ca != pending_cell_aliases.end()) {
+              size_t before = cell_aliases.size();
+              for (int r : it_ca->second) {
+                cell_aliases.insert(r);
+              }
+              if (cell_aliases.size() > before) cell_aliases_used = true;
+            }
+            break;
+          }
 
           // ---- MOV ----------------------------------------------------------
           case Opcode::MOV: {
