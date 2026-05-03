@@ -3,7 +3,6 @@
   "version": "0.9",
   "dependencies": [
     "boost-fiber",
-    "boost-context",
     "boost-iostreams",
     "boost-beast",
     "openssl",

@@ -76,7 +76,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   endif()
 endif()
 
-find_package(Boost CONFIG REQUIRED COMPONENTS context fiber iostreams)
+find_package(Boost CONFIG REQUIRED COMPONENTS fiber iostreams)
 find_package(replxx CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
@@ -222,7 +222,7 @@ set(NANOS_CORE_SOURCES
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::context Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform google-cloud-cpp::dialogflow_cx asio-grpc::asio-grpc -pthread -ldl)
+set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform google-cloud-cpp::dialogflow_cx asio-grpc::asio-grpc -pthread -ldl)
 
 
 # ==============================================================================
