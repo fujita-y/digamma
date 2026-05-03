@@ -10,6 +10,7 @@ Users seeking a complete R6RS/R7RS implementation should see [Ypsilon](https://g
 
 Digamma features a self-hosted compiler, an LLVM-based JIT backend, a concurrent garbage collector, and a tagged-pointer object system with ARM64 TBI support.
 Its virtual machine, **nanos**, compiles Scheme to native code on-demand through a multi-stage pipeline.
+
 While Digamma does not target full RnRS conformance, it provides standard hygienic macros — `syntax-case` and `syntax-rules` — for expressive, composable abstractions.
 
 ### Highlights
