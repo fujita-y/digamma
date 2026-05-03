@@ -1399,6 +1399,26 @@
 
 (display "All letrec* expansion tests done.\n")
 
+;; =============================================================================
+;; Escaped ellipsis in syntax-case templates (R6RS §12.4)
+;; =============================================================================
+(display "\n>>> Escaped ellipsis in syntax-case templates\n")
+
+;; Test 1: (... ...) produces literal ..., (... (a ...)) produces (a ...) with substitution
+(macroexpand
+ '(define-syntax sc-elli-esc
+    (lambda (x)
+      (syntax-case x ()
+        ((_)
+         (syntax '(... ...)))
+        ((_ a)
+         (syntax '(... (a ...))))
+        ((_ a b)
+         (syntax '(... (... a b))))))))
+
+(test "sc-elli-esc no args"  (macroexpand '(sc-elli-esc)       'strip) ''...)
+(test "sc-elli-esc 1 arg"   (macroexpand '(sc-elli-esc 100)    'strip) ''(100 ...))
+(test "sc-elli-esc 2 args"  (macroexpand '(sc-elli-esc 100 200) 'strip) ''(... 100 200))
 
 
 (newline)
