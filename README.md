@@ -3,6 +3,7 @@
 [![arm64 llvm22](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml)
 [![arm64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml)
 [![amd64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml)
+[![docker](https://github.com/fujita-y/digamma/actions/workflows/docker.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/docker.yml)
 
 Digamma is a lightweight Scheme dialect designed for AI workflow automation.
 It focuses on execution efficiency and Lisp-based extensibility rather than strict RnRS compliance.
