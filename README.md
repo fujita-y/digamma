@@ -314,10 +314,6 @@ cd core/tests && ./run_tests.sh      # Core compiler tests
 
 ---
 
-## Acknowledgments
-
-Digamma is an ancestor and a successor of [Ypsilon](https://github.com/fujita-y/ypsilon).
-
 ## License
 
 BSD 2-Clause. See [LICENSE](LICENSE) for details.
