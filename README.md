@@ -239,6 +239,18 @@ cmake ..
 make -j$(nproc)
 ```
 
+### Docker
+
+A pre-built Docker image is available on [Docker Hub](https://hub.docker.com/r/fujitay/digamma):
+
+```bash
+# x86_64
+docker run --rm -it fujitay/digamma:latest-amd64-llvm21
+
+# ARM64
+docker run --rm -it fujitay/digamma:latest-arm64-llvm22
+```
+
 ### Rebuilding the Boot Image
 
 The compiler pipeline is self-hosted: the Scheme files in `core/` are cross-compiled by an external RnRS Scheme (such as Ypsilon or Gauche) into `boot/core.ir`, which nanos loads at startup.
