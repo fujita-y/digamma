@@ -23,7 +23,6 @@
 #include <sstream>
 #include <string>
 
-#define IR_MODE    0
 #define IR_VERBOSE 0
 
 // ============================================================================
@@ -81,43 +80,6 @@ void nanos_t::destroy() {
 // ============================================================================
 // Execution & REPL
 // ============================================================================
-/*
-void nanos_t::load_script(std::string filename) {
-  if (!filename.empty()) nanos_options::script_file = filename;
-  std::ifstream ifs(nanos_options::script_file);
-  if (!ifs) {
-    puts("Error: failed to open file");
-    return;
-  }
-  reader_t reader(ifs);
-  printer_t printer(std::cout);
-  std::vector<scm_obj_t> lst;
-  bool err = false;
-  while (true) {
-    scm_obj_t obj = reader.read(err);
-    if (err) {
-      std::string msg = reader.get_error_message();
-      std::cout << "read error: " << msg << std::endl;
-      exit(1);
-    }
-    if (obj == scm_eof) break;
-    lst.push_back(obj);
-  }
-  scm_obj_t expr = scm_nil;
-  for (scm_obj_t obj : lst | std::views::reverse) {
-    expr = make_cons(obj, expr);
-  }
-  expr = make_cons(make_symbol("begin"), expr);
-  try {
-    evaluate(expr, printer);
-  } catch (const nanos_exit_t& e) {
-    throw;
-  } catch (const std::exception& e) {
-    std::cerr << "Exception while executing script: " << e.what() << std::endl;
-    exit(1);
-  }
-}
-*/
 
 void nanos_t::load_script(std::string filename) {
   std::ifstream ifs(filename);
@@ -171,19 +133,9 @@ void nanos_t::load_ir(std::string filename) {
       break;
     }
     if (is_cons(obj)) {
-#if IR_VERBOSE
-      printf("codegen: ");
-      printer.write(cons_car(cons_cdr(obj)));
-      puts("");
-#endif
       try {
         auto func = codegen_t::current()->compile(obj);
         intptr_t result = func.release_and_run();
-#if IR_VERBOSE
-        printf("(0x%016lx)\n", result);
-        printer.write((scm_obj_t)result);
-        puts("");
-#endif
       } catch (const nanos_exit_t& e) {
         throw;
       } catch (const std::exception& e) {
@@ -226,7 +178,7 @@ scm_obj_t nanos_t::call_add_load_path(scm_obj_t path) {
 }
 
 void nanos_t::run() {
-  puts(";; nanos - scheme-like lisp-2 interpreter for bootstrapping.");
+  puts(";; digamma/nanos - lightweight Scheme dialect for concurrent tasks");
 #if USE_TBI
   puts(";; USE_TBI == 1");
 #else
@@ -275,11 +227,7 @@ static void add_history(replxx::Replxx& rx, const std::string& line) {
 }
 
 bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& printer) {
-#if IR_MODE
-  char const* cinput = rx.input(input_buffer.empty() ? "nanos-ir> " : "        ");
-#else
   char const* cinput = rx.input(input_buffer.empty() ? "> " : "  ");
-#endif
 
   if (cinput == nullptr) return false;
 
@@ -335,14 +283,6 @@ bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& pri
 
 void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
   try {
-#if IR_MODE
-    codegen_t* cg = codegen_t::current();
-    auto func = cg->compile(obj);
-    intptr_t result = func();
-    printf("(0x%016lx)\n", result);
-    printer.write((scm_obj_t)result);
-    puts("\n");
-#else
     scm_obj_t result = call_core_eval(obj);
     if (auto out = port_get_ostream(context::s_standard_error_port)) out->flush();
     if (result != scm_unspecified) {
@@ -350,7 +290,6 @@ void nanos_t::evaluate(scm_obj_t obj, printer_t& printer) {
       printer.newline();
       if (auto out = port_get_ostream(context::s_standard_output_port)) out->flush();
     }
-#endif
   } catch (const nanos_exit_t& e) {
     throw;
   } catch (const std::exception& e) {
