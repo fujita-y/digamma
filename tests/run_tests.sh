@@ -23,7 +23,7 @@ for test_file in test_*.scm; do
     echo "Running $test_file..."
     
     # Run the test and capture output
-    OUTPUT=$(../build/nanos --boot ../boot/core.ir --script "$test_file" 2>&1)
+    OUTPUT=$(../build/nanos --boot ../boot/core.ir --load-path ../stdlib --script "$test_file" 2>&1)
     RETVAL=$?
     
     echo "$OUTPUT"
