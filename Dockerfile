@@ -31,6 +31,11 @@ COPY . /app
 RUN git clone https://github.com/microsoft/vcpkg.git /vcpkg --depth 1 && \
     /vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
+RUN for i in $(seq 1 3); do \
+        /vcpkg/vcpkg install --only-downloads --x-manifest-root=/app && break \
+        || { echo "vcpkg download attempt $i failed, retrying in 10s..."; sleep 10; }; \
+    done
+
 RUN cmake -S . -B build \
     -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE=/vcpkg/scripts/buildsystems/vcpkg.cmake \

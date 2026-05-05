@@ -76,6 +76,12 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git ${{ runner.temp }}/vcpkg --depth 1
           ${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
+      - name: Pre-download vcpkg dependencies (with retries)
+        run: |
+          for i in {1..3}; do
+            ${{ runner.temp }}/vcpkg/vcpkg install --only-downloads --x-manifest-root=. && break || { echo "Attempt $i failed, retrying in 10s..."; sleep 10; }
+          done
+
       # --- Build ---
       - name: Configure CMake
         run: |
