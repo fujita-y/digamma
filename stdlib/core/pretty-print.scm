@@ -2,7 +2,10 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define-module (core pretty-print)
-  (export pretty-print)
+  (export pretty-print
+          pretty-print-line-length 
+          pretty-print-initial-indent 
+          pretty-print-maximum-lines)
   (import (core destructuring))
 
 #|
