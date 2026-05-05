@@ -1,6 +1,48 @@
 ;;; Copyright (c) 2004-2026 Yoshikatsu Fujita / LittleWing Company Limited.
 ;;; See LICENSE file for terms and conditions of use.
 
+#|
+  Destructuring Pattern Matching and Binding
+
+  This module provides two macros for pattern-based decomposition of
+  S-expressions:
+
+  (destructuring-match expr clause ...)
+
+    Each clause is (pattern body) or (pattern fender body).
+    Returns the body of the first clause whose pattern matches expr
+    and whose fender (if present) returns true. Returns #f if no
+    clause matches.
+
+  (destructuring-bind pattern expr body ...)
+
+    Binds variables in pattern to the corresponding parts of expr,
+    then evaluates body. Signals an error if the pattern does not
+    match.
+
+  Pattern language:
+
+    symbol        Binds the matched value to symbol.
+    _             Wildcard; matches anything, no binding.
+    ()            Matches the empty list.
+    (p1 . p2)     Matches a pair; p1 matches car, p2 matches cdr.
+    (p ... )      Matches zero or more elements; p is bound to a
+                  list of all matched values.
+    (p ... . q)   Matches zero or more elements followed by a tail
+                  that matches q.
+    (p ... q1 q2) Matches zero or more elements followed by fixed
+                  trailing elements.
+    'datum        Matches datum using eq?, eqv?, or equal? depending
+                  on the datum type.
+    (? pred)      Matches if (pred value) is true.
+    (? pred pat)  Matches if (pred value) is true and pat matches
+                  value.
+
+  The compiler optimizes car/cdr chains into caar, cadr, etc. up to
+  four levels deep and memoizes repeated subexpressions to avoid
+  redundant traversals.
+|#
+
 (define-module (core destructuring)
   (export destructuring-match destructuring-bind)
   (import (core let-values))
