@@ -537,26 +537,29 @@
                        (else (cdr lst)))))
               (else lst))))
 
-    (define count-pair
-      (lambda (lst)
-        (let loop ((lst lst) (n 0))
-          (cond ((pair? lst) (loop (cdr lst) (+ n 1)))
-                (else n)))))
-
     (define last-n-pair
       (lambda (n lst)
-        (let ((m (count-pair lst)))
-          (cond ((< m n) '())
-                (else (list-tail lst (- m n)))))))
-                
+        (let ((lead (let advance ((l lst) (i n))
+                      (cond ((= i 0) l)
+                            ((pair? l) (advance (cdr l) (- i 1)))
+                            (else #f)))))
+          (cond (lead
+                 (let walk ((lead lead) (trail lst))
+                   (cond ((pair? lead) (walk (cdr lead) (cdr trail)))
+                         (else trail))))
+                (else '())))))
+
     (define drop-last-n-pair
       (lambda (n lst)
-        (cond ((null? lst) '())
-              (else
-               (let loop ((lst lst) (m (- (count-pair lst) n)))
-                 (cond ((<= m 0) '())
-                       ((pair? (cdr lst)) (cons (car lst) (loop (cdr lst) (- m 1))))
-                       (else '())))))))
+        (let ((lead (let advance ((l lst) (i n))
+                      (cond ((= i 0) l)
+                            ((pair? l) (advance (cdr l) (- i 1)))
+                            (else #f)))))
+          (cond (lead
+                 (let walk ((lead lead) (trail lst))
+                   (cond ((pair? lead) (cons (car trail) (walk (cdr lead) (cdr trail))))
+                         (else '()))))
+                (else '())))))
 
     (define gentemp (lambda () (gensym "tmp")))
 
@@ -621,47 +624,41 @@
       (lambda (e mem)
         (cond ((assoc e (vector-ref mem 0)) => cdr)
               (else
-               (let ((name (gentemp)))
-                 (begin (vector-set! mem 0 (cons (cons e name) (vector-ref mem 0))) name))))))
+                (let ((name (gentemp)))
+                  (vector-set! mem 0 (cons (cons e name) (vector-ref mem 0)))
+                  name)))))
 
     (define compile-match
       (lambda (ren mem pat ref match bind vars)
         (cond ((quoted-pair? pat)
                (values (cons `(,(choose-pred (cadr pat)) ,ref ',(cadr pat)) match) bind vars))
               ((ellipsis-pair? pat)
-               (cond ((null? (cddr pat))
-                      (if (eq? (car pat) '_)
-                          (values (cons `(list? ,ref) match) bind vars)
-                          (values (cons `(list? ,ref) match) (cons ref bind) (cons (car pat) vars))))
-                     ((or (not (pair? (cddr pat))) (predicate-pair? (cddr pat)))
-                      (if (eq? (car pat) '_)
-                          (compile-match ren mem (cddr pat) `(last-cdr ,ref) match bind vars)
-                          (compile-match ren mem (cddr pat) `(last-cdr ,ref) match (cons `(drop-last-cdr ,ref) bind) (cons (car pat) vars))))
-                     ((pair? (cddr pat))
-                      (cond ((null? (cdddr pat))
-                             (let ((memoize (memoize-ref `(last-pair ,ref) mem)))
-                               (if (eq? (car pat) '_)
-                                   (compile-match ren mem (cddr pat) memoize
-                                                 (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
-                                                 bind
-                                                 vars)
-                                   (compile-match ren mem (cddr pat) memoize
-                                                 (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
-                                                 (cons `(drop-last-pair ,ref) bind)
-                                                 (cons (car pat) vars)))))
-                            (else
-                             (let ((n (- (count-non-dotted-pattern pat) 2)))
-                               (let ((memoize (memoize-ref `(last-n-pair ,n ,ref) mem)))
-                                 (if (eq? (car pat) '_)
-                                     (compile-match ren mem (cddr pat) memoize
-                                                   (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
-                                                   bind
-                                                   vars)
-                                     (compile-match ren mem (cddr pat) memoize
-                                                   (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
-                                                   (cons `(drop-last-n-pair ,n ,ref) bind)
-                                                   (cons (car pat) vars))))))))
-                    (else (values #f #f #f))))
+               (let ((wild? (eq? (car pat) '_)))
+                 (cond ((null? (cddr pat))
+                        (values (cons `(list? ,ref) match)
+                                (if wild? bind (cons ref bind))
+                                (if wild? vars (cons (car pat) vars))))
+                       ((or (not (pair? (cddr pat))) (predicate-pair? (cddr pat)))
+                        (compile-match ren mem (cddr pat) `(last-cdr ,ref) match
+                                       (if wild? bind (cons `(drop-last-cdr ,ref) bind))
+                                       (if wild? vars (cons (car pat) vars))))
+                       ((pair? (cddr pat))
+                        (let-values (((tail-ref new-match drop-expr)
+                                      (cond ((null? (cdddr pat))
+                                             (let ((memoize (memoize-ref `(last-pair ,ref) mem)))
+                                               (values memoize
+                                                       (cons `(and (pair? ,ref) (set! ,memoize (last-pair ,ref))) match)
+                                                       `(drop-last-pair ,ref))))
+                                            (else
+                                             (let* ((n (- (count-non-dotted-pattern pat) 2))
+                                                    (memoize (memoize-ref `(last-n-pair ,n ,ref) mem)))
+                                               (values memoize
+                                                       (cons `(and (pair? ,ref) (set! ,memoize (last-n-pair ,n ,ref))) match)
+                                                       `(drop-last-n-pair ,n ,ref)))))))
+                          (compile-match ren mem (cddr pat) tail-ref new-match
+                                         (if wild? bind (cons drop-expr bind))
+                                         (if wild? vars (cons (car pat) vars)))))
+                       (else (values #f #f #f)))))
               ((predicate-pair? pat)
                (let ((renamed (or (hashtable-ref ren (cadr pat) #f) (gentemp))))
                  (hashtable-set! ren (cadr pat) renamed)

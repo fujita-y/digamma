@@ -3,6 +3,9 @@
           when
           unless
           pretty-print
+          pretty-print-line-length 
+          pretty-print-initial-indent 
+          pretty-print-maximum-lines
           destructuring-match
           destructuring-bind
           current-exception-handler
