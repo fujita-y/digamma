@@ -38,7 +38,7 @@
         (set! *fail-count* (+ *fail-count* 1))
         (display "FAIL: Module not found in registry\n"))))
 
-(import-module (math utils))
+(import (math utils))
 
 (test "Use imported add function"
       '(add 3 5)
@@ -54,7 +54,7 @@
   (begin
     (define (double-val x) (* x 2))))
 
-(import-module (ops))
+(import (ops))
 
 (test "Use renamed export"
       '(double 5)
@@ -68,7 +68,7 @@
     (define (combined x y)
       (multiply (add x y) 2))))
 
-(import-module (composite))
+(import (composite))
 
 (test "Use function that depends on imported functions"
       '(combined 3 4)
@@ -82,7 +82,7 @@
     (define (multi-add x y) (add x y))
     (define (multi-double x) (double x))))
 
-(import-module (multi-import-test))
+(import (multi-import-test))
 
 (test "Use multiple imported modules (add)"
       '(multi-add 1 2)
@@ -98,7 +98,7 @@
 (display "\n>>> Section 2: Import Modifiers\n")
 
 ;; Test prefix modifier
-(import-module (prefix (math utils) m:))
+(import (prefix (math utils) m:))
 
 (test "Use prefixed import"
       '(m:add 10 20)
@@ -114,7 +114,7 @@
     (define (d) 'd-val)))
 
 ;; Test only modifier
-(import-module (only (test-mod) a c))
+(import (only (test-mod) a c))
 
 (test "Use only imported a"
       '(a)
@@ -132,7 +132,7 @@
     (define (y) 'y-val)
     (define (z) 'z-val)))
 
-(import-module (except (test-mod2) y))
+(import (except (test-mod2) y))
 
 (test "Use except imported x"
       '(x)
@@ -143,7 +143,7 @@
       'z-val)
 
 ;; Test rename modifier
-(import-module (rename (math utils) (add plus) (multiply times)))
+(import (rename (math utils) (add plus) (multiply times)))
 
 (test "Use rename imported plus"
       '(plus 7 8)
@@ -154,15 +154,15 @@
       27)
 
 ;; Missing Test: Nested import modifiers
-(import-module (prefix (only (math utils) add) nested:))
+(import (prefix (only (math utils) add) nested:))
 
 (test "Use nested import modifiers (prefix of only)"
       '(nested:add 5 5)
       10)
 
 ;; Missing Test: Importing same module multiple times with different modifiers
-(import-module (prefix (math utils) p1:))
-(import-module (prefix (math utils) p2:))
+(import (prefix (math utils) p1:))
+(import (prefix (math utils) p2:))
 
 (test "Import same module multiple times (p1)"
       '(p1:add 1 2)
@@ -193,7 +193,7 @@
     (define (stack-empty? s)
       (null? (vector-ref s 0)))))
 
-(import-module (data stack))
+(import (data stack))
 
 (test "Stack usage"
       '(let ((s (make-stack)))
@@ -233,7 +233,7 @@
             ((vector? thing) "Draw Color")
             (else "Unknown")))))
 
-(import-module (geometry canvas))
+(import (geometry canvas))
 
 (test "Aggregated library usage (Point)"
       '(point-x (make-point 10 20))
@@ -263,7 +263,7 @@
   (import (internal calc))
   (begin))
 
-(import-module (prefix (api math) math:))
+(import (prefix (api math) math:))
 
 (test "Renamed API usage"
       '(list (math:plus 10 2) (math:minus 10 2))
@@ -282,7 +282,7 @@
           s2
           (set-union (cdr s1) (set-add s2 (car s1)))))))
 
-(import-module (data set))
+(import (data set))
 
 (test "Set usage"
       '(let* ((s1 (set-add (set-add (make-set) 1) 2))
@@ -310,7 +310,7 @@
             (cols (grid-cols g)))
         (vector-set! data (+ (* r cols) c) val)))))
 
-(import-module (data grid))
+(import (data grid))
 
 (test "Grid usage"
       '(let ((g (make-grid 3 3 0)))
@@ -329,7 +329,7 @@
     (define (clear-log)
       (set! logs '()))))
 
-(import-module (system logger))
+(import (system logger))
 
 (test "Logger usage"
       '(begin
@@ -354,7 +354,7 @@
              (begin expr ...)
              #f))))))
 
-(import-module (test macro-export))
+(import (test macro-export))
 
 (test "Use imported macro (true case)"
       '(let ((x 0))
@@ -380,7 +380,7 @@
            (syntax (let ((t e1))
                      (if t t (my-or e2 e3 ...))))))))))
 
-(import-module (test syntax-case-export))
+(import (test syntax-case-export))
 
 (test "Use imported syntax-case macro"
       '(my-or #f 1 2)
@@ -397,7 +397,7 @@
           ((_ val)
            (syntax (helper val))))))))
 
-(import-module (test helper-export))
+(import (test helper-export))
 
 (test "Use macro using helper"
       '(param-macro 10)
@@ -429,7 +429,7 @@
   (begin
     (define-struct point (x y))))
 
-(import-module (struct-user))
+(import (struct-user))
 
 (test "Use imported generated macro 1" 
       '(point? 8)
@@ -449,7 +449,7 @@
            (define (getter) (vector-ref container index))
            (define (setter val) (vector-set! container index val))))))))
 
-(import-module (macro tools))
+(import (macro tools))
 
 (test "Macro composition usage"
       '(begin
@@ -469,7 +469,7 @@
          (let ((internal-val 99))
            (list internal-val expr)))))))
 
-(import-module (macro hygiene))
+(import (macro hygiene))
 
 (test "Hygiene usage 1"
       '(let ((internal-val 0))
@@ -507,7 +507,7 @@
         ((_ ((e1 e2) ...) body ...)
          (parameterize-aux ((e1 e2) ...) () body ...))))))
 
-(import-module (core parameterize))
+(import (core parameterize))
 
 (define p (make-parameter 1))
 
@@ -533,7 +533,7 @@
   (begin
     (define (bar-proc x) (foo-macro x))))
 
-(import-module (tests bar))
+(import (tests bar))
 
 (test "helper" (bar-proc 10) 11)
 

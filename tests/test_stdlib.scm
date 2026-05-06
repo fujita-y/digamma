@@ -2,7 +2,7 @@
 (define *pass-count* 0)
 (define *fail-count* 0)
 
-(import-module (core))
+(import (core))
 
 (define (test name expr expected)
   (let ((result expr))

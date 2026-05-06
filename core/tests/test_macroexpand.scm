@@ -119,7 +119,7 @@
 ;; test_module_macroexpand.scm
 ;; =============================================================================
 ;; test_module_macroexpand.scm
-;; Test suite for define-module and import-module in macroexpand.scm
+;; Test suite for define-module and import in macroexpand.scm
 
 
 (copy-environment-variables! (system-environment) (current-environment) '(lookup-module))
@@ -178,8 +178,8 @@
 ;; =============================================================================
 (display "\n>>> Section 2: Import module and use exported functions\n")
 
-(test "import-module expansion"
-      '(import-module (math utils))
+(test "import expansion"
+      '(import (math utils))
       (unspecified))
 
 ;; Test imported functions
@@ -203,7 +203,7 @@
            (define (double-val x) (* x 2))))
       (unspecified))
 
-(macroexpand '(import-module (ops)))
+(macroexpand '(import (ops)))
 
 (test-eval "Use renamed export"
            '(double 5)
@@ -215,8 +215,8 @@
 (display "\n>>> Section 4: Import modifiers\n")
 
 ;; Test prefix modifier
-(test "import-module with prefix"
-      '(import-module (prefix (math utils) m:))
+(test "import with prefix"
+      '(import (prefix (math utils) m:))
       (unspecified))
 
 (test-eval "Use prefixed import"
@@ -233,7 +233,7 @@
                   (define (d) 'd-val))))
 
 ;; Test only modifier
-(macroexpand '(import-module (only (test-mod) a c)))
+(macroexpand '(import (only (test-mod) a c)))
 
 (test-eval "Use only imported a"
            '(a)
@@ -251,7 +251,7 @@
                   (define (y) 'y-val)
                   (define (z) 'z-val))))
 
-(macroexpand '(import-module (except (test-mod2) y)))
+(macroexpand '(import (except (test-mod2) y)))
 
 (test-eval "Use except imported x"
            '(x)
@@ -262,7 +262,7 @@
            'z-val)
 
 ;; Test rename modifier
-(macroexpand '(import-module (rename (math utils) (add plus) (multiply times))))
+(macroexpand '(import (rename (math utils) (add plus) (multiply times))))
 
 (test-eval "Use rename imported plus"
            '(plus 7 8)
@@ -284,7 +284,7 @@
                   (define (combined x y)
                     (multiply (add x y) 2)))))
 
-(macroexpand '(import-module (composite)))
+(macroexpand '(import (composite)))
 
 (test-eval "Use function that depends on imported functions"
            '(combined 3 4)
@@ -315,7 +315,7 @@
              (null? (vector-ref s 0)))))
       (unspecified))
 
-(macroexpand '(import-module (data stack)))
+(macroexpand '(import (data stack)))
 
 (test-eval "Stack usage"
            '(let ((s (make-stack)))
@@ -367,7 +367,7 @@
                    (else "Unknown")))))
       (unspecified))
 
-(macroexpand '(import-module (geometry canvas)))
+(macroexpand '(import (geometry canvas)))
 
 (test-eval "Aggregated library usage (Point)"
            '(point-x (make-point 10 20))
@@ -404,7 +404,7 @@
          (begin)) ;; Pure wrapper/renamer
       (unspecified))
 
-(macroexpand '(import-module (prefix (api math) math:)))
+(macroexpand '(import (prefix (api math) math:)))
 
 (test-eval "Renamed API usage"
            '(list (math:plus 10 2) (math:minus 10 2))
@@ -427,7 +427,7 @@
                     #f))))))
       (unspecified))
 
-(macroexpand '(import-module (test macro-export)))
+(macroexpand '(import (test macro-export)))
 
 (test-eval "Use imported macro (true case)"
            '(let ((x 0))
@@ -457,7 +457,7 @@
                             (if t t (my-or e2 e3 ...))))))))))
       (unspecified))
 
-(macroexpand '(import-module (test syntax-case-export)))
+(macroexpand '(import (test syntax-case-export)))
 
 (test-eval "Use imported syntax-case macro"
            '(my-or #f 1 2)
@@ -478,7 +478,7 @@
                   (syntax (helper val))))))))
       (unspecified))
 
-(macroexpand '(import-module (test helper-export)))
+(macroexpand '(import (test helper-export)))
 
 (test-eval "Use macro using helper"
            '(param-macro 10)
@@ -516,7 +516,7 @@
            (define-struct point (x y))))
       (unspecified))
 
-(macroexpand '(import-module (struct-user)))
+(macroexpand '(import (struct-user)))
 
 (test-eval "Use imported generated macro 1" 
            '(point? 8)
@@ -548,7 +548,7 @@
                  (set-union (cdr s1) (set-add s2 (car s1)))))))
       (unspecified))
 
-(macroexpand '(import-module (data set)))
+(macroexpand '(import (data set)))
 
 (test-eval "Set usage"
            '(let* ((s1 (set-add (set-add (make-set) 1) 2))
@@ -580,7 +580,7 @@
                (vector-set! data (+ (* r cols) c) val)))))
       (unspecified))
 
-(macroexpand '(import-module (data grid)))
+(macroexpand '(import (data grid)))
 
 (test-eval "Grid usage"
            '(let ((g (make-grid 3 3 0)))
@@ -603,7 +603,7 @@
              (set! logs '()))))
       (unspecified))
 
-(macroexpand '(import-module (system logger)))
+(macroexpand '(import (system logger)))
 
 (test-eval "Logger usage"
            '(begin
@@ -632,7 +632,7 @@
                   (define (setter val) (vector-set! container index val))))))))
       (unspecified))
 
-(macroexpand '(import-module (macro tools)))
+(macroexpand '(import (macro tools)))
 
 (test-eval "Macro composition usage"
            '(begin
@@ -656,7 +656,7 @@
                   (list internal-val expr))))))) ;; Should return (99 <expr>)
       (unspecified))
 
-(macroexpand '(import-module (macro hygiene)))
+(macroexpand '(import (macro hygiene)))
 
 (test-eval "Hygiene usage 1"
            '(let ((internal-val 0))

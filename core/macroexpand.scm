@@ -8,7 +8,7 @@
 ;; - syntax-case (procedural macros)
 ;; - identifier-syntax and variable-transformers
 ;; - let-syntax, letrec-syntax, let*-syntax for local bindings
-;; - R7RS-style libraries/modules (via define-module and import-module)
+;; - R7RS-style libraries/modules (via define-module and import)
 ;; - Proper hygiene through alpha-renaming and context tracking
 
 ;;=============================================================================
@@ -504,7 +504,7 @@
                   ((and (pair? decl) (eq? (car decl) 'begin)) (loop (cdr decls) exports imports (append (cdr decl) body-forms)))
                   (else (loop (cdr decls) exports imports (cons decl body-forms)))))))))
 
-(define (expand-import-module expr m-env s-env r-env marks)
+(define (expand-import expr m-env s-env r-env marks)
   (for-each (lambda (b) (if (macro-binding? (cdr b)) (environment-macro-set! (car b) (unwrap-macro-binding (cdr b))) (inject-binding! (car b) (cdr b))))
             (apply append (map process-import-set (cdr expr)))) (unspecified))
 
@@ -686,7 +686,7 @@
     (cons 'define-module expand-define-module)
     (cons 'define-syntax expand-define-syntax)
     (cons 'if expand-if)
-    (cons 'import-module expand-import-module)
+    (cons 'import expand-import)
     (cons 'lambda expand-lambda)
     (cons 'let expand-let)
     (cons 'let* expand-let*)
