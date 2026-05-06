@@ -137,7 +137,7 @@
 (define (collect-pattern-vars pattern literals ellipsis)
   (cond
     ((and (symbol? pattern)
-          (not (member pattern literals))
+          (not (memq pattern literals))
           (not (eq? pattern '_))
           (not (eq? pattern ellipsis)))
      (list pattern))
@@ -156,7 +156,7 @@
 ;; Match input syntax against a pattern.
 (define (syntax-case-match literals pattern input ellipsis)
   (cond
-    ((and (identifier? pattern) (member (syntax-object-datum pattern) literals))
+    ((and (identifier? pattern) (memq (syntax-object-datum pattern) literals))
      (and (identifier? input)
           (free-identifier=? pattern input)
           '()))
@@ -198,7 +198,7 @@
 ;; Map pattern variables to their ellipsis depths for expansion.
 (define (syntax-depth-map pattern literals ellipsis depth)
   (cond
-    ((and (symbol? pattern) (not (member pattern literals))
+    ((and (symbol? pattern) (not (memq pattern literals))
           (not (eq? pattern '_)) (not (eq? pattern ellipsis)))
      (list (cons pattern depth)))
     ((and (pair? pattern) (pair? (cdr pattern)) (eq? (cadr pattern) ellipsis))
@@ -257,12 +257,14 @@
             (len (if (null? drivers)
                      (syntax-violation 'syntax "ellipsis in template with no pattern variables" template)
                      (length (cdr (assq (car drivers) bindings)))))
+            ;; Pre-extract driver values as vectors for O(1) indexed access
+            (driver-vecs (map (lambda (v) (cons v (list->vector (cdr (assq v bindings))))) drivers))
             (new-template-list
              (map (lambda (i)
                     (let ((iter-bindings
-                           (map (lambda (v)
-                                  (cons v (list-ref (cdr (assq v bindings)) i)))
-                                drivers)))
+                           (map (lambda (dv)
+                                  (cons (car dv) (vector-ref (cdr dv) i)))
+                                driver-vecs)))
                       (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals suffix)))
                   (iota len))))
        (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals suffix))))

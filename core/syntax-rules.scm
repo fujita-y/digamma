@@ -160,13 +160,15 @@
                      0 
                      (let ((b (assq (car drivers) bindings)))
                        (if b (length (cdr b)) 0))))
+            ;; Pre-extract driver values as vectors for O(1) indexed access
+            (driver-vecs (map (lambda (v) (cons v (list->vector (cdr (assq v bindings))))) drivers))
             ;; Expand sub-template for each iteration
             (expanded-list 
              (map (lambda (i)
                     (let ((iter-bindings
-                           (map (lambda (v)
-                                  (cons v (list-ref (cdr (assq v bindings)) i)))
-                                drivers)))
+                           (map (lambda (dv)
+                                  (cons (car dv) (vector-ref (cdr dv) i)))
+                                driver-vecs)))
                        (expand-template sub-tmpl (append iter-bindings bindings) rename ellipsis meta-env (+ depth 1))))
                   (iota len))))
        (append expanded-list 

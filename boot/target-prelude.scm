@@ -87,6 +87,20 @@
         (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (fold-left-n proc seed lst)))
               (else (assertion-violation 'fold "expected same length proper lists" (cons* proc seed lst1 lst2)))))))
 
+(define fold-right
+  (lambda (proc seed lst1 . lst2)
+    (define fold-right-1
+      (lambda (proc seed lst) (if (null? lst) seed (proc (car lst) (fold-right-1 proc seed (cdr lst))))))
+    (define fold-right-n
+      (lambda (proc seed lst)
+        (if (null? lst) seed (apply proc (append (car lst) (list (fold-right-n proc seed (cdr lst))))))))
+    (if (null? lst2) 
+        (if (list? lst1)
+            (fold-right-1 proc seed lst1)
+            (assertion-violation 'fold-right "expected proper list" (cons* proc seed lst1 lst2)))
+        (cond ((apply list-transpose+ lst1 lst2) => (lambda (lst) (fold-right-n proc seed lst)))
+              (else (assertion-violation 'fold-right "expected same length proper lists" (cons* proc seed lst1 lst2)))))))
+
 (define make-parameter
   (lambda (init . rest)
     (define parameter-proc-0

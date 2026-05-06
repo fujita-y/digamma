@@ -12,22 +12,22 @@
 
   (define (is-unquote? s)
     (and (symbol? s)
-         (let ((name (symbol->string s)))
-           (or (eq? s 'unquote)
+         (or (eq? s 'unquote)
+             (let ((name (symbol->string s)))
                (and (> (string-length name) 8)
                     (string=? (substring name 0 8) "unquote."))))))
 
   (define (is-unquote-splicing? s)
     (and (symbol? s)
-         (let ((name (symbol->string s)))
-           (or (eq? s 'unquote-splicing)
+         (or (eq? s 'unquote-splicing)
+             (let ((name (symbol->string s)))
                (and (> (string-length name) 17)
                     (string=? (substring name 0 17) "unquote-splicing."))))))
 
   (define (is-quasiquote? s)
     (and (symbol? s)
-         (let ((name (symbol->string s)))
-           (or (eq? s 'quasiquote)
+         (or (eq? s 'quasiquote)
+             (let ((name (symbol->string s)))
                (and (> (string-length name) 11)
                     (string=? (substring name 0 11) "quasiquote."))))))
 

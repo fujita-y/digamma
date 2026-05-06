@@ -118,10 +118,9 @@ compile
 compile-to-coreform
 cons
 cons*
-
 copy-environment-macros!
 copy-environment-variables!
-core-eval ;;; ####
+core-eval
 cos
 current-collect-trip-bytes
 current-environment
@@ -166,6 +165,7 @@ filter
 fixnum?
 flush-output-port
 fold
+fold-right
 for-each
 format
 free-identifier=?
