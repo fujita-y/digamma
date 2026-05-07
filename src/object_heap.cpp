@@ -374,3 +374,70 @@ void object_heap_t::renounce(void* obj, int size, void* refcon) {
 void object_heap_t::consistency_check() {}
 void object_heap_t::validate_concurrent_slab(void* slab) {}
 #endif
+
+void object_heap_t::display_heap_statistics(std::ostream* os) {
+  if (!os) return;
+  int n_free = 0;
+  int n_general = 0;
+  int n_slab = 0;
+  int n_gcslab = 0;
+
+  *os << '\n';
+  slab_traits_t* traits;
+  for (int n = 0; n < m_concurrent_pool.m_pool_watermark; n++) {
+    if ((n & 63) == 0) {
+      *os << "  |";
+    }
+    switch (m_concurrent_pool.m_pool[n]) {
+      case PTAG_FREE:
+        *os << ' ';
+        n_free++;
+        break;
+      case PTAG_USED:
+        *os << 'P';
+        n_general++;
+        break;
+      case PTAG_USED | PTAG_SLAB:
+        traits = SLAB_TRAITS_OF(m_concurrent_pool.m_pool + ((intptr_t)n << SLAB_SIZE_SHIFT));
+        if (traits->free)
+          *os << 's';
+        else
+          *os << 'S';
+        n_slab++;
+        break;
+      case PTAG_USED | PTAG_SLAB | PTAG_GC:
+        traits = SLAB_TRAITS_OF(m_concurrent_pool.m_pool + ((intptr_t)n << SLAB_SIZE_SHIFT));
+        if (traits->refc == 0) {
+          *os << '.';
+        } else {
+          if (traits->free)
+            *os << 'o';
+          else
+            *os << 'O';
+        }
+        n_gcslab++;
+        break;
+      case PTAG_EXTENT:
+        *os << '-';
+        n_general++;
+        break;
+      case PTAG_EXTENT | PTAG_SLAB:
+        *os << '?';
+        n_slab++;
+        break;
+      case PTAG_EXTENT | PTAG_SLAB | PTAG_GC:
+        *os << '?';
+        n_slab++;
+        break;
+    }
+    if ((n & 63) == 63) {
+      *os << "|\n";
+    }
+  }
+  if ((m_concurrent_pool.m_pool_watermark & 63) != 0) {
+    *os << "|\n";
+  }
+  *os << std::format("  object:{} static:{} page:{} free:{} watermark:{} limit:{}\n\n", n_gcslab, n_slab, n_general, n_free,
+                     m_concurrent_pool.m_pool_watermark, (m_concurrent_pool.m_pool_size >> SLAB_SIZE_SHIFT));
+  os->flush();
+}

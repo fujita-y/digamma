@@ -19,6 +19,7 @@ scm_obj_t port_put_bytes(scm_obj_t port, const uint8_t* byte, int bsize);
 scm_obj_t port_put_char(scm_obj_t port, scm_obj_t ch);
 scm_obj_t port_put_string(scm_obj_t port, scm_obj_t str);
 scm_obj_t port_flush_output(scm_obj_t port);
+void port_format(scm_obj_t port, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
 void port_close(scm_obj_t port);
 scm_obj_t port_open_string_output_port();
 scm_obj_t port_get_output_string(scm_obj_t port);

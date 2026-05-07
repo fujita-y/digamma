@@ -54,6 +54,8 @@ class object_heap_t {
   void* alloc_collectible(size_t nsize);
   void write_barrier(scm_obj_t obj);
 
+  void display_heap_statistics(std::ostream* os);
+
   std::mutex m_symbols_mutex;
   std::unordered_map<std::string, scm_obj_t> m_symbol_map;
   uint64_t m_collect_trip_bytes;
