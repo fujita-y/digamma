@@ -9,6 +9,7 @@
 #include "exception.h"
 #include "list.h"
 #include "object_heap.h"
+#include "port.h"
 #include "subr.h"
 #include "uniq_id.h"
 
@@ -190,6 +191,17 @@ SUBR subr_current_collect_trip_bytes(scm_obj_t self, int argc, scm_obj_t argv[])
   throw std::runtime_error("current-collect-trip-bytes: argument must be a fixnum");
 }
 
+// display-heap-statistics - Nanos extension
+SUBR subr_display_heap_statistics(scm_obj_t self, int argc, scm_obj_t argv[]) {
+  if (argc > 1) throw std::runtime_error("display-heap-statistics: too many arguments");
+  scm_obj_t port = (argc == 1) ? argv[0] : context::s_current_output_port;
+  if (!is_port(port)) throw std::runtime_error("display-heap-statistics: argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("display-heap-statistics: argument must be an output port");
+  std::ostream* os = port_get_ostream(port);
+  object_heap_t::current()->display_heap_statistics(os);
+  return scm_unspecified;
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -219,4 +231,5 @@ void init_subr_misc() {
   reg("tuple-ref", (void*)subr_tuple_ref, 2, false);
   reg("tuple-set!", (void*)subr_tuple_set, 3, false);
   reg("current-collect-trip-bytes", (void*)subr_current_collect_trip_bytes, 0, true);
+  reg("display-heap-statistics", (void*)subr_display_heap_statistics, 0, true);
 }

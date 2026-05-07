@@ -133,6 +133,7 @@ _current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f
 cyclic-object?
 datum->syntax
 display
+display-heap-statistics
 dynamic-wind
 environment-macro-contains?
 environment-macro-ref
