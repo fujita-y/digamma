@@ -245,6 +245,8 @@ class codegen_t {
   void emit_num_gt_subr(bool is_tail);
   void emit_num_le_subr(bool is_tail);
   void emit_num_ge_subr(bool is_tail);
+  // Helper: emit fixnum fast-path comparison with float fallback.
+  void emit_fixnum_cmp_subr(bool is_tail, llvm::CmpInst::Predicate pred, const char* helper_name, void* helper_fn_ptr, const char* result_name);
   void emit_append2_subr(bool is_tail);
   void emit_vector_ref_subr(bool is_tail);
   void emit_vector_set_subr(bool is_tail);

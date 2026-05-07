@@ -706,9 +706,10 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
 
   // Check if it is a global closure (known at compile time but not in this module's function_map)
   if (is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) {
-    // Attempt to resolve it as a global closure
-    if (closure_params.find(inst.closure_label) != closure_params.end()) {
-      auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
+    // Attempt to resolve it as a global closure — single lookup.
+    auto cp_it = closure_params.find(inst.closure_label);
+    if (cp_it != closure_params.end()) {
+      auto [fixed_argc, has_rest] = cp_it->second;
 
       // Retrieve the actual closure object to get code pointer and cdecl
       scm_obj_t val = context::environment_variable_ref(inst.closure_label);
@@ -804,14 +805,16 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
   }
 
-  if (is_symbol(inst.closure_label) && function_map.count(inst.closure_label)) {
-    llvm::Function* target_func = function_map[inst.closure_label];
+  auto fm_it = function_map.find(inst.closure_label);
+  if (is_symbol(inst.closure_label) && fm_it != function_map.end()) {
+    llvm::Function* target_func = fm_it->second;
 
-    // Get closure parameters from compile-time info
-    if (closure_params.find(inst.closure_label) == closure_params.end()) {
+    // Get closure parameters from compile-time info — single lookup.
+    auto cp_it2 = closure_params.find(inst.closure_label);
+    if (cp_it2 == closure_params.end()) {
       fatal("%s:%u codegen: closure params not found for label", __FILE__, __LINE__);
     }
-    auto [fixed_argc, has_rest] = closure_params[inst.closure_label];
+    auto [fixed_argc, has_rest] = cp_it2->second;
 
     // Prepare arguments
     std::vector<llvm::Value*> args;
@@ -1132,9 +1135,11 @@ void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
     return;
   }
 
-  // Check if it's a known closure (global or local) call optimization
-  if ((is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) ||
-      (is_symbol(inst.closure_label) && function_map.count(inst.closure_label))) {
+  // Any known symbol label is routed through the optimised path, which
+  // handles both locally-compiled closures (in function_map) and globally
+  // resolved ones.  The previous two-clause condition was a tautology:
+  // (is_symbol && not-in-map) || (is_symbol && in-map) == is_symbol.
+  if (is_symbol(inst.closure_label)) {
     emit_known_closure_call(inst, is_tail);
     return;
   }

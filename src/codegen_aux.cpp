@@ -249,102 +249,51 @@ extern "C" scm_obj_t c_num_mul(scm_obj_t arg1, scm_obj_t arg2) {
   throw std::runtime_error("*: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
 }
 
+// ---------------------------------------------------------------------------
+// Numeric helper: extract a double from a Scheme object, throw on type error.
+// ---------------------------------------------------------------------------
+
+static inline void extract_numeric(scm_obj_t obj, double& out, const char* op_name, scm_obj_t other) {
+  if (is_fixnum(obj)) {
+    out = fixnum(obj);
+  } else if (is_flonum(obj)) {
+    out = flonum(obj);
+  } else {
+    throw std::runtime_error(std::string(op_name) + ": arguments must be numbers: " + to_string(obj) + " " + to_string(other));
+  }
+}
+
 extern "C" scm_obj_t c_num_eq(scm_obj_t arg1, scm_obj_t arg2) {
-  double lhs;
-  double rhs;
-  if (is_fixnum(arg1)) {
-    lhs = fixnum(arg1);
-  } else if (is_flonum(arg1)) {
-    lhs = flonum(arg1);
-  } else {
-    throw std::runtime_error("=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
-  if (is_fixnum(arg2)) {
-    rhs = fixnum(arg2);
-  } else if (is_flonum(arg2)) {
-    rhs = flonum(arg2);
-  } else {
-    throw std::runtime_error("=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
+  double lhs, rhs;
+  extract_numeric(arg1, lhs, "=", arg2);
+  extract_numeric(arg2, rhs, "=", arg1);
   return lhs == rhs ? scm_true : scm_false;
 }
 
 extern "C" scm_obj_t c_num_lt(scm_obj_t arg1, scm_obj_t arg2) {
-  double lhs;
-  double rhs;
-  if (is_fixnum(arg1)) {
-    lhs = fixnum(arg1);
-  } else if (is_flonum(arg1)) {
-    lhs = flonum(arg1);
-  } else {
-    throw std::runtime_error("<: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
-  if (is_fixnum(arg2)) {
-    rhs = fixnum(arg2);
-  } else if (is_flonum(arg2)) {
-    rhs = flonum(arg2);
-  } else {
-    throw std::runtime_error("<: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
+  double lhs, rhs;
+  extract_numeric(arg1, lhs, "<", arg2);
+  extract_numeric(arg2, rhs, "<", arg1);
   return lhs < rhs ? scm_true : scm_false;
 }
 
 extern "C" scm_obj_t c_num_gt(scm_obj_t arg1, scm_obj_t arg2) {
-  double lhs;
-  double rhs;
-  if (is_fixnum(arg1)) {
-    lhs = fixnum(arg1);
-  } else if (is_flonum(arg1)) {
-    lhs = flonum(arg1);
-  } else {
-    throw std::runtime_error(">: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
-  if (is_fixnum(arg2)) {
-    rhs = fixnum(arg2);
-  } else if (is_flonum(arg2)) {
-    rhs = flonum(arg2);
-  } else {
-    throw std::runtime_error(">: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
+  double lhs, rhs;
+  extract_numeric(arg1, lhs, ">", arg2);
+  extract_numeric(arg2, rhs, ">", arg1);
   return lhs > rhs ? scm_true : scm_false;
 }
 
 extern "C" scm_obj_t c_num_le(scm_obj_t arg1, scm_obj_t arg2) {
-  double lhs;
-  double rhs;
-  if (is_fixnum(arg1)) {
-    lhs = fixnum(arg1);
-  } else if (is_flonum(arg1)) {
-    lhs = flonum(arg1);
-  } else {
-    throw std::runtime_error("<=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
-  if (is_fixnum(arg2)) {
-    rhs = fixnum(arg2);
-  } else if (is_flonum(arg2)) {
-    rhs = flonum(arg2);
-  } else {
-    throw std::runtime_error("<=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
+  double lhs, rhs;
+  extract_numeric(arg1, lhs, "<=", arg2);
+  extract_numeric(arg2, rhs, "<=", arg1);
   return lhs <= rhs ? scm_true : scm_false;
 }
 
 extern "C" scm_obj_t c_num_ge(scm_obj_t arg1, scm_obj_t arg2) {
-  double lhs;
-  double rhs;
-  if (is_fixnum(arg1)) {
-    lhs = fixnum(arg1);
-  } else if (is_flonum(arg1)) {
-    lhs = flonum(arg1);
-  } else {
-    throw std::runtime_error(">=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
-  if (is_fixnum(arg2)) {
-    rhs = fixnum(arg2);
-  } else if (is_flonum(arg2)) {
-    rhs = flonum(arg2);
-  } else {
-    throw std::runtime_error(">=: arguments must be numbers: " + to_string(arg1) + " " + to_string(arg2));
-  }
+  double lhs, rhs;
+  extract_numeric(arg1, lhs, ">=", arg2);
+  extract_numeric(arg2, rhs, ">=", arg1);
   return lhs >= rhs ? scm_true : scm_false;
 }

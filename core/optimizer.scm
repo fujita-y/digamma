@@ -27,9 +27,11 @@
     pair? cons car cdr caar cadr cdar cddr null? list? list length append reverse
     make-list list-tail list-ref memq memv member assq assv assoc
     symbol? symbol=? symbol->string string->symbol
-    number? complex? real? rational? integer? exact? inexact? = < > <= >= zero?
-    positive? negative? odd? even? max min + * - / abs floor ceiling truncate
-    round gcd lcm numerator denominator expt sqrt number->string exact-integer-sqrt
+    number? complex? real? rational? integer? exact? inexact? infinite? nan?
+    = < > <= >= zero? positive? negative? odd? even? max min + * - / abs
+    floor ceiling truncate round gcd lcm numerator denominator expt sqrt
+    quotient remainder modulo exact->inexact inexact->exact
+    sin cos tan atan number->string exact-integer-sqrt
     char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>?
     char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace?
     char-upper-case? char-lower-case? char->integer integer->char char-upcase char-downcase
@@ -37,7 +39,9 @@
     string<=? string>=? string-ci=? string-ci<? string-ci>? string-ci<=? string-ci>=?
     substring string-append string->list list->string string-copy string->number
     vector? make-vector vector vector-length vector-ref vector->list list->vector
-    tuple? tuple tuple-ref
+    tuple? make-tuple tuple tuple-ref
+    hashtable? hashtable-ref hashtable-contains? equal-hash
+    u8vector? u8vector-length u8vector-ref
     procedure? bytevector? bytevector-length bytevector-u8-ref))
 
 (define pure-primitives-ht (make-eq-hashtable))
@@ -50,8 +54,9 @@
   '(set-car! set-cdr!
     vector-set! vector-fill!
     string-set! string-fill!
-    bytevector-u8-set!
     hashtable-set! hashtable-delete!
+    tuple-set!
+    u8vector-set!
     list-set!))
 
 (define structural-mutation-ht (make-eq-hashtable))

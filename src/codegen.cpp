@@ -254,11 +254,23 @@ void codegen_t::phase2c_analyze_safepoints() {
       Instruction si;
       si.op = Opcode::SAFEPOINT;
       si.original = scm_nil;
-      size_t insert_pos = 0;
-      if (func.instructions.size() > 0 && func.instructions[0].op == Opcode::LABEL) {
-        insert_pos = 1;
+
+      // Determine insertion position: after the initial LABEL if present.
+      bool has_leading_label = !func.instructions.empty() && func.instructions[0].op == Opcode::LABEL;
+
+      // Build a new vector with the safepoint prepended in the right slot.
+      // Avoids O(n) element-shift that vector::insert(begin(), ...) would cause.
+      std::vector<Instruction> new_insts;
+      new_insts.reserve(func.instructions.size() + 1);
+      if (has_leading_label) {
+        new_insts.push_back(std::move(func.instructions[0]));
       }
-      func.instructions.insert(func.instructions.begin() + insert_pos, si);
+      new_insts.push_back(si);
+      size_t start = has_leading_label ? 1 : 0;
+      for (size_t k = start; k < func.instructions.size(); ++k) {
+        new_insts.push_back(std::move(func.instructions[k]));
+      }
+      func.instructions = std::move(new_insts);
     } else {
       // std::cout << "#### phase3_analyze_safepoints: no safepoint for " << to_string(func.label) << std::endl;
     }
@@ -575,19 +587,16 @@ void codegen_t::parse_instructions(scm_obj_t inst_list) {
   }
 
   // Post-process: Update max_reg for each function based on parameters
-  // Main function (index 0) doesn't have parameters in registers initially (or rather, it's just entry)
-  // Closures have parameters.
   for (auto& func : functions) {
-    if (func.label != scm_nil && closure_params.count(func.label)) {
-      auto params = closure_params[func.label];
-      func.argc = params.first;
-      func.has_rest = params.second;
-      int argc = func.argc + (func.has_rest ? 1 : 0);
-      if (argc > 0) {
-        int needed_max = argc - 1;
-        if (needed_max > func.max_reg) {
-          func.max_reg = needed_max;
-        }
+    auto it = closure_params.find(func.label);
+    if (func.label != scm_nil && it != closure_params.end()) {
+      auto [argc, has_rest] = it->second;
+      func.argc = argc;
+      func.has_rest = has_rest;
+      int total = func.argc + (func.has_rest ? 1 : 0);
+      if (total > 0) {
+        int needed_max = total - 1;
+        if (needed_max > func.max_reg) func.max_reg = needed_max;
       }
     }
   }
@@ -1072,10 +1081,9 @@ void codegen_t::phase2a_analyze_closure_labels() {
         auto& inst = func.instructions[i];
 
         if (inst.op == Opcode::LABEL) {
-          if (block_entry_states[inst.opr1].merge(current_state)) {
-            changed = true;
-          }
-          current_state = block_entry_states[inst.opr1];
+          auto& entry = block_entry_states[inst.opr1];
+          if (entry.merge(current_state)) changed = true;
+          current_state = entry;
         }
 
         switch (inst.op) {
@@ -1113,12 +1121,13 @@ void codegen_t::phase2a_analyze_closure_labels() {
             } else if (global_closure_defs.count(inst.opr2)) {
               current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
             } else {
-              // Try to look up in the global environment
+              // Try to look up in the global environment — single lookup.
               scm_obj_t val = context::environment_variable_ref(inst.opr2);
               if (val != scm_undef) {
                 current_state.regs[inst.rn1] = inst.opr2;
                 if (is_closure(val)) {
-                  closure_params[inst.opr2] = {closure_argc(val), closure_rest(val) == 1};
+                  // Single emplace — avoids double lookup if already present.
+                  closure_params.emplace(inst.opr2, std::make_pair(closure_argc(val), closure_rest(val) == 1));
                 }
               } else {
 #ifndef NDEBUG
@@ -1187,21 +1196,20 @@ void codegen_t::phase2a_analyze_closure_labels() {
               }
             }
             break;
-          case Opcode::JUMP:
-            if (block_entry_states[inst.opr1].merge(current_state)) {
-              changed = true;
-            }
-            current_state = State();  // Conservative: reset state after jump if not fall-through
+          case Opcode::JUMP: {
+            auto& entry_j = block_entry_states[inst.opr1];
+            if (entry_j.merge(current_state)) changed = true;
+            current_state = State();  // Conservative: reset state after jump
             break;
-          case Opcode::IF:
-            if (block_entry_states[inst.opr1].merge(current_state)) {
-              changed = true;
-            }
-            if (block_entry_states[inst.opr2].merge(current_state)) {
-              changed = true;
-            }
+          }
+          case Opcode::IF: {
+            auto& entry_t = block_entry_states[inst.opr1];
+            auto& entry_f = block_entry_states[inst.opr2];
+            if (entry_t.merge(current_state)) changed = true;
+            if (entry_f.merge(current_state)) changed = true;
             // State continues for fall-through (though in this IR IF usually has two labels)
             break;
+          }
           default:
             if (inst.rn1 != -1) {
               current_state.regs[inst.rn1] = scm_nil;

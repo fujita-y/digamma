@@ -71,6 +71,11 @@ void codegen_t::init_opcode_map() {
   no_gc_code_set.insert((void*)subr_num_gt);
   no_gc_code_set.insert((void*)subr_num_le);
   no_gc_code_set.insert((void*)subr_num_ge);
+  no_gc_code_set.insert((void*)subr_zero_p);
+  no_gc_code_set.insert((void*)subr_positive_p);
+  no_gc_code_set.insert((void*)subr_negative_p);
+  no_gc_code_set.insert((void*)subr_odd_p);
+  no_gc_code_set.insert((void*)subr_even_p);
 
   // list/vector/string accessors and mutators
   no_gc_code_set.insert((void*)subr_set_car);
@@ -89,10 +94,14 @@ void codegen_t::init_opcode_map() {
   no_gc_code_set.insert((void*)subr_string_ref);
   no_gc_code_set.insert((void*)subr_string_eq);
 
+  // u8vector accessors and mutator
+  no_gc_code_set.insert((void*)subr_u8vector_p);
+  no_gc_code_set.insert((void*)subr_u8vector_length);
+  no_gc_code_set.insert((void*)subr_u8vector_ref);
+  no_gc_code_set.insert((void*)subr_u8vector_set);
+
   // basic predicates and logic
   no_gc_code_set.insert((void*)subr_boolean_p);
-
-
   no_gc_code_set.insert((void*)subr_char_eq);
   no_gc_code_set.insert((void*)subr_char_numeric_p);
   no_gc_code_set.insert((void*)subr_char_p);
@@ -125,6 +134,8 @@ void codegen_t::init_opcode_map() {
   no_gc_code_set.insert((void*)subr_interaction_environment);
   no_gc_code_set.insert((void*)subr_system_environment);
   no_gc_code_set.insert((void*)subr_equal_hash);
+  no_gc_code_set.insert((void*)subr_hashtable_ref);
+  no_gc_code_set.insert((void*)subr_hashtable_contains);
   no_gc_code_set.insert((void*)subr_hashtable_delete);
   no_gc_code_set.insert((void*)subr_hashtable_clear);
 
