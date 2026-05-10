@@ -208,7 +208,7 @@ bool context::environment_variable_contains(scm_obj_t key) {
 }
 
 void context::add_literal(scm_obj_t obj) {
-  if (is_heap_object(obj)) {
+  if (is_cons(obj) || is_heap_object(obj)) {
     object_heap_t::current()->write_barrier(obj);
     s_literals.insert(obj);
   }
