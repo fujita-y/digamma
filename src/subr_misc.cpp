@@ -202,6 +202,14 @@ SUBR subr_display_heap_statistics(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return scm_unspecified;
 }
 
+// architecture-feature - Nanos extension
+SUBR subr_architecture_feature(scm_obj_t self, scm_obj_t a1) {
+  if (!is_symbol(a1)) throw std::runtime_error("architecture-feature: argument must be a symbol");
+  auto it = context::s_architecture_feature.find(a1);
+  if (it != context::s_architecture_feature.end()) return it->second;
+  throw std::runtime_error("architecture-feature: key not found: " + to_string(a1));
+}
+
 // ============================================================================
 // Initialization
 // ============================================================================
@@ -232,4 +240,5 @@ void init_subr_misc() {
   reg("tuple-set!", (void*)subr_tuple_set, 3, false);
   reg("current-collect-trip-bytes", (void*)subr_current_collect_trip_bytes, 0, true);
   reg("display-heap-statistics", (void*)subr_display_heap_statistics, 0, true);
+  reg("architecture-feature", (void*)subr_architecture_feature, 1, false);
 }

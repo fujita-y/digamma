@@ -314,6 +314,10 @@ void object_heap_t::enqueue_root(scm_obj_t obj) {
 void object_heap_t::snapshot_root() {
   for (auto it = context::s_gc_protected.begin(); it != context::s_gc_protected.end(); it++) enqueue_root(*it);
   for (auto it = context::s_literals.begin(); it != context::s_literals.end(); it++) enqueue_root(*it);
+  for (auto it = context::s_architecture_feature.begin(); it != context::s_architecture_feature.end(); it++) {
+    enqueue_root(it->first);
+    enqueue_root(it->second);
+  }
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);

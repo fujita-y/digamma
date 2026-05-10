@@ -58,6 +58,7 @@ class context {
   thread_local static int s_trampoline_uid;
   thread_local static int s_cffi_uid;
   thread_local static std::unordered_map<std::string, void*> s_callout_cache;
+  thread_local static std::unordered_map<scm_obj_t, scm_obj_t> s_architecture_feature;
 
   struct fiber_stack_info {
     void* sp;
@@ -82,6 +83,9 @@ class context {
   thread_local static std::vector<fiber_stack_info> s_fiber_stacks;
   thread_local static fiber_stack_allocator s_fiber_stack_allocator;
   thread_local static asio_context* s_asio_context;
+
+ private:
+  static void init_architecture_feature();
 };
 
 class scoped_gc_protect {

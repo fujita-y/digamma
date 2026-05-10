@@ -26,6 +26,7 @@ void init_subr_dialogflow();
 
 SUBR subr_append(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_apply(scm_obj_t self, int argc, scm_obj_t argv[]);
+SUBR architecture_feature(scm_obj_t self, scm_obj_t a1);
 SUBR subr_assertion_violation(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_assoc(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_assq(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);

@@ -17,6 +17,7 @@ add-load-path
 any
 append
 apply
+architecture-feature
 assertion-violation
 assoc
 assq

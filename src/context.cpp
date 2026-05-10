@@ -33,6 +33,7 @@ thread_local asio_context* context::s_asio_context;
 thread_local int context::s_trampoline_uid;
 thread_local int context::s_cffi_uid;
 thread_local std::unordered_map<std::string, void*> context::s_callout_cache;
+thread_local std::unordered_map<scm_obj_t, scm_obj_t> context::s_architecture_feature;
 
 boost::context::stack_context context::fiber_stack_allocator::allocate() {
   auto sctx = m_alloc.allocate();
@@ -85,6 +86,8 @@ void context::init() {
   s_current_codegen = nullptr;
   s_current_nanos = nullptr;
   s_asio_context = nullptr;
+
+  init_architecture_feature();
 }
 
 void context::destroy() {
@@ -111,9 +114,28 @@ void context::destroy() {
   s_trampoline_uid = 0;
   s_cffi_uid = 0;
   s_callout_cache.clear();
+  s_architecture_feature.clear();
   s_live_fiber_count = 0;
   s_fiber_stacks.clear();
   s_asio_context = nullptr;
+}
+
+void context::init_architecture_feature() {
+  auto reg_fixnum = [](const char* name, size_t val) { s_architecture_feature[make_symbol(name)] = make_fixnum(val); };
+  s_architecture_feature.clear();
+  reg_fixnum("sizeof:bool", sizeof(bool));
+  reg_fixnum("sizeof:short", sizeof(short));
+  reg_fixnum("sizeof:int", sizeof(int));
+  reg_fixnum("sizeof:long", sizeof(long));
+  reg_fixnum("sizeof:long-long", sizeof(long long));
+  reg_fixnum("sizeof:void*", sizeof(void*));
+  reg_fixnum("sizeof:size_t", sizeof(size_t));
+  reg_fixnum("alignof:float", sizeof(float));
+  reg_fixnum("alignof:double", sizeof(double));
+  reg_fixnum("alignof:int8_t", sizeof(int8_t));
+  reg_fixnum("alignof:int16_t", sizeof(int16_t));
+  reg_fixnum("alignof:int32_t", sizeof(int32_t));
+  reg_fixnum("alignof:int64_t", sizeof(int64_t));
 }
 
 void context::environment_macro_set(scm_obj_t key, scm_obj_t value) {
@@ -186,8 +208,10 @@ bool context::environment_variable_contains(scm_obj_t key) {
 }
 
 void context::add_literal(scm_obj_t obj) {
-  object_heap_t::current()->write_barrier(obj);
-  s_literals.insert(obj);
+  if (is_heap_object(obj)) {
+    object_heap_t::current()->write_barrier(obj);
+    s_literals.insert(obj);
+  }
 }
 
 void context::gc_protect(scm_obj_t obj) {
