@@ -2,9 +2,9 @@ name: CI (macos, llvm21)
 
 on:
   push:
-    branches: ["master", "darwin_fixed"]
+    branches: ["master"]
   pull_request:
-    branches: ["master", "darwin_fixed"]
+    branches: ["master"]
 
 jobs:
   build-and-test:
