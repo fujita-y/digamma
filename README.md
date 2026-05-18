@@ -1,11 +1,5 @@
 # Digamma
 
-[![arm64 llvm22](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml)
-[![arm64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml)
-[![amd64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml)
-[![arm64 macos](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml)
-[![docker](https://github.com/fujita-y/digamma/actions/workflows/docker.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/docker.yml)
-
 Digamma is a lightweight Scheme dialect designed for AI workflow automation.
 It focuses on execution efficiency and Lisp-based extensibility rather than strict RnRS compliance.
 Users seeking a complete R6RS/R7RS implementation should see [Ypsilon](https://github.com/fujita-y/ypsilon), developed by the same author.
@@ -217,6 +211,12 @@ Nanos records the fastest wall-clock time in **25 of 30 benchmarks**.
 ---
 
 ## Getting Started
+
+[![arm64 llvm22](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml)
+[![arm64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml)
+[![amd64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml)
+[![arm64 macos](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml)
+[![docker](https://github.com/fujita-y/digamma/actions/workflows/docker.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/docker.yml)
 
 ### Requirements
 
