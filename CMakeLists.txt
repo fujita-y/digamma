@@ -239,6 +239,14 @@ target_link_options(nanos_config INTERFACE
   $<$<BOOL:${APPLE}>:-Wl,-no_warn_duplicate_libraries>
 )
 
+if(APPLE AND MACOS_SDK_PATH)
+  # Explicitly set the sysroot to the actual macOS SDK. This prevents Homebrew
+  # LLVM clang from defaulting to a potentially missing SDK path (e.g., MacOSX15.sdk)
+  # from its wrapper configuration, which triggers a -Wmissing-sysroot error under -Werror.
+  target_compile_options(nanos_config INTERFACE -isysroot ${MACOS_SDK_PATH})
+  target_link_options(nanos_config INTERFACE -isysroot ${MACOS_SDK_PATH})
+endif()
+
 # ==============================================================================
 # Sources
 # ==============================================================================

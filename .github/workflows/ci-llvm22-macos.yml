@@ -1,4 +1,4 @@
-name: CI (macos, llvm21)
+name: CI (macos, llvm22)
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
 
     env:
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-      LLVM_VERSION: "21"
+      LLVM_VERSION: "22"
 
     steps:
       - name: Checkout
@@ -28,7 +28,7 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      # --- LLVM 21 via Homebrew ---
+      # --- LLVM 22 via Homebrew ---
       - name: Install LLVM ${{ env.LLVM_VERSION }}
         run: |
           brew install llvm@${{ env.LLVM_VERSION }}
@@ -45,8 +45,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/Library/Caches/ccache
-          key: ccache-macos-llvm21-${{ github.sha }}
-          restore-keys: ccache-macos-llvm21-
+          key: ccache-macos-llvm22-${{ github.sha }}
+          restore-keys: ccache-macos-llvm22-
 
       - name: Configure ccache
         run: |

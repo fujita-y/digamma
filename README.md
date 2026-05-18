@@ -212,10 +212,10 @@ Nanos records the fastest wall-clock time in **25 of 30 benchmarks**.
 
 ## Getting Started
 
-[![arm64 llvm22](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml)
-[![arm64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml)
-[![amd64 llvm21](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml)
-[![arm64 macos](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-macos.yml)
+[![llvm22 arm64](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-arm64.yml)
+[![llvm21 arm64](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-arm64.yml)
+[![llvm21 amd64](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm21-amd64.yml)
+[![llvm22 macos](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-macos.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/ci-llvm22-macos.yml)
 [![docker](https://github.com/fujita-y/digamma/actions/workflows/docker.yml/badge.svg)](https://github.com/fujita-y/digamma/actions/workflows/docker.yml)
 
 ### Requirements
