@@ -16,7 +16,7 @@ from collections import defaultdict
 
 # --- Configuration ---
 IMPLEMENTATIONS = {
-    "nanos":   {"command": ["make", "nanos"],   "label": "Nanos"},
+    "nanos":   {"command": ["make", "nanos"],   "label": "Digamma/Nanos"},
     "ypsilon": {"command": ["make", "ypsilon"], "label": "Ypsilon 2.0.9"},
     "guile":   {"command": ["make", "guile"],   "label": "Guile 3.0.10"},
 }
