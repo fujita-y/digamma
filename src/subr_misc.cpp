@@ -169,11 +169,11 @@ SUBR subr_cyclic_object_p(scm_obj_t self, scm_obj_t a1) { return cyclic_object_p
 
 // time-usage
 SUBR subr_time_usage(scm_obj_t self) {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
   struct rusage usage;
   getrusage(RUSAGE_SELF, &usage);
-  return make_list(3, make_flonum((double)tv.tv_sec + tv.tv_usec / 1000000.0),
+  return make_list(3, make_flonum((double)ts.tv_sec + ts.tv_nsec / 1000000000.0),
                    make_flonum((double)usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0),
                    make_flonum((double)usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0));
 }
