@@ -1,0 +1,95 @@
+name: CI (macos, llvm21)
+
+on:
+  push:
+    branches: ["master", "darwin_fixed"]
+  pull_request:
+    branches: ["master", "darwin_fixed"]
+
+jobs:
+  build-and-test:
+    # macOS 15 runner — Apple Silicon (arm64).
+    # HWASan is Linux-only; the build falls back to Release without sanitizers.
+    runs-on: macos-15
+
+    env:
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      LLVM_VERSION: "21"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- vcpkg binary caching via GitHub Actions cache ---
+      - name: Export GitHub Actions cache environment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # --- LLVM 21 via Homebrew ---
+      - name: Install LLVM ${{ env.LLVM_VERSION }}
+        run: |
+          brew install llvm@${{ env.LLVM_VERSION }}
+          LLVM_PREFIX="$(brew --prefix llvm@${{ env.LLVM_VERSION }})"
+          echo "LLVM_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "${LLVM_PREFIX}/bin" >> "$GITHUB_PATH"
+
+      - name: Install system dependencies
+        run: |
+          brew install cmake ninja ccache pkg-config
+
+      # --- ccache ---
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-llvm21-${{ github.sha }}
+          restore-keys: ccache-macos-llvm21-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=500M
+          ccache --set-config=compression=true
+          ccache -z
+
+      # --- vcpkg ---
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git ${{ runner.temp }}/vcpkg --depth 1
+          ${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Pre-download vcpkg dependencies (with retries)
+        run: |
+          for i in {1..3}; do
+            ${{ runner.temp }}/vcpkg/vcpkg install --only-downloads --x-manifest-root=. && break || { echo "Attempt $i failed, retrying in 10s..."; sleep 10; }
+          done
+
+      # --- Build ---
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_CONFIG_CMD="${LLVM_PREFIX}/bin/llvm-config"
+
+      - name: Build
+        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+
+      - name: ccache statistics
+        run: ccache -s
+
+      # --- Tests ---
+      - name: Run C++ unit tests
+        run: ctest --test-dir build --output-on-failure --parallel $(sysctl -n hw.logicalcpu)
+
+      - name: Run Scheme integration tests
+        run: bash tests/run_tests.sh
+
+      - name: Run core compiler tests
+        run: bash core/tests/run_tests.sh
+
+      - name: Run benchmarks
+        run: build/nanos --boot boot/core.ir --script bench/run-nanos.scm --load-path bench/gambit-benchmarks:stdlib

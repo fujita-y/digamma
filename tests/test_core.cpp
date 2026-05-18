@@ -57,11 +57,11 @@ static bool test_fixnum_in_range(int64_t i64) {
   scm_obj_t x2 = make_fixnum(x1);
   int64_t x3 = fixnum(x2);
   if (x1 != x3) {
-    printf("\033[31m###### fixnum failed: %ld != %ld\033[0m\n", x1, x3);
+    printf("\033[31m###### fixnum failed: %lld != %lld\033[0m\n", (long long)x1, (long long)x3);
     some_test_failed = true;
     return false;
   }
-  printf("\033[32mfixnum passed: %ld\033[0m\n", x1);
+  printf("\033[32mfixnum passed: %lld\033[0m\n", (long long)x1);
   return true;
 }
 
@@ -113,7 +113,7 @@ static bool test_vector(int nsize) {
   scm_obj_t* elts = vector_elts(x1);
   while (n-- > 0) {
     if (elts[n] != make_fixnum(nsize)) {
-      printf("\033[31m###### vector elts failed: %d != %ld\033[0m\n", nsize, fixnum(elts[n]));
+      printf("\033[31m###### vector elts failed: %d != %lld\033[0m\n", nsize, (long long)fixnum(elts[n]));
       some_test_failed = true;
       return false;
     }
@@ -215,18 +215,18 @@ static bool test_cell(int64_t val) {
     return false;
   }
   if (cell_value(c) != v) {
-    printf("\033[31m###### cell value failed: %ld != %ld\033[0m\n", fixnum(cell_value(c)), val);
+    printf("\033[31m###### cell value failed: %lld != %lld\033[0m\n", (long long)fixnum(cell_value(c)), (long long)val);
     some_test_failed = true;
     return false;
   }
   scm_obj_t v2 = make_fixnum(val + 1);
   cell_value_set(c, v2);
   if (cell_value(c) != v2) {
-    printf("\033[31m###### cell value update failed: %ld != %ld\033[0m\n", fixnum(cell_value(c)), val + 1);
+    printf("\033[31m###### cell value update failed: %lld != %lld\033[0m\n", (long long)fixnum(cell_value(c)), (long long)(val + 1));
     some_test_failed = true;
     return false;
   }
-  printf("\033[32mcell passed: %ld\033[0m\n", val);
+  printf("\033[32mcell passed: %lld\033[0m\n", (long long)val);
   return true;
 }
 

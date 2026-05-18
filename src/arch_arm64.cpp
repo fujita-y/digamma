@@ -28,6 +28,14 @@ uint64_t capture_thread_stack_bottom() {
   if (cached) [[likely]] {
     return cached;
   }
+#if defined(__APPLE__)
+  // macOS provides pthread_get_stackaddr_np and pthread_get_stacksize_np
+  // as direct accessors, eliminating the need for pthread_getattr_np.
+  void* stackaddr = pthread_get_stackaddr_np(pthread_self());
+  size_t stacksize = pthread_get_stacksize_np(pthread_self());
+  cached = (uint64_t)stackaddr;
+  (void)stacksize;
+#else
   pthread_attr_t attr;
   pthread_getattr_np(pthread_self(), &attr);
   void* stackaddr;
@@ -35,5 +43,7 @@ uint64_t capture_thread_stack_bottom() {
   pthread_attr_getstack(&attr, &stackaddr, &stacksize);
   pthread_attr_destroy(&attr);
   cached = (uint64_t)stackaddr + stacksize;
+#endif
   return cached;
 }
+

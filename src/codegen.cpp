@@ -66,19 +66,27 @@ intptr_t compiled_code_t::release_and_run() {
   // Grab the function pointer locally before clearing it from the object.
   auto f = func_ptr;
   func_ptr = nullptr;
-  // Explicitly remove the LLVM tracker BEFORE running JIT code.
-  // Scheme continuations captured before subr_codegen_and_run can overwrite
-  // this function's stack frame (including 'tracker') during restoration.
-  // By releasing here, the destructor becomes a safe no-op even on a
-  // corrupted stack.
+
+  // Run the JIT-compiled code FIRST, while the executable pages are still mapped.
+  // On macOS/ARM64, tracker->remove() immediately munmap()s the JIT code pages
+  // (W^X enforcement via MAP_JIT).  Calling remove() before f() would cause a
+  // SIGBUS when the code runs on unmapped pages.  Linux lazily reclaims pages
+  // so the ordering was invisible there.
+  //
+  // Continuation safety: we null out func_ptr above so re-entry is safe.
+  // The tracker is still held by *this; if a Scheme continuation unwinds past
+  // this frame, the compiled_code_t destructor will call tracker->remove() as
+  // normal cleanup, which is correct behavior.
+  intptr_t result = f ? f() : 0;
+
+  // Release the JIT module now that execution is complete.
   if (tracker) {
     if (auto err = tracker->remove()) {
       llvm::consumeError(std::move(err));
     }
     tracker = nullptr;
   }
-  if (f) return f();
-  return 0;
+  return result;
 }
 
 // ============================================================================
@@ -233,7 +241,7 @@ void codegen_t::phase2c_analyze_safepoints() {
       } else if (inst.op == Opcode::CALL || inst.op == Opcode::TAIL_CALL) {
         if (is_symbol(inst.closure_label)) {
           if (is_closure_label(inst.closure_label)) {
-            // std::cout << "#### phase3_analyze_safepoints: closure label " << to_string(inst.closure_label) << std::endl;
+            // std::cout << "#### phase2c_analyze_safepoints: closure label " << to_string(inst.closure_label) << std::endl;
             continue;
           }
           scm_obj_t val = context::environment_variable_ref(inst.closure_label);
@@ -241,7 +249,7 @@ void codegen_t::phase2c_analyze_safepoints() {
             scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
             void* code_ptr = closure_rec->code;
             if (no_gc_code_set.contains(code_ptr)) {
-              // std::cout << "#### phase3_analyze_safepoints: known subr " << to_string(inst.closure_label) << std::endl;
+              // std::cout << "#### phase2c_analyze_safepoints: known subr " << to_string(inst.closure_label) << std::endl;
               continue;
             }
           }
@@ -272,13 +280,13 @@ void codegen_t::phase2c_analyze_safepoints() {
       }
       func.instructions = std::move(new_insts);
     } else {
-      // std::cout << "#### phase3_analyze_safepoints: no safepoint for " << to_string(func.label) << std::endl;
+      // std::cout << "#### phase2c_analyze_safepoints: no safepoint for " << to_string(func.label) << std::endl;
     }
   }
 }
 
 // --------------------------------------------------------------------------
-//  Phase 2: Function and BasicBlock creation
+//  Phase 3: Function and BasicBlock creation
 // --------------------------------------------------------------------------
 
 void codegen_t::phase3_create_functions() {
@@ -348,7 +356,7 @@ void codegen_t::phase3_create_functions() {
 }
 
 // --------------------------------------------------------------------------
-//  Phase 3: Code generation
+//  Phase 4: Code generation
 // --------------------------------------------------------------------------
 
 void codegen_t::phase4_generate_code() {
@@ -414,7 +422,7 @@ void codegen_t::phase4_generate_code() {
 }
 
 // --------------------------------------------------------------------------
-//  Phase 4: Verification and optimization
+//  Phase 5: Verification and optimization
 // --------------------------------------------------------------------------
 
 void codegen_t::optimize_module(llvm::Module& mod) {
@@ -430,12 +438,51 @@ void codegen_t::optimize_module(llvm::Module& mod) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+#if defined(__APPLE__) && defined(__aarch64__)
+  // On macOS/ARM64, the SROA (Scalar Replacement of Aggregates) pass
+  // miscompiles alloca-based argument arrays used for closure calls.
+  // The promoted register values become corrupted, producing garbage
+  // Scheme objects (e.g. ARM64 instruction bytes appearing as cons cell
+  // fields).  This is specific to the MachO JITLink backend on Apple
+  // Silicon — Linux ARM64 with ELF JITLink is unaffected.
+  //
+  // Workaround: use a custom pipeline with beneficial passes that
+  // exclude SROA.
+  llvm::FunctionPassManager FPM;
+  FPM.addPass(llvm::InstCombinePass());
+  FPM.addPass(llvm::SimplifyCFGPass());
+  FPM.addPass(llvm::InstCombinePass());
+
+  llvm::ModulePassManager MPM;
+  MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
+  MPM.run(mod, MAM);
+#else
   llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
   MPM.run(mod, MAM);
+#endif
 }
 
 void codegen_t::phase5_optimize_and_verify() {
-  // Verify all functions first
+  // Fixup: add unreachable terminators to dead blocks that lack one.
+  // Without optimization passes, dead code isn't removed and LLVM verification
+  // requires every basic block to have a terminator.
+  auto fixup_unterminated = [&](llvm::Function* func) {
+    for (auto& BB : *func) {
+      if (BB.getTerminator() == nullptr) {
+        llvm::IRBuilder<> TmpB(&BB);
+        // Return scm_false as a safe default for blocks missing terminators.
+        // These blocks may be dead code or fall-through paths that the
+        // optimization passes would normally handle.
+        TmpB.CreateRet(createInt64Constant(func->getContext(), (uint64_t)scm_false));
+      }
+    }
+  };
+  for (auto const& [label, func] : function_map) {
+    fixup_unterminated(func);
+  }
+  fixup_unterminated(main_function);
+
+  // Verify all functions
   for (auto const& [label, func] : function_map) {
     if (llvm::verifyFunction(*func, &llvm::errs())) {
       fatal("%s:%u codegen: LLVM function verification failed for: %s", __FILE__, __LINE__, func->getName().str().c_str());
@@ -485,7 +532,7 @@ void codegen_t::phase5_optimize_and_verify() {
 }
 
 // --------------------------------------------------------------------------
-//  Phase 5: Finalize and hand off to JIT
+//  Phase 6: Finalize and hand off to JIT
 // --------------------------------------------------------------------------
 
 compiled_code_t codegen_t::phase6_finalize() {
@@ -1252,7 +1299,7 @@ void codegen_t::phase2a_analyze_closure_labels() {
 //   - MAKE_CLOSURE free-var: a direct or cell alias is captured
 //   - CALL/TAIL_CALL callee: the closure is called through an unknown callee
 //
-// Note: this pass runs after phase2_analyze_closure_labels so that
+// Note: this pass runs after phase2a_analyze_closure_labels so that
 // inst.closure_label is already populated for CALL/TAIL_CALL instructions.
 // NOTE: function_map is populated in phase4 (after this pass), so we build
 // our own local_labels set from the parsed functions list instead.

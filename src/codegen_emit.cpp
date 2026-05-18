@@ -1024,8 +1024,15 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
   llvm::Value* proc_name_val = BL.CreateGlobalString(to_string(inst.closure_label), "proc_name");
   BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc), proc_name_val});
 
-  if (inst.argc <= BRIDGE_MAX_ARGS) {
-    // Optimized generic call via bridge
+  if (!is_tail && inst.argc <= BRIDGE_MAX_ARGS) {
+    // Optimized generic NON-TAIL call via bridge.
+    //
+    // For TAIL calls we must NOT use the bridge: the call-to-bridge pattern
+    // (call bridge; ret bridge_result) cannot be optimized into a true tail
+    // call on macOS/ARM64 because the bridge function is NoInline and uses a
+    // switch/dispatch internally.  This causes unbounded stack growth for
+    // CPS-style programs (e.g. cpstak).  Instead, tail calls fall through to
+    // the inline dispatch path below which emits proper musttail calls.
     llvm::Function* bridge = get_or_create_call_closure_bridge();
     llvm::Type* i64 = this->getInt64Type();
     llvm::Type* i64_ptr = this->getInt64PtrType();
@@ -1046,17 +1053,12 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
     }
 
     auto call = BL.CreateCall(bridge->getFunctionType(), bridge, {closure, argc_val, argv_array}, "bridge_call");
-    // The bridge itself handles the calling convention (Scheme/CDECL) and musttail optimization internally.
-    // However, the call TO the bridge is a standard C call.
-    if (is_tail) {
-      BL.CreateRet(call);
-    } else {
-      set_reg(0, call);
-    }
+    set_reg(0, call);
     return;
   }
 
-  // Fallback for large argument counts: Get closure object from register
+  // Inline dispatch path: used for ALL tail calls (to guarantee musttail) and
+  // for non-tail calls with large argument counts (> BRIDGE_MAX_ARGS).
   llvm::Value* closure = get_reg(inst.rn1);
 
   // Get code pointer from closure struct

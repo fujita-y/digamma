@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <stddef.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -17,7 +18,6 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

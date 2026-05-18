@@ -57,6 +57,42 @@ execute_process(
 separate_arguments(llvm_libs UNIX_COMMAND "${llvm_libs_raw}")
 
 # ==============================================================================
+# macOS / Homebrew LLVM Compatibility
+# ==============================================================================
+# On macOS with Homebrew LLVM, transitive library dependencies (e.g. ZLIB,
+# LibEdit found by LLVM's CMake config) may export the raw macOS SDK
+# /usr/include as an INTERFACE_INCLUDE_DIRECTORY, which CMake passes as
+# -isystem ahead of libc++ wrapper headers. Homebrew clang then finds the
+# platform ctype.h/stdlib.h etc. instead of libc++'s shims, causing errors
+# like "<cctype> tried including <ctype.h> but didn't find libc++'s header".
+#
+# Fix: detect the SDK path, then strip it from any imported target that
+# exports it. The compiler already locates those headers via its sysroot.
+if(APPLE)
+  execute_process(
+    COMMAND xcrun --show-sdk-path
+    OUTPUT_VARIABLE MACOS_SDK_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+  if(MACOS_SDK_PATH)
+    message(STATUS "macOS SDK: ${MACOS_SDK_PATH}")
+    set(MACOS_SDK_USR_INCLUDE "${MACOS_SDK_PATH}/usr/include")
+  endif()
+endif()
+
+# Remove the macOS SDK /usr/include from a target's INTERFACE_INCLUDE_DIRECTORIES
+# so it is not emitted as -isystem ahead of libc++ headers.
+macro(strip_macos_sdk_include_from_target tgt)
+  if(APPLE AND MACOS_SDK_USR_INCLUDE AND TARGET ${tgt})
+    get_target_property(_iid ${tgt} INTERFACE_INCLUDE_DIRECTORIES)
+    if(_iid)
+      list(REMOVE_ITEM _iid "${MACOS_SDK_USR_INCLUDE}")
+      set_target_properties(${tgt} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_iid}")
+    endif()
+  endif()
+endmacro()
+
+# ==============================================================================
 # Dependencies
 # ==============================================================================
 
@@ -64,13 +100,19 @@ separate_arguments(llvm_libs UNIX_COMMAND "${llvm_libs_raw}")
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   # Automatically detect vcpkg installation for the current architecture
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed")
-    # Detect triplet based on system processor
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-      set(VCPKG_TRIPLET "arm64-linux")
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-      set(VCPKG_TRIPLET "x64-linux")
+    # Determine OS suffix for vcpkg triplet
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      set(VCPKG_OS_SUFFIX "osx")
     else()
-      set(VCPKG_TRIPLET "${CMAKE_SYSTEM_PROCESSOR}-linux")
+      set(VCPKG_OS_SUFFIX "linux")
+    endif()
+    # Detect triplet based on system processor and OS
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+      set(VCPKG_TRIPLET "arm64-${VCPKG_OS_SUFFIX}")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      set(VCPKG_TRIPLET "x64-${VCPKG_OS_SUFFIX}")
+    else()
+      set(VCPKG_TRIPLET "${CMAKE_SYSTEM_PROCESSOR}-${VCPKG_OS_SUFFIX}")
     endif()
     list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/${VCPKG_TRIPLET}")
   endif()
@@ -86,11 +128,29 @@ find_package(google_cloud_cpp_dialogflow_cx CONFIG REQUIRED)
 
 find_package(asio-grpc CONFIG REQUIRED)
 
+# Strip the macOS SDK /usr/include from all imported targets that may
+# have exported it as a system include path (after all packages are found).
+if(APPLE AND MACOS_SDK_USR_INCLUDE)
+  foreach(_sdk_tgt IN ITEMS
+      ZLIB::ZLIB
+      LibEdit::LibEdit
+      LibXml2::LibXml2
+      OpenSSL::SSL
+      OpenSSL::Crypto)
+    strip_macos_sdk_include_from_target(${_sdk_tgt})
+  endforeach()
+endif()
+
 # ==============================================================================
 # Compiler Configuration
 # ==============================================================================
 
-add_link_options("-fuse-ld=lld")
+# lld is available as ld.lld on Linux but not on macOS (where Homebrew ships
+# ld64.lld internally, but the -fuse-ld=lld clang flag is not supported).
+# Use lld only on Linux; macOS uses its default ld64 linker.
+if(NOT APPLE)
+  add_link_options("-fuse-ld=lld")
+endif()
 
 # ==============================================================================
 # Installation Directories
@@ -138,6 +198,13 @@ else()
 endif()
 message(STATUS "Target architecture: ${NANOS_ARCH}")
 
+# HWASan is only supported on Linux (not macOS/Darwin)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(NANOS_HWASAN_SUPPORTED TRUE)
+else()
+  set(NANOS_HWASAN_SUPPORTED FALSE)
+endif()
+
 # Define compile options
 target_compile_options(nanos_config INTERFACE
   -Werror
@@ -149,24 +216,27 @@ target_compile_options(nanos_config INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-funwind-tables>
   $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
   $<$<CONFIG:RelWithDebInfo>:-fno-optimize-sibling-calls>
-  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
-  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-mllvm>
-  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-hwasan-globals=0>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-mllvm>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-hwasan-globals=0>
   $<$<CONFIG:Debug>:-fexceptions>
   $<$<CONFIG:Debug>:-funwind-tables>
   $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
   $<$<CONFIG:Debug>:-fno-optimize-sibling-calls>
-  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
-  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-mllvm>
-  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-hwasan-globals=0>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-mllvm>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-hwasan-globals=0>
 )
 
 # Define link options
 target_link_options(nanos_config INTERFACE
   -Werror
   $<$<CONFIG:Release>:-flto>
-  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
-  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:RelWithDebInfo>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-fsanitize=hwaddress>
+  $<$<AND:$<CONFIG:Debug>,$<STREQUAL:${NANOS_ARCH},arm64>,$<BOOL:${NANOS_HWASAN_SUPPORTED}>>:-fsanitize=hwaddress>
+  # Suppress duplicate-library warnings emitted by ld64 on macOS when the same
+  # static archive is pulled in more than once through transitive dependencies.
+  $<$<BOOL:${APPLE}>:-Wl,-no_warn_duplicate_libraries>
 )
 
 # ==============================================================================
@@ -222,7 +292,14 @@ set(NANOS_CORE_SOURCES
 # Common Dependencies
 # ==============================================================================
 
-set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::fiber Boost::iostreams replxx::replxx OpenSSL::SSL OpenSSL::Crypto Threads::Threads google-cloud-cpp::aiplatform google-cloud-cpp::dialogflow_cx asio-grpc::asio-grpc -pthread -ldl)
+# OpenSSL is intentionally omitted here; it is added directly to nanos_core
+# below so it appears only once on each linker command line (nanos_core's PUBLIC
+# link-libraries already propagate to all executables that link nanos_core).
+# LLVM_LIBRARY_DIR (set by find_package(LLVM)) must be on the linker search
+# path so ld can resolve -lLLVM-21 (the shared dylib returned by
+# `llvm-config --libs all`). On CI runners the Homebrew cellar path is not a
+# default search location, so we add it explicitly via -L.
+set(NANOS_LINK_LIBRARIES -L${LLVM_LIBRARY_DIR} ${llvm_libs} CLI11::CLI11 Boost::fiber Boost::iostreams replxx::replxx Threads::Threads google-cloud-cpp::aiplatform google-cloud-cpp::dialogflow_cx asio-grpc::asio-grpc -pthread -ldl)
 
 
 # ==============================================================================
@@ -232,7 +309,7 @@ set(NANOS_LINK_LIBRARIES ${llvm_libs} CLI11::CLI11 Boost::fiber Boost::iostreams
 # --- Core Library ---
 # Object library for core sources shared across all executables
 add_library(nanos_core OBJECT ${NANOS_CORE_SOURCES})
-target_link_libraries(nanos_core PUBLIC nanos_config ${NANOS_LINK_LIBRARIES})
+target_link_libraries(nanos_core PUBLIC nanos_config ${NANOS_LINK_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 
 # --- Main Executable ---
 add_executable(nanos src/main.cpp)
