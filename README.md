@@ -211,7 +211,7 @@ The entire compiler pipeline is written in Scheme and cross-compiled into a boot
 
 Preliminary results from a partial [Gambit benchmark suite on Raspberry Pi 5](https://fujita-y.github.io/benchmarks/benchmark_baseline.html) compare **Nanos** against **Ypsilon 2.0.9** and **Guile 3.0.10**.
 Each result is a trimmed average of 7 runs (min/max excluded) reporting wall-clock and CPU time.
-Nanos records the fastest wall-clock time in **23 of 30 benchmarks**.
+Nanos records the fastest wall-clock time in **25 of 30 benchmarks**.
 
 ---
 
