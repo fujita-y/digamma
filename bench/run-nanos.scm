@@ -1,5 +1,4 @@
 (import (core))
-(add-load-path "~/github/digamma/bench/gambit-benchmarks")
 
 (define warmup #t)
 

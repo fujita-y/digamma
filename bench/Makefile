@@ -1,8 +1,8 @@
 nanos:
-	../build/nanos --script run-nanos.scm
+	../build/nanos --boot=../boot/core.ir --load-path=gambit-benchmarks:../stdlib --script=run-nanos.scm
 
 nanos1:
-	../build/nanos --script run-nanos-only-one.scm
+	../build/nanos --boot=../boot/core.ir --load-path=gambit-benchmarks:../stdlib --script=run-nanos-only-one.scm
 
 ypsilon:
 	ypsilon run-ypsilon.scm

@@ -14,6 +14,7 @@
 
 #include "asio.h"  // include after nanos.h due to CR1 macro conflict
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <llvm/Support/TargetSelect.h>
@@ -81,7 +82,20 @@ void nanos_t::destroy() {
 // Execution & REPL
 // ============================================================================
 
+static std::string expand_home(const std::string& path) {
+  if (!path.empty() && path[0] == '~') {
+    const char* home = std::getenv("HOME");
+    if (home) {
+      if (path.length() == 1 || path[1] == '/') {
+        return std::string(home) + path.substr(1);
+      }
+    }
+  }
+  return path;
+}
+
 void nanos_t::load_script(std::string filename) {
+  filename = expand_home(filename);
   std::ifstream ifs(filename);
   if (!ifs) {
     puts("Error: failed to open file");
@@ -113,6 +127,7 @@ void nanos_t::load_script(std::string filename) {
 }
 
 void nanos_t::load_ir(std::string filename) {
+  filename = expand_home(filename);
   std::ifstream ifs(filename);
   if (!ifs) {
     puts("Error: failed to open file");
