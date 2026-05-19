@@ -83,13 +83,25 @@ jobs:
 
       # --- Tests ---
       - name: Run C++ unit tests
-        run: ctest --test-dir build --output-on-failure --parallel $(sysctl -n hw.logicalcpu)
+        run: |
+          for i in 1 2 3; do
+            ctest --test-dir build --output-on-failure --parallel $(sysctl -n hw.logicalcpu)
+          done
 
       - name: Run Scheme integration tests
-        run: bash tests/run_tests.sh
+        run: |
+          for i in 1 2 3; do
+            bash tests/run_tests.sh
+          done
 
       - name: Run core compiler tests
-        run: bash core/tests/run_tests.sh
+        run: |
+          for i in 1 2 3; do
+            bash core/tests/run_tests.sh
+          done
 
       - name: Run benchmarks
-        run: build/nanos --boot boot/core.ir --script bench/run-nanos.scm --load-path bench/gambit-benchmarks:stdlib
+        run: |
+          for i in 1 2 3; do
+            build/nanos --boot boot/core.ir --script bench/run-nanos.scm --load-path bench/gambit-benchmarks:stdlib
+          done

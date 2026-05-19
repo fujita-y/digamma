@@ -1,4 +1,4 @@
-name: CI (arm64, llvm21)
+name: CI (macos, llvm21)
 
 on:
   push:
@@ -8,9 +8,9 @@ on:
 
 jobs:
   build-and-test:
-    # ARM64 runner is required — the project uses ARM64 TBI tagged pointers,
-    # hwaddress sanitizer, and arch_arm64.cpp with no x86 fallback.
-    runs-on: ubuntu-24.04-arm
+    # macOS 15 runner — Apple Silicon (arm64).
+    # HWASan is Linux-only; the build falls back to Release without sanitizers.
+    runs-on: macos-15
 
     env:
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -28,43 +28,25 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      # --- LLVM 21 ---
+      # --- LLVM 21 via Homebrew ---
       - name: Install LLVM ${{ env.LLVM_VERSION }}
         run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${{ env.LLVM_VERSION }} main" \
-            | sudo tee /etc/apt/sources.list.d/llvm.list
-          sudo apt-get update
-          sudo apt-get install -y \
-            llvm-${{ env.LLVM_VERSION }} \
-            llvm-${{ env.LLVM_VERSION }}-dev \
-            clang-${{ env.LLVM_VERSION }} \
-            lld-${{ env.LLVM_VERSION }} \
-            libclang-${{ env.LLVM_VERSION }}-dev
-
-          # Make versioned binaries available as unversioned commands
-          sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-${{ env.LLVM_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.LLVM_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ env.LLVM_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{ env.LLVM_VERSION }} 100
+          brew install llvm@${{ env.LLVM_VERSION }}
+          LLVM_PREFIX="$(brew --prefix llvm@${{ env.LLVM_VERSION }})"
+          echo "LLVM_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "${LLVM_PREFIX}/bin" >> "$GITHUB_PATH"
 
       - name: Install system dependencies
         run: |
-          sudo apt-get install -y \
-            cmake \
-            ninja-build \
-            ccache \
-            pkg-config \
-            curl zip unzip tar
+          brew install cmake ninja ccache pkg-config
 
       # --- ccache ---
       - name: Cache ccache
         uses: actions/cache@v5
         with:
-          path: ~/.cache/ccache
-          key: ccache-arm64-llvm21-${{ github.sha }}
-          restore-keys: ccache-arm64-llvm21-
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-llvm21-${{ github.sha }}
+          restore-keys: ccache-macos-llvm21-
 
       - name: Configure ccache
         run: |
@@ -91,10 +73,10 @@ jobs:
             -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_CONFIG_CMD=/usr/bin/llvm-config-${{ env.LLVM_VERSION }}
+            -DLLVM_CONFIG_CMD="${LLVM_PREFIX}/bin/llvm-config"
 
       - name: Build
-        run: cmake --build build --parallel $(nproc)
+        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
       - name: ccache statistics
         run: ccache -s
@@ -103,7 +85,7 @@ jobs:
       - name: Run C++ unit tests
         run: |
           for i in 1 2 3; do
-            ctest --test-dir build --output-on-failure --parallel $(nproc)
+            ctest --test-dir build --output-on-failure --parallel $(sysctl -n hw.logicalcpu)
           done
 
       - name: Run Scheme integration tests
