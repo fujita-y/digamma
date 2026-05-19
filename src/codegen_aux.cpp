@@ -193,6 +193,10 @@ extern "C" void c_error_tuple_set(scm_obj_t tup, scm_obj_t idx, scm_obj_t val) {
   throw std::runtime_error("error: tuple-set!: bad arguments: " + to_string(tup) + " " + to_string(idx) + " " + to_string(val));
 }
 
+extern "C" void c_error_closure_bridge(int64_t argc) {
+  throw std::runtime_error("error: closure bridge: too many fixed arguments: " + std::to_string(argc));
+}
+
 extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2) {
   if (arg1 == scm_nil) [[unlikely]] {
     return arg2;

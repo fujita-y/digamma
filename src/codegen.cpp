@@ -341,18 +341,6 @@ void codegen_t::phase3_create_functions() {
     llvm::BasicBlock::Create(CT, "entry", closure_func);
   }
 
-  // 3. Create BasicBlocks for all labels within each function
-  for (auto& info : functions) {
-    llvm::Function* llvm_func = info.llvm_function;
-    for (const auto& inst : info.instructions) {
-      if (inst.op == Opcode::LABEL) {
-        // Allocate a new BasicBlock for each label.
-        // Closure entry labels are also valid jump targets.
-        const char* label_str = (const char*)symbol_name(inst.opr1);
-        labels[inst.opr1] = llvm::BasicBlock::Create(CT, label_str, llvm_func);
-      }
-    }
-  }
 }
 
 // --------------------------------------------------------------------------
@@ -361,6 +349,17 @@ void codegen_t::phase3_create_functions() {
 
 void codegen_t::phase4_generate_code() {
   for (auto& info : functions) {
+    // Rebuild labels map scoped to this function only.
+    // This prevents cross-function basic block references that would trigger
+    // "Referring to a basic block in another function!" verifier errors.
+    labels.clear();
+    for (const auto& inst : info.instructions) {
+      if (inst.op == Opcode::LABEL) {
+        const char* label_str = (const char*)symbol_name(inst.opr1);
+        labels[inst.opr1] = llvm::BasicBlock::Create(CT, label_str, info.llvm_function);
+      }
+    }
+
     current_function = info.llvm_function;
     current_function_info = &info;
     this->main_module = current_function->getParent();  // set current module

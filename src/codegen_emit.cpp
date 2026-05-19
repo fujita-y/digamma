@@ -552,7 +552,10 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
       BL.CreateRet(s);
     }
     BL.SetInsertPoint(def_b);
-    BL.CreateRet(getScmFalseValue());
+    llvm::FunctionType* err_ft = llvm::FunctionType::get(BL.getVoidTy(), {i64}, false);
+    llvm::Function* err_fn = get_or_create_external_function("c_error_closure_bridge", err_ft, (void*)&c_error_closure_bridge);
+    BL.CreateCall(err_ft, err_fn, {argc});
+    BL.CreateUnreachable();
   }
 
   if (saved_block) BL.SetInsertPoint(saved_block);
@@ -1024,41 +1027,10 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
   llvm::Value* proc_name_val = BL.CreateGlobalString(to_string(inst.closure_label), "proc_name");
   BL.CreateCall(test_ft, test_func, {get_reg(inst.rn1), createInt32Constant(CT, inst.argc), proc_name_val});
 
-  if (!is_tail && inst.argc <= BRIDGE_MAX_ARGS) {
-    // Optimized generic NON-TAIL call via bridge.
-    //
-    // For TAIL calls we must NOT use the bridge: the call-to-bridge pattern
-    // (call bridge; ret bridge_result) cannot be optimized into a true tail
-    // call on macOS/ARM64 because the bridge function is NoInline and uses a
-    // switch/dispatch internally.  This causes unbounded stack growth for
-    // CPS-style programs (e.g. cpstak).  Instead, tail calls fall through to
-    // the inline dispatch path below which emits proper musttail calls.
-    llvm::Function* bridge = get_or_create_call_closure_bridge();
-    llvm::Type* i64 = this->getInt64Type();
-    llvm::Type* i64_ptr = this->getInt64PtrType();
-
-    // Prepare arguments for bridge: i64 (i64 closure, i64 argc, i64* argv)
-    llvm::Value* closure = get_reg(inst.rn1);
-    llvm::Value* argc_val = createInt64Constant(CT, inst.argc);
-    llvm::Value* argv_array = nullptr;
-    if (inst.argc > 0) {
-      llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-      argv_array = TmpB.CreateAlloca(i64, createInt32Constant(CT, inst.argc), "bridge_argv");
-      for (int i = 0; i < inst.argc; i++) {
-        llvm::Value* p = BL.CreateGEP(i64, argv_array, createInt32Constant(CT, i));
-        BL.CreateStore(get_reg(i), p);
-      }
-    } else {
-      argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
-    }
-
-    auto call = BL.CreateCall(bridge->getFunctionType(), bridge, {closure, argc_val, argv_array}, "bridge_call");
-    set_reg(0, call);
-    return;
-  }
-
-  // Inline dispatch path: used for ALL tail calls (to guarantee musttail) and
-  // for non-tail calls with large argument counts (> BRIDGE_MAX_ARGS).
+  // Inline dispatch path: argc is known at codegen time so we emit the
+  // type-correct call directly, keeping arguments in registers.  This avoids
+  // the store-to-argv → bridge-switch → load-from-argv round-trip that the
+  // shared bridge function would introduce.
   llvm::Value* closure = get_reg(inst.rn1);
 
   // Get code pointer from closure struct
