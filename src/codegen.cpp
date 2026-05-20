@@ -537,17 +537,22 @@ compiled_code_t codegen_t::phase6_finalize() {
   // we decouple them by cloning the closure module into its own fresh context via bitcode.
 
   if (functions.size() > 1) {
-    // 1. Serialize closure_module to bitcode in-memory
+    // Serialize closure_module to bitcode in-memory, then parse into a fresh
+    // isolated LLVMContext.  This decouples the closure module from the main
+    // module's context so that the multi-threaded COD JIT can compile them in
+    // parallel without locking on a shared context.
+    //
+    // All closures are submitted as a single module so that CODLayer's
+    // internal partitioner can correctly extract individual functions on
+    // demand while preserving the tailcc calling convention.
     llvm::SmallVector<char, 0> bitcode;
     llvm::raw_svector_ostream bitcode_stream(bitcode);
     llvm::WriteBitcodeToFile(*closure_module_uptr, bitcode_stream);
 
-    // 2. Parse bitcode into a completely new, isolated LLVMContext
     auto fresh_ctx = std::make_unique<llvm::LLVMContext>();
     auto memory_buffer = llvm::MemoryBuffer::getMemBuffer(llvm::StringRef(bitcode.data(), bitcode.size()), "closure_bitcode", false);
     auto parsed_module = cantFail(llvm::parseBitcodeFile(*memory_buffer, *fresh_ctx));
 
-    // 3. Wrap in an independent ThreadSafeContext & ThreadSafeModule
     llvm::orc::ThreadSafeContext fresh_tsc(std::move(fresh_ctx));
     auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(parsed_module), fresh_tsc);
 
