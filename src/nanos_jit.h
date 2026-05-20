@@ -32,6 +32,7 @@ class nanos_jit_t {
   llvm::orc::ExecutionSession &getExecutionSession() { return *ES; }
   llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name) { return Mangle(Name); }
   llvm::Error addIRModule(llvm::orc::ThreadSafeModule TSM, llvm::orc::ResourceTrackerSP RT = nullptr);
+  llvm::Error addLazyIRModule(llvm::orc::ThreadSafeModule TSM, llvm::orc::ResourceTrackerSP RT = nullptr);
   llvm::Expected<llvm::orc::ExecutorAddr> lookup(llvm::StringRef Name);
 
  private:

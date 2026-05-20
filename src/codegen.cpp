@@ -551,7 +551,7 @@ compiled_code_t codegen_t::phase6_finalize() {
     llvm::orc::ThreadSafeContext fresh_tsc(std::move(fresh_ctx));
     auto clo_tsm = llvm::orc::ThreadSafeModule(std::move(parsed_module), fresh_tsc);
 
-    if (auto err = jit->addIRModule(std::move(clo_tsm))) {
+    if (auto err = jit->addLazyIRModule(std::move(clo_tsm))) {
       fatal("%s:%u codegen: failed to add closure module to JIT: %s", __FILE__, __LINE__, llvm::toString(std::move(err)).c_str());
     }
   }

@@ -9,6 +9,8 @@
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Process.h>
+#include <algorithm>
+#include <thread>
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -55,7 +57,10 @@ nanos_jit_t::~nanos_jit_t() {
 // ============================================================================
 
 Expected<std::unique_ptr<nanos_jit_t>> nanos_jit_t::Create() {
-  auto EPC = SelfExecutorProcessControl::Create(nullptr, std::make_unique<DynamicThreadPoolTaskDispatcher>(std::make_optional<size_t>(2)));
+  unsigned int num_threads = std::thread::hardware_concurrency();
+  if (num_threads == 0) num_threads = 4;
+  size_t pool_size = std::max<size_t>(1, num_threads / 2);
+  auto EPC = SelfExecutorProcessControl::Create(nullptr, std::make_unique<DynamicThreadPoolTaskDispatcher>(std::make_optional<size_t>(pool_size)));
   if (!EPC) return EPC.takeError();
 
   auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
@@ -94,6 +99,11 @@ void nanos_jit_t::handleLazyCallThroughError() {
 // ============================================================================
 
 Error nanos_jit_t::addIRModule(ThreadSafeModule TSM, ResourceTrackerSP RT) {
+  if (!RT) RT = MainJD.getDefaultResourceTracker();
+  return CompileLayer->add(std::move(RT), std::move(TSM));
+}
+
+Error nanos_jit_t::addLazyIRModule(ThreadSafeModule TSM, ResourceTrackerSP RT) {
   if (!RT) RT = MainJD.getDefaultResourceTracker();
   return CODLayer->add(std::move(RT), std::move(TSM));
 }
