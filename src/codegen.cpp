@@ -1102,30 +1102,42 @@ void codegen_t::add_common_closure_attributes(llvm::Function* func) {
 
 void codegen_t::phase2a_analyze_closure_labels() {
   struct State {
-    std::unordered_map<int, scm_obj_t> regs;   // reg index -> closure label
-    std::unordered_map<int, scm_obj_t> cells;  // reg-cell index -> closure label
+    std::vector<scm_obj_t> regs;   // reg index -> closure label
+    std::vector<scm_obj_t> cells;  // reg-cell index -> closure label
     std::unordered_map<scm_obj_t, scm_obj_t> globals;
+
+    void init(int num_regs) {
+      if (regs.size() < (size_t)num_regs) {
+        regs.resize(num_regs, 0);
+        cells.resize(num_regs, 0);
+      }
+    }
 
     bool merge(const State& other) {
       bool changed = false;
-      for (auto const& [reg, label] : other.regs) {
-        if (regs.find(reg) == regs.end()) {
-          regs[reg] = label;
+      const size_t num_regs = regs.size();
+      for (size_t r = 0; r < num_regs; ++r) {
+        scm_obj_t other_label = other.regs[r];
+        if (other_label == 0) continue;
+        if (regs[r] == 0) {
+          regs[r] = other_label;
           changed = true;
-        } else if (regs[reg] != label) {
-          if (regs[reg] != scm_nil) {
-            regs[reg] = scm_nil;
+        } else if (regs[r] != other_label) {
+          if (regs[r] != scm_nil) {
+            regs[r] = scm_nil;
             changed = true;
           }
         }
       }
-      for (auto const& [cell, label] : other.cells) {
-        if (cells.find(cell) == cells.end()) {
-          cells[cell] = label;
+      for (size_t r = 0; r < num_regs; ++r) {
+        scm_obj_t other_label = other.cells[r];
+        if (other_label == 0) continue;
+        if (cells[r] == 0) {
+          cells[r] = other_label;
           changed = true;
-        } else if (cells[cell] != label) {
-          if (cells[cell] != scm_nil) {
-            cells[cell] = scm_nil;
+        } else if (cells[r] != other_label) {
+          if (cells[r] != scm_nil) {
+            cells[r] = scm_nil;
             changed = true;
           }
         }
@@ -1146,6 +1158,7 @@ void codegen_t::phase2a_analyze_closure_labels() {
   };
 
   for (auto& func : functions) {
+    const int num_regs = func.max_reg + 1;
     // Per-function map: closure_label -> {free_idx -> reg_idx}
     // Scoped to this function so REG_CELL_SET only matches closures
     // make-closure'd in the same function body.
@@ -1156,19 +1169,24 @@ void codegen_t::phase2a_analyze_closure_labels() {
     while (changed) {
       changed = false;
       State current_state;
+      current_state.init(num_regs);
 
       for (size_t i = 0; i < func.instructions.size(); ++i) {
         auto& inst = func.instructions[i];
 
         if (inst.op == Opcode::LABEL) {
           auto& entry = block_entry_states[inst.opr1];
+          entry.init(num_regs);
           if (entry.merge(current_state)) changed = true;
           current_state = entry;
         }
 
         switch (inst.op) {
           case Opcode::MAKE_CLOSURE:
-            current_state.regs[inst.rn1] = inst.opr1;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              current_state.regs[inst.rn1] = inst.opr1;
+            }
             // Record which register each free-variable slot captures, so that
             // a subsequent reg-cell-set! into that register can propagate the
             // written label into closure_cell_labels for use in the closure body.
@@ -1184,48 +1202,67 @@ void codegen_t::phase2a_analyze_closure_labels() {
             }
             break;
           case Opcode::CLOSURE_SELF:
-            current_state.regs[inst.rn1] = func.label;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              current_state.regs[inst.rn1] = func.label;
+            }
             break;
           case Opcode::MOV:
-            current_state.regs[inst.rn1] = (current_state.regs.count(inst.rn2) ? current_state.regs[inst.rn2] : scm_nil);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              current_state.regs[inst.rn1] = (inst.rn2 >= 0 && current_state.regs[inst.rn2] != 0 ? current_state.regs[inst.rn2] : scm_nil);
+            }
             break;
           case Opcode::GLOBAL_SET:
-            current_state.globals[inst.opr1] = (current_state.regs.count(inst.rn1) ? current_state.regs[inst.rn1] : scm_nil);
-            if (current_state.regs.count(inst.rn1) && current_state.regs[inst.rn1] != scm_nil) {
-              global_closure_defs[inst.opr1] = current_state.regs[inst.rn1];
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              current_state.globals[inst.opr1] = (current_state.regs[inst.rn1] != 0 ? current_state.regs[inst.rn1] : scm_nil);
+              if (current_state.regs[inst.rn1] != 0 && current_state.regs[inst.rn1] != scm_nil) {
+                global_closure_defs[inst.opr1] = current_state.regs[inst.rn1];
+              }
+            } else {
+              current_state.globals[inst.opr1] = scm_nil;
             }
             break;
           case Opcode::GLOBAL_REF:
-            if (current_state.globals.count(inst.opr2)) {
-              current_state.regs[inst.rn1] = current_state.globals[inst.opr2];
-            } else if (global_closure_defs.count(inst.opr2)) {
-              current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
-            } else {
-              // Try to look up in the global environment — single lookup.
-              scm_obj_t val = context::environment_variable_ref(inst.opr2);
-              if (val != scm_undef) {
-                current_state.regs[inst.rn1] = inst.opr2;
-                if (is_closure(val)) {
-                  // Single emplace — avoids double lookup if already present.
-                  closure_params.emplace(inst.opr2, std::make_pair(closure_argc(val), closure_rest(val) == 1));
-                }
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (current_state.globals.find(inst.opr2) != current_state.globals.end()) {
+                current_state.regs[inst.rn1] = current_state.globals[inst.opr2];
+              } else if (global_closure_defs.find(inst.opr2) != global_closure_defs.end()) {
+                current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
               } else {
+                // Try to look up in the global environment — single lookup.
+                scm_obj_t val = context::environment_variable_ref(inst.opr2);
+                if (val != scm_undef) {
+                  current_state.regs[inst.rn1] = inst.opr2;
+                  if (is_closure(val)) {
+                    // Single emplace — avoids double lookup if already present.
+                    closure_params.emplace(inst.opr2, std::make_pair(closure_argc(val), closure_rest(val) == 1));
+                  }
+                } else {
 #ifndef NDEBUG
-                std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
+                  std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
 #endif
 
-                scm_obj_t string_name = make_string((const char*)symbol_name(inst.opr2));
-                context::gc_protect(string_name);
-                gc_protected_objects.push_back(string_name);
-                current_state.regs[inst.rn1] = string_name;
+                  scm_obj_t string_name = make_string((const char*)symbol_name(inst.opr2));
+                  context::gc_protect(string_name);
+                  gc_protected_objects.push_back(string_name);
+                  current_state.regs[inst.rn1] = string_name;
+                }
               }
             }
             break;
           case Opcode::REG_CELL_SET:
             // (reg-cell-set! cell-reg value-reg): store value of rn2 into the cell held in rn1
             {
-              scm_obj_t val_label = current_state.regs.count(inst.rn2) ? current_state.regs[inst.rn2] : scm_nil;
-              current_state.cells[inst.rn1] = val_label;
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              scm_obj_t val_label = (inst.rn2 >= 0 && current_state.regs[inst.rn2] != 0) ? current_state.regs[inst.rn2] : scm_nil;
+              if (inst.rn1 >= 0) {
+                if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+                current_state.cells[inst.rn1] = val_label;
+              }
               // Propagate into closure_cell_labels only for the letrec self-referential
               // pattern: (make-closure r0 C (... rN ...) ...) followed by
               // (make-cell rN) / (reg-cell-set! rN r0).  The cell at free-var
@@ -1244,7 +1281,11 @@ void codegen_t::phase2a_analyze_closure_labels() {
             break;
           case Opcode::REG_CELL_REF:
             // (reg-cell-ref dst-reg cell-reg): load from the cell in rn2 into rn1
-            current_state.regs[inst.rn1] = (current_state.cells.count(inst.rn2) ? current_state.cells[inst.rn2] : scm_nil);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              current_state.regs[inst.rn1] = (inst.rn2 >= 0 && current_state.cells[inst.rn2] != 0 ? current_state.cells[inst.rn2] : scm_nil);
+            }
             break;
           case Opcode::CLOSURE_CELL_REF: {
             // (closure-cell-ref dst-reg idx): read cell slot idx of the current closure.
@@ -1252,17 +1293,25 @@ void codegen_t::phase2a_analyze_closure_labels() {
             // closure was constructed via make-closure + reg-cell-set!), propagate it.
             int cell_idx = (int)fixnum(inst.opr2);
             scm_obj_t cl_label = func.label;
-            if (closure_cell_labels.count(cl_label) && closure_cell_labels[cl_label].count(cell_idx)) {
-              current_state.regs[inst.rn1] = closure_cell_labels[cl_label][cell_idx];
-            } else {
-              current_state.regs[inst.rn1] = scm_nil;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (closure_cell_labels.count(cl_label) && closure_cell_labels[cl_label].count(cell_idx)) {
+                current_state.regs[inst.rn1] = closure_cell_labels[cl_label][cell_idx];
+              } else {
+                current_state.regs[inst.rn1] = scm_nil;
+              }
             }
             break;
           }
           case Opcode::CALL:
           case Opcode::TAIL_CALL:
-            if (current_state.regs.count(inst.rn1)) {
-              inst.closure_label = current_state.regs[inst.rn1];
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (current_state.regs[inst.rn1] != 0) {
+                inst.closure_label = current_state.regs[inst.rn1];
+              } else {
+                inst.closure_label = scm_nil;
+              }
             } else {
               inst.closure_label = scm_nil;
             }
@@ -1272,26 +1321,31 @@ void codegen_t::phase2a_analyze_closure_labels() {
             // by the call and r0 receives the return value.
             if (inst.op == Opcode::CALL) {
               for (int a = 0; a <= inst.argc; ++a) {  // r0..r(argc)
-                current_state.regs.erase(a);
+                if (a < num_regs) current_state.regs[a] = 0;
               }
             }
             break;
           case Opcode::JUMP: {
             auto& entry_j = block_entry_states[inst.opr1];
+            entry_j.init(num_regs);
             if (entry_j.merge(current_state)) changed = true;
             current_state = State();  // Conservative: reset state after jump
+            current_state.init(num_regs);
             break;
           }
           case Opcode::IF: {
             auto& entry_t = block_entry_states[inst.opr1];
             auto& entry_f = block_entry_states[inst.opr2];
+            entry_t.init(num_regs);
+            entry_f.init(num_regs);
             if (entry_t.merge(current_state)) changed = true;
             if (entry_f.merge(current_state)) changed = true;
             // State continues for fall-through (though in this IR IF usually has two labels)
             break;
           }
           default:
-            if (inst.rn1 != -1) {
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
               current_state.regs[inst.rn1] = scm_nil;
             }
             break;
@@ -1309,7 +1363,7 @@ void codegen_t::phase2a_analyze_closure_labels() {
 // can escape to heap-reachable memory.  A closure is considered non-escaping
 // (no_escape = true) when the closure value never reaches heap-reachable memory.
 //
-// Alias tracking uses three parallel sets:
+// Alias tracking uses three parallel vectors (representing dense sets):
 //   aliases      — registers currently holding the closure directly
 //   cell_aliases — registers whose pointed-to heap-cell contains the closure
 //   slot_aliases — free-var slot indices of the current closure that contain
@@ -1348,6 +1402,7 @@ void codegen_t::phase2b_analyze_no_escape() {
   for (auto& func : functions) {
     const auto& insts = func.instructions;
     const size_t n = insts.size();
+    const int num_regs = func.max_reg + 1;
 
     for (size_t mk = 0; mk < n; ++mk) {
       auto& mk_inst = func.instructions[mk];
@@ -1355,32 +1410,32 @@ void codegen_t::phase2b_analyze_no_escape() {
 
       const int dst = mk_inst.rn1;
       if (dst < 0) continue;
+      if (dst >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, dst, num_regs - 1);
 
-      std::unordered_set<int> aliases;       // direct register aliases
-      std::unordered_set<int> cell_aliases;  // cell-register aliases
-      std::unordered_set<int> slot_aliases;  // closure free-var slot aliases
-      aliases.insert(dst);
+      int nenv = count_list_length(mk_inst.free_indices);
+
+      std::vector<uint8_t> aliases(num_regs, 0);       // direct register aliases
+      std::vector<uint8_t> cell_aliases(num_regs, 0);  // cell-register aliases
+      std::vector<uint8_t> slot_aliases(nenv, 0);      // closure free-var slot aliases
+      aliases[dst] = 1;
 
       bool escaped = false;
       bool cell_aliases_used = false;  // becomes true if closure ever flowed through a heap cell
       bool tail_called = false;        // becomes true if closure is tail-called from creating frame
 
-      // Maps label symbol -> alias sets saved from JUMP/IF instructions pointing to that label.
-      // At each LABEL instruction we merge saved incoming aliases into the current alias sets.
-      std::unordered_map<scm_obj_t, std::unordered_set<int>> pending_aliases;
-      std::unordered_map<scm_obj_t, std::unordered_set<int>> pending_cell_aliases;
+      // Maps label symbol -> alias vectors saved from JUMP/IF instructions pointing to that label.
+      // At each LABEL instruction we merge saved incoming aliases into the current alias vectors.
+      std::unordered_map<scm_obj_t, std::vector<uint8_t>> pending_aliases;
+      std::unordered_map<scm_obj_t, std::vector<uint8_t>> pending_cell_aliases;
 
       for (size_t i = mk + 1; i < n && !escaped; ++i) {
         const auto& inst = insts[i];
-
-        // Track when cell_aliases gains an entry (closure stored into a heap cell).
-        size_t prev_cell_count = cell_aliases.size();
 
         switch (inst.op) {
           // ---- RET ----------------------------------------------------------
           case Opcode::RET:
             // Returns r0; escape if r0 holds the closure or a cell with it.
-            if (aliases.count(0) || cell_aliases.count(0)) {
+            if ((num_regs > 0 && aliases[0]) || (num_regs > 0 && cell_aliases[0])) {
               escaped = true;
             }
             break;
@@ -1393,10 +1448,14 @@ void codegen_t::phase2b_analyze_no_escape() {
             scm_obj_t target = inst.opr1;
             auto& pa = pending_aliases[target];
             auto& pca = pending_cell_aliases[target];
-            for (int r : aliases) pa.insert(r);
-            for (int r : cell_aliases) pca.insert(r);
-            aliases.clear();
-            cell_aliases.clear();
+            if (pa.empty()) pa.resize(num_regs, 0);
+            if (pca.empty()) pca.resize(num_regs, 0);
+            for (int r = 0; r < num_regs; ++r) {
+              if (aliases[r]) pa[r] = 1;
+              if (cell_aliases[r]) pca[r] = 1;
+            }
+            std::fill(aliases.begin(), aliases.end(), 0);
+            std::fill(cell_aliases.begin(), cell_aliases.end(), 0);
             break;
           }
 
@@ -1410,13 +1469,19 @@ void codegen_t::phase2b_analyze_no_escape() {
             auto& pca_t = pending_cell_aliases[true_lbl];
             auto& pa_f = pending_aliases[false_lbl];
             auto& pca_f = pending_cell_aliases[false_lbl];
-            for (int r : aliases) {
-              pa_t.insert(r);
-              pa_f.insert(r);
-            }
-            for (int r : cell_aliases) {
-              pca_t.insert(r);
-              pca_f.insert(r);
+            if (pa_t.empty()) pa_t.resize(num_regs, 0);
+            if (pca_t.empty()) pca_t.resize(num_regs, 0);
+            if (pa_f.empty()) pa_f.resize(num_regs, 0);
+            if (pca_f.empty()) pca_f.resize(num_regs, 0);
+            for (int r = 0; r < num_regs; ++r) {
+              if (aliases[r]) {
+                pa_t[r] = 1;
+                pa_f[r] = 1;
+              }
+              if (cell_aliases[r]) {
+                pca_t[r] = 1;
+                pca_f[r] = 1;
+              }
             }
             // Keep current aliases for linear fall-through (conservative).
             break;
@@ -1428,15 +1493,20 @@ void codegen_t::phase2b_analyze_no_escape() {
             scm_obj_t lbl = inst.opr1;
             auto it_a = pending_aliases.find(lbl);
             if (it_a != pending_aliases.end()) {
-              for (int r : it_a->second) aliases.insert(r);
+              for (int r = 0; r < num_regs; ++r) {
+                if (it_a->second[r]) aliases[r] = 1;
+              }
             }
             auto it_ca = pending_cell_aliases.find(lbl);
             if (it_ca != pending_cell_aliases.end()) {
-              size_t before = cell_aliases.size();
-              for (int r : it_ca->second) {
-                cell_aliases.insert(r);
+              for (int r = 0; r < num_regs; ++r) {
+                if (it_ca->second[r]) {
+                  if (!cell_aliases[r]) {
+                    cell_aliases[r] = 1;
+                    cell_aliases_used = true;
+                  }
+                }
               }
-              if (cell_aliases.size() > before) cell_aliases_used = true;
             }
             break;
           }
@@ -1444,17 +1514,20 @@ void codegen_t::phase2b_analyze_no_escape() {
           // ---- MOV ----------------------------------------------------------
           case Opcode::MOV: {
             // Propagate both alias kinds.
-            bool src_direct = inst.rn2 >= 0 && aliases.count(inst.rn2);
-            bool src_cell = inst.rn2 >= 0 && cell_aliases.count(inst.rn2);
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            bool src_direct = inst.rn2 >= 0 && aliases[inst.rn2];
+            bool src_cell = inst.rn2 >= 0 && cell_aliases[inst.rn2];
             if (inst.rn1 >= 0) {
-              if (src_direct)
-                aliases.insert(inst.rn1);
-              else
-                aliases.erase(inst.rn1);
-              if (src_cell)
-                cell_aliases.insert(inst.rn1);
-              else
-                cell_aliases.erase(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = src_direct ? 1 : 0;
+              if (src_cell) {
+                if (!cell_aliases[inst.rn1]) {
+                  cell_aliases[inst.rn1] = 1;
+                  cell_aliases_used = true;
+                }
+              } else {
+                cell_aliases[inst.rn1] = 0;
+              }
             }
             break;
           }
@@ -1464,9 +1537,15 @@ void codegen_t::phase2b_analyze_no_escape() {
             // make-cell rn1: wraps rn1's current value in a heap cell and writes
             // the cell pointer back into rn1.  If rn1 held the closure directly,
             // it now holds a cell containing the closure.
-            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) {
-              aliases.erase(inst.rn1);
-              cell_aliases.insert(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (aliases[inst.rn1]) {
+                aliases[inst.rn1] = 0;
+                if (!cell_aliases[inst.rn1]) {
+                  cell_aliases[inst.rn1] = 1;
+                  cell_aliases_used = true;
+                }
+              }
             }
             break;
 
@@ -1476,8 +1555,15 @@ void codegen_t::phase2b_analyze_no_escape() {
             // Stores rn2 into the cell object pointed to by rn1.
             // This is like MOV into a cell — does NOT immediately escape.
             // The closure in rn2 flows into the cell held by rn1.
-            if (inst.rn2 >= 0 && aliases.count(inst.rn2)) {
-              if (inst.rn1 >= 0) cell_aliases.insert(inst.rn1);
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            if (inst.rn2 >= 0 && aliases[inst.rn2]) {
+              if (inst.rn1 >= 0) {
+                if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+                if (!cell_aliases[inst.rn1]) {
+                  cell_aliases[inst.rn1] = 1;
+                  cell_aliases_used = true;
+                }
+              }
               // rn2 still holds the closure value directly (src not consumed).
             }
             // reg-cell-set! writes *through* rn1 (the cell pointer) — it does
@@ -1488,10 +1574,14 @@ void codegen_t::phase2b_analyze_no_escape() {
           case Opcode::REG_CELL_REF:
             // reg-cell-ref rn1(dst) rn2(cell-reg):
             // Loads the cell's contents into rn1.
-            if (inst.rn2 >= 0 && cell_aliases.count(inst.rn2)) {
-              if (inst.rn1 >= 0) aliases.insert(inst.rn1);  // closure retrieved
-            } else {
-              if (inst.rn1 >= 0) aliases.erase(inst.rn1);  // non-closure loaded
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              if (inst.rn2 >= 0 && cell_aliases[inst.rn2]) {
+                aliases[inst.rn1] = 1;  // closure retrieved
+              } else {
+                aliases[inst.rn1] = 0;  // non-closure loaded
+              }
             }
             break;
 
@@ -1500,29 +1590,41 @@ void codegen_t::phase2b_analyze_no_escape() {
             // closure-cell-set! opr1(slot-idx) rn2(value):
             // Stores rn2 into free-var slot opr1 of the current closure.
             // Like MOV into a slot — does NOT immediately escape.
-            if (inst.rn2 >= 0 && aliases.count(inst.rn2)) {
-              slot_aliases.insert((int)fixnum(inst.opr1));
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            if (inst.rn2 >= 0 && aliases[inst.rn2]) {
+              int slot_idx = (int)fixnum(inst.opr1);
+              if (slot_idx >= 0 && slot_idx < nenv) {
+                slot_aliases[slot_idx] = 1;
+              }
               // rn2 still holds the closure.
             }
             break;
 
           // ---- CLOSURE_CELL_REF ---------------------------------------------
-          case Opcode::CLOSURE_CELL_REF:
+          case Opcode::CLOSURE_CELL_REF: {
             // closure-cell-ref rn1(dst) opr2(slot-idx):
             // Loads free-var slot opr2 into rn1.
-            if (slot_aliases.count((int)fixnum(inst.opr2))) {
-              if (inst.rn1 >= 0) aliases.insert(inst.rn1);
-            } else {
-              if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            int slot_idx = (int)fixnum(inst.opr2);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (slot_idx >= 0 && slot_idx < nenv && slot_aliases[slot_idx]) {
+                aliases[inst.rn1] = 1;
+              } else {
+                aliases[inst.rn1] = 0;
+              }
             }
             break;
+          }
 
           // ---- GLOBAL_SET ---------------------------------------------------
           case Opcode::GLOBAL_SET:
             // Storing a direct alias or a cell-register globally escapes the
             // closure (directly or via the cell that holds it).
-            if (inst.rn1 >= 0 && (aliases.count(inst.rn1) || cell_aliases.count(inst.rn1))) {
-              escaped = true;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (aliases[inst.rn1] || cell_aliases[inst.rn1]) {
+                escaped = true;
+              }
             }
             break;
 
@@ -1533,16 +1635,20 @@ void codegen_t::phase2b_analyze_no_escape() {
             scm_obj_t fi = inst.free_indices;
             while (is_cons(fi)) {
               int r = parse_reg(cons_car(fi));
-              if (r >= 0 && (aliases.count(r) || cell_aliases.count(r))) {
-                escaped = true;
-                break;
+              if (r >= 0) {
+                if (r >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, r, num_regs - 1);
+                if (aliases[r] || cell_aliases[r]) {
+                  escaped = true;
+                  break;
+                }
               }
               fi = cons_cdr(fi);
             }
             // Kill any alias overwritten by this instruction's destination.
             if (inst.rn1 >= 0) {
-              aliases.erase(inst.rn1);
-              cell_aliases.erase(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = 0;
+              cell_aliases[inst.rn1] = 0;
             }
             break;
           }
@@ -1566,7 +1672,7 @@ void codegen_t::phase2b_analyze_no_escape() {
               // If a direct alias or a cell-reg alias appears as a call argument,
               // the callee may store it on the heap (or call it after frame exits).
               for (int a = 0; a < inst.argc; ++a) {
-                if (aliases.count(a) || cell_aliases.count(a)) {
+                if (a < num_regs && (aliases[a] || cell_aliases[a])) {
                   if (inst.op == Opcode::TAIL_CALL) {
                     // Frame exits before callee runs — closure would be dangling.
                     tail_called = true;
@@ -1581,19 +1687,23 @@ void codegen_t::phase2b_analyze_no_escape() {
 
             // Closure used as the callee: non-escaping only if it is a
             // locally-compiled closure (receives `self`, not heap-stored).
-            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) {
-              bool known_local = is_symbol(inst.closure_label) && local_labels.count(inst.closure_label);
-              if (!known_local) {
-                escaped = true;
-              } else if (inst.op == Opcode::TAIL_CALL) {
-                // A tail-call from the creating frame exits that frame before
-                // the closure runs — a stack-allocated struct would be dangling.
-                tail_called = true;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (aliases[inst.rn1]) {
+                bool known_local = is_symbol(inst.closure_label) && local_labels.count(inst.closure_label);
+                if (!known_local) {
+                  escaped = true;
+                } else if (inst.op == Opcode::TAIL_CALL) {
+                  // A tail-call from the creating frame exits that frame before
+                  // the closure runs — a stack-allocated struct would be dangling.
+                  tail_called = true;
+                }
               }
             }
             // A cell alias in callee position is conservatively an escape.
-            if (!escaped && inst.rn1 >= 0 && cell_aliases.count(inst.rn1)) {
-              escaped = true;
+            if (!escaped && inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (cell_aliases[inst.rn1]) escaped = true;
             }
 
             // For a regular CALL (not tail-call), the argument registers
@@ -1601,19 +1711,12 @@ void codegen_t::phase2b_analyze_no_escape() {
             // value.  Kill any stale closure aliases in those slots so that
             // subsequent aliases don't propagate a phantom alias from the
             // return-value register into later instructions.
-            //
-            // Example of the false positive this prevents:
-            //   (mov r0 r5)      ; r0 = closure (r5 already aliased it)
-            //   (call map 2)     ; map(closure, x) — safe HOF, frame stays alive
-            //   (mov r4 r0)      ; WITHOUT this kill: r4 gets stale closure alias
-            //   (tail-call len 1); tail-call with r0 re-loaded from r4 → false tail_called
-            //
-            // Note: for TAIL_CALL the analysis is already done (escaped/tail_called
-            // set above) and the frame no longer matters, so no kill needed there.
             if (inst.op == Opcode::CALL) {
               for (int a = 0; a < inst.argc; ++a) {
-                aliases.erase(a);
-                cell_aliases.erase(a);
+                if (a < num_regs) {
+                  aliases[a] = 0;
+                  cell_aliases[a] = 0;
+                }
               }
             }
             break;
@@ -1623,14 +1726,12 @@ void codegen_t::phase2b_analyze_no_escape() {
           default:
             // Any instruction that writes rn1 kills aliases there.
             if (inst.rn1 >= 0) {
-              aliases.erase(inst.rn1);
-              cell_aliases.erase(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = 0;
+              cell_aliases[inst.rn1] = 0;
             }
             break;
         }
-
-        // If cell_aliases grew this iteration, the closure flowed through a heap cell.
-        if (cell_aliases.size() > prev_cell_count) cell_aliases_used = true;
       }
 
       mk_inst.no_escape = !escaped;
@@ -1645,78 +1746,72 @@ void codegen_t::phase2b_analyze_no_escape() {
     // Second pass: propagate no_escape from MAKE_CLOSURE and stack_alloc
     // MAKE_CELL to store instructions so that emit_reg_cell_set /
     // emit_closure_set / emit_closure_cell_set can skip the write barrier.
-    //
-    // We do a single linear forward sweep per function (conservative:
-    // no loop-back edges are considered, but the typical patterns are
-    // straight-line code generated for let/letrec).  At each point we
-    // maintain the set of registers that currently hold (directly or via
-    // MOV) a value produced by a no_escape MAKE_CLOSURE, or a tagged
-    // pointer to a stack-allocated cell (stack_alloc MAKE_CELL).
     // ----------------------------------------------------------------
     {
-      std::unordered_set<int> no_escape_regs;
-      // Registers holding a stack-allocated cell pointer (stack_alloc MAKE_CELL).
-      std::unordered_set<int> stack_cell_regs;
+      std::vector<uint8_t> no_escape_regs(num_regs, 0);
+      std::vector<uint8_t> stack_cell_regs(num_regs, 0);
 
       for (auto& inst : func.instructions) {
         switch (inst.op) {
           case Opcode::MAKE_CLOSURE:
-            if (inst.no_escape && inst.rn1 >= 0)
-              no_escape_regs.insert(inst.rn1);
-            else if (inst.rn1 >= 0)
-              no_escape_regs.erase(inst.rn1);
-            // MAKE_CLOSURE never produces a cell pointer.
-            if (inst.rn1 >= 0) stack_cell_regs.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.no_escape)
+                no_escape_regs[inst.rn1] = 1;
+              else
+                no_escape_regs[inst.rn1] = 0;
+              stack_cell_regs[inst.rn1] = 0;
+            }
             break;
 
           case Opcode::MAKE_CELL:
-            // Stack-allocated cells: treat the cell pointer register as
-            // no_escape so that writes through it skip the write barrier.
-            if (inst.stack_alloc && inst.rn1 >= 0) {
-              stack_cell_regs.insert(inst.rn1);
-              no_escape_regs.erase(inst.rn1);  // cell ptr, not a closure value
-            } else if (inst.rn1 >= 0) {
-              stack_cell_regs.erase(inst.rn1);
-              no_escape_regs.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.stack_alloc) {
+                stack_cell_regs[inst.rn1] = 1;
+              } else {
+                stack_cell_regs[inst.rn1] = 0;
+              }
+              no_escape_regs[inst.rn1] = 0;
             }
             break;
 
           case Opcode::MOV:
-            // Propagate through copies.
             if (inst.rn1 >= 0) {
-              if (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2))
-                no_escape_regs.insert(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              if (inst.rn2 >= 0 && no_escape_regs[inst.rn2])
+                no_escape_regs[inst.rn1] = 1;
               else
-                no_escape_regs.erase(inst.rn1);
-              if (inst.rn2 >= 0 && stack_cell_regs.count(inst.rn2))
-                stack_cell_regs.insert(inst.rn1);
+                no_escape_regs[inst.rn1] = 0;
+              if (inst.rn2 >= 0 && stack_cell_regs[inst.rn2])
+                stack_cell_regs[inst.rn1] = 1;
               else
-                stack_cell_regs.erase(inst.rn1);
+                stack_cell_regs[inst.rn1] = 0;
             }
             break;
 
           case Opcode::REG_CELL_SET:
-            // rn2 is the value being stored into the cell held by rn1.
-            // The store is no_escape if the value is no_escape OR if the
-            // cell itself is stack-allocated (rn1 in stack_cell_regs).
-            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2)) || (inst.rn1 >= 0 && stack_cell_regs.count(inst.rn1));
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs[inst.rn2]) || (inst.rn1 >= 0 && stack_cell_regs[inst.rn1]);
             break;
 
           case Opcode::CLOSURE_SET:
-            // rn2 is the value being stored into the current closure's env slot.
-            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs[inst.rn2]);
             break;
 
           case Opcode::CLOSURE_CELL_SET:
-            // rn2 is the value being stored into a cell slot of the current closure.
-            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs.count(inst.rn2));
+            if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+            inst.no_escape = (inst.rn2 >= 0 && no_escape_regs[inst.rn2]);
             break;
 
           default:
-            // Any instruction that writes rn1 kills the tracking for that register.
             if (inst.rn1 >= 0) {
-              no_escape_regs.erase(inst.rn1);
-              stack_cell_regs.erase(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              no_escape_regs[inst.rn1] = 0;
+              stack_cell_regs[inst.rn1] = 0;
             }
             break;
         }
@@ -1749,6 +1844,7 @@ void codegen_t::phase2b_analyze_no_escape() {
 void codegen_t::phase2d_analyze_cell_stack_alloc() {
   for (auto& func : functions) {
     const size_t n = func.instructions.size();
+    const int num_regs = func.max_reg + 1;
 
     for (size_t mk = 0; mk < n; ++mk) {
       auto& mk_inst = func.instructions[mk];
@@ -1756,9 +1852,10 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
 
       const int cell_reg = mk_inst.rn1;
       if (cell_reg < 0) continue;
+      if (cell_reg >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, cell_reg, num_regs - 1);
 
-      std::unordered_set<int> aliases;  // registers holding the cell pointer
-      aliases.insert(cell_reg);
+      std::vector<uint8_t> aliases(num_regs, 0);  // registers holding the cell pointer
+      aliases[cell_reg] = 1;
 
       bool escaped = false;
       int capturing_closures = 0;  // number of stack_alloc closures that captured this cell
@@ -1769,28 +1866,36 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
         switch (inst.op) {
           // ---- RET ----------------------------------------------------------
           case Opcode::RET:
-            if (aliases.count(0)) escaped = true;
+            if (num_regs > 0 && aliases[0]) escaped = true;
             break;
 
           // ---- MOV ----------------------------------------------------------
           case Opcode::MOV:
             if (inst.rn1 >= 0) {
-              if (inst.rn2 >= 0 && aliases.count(inst.rn2))
-                aliases.insert(inst.rn1);
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (inst.rn2 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn2, num_regs - 1);
+              if (inst.rn2 >= 0 && aliases[inst.rn2])
+                aliases[inst.rn1] = 1;
               else
-                aliases.erase(inst.rn1);
+                aliases[inst.rn1] = 0;
             }
             break;
 
           // ---- MAKE_CELL ----------------------------------------------------
           case Opcode::MAKE_CELL:
             // A subsequent MAKE_CELL overwrites the same register — kill alias.
-            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = 0;
+            }
             break;
 
           // ---- GLOBAL_SET ---------------------------------------------------
           case Opcode::GLOBAL_SET:
-            if (inst.rn1 >= 0 && aliases.count(inst.rn1)) escaped = true;
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (aliases[inst.rn1]) escaped = true;
+            }
             break;
 
           // ---- MAKE_CLOSURE -------------------------------------------------
@@ -1800,9 +1905,12 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
             bool cell_captured = false;
             while (is_cons(fi)) {
               int r = parse_reg(cons_car(fi));
-              if (r >= 0 && aliases.count(r)) {
-                cell_captured = true;
-                break;
+              if (r >= 0) {
+                if (r >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, r, num_regs - 1);
+                if (aliases[r]) {
+                  cell_captured = true;
+                  break;
+                }
               }
               fi = cons_cdr(fi);
             }
@@ -1815,7 +1923,10 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
               }
             }
             // Kill any alias overwritten by this instruction's destination.
-            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = 0;
+            }
             break;
           }
 
@@ -1825,13 +1936,18 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
             // If a cell alias appears as a call argument to an unknown callee,
             // the callee might store it and access it after the frame exits.
             for (int a = 0; a < inst.argc && !escaped; ++a) {
-              if (aliases.count(a)) escaped = true;
+              if (a < num_regs && aliases[a]) escaped = true;
             }
             // Cell alias in callee position: conservative escape.
-            if (!escaped && inst.rn1 >= 0 && aliases.count(inst.rn1)) escaped = true;
+            if (!escaped && inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              if (aliases[inst.rn1]) escaped = true;
+            }
             // Kill aliases in argument registers consumed by the call.
             if (inst.op == Opcode::CALL) {
-              for (int a = 0; a < inst.argc; ++a) aliases.erase(a);
+              for (int a = 0; a < inst.argc; ++a) {
+                if (a < num_regs) aliases[a] = 0;
+              }
             }
             break;
 
@@ -1845,7 +1961,10 @@ void codegen_t::phase2d_analyze_cell_stack_alloc() {
           // ---- default ------------------------------------------------------
           default:
             // Any instruction that writes rn1 kills the alias there.
-            if (inst.rn1 >= 0) aliases.erase(inst.rn1);
+            if (inst.rn1 >= 0) {
+              if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
+              aliases[inst.rn1] = 0;
+            }
             break;
         }
       }
