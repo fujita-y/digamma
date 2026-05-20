@@ -212,6 +212,7 @@ void codegen_t::emit_num_add_subr(bool is_tail) {
   clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
+  llvm::Type* intptrTy = this->getInt64Type();
 
   llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
   llvm::Value* mask = createInt64Constant(CT, 0x01);
@@ -234,7 +235,6 @@ void codegen_t::emit_num_add_subr(bool is_tail) {
   BL.CreateBr(cont_bb);
 
   BL.SetInsertPoint(err_bb);
-  llvm::Type* intptrTy = this->getInt64Type();
   llvm::FunctionType* c_num_add_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
   llvm::Function* c_num_add_func = get_or_create_external_function("c_num_add", c_num_add_ft, (void*)&c_num_add);
   llvm::CallInst* call_err = BL.CreateCall(c_num_add_ft, c_num_add_func, {arg1, arg2}, "call_err");
@@ -256,6 +256,7 @@ void codegen_t::emit_num_sub_subr(bool is_tail) {
   clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
+  llvm::Type* intptrTy = this->getInt64Type();
 
   llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
   llvm::Value* mask = createInt64Constant(CT, 0x01);
@@ -278,7 +279,6 @@ void codegen_t::emit_num_sub_subr(bool is_tail) {
   BL.CreateBr(cont_bb);
 
   BL.SetInsertPoint(err_bb);
-  llvm::Type* intptrTy = this->getInt64Type();
   llvm::FunctionType* c_num_sub_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
   llvm::Function* c_num_sub_func = get_or_create_external_function("c_num_sub", c_num_sub_ft, (void*)&c_num_sub);
   llvm::CallInst* call_err = BL.CreateCall(c_num_sub_ft, c_num_sub_func, {arg1, arg2}, "call_err");
@@ -300,6 +300,7 @@ void codegen_t::emit_num_mul_subr(bool is_tail) {
   clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
+  llvm::Type* intptrTy = this->getInt64Type();
 
   llvm::Value* args_and = BL.CreateAnd(arg1, arg2, "args_and");
   llvm::Value* mask = createInt64Constant(CT, 0x01);
@@ -325,7 +326,6 @@ void codegen_t::emit_num_mul_subr(bool is_tail) {
   BL.CreateBr(cont_bb);
 
   BL.SetInsertPoint(err_bb);
-  llvm::Type* intptrTy = this->getInt64Type();
   llvm::FunctionType* c_num_mul_ft = llvm::FunctionType::get(intptrTy, {intptrTy, intptrTy}, false);
   llvm::Function* c_num_mul_func = get_or_create_external_function("c_num_mul", c_num_mul_ft, (void*)&c_num_mul);
   llvm::Value* call_err = BL.CreateCall(c_num_mul_ft, c_num_mul_func, {arg1, arg2}, "call_err");
@@ -360,9 +360,11 @@ void codegen_t::emit_fixnum_cmp_subr(bool is_tail, llvm::CmpInst::Predicate pred
   llvm::Value* is_fixnum_cmp = BL.CreateICmpEQ(args_mask, mask, "is_fixnum_cmp");
 
   llvm::Function* f = BL.GetInsertBlock()->getParent();
-  llvm::BasicBlock* fast_bb = llvm::BasicBlock::Create(CT, std::string(result_name) + "_fast", f);
-  llvm::BasicBlock* slow_bb = llvm::BasicBlock::Create(CT, std::string(result_name) + "_slow", f);
-  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, std::string(result_name) + "_cont", f);
+  // Use llvm::Twine for block name concatenation — avoids three std::string
+  // heap allocations that std::string(result_name) + suffix would incur.
+  llvm::BasicBlock* fast_bb = llvm::BasicBlock::Create(CT, llvm::Twine(result_name) + "_fast", f);
+  llvm::BasicBlock* slow_bb = llvm::BasicBlock::Create(CT, llvm::Twine(result_name) + "_slow", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, llvm::Twine(result_name) + "_cont", f);
 
   llvm::MDBuilder mdb(CT);
   llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);

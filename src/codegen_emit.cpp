@@ -7,6 +7,7 @@
 #include "context.h"
 #include "object_heap.h"
 
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
@@ -537,11 +538,12 @@ llvm::Function* codegen_t::get_or_create_call_closure_bridge() {
       sw->addCase(llvm::cast<llvm::ConstantInt>(createInt64Constant(CT, (uint64_t)n)), bb);
       BL.SetInsertPoint(bb);
 
-      std::vector<llvm::Type*> pts(n + 1, i64);
+      llvm::SmallVector<llvm::Type*, 9> pts(n + 1, i64);
       llvm::FunctionType* fixed_ft = llvm::FunctionType::get(i64, pts, false);
       llvm::Value* fp = code_ptr;
 
-      std::vector<llvm::Value*> call_args;
+      llvm::SmallVector<llvm::Value*, 9> call_args;
+      call_args.reserve(n + 1);
       call_args.push_back(closure);
       for (int i = 0; i < n; ++i) {
         llvm::Value* p = BL.CreateGEP(i64, argv, createInt32Constant(CT, i));
@@ -660,20 +662,25 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
 }
 
 void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
+  // NOTE: this function is only called from emit_call_common when
+  // is_symbol(inst.closure_label) is already true, so no inner guard is needed.
+
+  // Hoist the function_map lookup once; both the global-closure path and the
+  // local-function path need this result, and doing it once avoids a second
+  // hash probe.
+  auto fm_it = function_map.find(inst.closure_label);
+
 #if ENABLE_INLINE
-  if (is_symbol(inst.closure_label)) {
+  {
     scm_obj_t val = context::environment_variable_ref(inst.closure_label);
     if (is_closure(val)) {
       scm_closure_rec_t* closure_rec = (scm_closure_rec_t*)to_address(val);
       void* code_ptr = closure_rec->code;
 
-      std::string label_name = (const char*)symbol_name(inst.closure_label);
-
       // inline nullary primitives
       if (inst.argc == 0) {
         auto it = nullary_code_map.find(code_ptr);
         if (it != nullary_code_map.end()) {
-          // std::cout << "inline nullary primitive: " << label_name << std::endl;
           (this->*(it->second))(is_tail);
           return;
         }
@@ -683,14 +690,12 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       if (inst.argc == 1) {
         auto it = unary_code_map.find(code_ptr);
         if (it != unary_code_map.end()) {
-          // std::cout << "inline unary primitive: " << label_name << std::endl;
           (this->*(it->second))(is_tail);
           return;
         }
 
         auto it_tc6 = tc6_code_map.find(code_ptr);
         if (it_tc6 != tc6_code_map.end()) {
-          // std::cout << "inline tc6 primitive: " << label_name << std::endl;
           emit_tc6_predicate(it_tc6->second, is_tail);
           return;
         }
@@ -700,7 +705,6 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       if (inst.argc == 2) {
         auto it = binary_code_map.find(code_ptr);
         if (it != binary_code_map.end()) {
-          // std::cout << "inline binary primitive: " << label_name << std::endl;
           (this->*(it->second))(is_tail);
           return;
         }
@@ -710,7 +714,6 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       if (inst.argc == 3) {
         auto it = ternary_code_map.find(code_ptr);
         if (it != ternary_code_map.end()) {
-          // std::cout << "inline ternary primitive: " << label_name << std::endl;
           (this->*(it->second))(is_tail);
           return;
         }
@@ -719,8 +722,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
   }
 #endif
 
-  // Check if it is a global closure (known at compile time but not in this module's function_map)
-  if (is_symbol(inst.closure_label) && function_map.find(inst.closure_label) == function_map.end()) {
+  // Check if it is a global closure (known at compile time but not in this module's function_map).
+  // fm_it was already computed at function entry — no second probe needed here.
+  if (fm_it == function_map.end()) {
     // Attempt to resolve it as a global closure — single lookup.
     auto cp_it = closure_params.find(inst.closure_label);
     if (cp_it != closure_params.end()) {
@@ -735,7 +739,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
 
         // Construct function type
         llvm::Type* retType = this->getInt64Type();
-        std::vector<llvm::Type*> paramTypes;
+        llvm::SmallVector<llvm::Type*, 8> paramTypes;
+        paramTypes.reserve(fixed_argc + 3);
 
         // Self argument
         paramTypes.push_back(this->getInt64Type());
@@ -754,7 +759,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
         llvm::FunctionType* funcType = llvm::FunctionType::get(retType, paramTypes, false);
 
         // Prepare arguments
-        std::vector<llvm::Value*> args;
+        llvm::SmallVector<llvm::Value*, 8> args;
+        args.reserve(fixed_argc + 3);
         args.push_back(get_reg(inst.rn1));  // self
 
         if (has_rest) {
@@ -821,8 +827,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     }
   }
 
-  auto fm_it = function_map.find(inst.closure_label);
-  if (is_symbol(inst.closure_label) && fm_it != function_map.end()) {
+  // fm_it already computed at function entry.
+  if (fm_it != function_map.end()) {
     llvm::Function* target_func = fm_it->second;
 
     // Get closure parameters from compile-time info — single lookup.
@@ -833,8 +839,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
     auto [fixed_argc, has_rest] = cp_it2->second;
 
     // Prepare arguments
-    std::vector<llvm::Value*> args;
-
+    llvm::SmallVector<llvm::Value*, 8> args;
+    args.reserve(inst.argc + 2);  // self + fixed args (or self + argc + argv)
     // 1. Closure object (self)
     args.push_back(get_reg(inst.rn1));
 
@@ -902,11 +908,9 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
 void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst,
                                        bool is_tail, llvm::BasicBlock* merge_block, llvm::BasicBlock*& rest_exit_block) {
   // --- Rest Block: (self, argc, argv[]) ---
-  std::vector<llvm::Type*> paramTypes;
-  paramTypes.push_back(this->getInt64Type());  // self
-  paramTypes.push_back(this->getInt64Type());  // argc
-  paramTypes.push_back(BL.getPtrTy());         // argv[]
-  llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), paramTypes, false);
+  // Use a C array for the 3-element parameter list — avoids any heap allocation.
+  llvm::Type* rest_param_types[] = {this->getInt64Type(), this->getInt64Type(), BL.getPtrTy()};
+  llvm::FunctionType* funcType = llvm::FunctionType::get(this->getInt64Type(), rest_param_types, false);
 
   // Allocate argv array and populate it
   llvm::Value* argv_array = nullptr;
@@ -922,10 +926,8 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
     argv_array = llvm::ConstantPointerNull::get(BL.getPtrTy());
   }
 
-  std::vector<llvm::Value*> args;
-  args.push_back(closure);
-  args.push_back(createInt64Constant(CT, inst.argc));
-  args.push_back(argv_array);
+  // 3-element args list — use a C array to avoid heap allocation.
+  llvm::Value* rest_call_args[] = {closure, createInt64Constant(CT, inst.argc), argv_array};
 
   llvm::Value* func_ptr = code_void_ptr;
 
@@ -943,7 +945,7 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
 
   // CDECL path - no musttail
   BL.SetInsertPoint(cdecl_block);
-  llvm::CallInst* call_c = BL.CreateCall(funcType, func_ptr, args, "rest_call_c");
+  llvm::CallInst* call_c = BL.CreateCall(funcType, func_ptr, rest_call_args, "rest_call_c");
   call_c->setCallingConv(llvm::CallingConv::C);
   if (is_tail) {
     BL.CreateRet(call_c);
@@ -953,7 +955,7 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
 
   // Scheme path - musttail if tail
   BL.SetInsertPoint(scheme_block);
-  llvm::CallInst* call_s = BL.CreateCall(funcType, func_ptr, args, "rest_call_s");
+  llvm::CallInst* call_s = BL.CreateCall(funcType, func_ptr, rest_call_args, "rest_call_s");
   call_s->setCallingConv(CLOSURE_CALLING_CONV);
   if (is_tail) {
     BL.CreateRet(call_s);
@@ -975,14 +977,16 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
 
 void codegen_t::emit_generic_normal_call(llvm::Value* closure, llvm::Value* code_void_ptr, llvm::Value* is_cdecl, const Instruction& inst,
                                          bool is_tail, llvm::BasicBlock* merge_block, llvm::BasicBlock*& normal_exit_block) {
-  std::vector<llvm::Type*> normalParamTypes;
+  llvm::SmallVector<llvm::Type*, 8> normalParamTypes;
+  normalParamTypes.reserve(inst.argc + 1);
   normalParamTypes.push_back(this->getInt64Type());  // self
   for (int i = 0; i < inst.argc; i++) {
     normalParamTypes.push_back(this->getInt64Type());
   }
   llvm::FunctionType* normalFuncType = llvm::FunctionType::get(this->getInt64Type(), normalParamTypes, false);
 
-  std::vector<llvm::Value*> normalArgs;
+  llvm::SmallVector<llvm::Value*, 8> normalArgs;
+  normalArgs.reserve(inst.argc + 1);
   normalArgs.push_back(closure);
   for (int i = 0; i < inst.argc; i++) {
     normalArgs.push_back(get_reg(i));

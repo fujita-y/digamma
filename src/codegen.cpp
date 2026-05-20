@@ -267,19 +267,11 @@ void codegen_t::phase2c_analyze_safepoints() {
       // Determine insertion position: after the initial LABEL if present.
       bool has_leading_label = !func.instructions.empty() && func.instructions[0].op == Opcode::LABEL;
 
-      // Build a new vector with the safepoint prepended in the right slot.
-      // Avoids O(n) element-shift that vector::insert(begin(), ...) would cause.
-      std::vector<Instruction> new_insts;
-      new_insts.reserve(func.instructions.size() + 1);
-      if (has_leading_label) {
-        new_insts.push_back(std::move(func.instructions[0]));
-      }
-      new_insts.push_back(si);
-      size_t start = has_leading_label ? 1 : 0;
-      for (size_t k = start; k < func.instructions.size(); ++k) {
-        new_insts.push_back(std::move(func.instructions[k]));
-      }
-      func.instructions = std::move(new_insts);
+      // Insert the safepoint in place.  vector::insert shifts elements rightward
+      // in O(n) — same complexity as the old temp-vector approach, but avoids
+      // allocating a second buffer and performing two sets of moves.
+      size_t insert_pos = has_leading_label ? 1 : 0;
+      func.instructions.insert(func.instructions.begin() + (std::ptrdiff_t)insert_pos, si);
     } else {
       // std::cout << "#### phase2c_analyze_safepoints: no safepoint for " << to_string(func.label) << std::endl;
     }
@@ -319,6 +311,7 @@ void codegen_t::phase3_create_functions() {
     std::string func_name = std::string((const char*)symbol_name(info.label)) + "_" + generate_unique_suffix();
 
     std::vector<llvm::Type*> paramTypes;
+    paramTypes.reserve(info.argc + 3);  // self + args (or self + argc + argv)
     paramTypes.push_back(this->getInt64Type());  // self
 
     if (info.has_rest) {
@@ -738,7 +731,7 @@ void codegen_t::parse_single_instruction(scm_obj_t inst_obj, FunctionInfo& func_
       break;
   }
 
-  func_info.instructions.push_back(inst);
+  func_info.instructions.push_back(std::move(inst));
 }
 
 // --------------------------------------------------------------------------
@@ -1143,12 +1136,15 @@ void codegen_t::phase2a_analyze_closure_labels() {
         }
       }
       for (auto const& [var, label] : other.globals) {
-        if (globals.find(var) == globals.end()) {
-          globals[var] = label;
+        // try_emplace avoids the double-lookup (find + operator[]) of the
+        // previous pattern.  On insert the iterator points at the new entry;
+        // on collision it points at the existing one.
+        auto [it, inserted] = globals.try_emplace(var, label);
+        if (inserted) {
           changed = true;
-        } else if (globals[var] != label) {
-          if (globals[var] != scm_nil) {
-            globals[var] = scm_nil;
+        } else if (it->second != label) {
+          if (it->second != scm_nil) {
+            it->second = scm_nil;
             changed = true;
           }
         }
@@ -1228,28 +1224,34 @@ void codegen_t::phase2a_analyze_closure_labels() {
           case Opcode::GLOBAL_REF:
             if (inst.rn1 >= 0) {
               if (inst.rn1 >= num_regs) fatal("%s:%u codegen: register index out of bounds: r%d (max: r%d)", __FILE__, __LINE__, inst.rn1, num_regs - 1);
-              if (current_state.globals.find(inst.opr2) != current_state.globals.end()) {
-                current_state.regs[inst.rn1] = current_state.globals[inst.opr2];
-              } else if (global_closure_defs.find(inst.opr2) != global_closure_defs.end()) {
-                current_state.regs[inst.rn1] = global_closure_defs[inst.opr2];
+              // Reuse the iterator from find() to avoid a second lookup via
+              // operator[] in the hit path.
+              auto g_it = current_state.globals.find(inst.opr2);
+              if (g_it != current_state.globals.end()) {
+                current_state.regs[inst.rn1] = g_it->second;
               } else {
-                // Try to look up in the global environment — single lookup.
-                scm_obj_t val = context::environment_variable_ref(inst.opr2);
-                if (val != scm_undef) {
-                  current_state.regs[inst.rn1] = inst.opr2;
-                  if (is_closure(val)) {
-                    // Single emplace — avoids double lookup if already present.
-                    closure_params.emplace(inst.opr2, std::make_pair(closure_argc(val), closure_rest(val) == 1));
-                  }
+                auto gd_it = global_closure_defs.find(inst.opr2);
+                if (gd_it != global_closure_defs.end()) {
+                  current_state.regs[inst.rn1] = gd_it->second;
                 } else {
+                  // Try to look up in the global environment — single lookup.
+                  scm_obj_t val = context::environment_variable_ref(inst.opr2);
+                  if (val != scm_undef) {
+                    current_state.regs[inst.rn1] = inst.opr2;
+                    if (is_closure(val)) {
+                      // Single emplace — avoids double lookup if already present.
+                      closure_params.emplace(inst.opr2, std::make_pair(closure_argc(val), closure_rest(val) == 1));
+                    }
+                  } else {
 #ifndef NDEBUG
-                  std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
+                    std::cout << "[codegen] Unknown global or letrec closure: " << symbol_name(inst.opr2) << std::endl;
 #endif
 
-                  scm_obj_t string_name = make_string((const char*)symbol_name(inst.opr2));
-                  context::gc_protect(string_name);
-                  gc_protected_objects.push_back(string_name);
-                  current_state.regs[inst.rn1] = string_name;
+                    scm_obj_t string_name = make_string((const char*)symbol_name(inst.opr2));
+                    context::gc_protect(string_name);
+                    gc_protected_objects.push_back(string_name);
+                    current_state.regs[inst.rn1] = string_name;
+                  }
                 }
               }
             }
