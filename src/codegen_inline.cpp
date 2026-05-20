@@ -13,12 +13,11 @@
 #define CT (*context_uptr)
 
 void codegen_t::emit_null_p_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
   llvm::Value* scm_nil_val = createInt64Constant(CT, (uint64_t)scm_nil);
   llvm::Value* is_pred_cmp = BL.CreateICmpEQ(arg, scm_nil_val, "is_pred_cmp");
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* is_pred_res = BL.CreateSelect(is_pred_cmp, scm_true_val, scm_false_val, "is_pred_res");
+  llvm::Value* is_pred_res = emit_boolean_select(is_pred_cmp);
   if (is_tail) {
     BL.CreateRet(is_pred_res);
   } else {
@@ -27,14 +26,13 @@ void codegen_t::emit_null_p_subr(bool is_tail) {
 }
 
 void codegen_t::emit_pair_p_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
   llvm::Value* mask_val = createInt64Constant(CT, 0x07);
   llvm::Value* masked_arg = BL.CreateAnd(arg, mask_val, "masked_arg");
   llvm::Value* zero_val = createInt64Constant(CT, 0x00);
   llvm::Value* is_pred_cmp = BL.CreateICmpEQ(masked_arg, zero_val, "is_pred_cmp");
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* is_pred_res = BL.CreateSelect(is_pred_cmp, scm_true_val, scm_false_val, "is_pred_res");
+  llvm::Value* is_pred_res = emit_boolean_select(is_pred_cmp);
   if (is_tail) {
     BL.CreateRet(is_pred_res);
   } else {
@@ -43,11 +41,11 @@ void codegen_t::emit_pair_p_subr(bool is_tail) {
 }
 
 void codegen_t::emit_not_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
   llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
   llvm::Value* is_false_cmp = BL.CreateICmpEQ(arg, scm_false_val, "is_false_cmp");
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* is_not_res = BL.CreateSelect(is_false_cmp, scm_true_val, scm_false_val, "is_not_res");
+  llvm::Value* is_not_res = emit_boolean_select(is_false_cmp);
   if (is_tail) {
     BL.CreateRet(is_not_res);
   } else {
@@ -56,6 +54,7 @@ void codegen_t::emit_not_subr(bool is_tail) {
 }
 
 void codegen_t::emit_car_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
 
   llvm::Value* mask_val = createInt64Constant(CT, 0x07);
@@ -92,6 +91,7 @@ void codegen_t::emit_car_subr(bool is_tail) {
 }
 
 void codegen_t::emit_append2_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
 
@@ -106,6 +106,7 @@ void codegen_t::emit_append2_subr(bool is_tail) {
 }
 
 void codegen_t::emit_cdr_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
 
   llvm::Value* mask_val = createInt64Constant(CT, 0x07);
@@ -143,12 +144,11 @@ void codegen_t::emit_cdr_subr(bool is_tail) {
 }
 
 void codegen_t::emit_eq_p_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
   llvm::Value* is_pred_cmp = BL.CreateICmpEQ(arg1, arg2, "is_pred_cmp");
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* is_pred_res = BL.CreateSelect(is_pred_cmp, scm_true_val, scm_false_val, "is_pred_res");
+  llvm::Value* is_pred_res = emit_boolean_select(is_pred_cmp);
   if (is_tail) {
     BL.CreateRet(is_pred_res);
   } else {
@@ -157,6 +157,7 @@ void codegen_t::emit_eq_p_subr(bool is_tail) {
 }
 
 void codegen_t::emit_tc6_predicate(int tc6_num, bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg = get_reg(0);
 #if USE_TBI
   llvm::Value* rot = BL.CreateIntrinsic(llvm::Intrinsic::fshl, {BL.getInt64Ty()}, {arg, arg, createInt64Constant(CT, 7)}, nullptr, "rot");
@@ -165,9 +166,7 @@ void codegen_t::emit_tc6_predicate(int tc6_num, bool is_tail) {
   llvm::Value* expected = createInt64Constant(CT, 0x100 + tc6_num);
   llvm::Value* is_pred_cmp = BL.CreateICmpEQ(masked, expected, "is_pred_cmp");
 
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* is_pred_res = BL.CreateSelect(is_pred_cmp, scm_true_val, scm_false_val, "is_pred_res");
+  llvm::Value* is_pred_res = emit_boolean_select(is_pred_cmp);
   if (is_tail) {
     BL.CreateRet(is_pred_res);
   } else {
@@ -200,9 +199,7 @@ void codegen_t::emit_tc6_predicate(int tc6_num, bool is_tail) {
   phi->addIncoming(llvm::ConstantInt::getFalse(CT), orig_bb);
   phi->addIncoming(tag_cmp, check_tag_bb);
 
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* is_pred_res = BL.CreateSelect(phi, scm_true_val, scm_false_val, "is_pred_res");
+  llvm::Value* is_pred_res = emit_boolean_select(phi);
   if (is_tail) {
     BL.CreateRet(is_pred_res);
   } else {
@@ -212,6 +209,7 @@ void codegen_t::emit_tc6_predicate(int tc6_num, bool is_tail) {
 }
 
 void codegen_t::emit_num_add_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
 
@@ -255,6 +253,7 @@ void codegen_t::emit_num_add_subr(bool is_tail) {
 }
 
 void codegen_t::emit_num_sub_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
 
@@ -298,6 +297,7 @@ void codegen_t::emit_num_sub_subr(bool is_tail) {
 }
 
 void codegen_t::emit_num_mul_subr(bool is_tail) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
 
@@ -349,6 +349,7 @@ void codegen_t::emit_num_mul_subr(bool is_tail) {
 
 void codegen_t::emit_fixnum_cmp_subr(bool is_tail, llvm::CmpInst::Predicate pred, const char* helper_name, void* helper_fn_ptr,
                                      const char* result_name) {
+  clear_reg_cache();
   llvm::Value* arg1 = get_reg(0);
   llvm::Value* arg2 = get_reg(1);
 
@@ -370,9 +371,7 @@ void codegen_t::emit_fixnum_cmp_subr(bool is_tail, llvm::CmpInst::Predicate pred
   // --- fast path: integer compare ---
   BL.SetInsertPoint(fast_bb);
   llvm::Value* cmp_result = BL.CreateICmp(pred, arg1, arg2, "cmp");
-  llvm::Value* scm_true_val = createInt64Constant(CT, (uint64_t)scm_true);
-  llvm::Value* scm_false_val = createInt64Constant(CT, (uint64_t)scm_false);
-  llvm::Value* fast_res = BL.CreateSelect(cmp_result, scm_true_val, scm_false_val, "fast_res");
+  llvm::Value* fast_res = emit_boolean_select(cmp_result);
   BL.CreateBr(cont_bb);
 
   // --- slow path: C fallback for flonum / error ---
@@ -415,6 +414,7 @@ void codegen_t::emit_num_ge_subr(bool is_tail) {
 
 
 void codegen_t::emit_vector_ref_subr(bool is_tail) {
+  clear_reg_cache();
   // arg1 = vector, arg2 = fixnum index
   // scm_vector_rec_t layout (LP64):
   //   offset  0: scm_tc6_t tag  (8 bytes)
@@ -470,9 +470,8 @@ void codegen_t::emit_vector_ref_subr(bool is_tail) {
   llvm::Value* vref_nsize_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 16, "vref_nsize_ptr");
   llvm::Value* vref_nsize_i32 = BL.CreateAlignedLoad(BL.getInt32Ty(), vref_nsize_ptr, llvm::Align(4), "vref_nsize_i32");
   llvm::Value* vref_nsize = BL.CreateZExt(vref_nsize_i32, getInt64Type(), "vref_nsize");
-  llvm::Value* vref_ge_zero = BL.CreateICmpSGE(vref_idx_raw, createInt64Constant(CT, 0), "vref_ge_zero");
-  llvm::Value* vref_lt_nsize = BL.CreateICmpSLT(vref_idx_raw, vref_nsize, "vref_lt_nsize");
-  llvm::Value* vref_ok = BL.CreateAnd(BL.CreateAnd(vref_is_fix, vref_ge_zero, "vref_fix_ge"), vref_lt_nsize, "vref_ok");
+  llvm::Value* vref_lt_nsize = BL.CreateICmpULT(vref_idx_raw, vref_nsize, "vref_lt_nsize");
+  llvm::Value* vref_ok = BL.CreateAnd(vref_is_fix, vref_lt_nsize, "vref_ok");
   BL.CreateCondBr(vref_ok, load_bb, err_bb, likely);
 
   // --- fast path: load elts[idx] ---
@@ -503,6 +502,7 @@ void codegen_t::emit_vector_ref_subr(bool is_tail) {
 }
 
 void codegen_t::emit_vector_set_subr(bool is_tail) {
+  clear_reg_cache();
   // arg1 = vector, arg2 = fixnum index, arg3 = new value
   // scm_vector_rec_t layout (LP64):
   //   offset  0: scm_tc6_t tag  (8 bytes)
@@ -559,9 +559,8 @@ void codegen_t::emit_vector_set_subr(bool is_tail) {
   llvm::Value* vset_nsize_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 16, "vset_nsize_ptr");
   llvm::Value* vset_nsize_i32 = BL.CreateAlignedLoad(BL.getInt32Ty(), vset_nsize_ptr, llvm::Align(4), "vset_nsize_i32");
   llvm::Value* vset_nsize = BL.CreateZExt(vset_nsize_i32, getInt64Type(), "vset_nsize");
-  llvm::Value* vset_ge_zero = BL.CreateICmpSGE(vset_idx_raw, createInt64Constant(CT, 0), "vset_ge_zero");
-  llvm::Value* vset_lt_nsize = BL.CreateICmpSLT(vset_idx_raw, vset_nsize, "vset_lt_nsize");
-  llvm::Value* vset_ok = BL.CreateAnd(BL.CreateAnd(vset_is_fix, vset_ge_zero, "vset_fix_ge"), vset_lt_nsize, "vset_ok");
+  llvm::Value* vset_lt_nsize = BL.CreateICmpULT(vset_idx_raw, vset_nsize, "vset_lt_nsize");
+  llvm::Value* vset_ok = BL.CreateAnd(vset_is_fix, vset_lt_nsize, "vset_ok");
   BL.CreateCondBr(vset_ok, store_bb, err_bb, likely);
 
   // --- fast path: store arg3 into elts[idx] + write barrier ---
@@ -594,6 +593,7 @@ void codegen_t::emit_vector_set_subr(bool is_tail) {
 }
 
 void codegen_t::emit_tuple_ref_subr(bool is_tail) {
+  clear_reg_cache();
   // arg1 = tuple, arg2 = fixnum index
   // scm_tuple_rec_t layout (LP64):
   //   offset  0: scm_tc6_t tag   (8 bytes)
@@ -651,9 +651,8 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
   llvm::Value* tref_nsize_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 8, "tref_nsize_ptr");
   llvm::Value* tref_nsize_i32 = BL.CreateAlignedLoad(BL.getInt32Ty(), tref_nsize_ptr, llvm::Align(4), "tref_nsize_i32");
   llvm::Value* tref_nsize = BL.CreateZExt(tref_nsize_i32, getInt64Type(), "tref_nsize");
-  llvm::Value* tref_ge_zero = BL.CreateICmpSGE(idx_raw, createInt64Constant(CT, 0), "tref_ge_zero");
-  llvm::Value* tref_lt_nsize = BL.CreateICmpSLT(idx_raw, tref_nsize, "tref_lt_nsize");
-  llvm::Value* tref_ok = BL.CreateAnd(BL.CreateAnd(tref_is_fix, tref_ge_zero, "tref_fix_ge"), tref_lt_nsize, "tref_ok");
+  llvm::Value* tref_lt_nsize = BL.CreateICmpULT(idx_raw, tref_nsize, "tref_lt_nsize");
+  llvm::Value* tref_ok = BL.CreateAnd(tref_is_fix, tref_lt_nsize, "tref_ok");
   BL.CreateCondBr(tref_ok, load_bb, err_bb, likely);
 
   // --- fast path: load elts[idx] at offset 16 ---
@@ -727,6 +726,7 @@ void codegen_t::emit_tuple_ref_subr(bool is_tail) {
 }
 
 void codegen_t::emit_tuple_set_subr(bool is_tail) {
+  clear_reg_cache();
   // arg1 = tuple, arg2 = fixnum index, arg3 = new value
   // scm_tuple_rec_t layout (LP64):
   //   offset  0: scm_tc6_t tag   (8 bytes)
@@ -781,9 +781,8 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
   llvm::Value* tset_nsize_ptr = BL.CreateConstInBoundsGEP1_32(BL.getInt8Ty(), raw_ptr, 8, "tset_nsize_ptr");
   llvm::Value* tset_nsize_i32 = BL.CreateAlignedLoad(BL.getInt32Ty(), tset_nsize_ptr, llvm::Align(4), "tset_nsize_i32");
   llvm::Value* tset_nsize = BL.CreateZExt(tset_nsize_i32, getInt64Type(), "tset_nsize");
-  llvm::Value* tset_ge_zero = BL.CreateICmpSGE(idx_raw, createInt64Constant(CT, 0), "tset_ge_zero");
-  llvm::Value* tset_lt_nsize = BL.CreateICmpSLT(idx_raw, tset_nsize, "tset_lt_nsize");
-  llvm::Value* tset_ok = BL.CreateAnd(BL.CreateAnd(tset_is_fix, tset_ge_zero, "tset_fix_ge"), tset_lt_nsize, "tset_ok");
+  llvm::Value* tset_lt_nsize = BL.CreateICmpULT(idx_raw, tset_nsize, "tset_lt_nsize");
+  llvm::Value* tset_ok = BL.CreateAnd(tset_is_fix, tset_lt_nsize, "tset_ok");
   BL.CreateCondBr(tset_ok, store_bb, err_bb, likely);
 
   // --- fast path: store arg3 into elts[idx] at offset 16 + write barrier ---
@@ -860,6 +859,7 @@ void codegen_t::emit_tuple_set_subr(bool is_tail) {
 }
 
 void codegen_t::emit_unspecified_subr(bool is_tail) {
+  clear_reg_cache();
   // (unspecified) — always returns scm_unspecified; no arguments, no side effects.
   llvm::Value* scm_unspec_val = createInt64Constant(CT, (uint64_t)scm_unspecified);
   if (is_tail) {

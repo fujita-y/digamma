@@ -143,6 +143,7 @@ void codegen_t::reset_compile_state() {
   current_closure_self = nullptr;
   functions.clear();
   allocas.clear();
+  reg_cache.clear();
   labels.clear();
   function_map.clear();
   closure_params.clear();
@@ -940,12 +941,25 @@ void codegen_t::parse_make_cell(const scm_obj_t& inst_obj, Instruction& inst, Fu
 //  IR helpers — types, values, utilities
 // ============================================================================
 
+void codegen_t::clear_reg_cache() {
+  if (!reg_cache.empty()) {
+    std::fill(reg_cache.begin(), reg_cache.end(), nullptr);
+  }
+}
+
 llvm::Value* codegen_t::get_reg(int idx) {
   if (idx < 0 || (size_t)idx >= allocas.size()) {
     fatal("%s:%u codegen: register index out of bounds: r%d (max: r%lu) in function %s", __FILE__, __LINE__, idx, allocas.size() - 1,
           current_function ? current_function->getName().str().c_str() : "unknown");
   }
-  return BL.CreateLoad(this->getInt64Type(), allocas[idx]);
+  if (idx < (int)reg_cache.size() && reg_cache[idx] != nullptr) {
+    return reg_cache[idx];
+  }
+  llvm::Value* val = BL.CreateLoad(this->getInt64Type(), allocas[idx]);
+  if (idx < (int)reg_cache.size()) {
+    reg_cache[idx] = val;
+  }
+  return val;
 }
 
 void codegen_t::set_reg(int idx, llvm::Value* val) {
@@ -954,14 +968,19 @@ void codegen_t::set_reg(int idx, llvm::Value* val) {
           current_function ? current_function->getName().str().c_str() : "unknown");
   }
   BL.CreateStore(val, allocas[idx]);
+  if (idx < (int)reg_cache.size()) {
+    reg_cache[idx] = val;
+  }
 }
 
 void codegen_t::create_allocas(llvm::Function* f, int num_regs) {
   llvm::IRBuilder<> tmpBuilder(&f->getEntryBlock(), f->getEntryBlock().begin());
   allocas.clear();
+  reg_cache.clear();
   if (num_regs <= 0) return;
 
   allocas.resize(num_regs);
+  reg_cache.resize(num_regs, nullptr);
   for (int i = 0; i < num_regs; ++i) {
     allocas[i] = tmpBuilder.CreateAlloca(this->getInt64Type(), nullptr, "r" + std::to_string(i));
     if (!allocas[i]) {
@@ -1010,12 +1029,27 @@ llvm::Value* codegen_t::getClosureCodePtr(llvm::Value* closure_tagged) {
 }
 
 void codegen_t::emit_write_barrier(llvm::Value* value) {
+  if (auto* ci = llvm::dyn_cast<llvm::ConstantInt>(value)) {
+    uint64_t val = ci->getZExtValue();
+    uint64_t tag = val & 0x07;
+    if (tag != 0x00 && tag != 0x02) {
+      // Statically guaranteed to NOT be a heap-allocated object (e.g. fixnum, bool, char, nil)
+      return;
+    }
+  }
+
   llvm::Type* intptrTy = this->getInt64Type();
   llvm::Type* voidTy = llvm::Type::getVoidTy(CT);
   std::vector<llvm::Type*> wbArgTypes = {intptrTy};
   llvm::FunctionType* wbFT = llvm::FunctionType::get(voidTy, wbArgTypes, false);
   llvm::Function* wb_func = get_or_create_external_function("c_write_barrier", wbFT, (void*)&c_write_barrier);
   BL.CreateCall(wbFT, wb_func, {value});
+}
+
+llvm::Value* codegen_t::emit_boolean_select(llvm::Value* cmp_i1) {
+  llvm::Value* cmp_i64 = BL.CreateZExt(cmp_i1, getInt64Type(), "cmp_i64");
+  llvm::Value* shift = BL.CreateShl(cmp_i64, 4, "shift");
+  return BL.CreateXor(shift, createInt64Constant(CT, (uint64_t)scm_false), "bool_res");
 }
 
 llvm::Function* codegen_t::get_or_create_external_function(const char* name, llvm::FunctionType* type, void* symbol_ptr) {

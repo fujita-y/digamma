@@ -254,6 +254,7 @@ class codegen_t {
   void emit_tuple_set_subr(bool is_tail);
 
   void emit_write_barrier(llvm::Value* value);
+  llvm::Value* emit_boolean_select(llvm::Value* cmp_i1);
 
   // --------------------------------------------------------------------------
   //  IR helpers — types, values, utilities
@@ -268,6 +269,7 @@ class codegen_t {
   llvm::Value* get_reg(int idx);
   void set_reg(int idx, llvm::Value* val);
   void create_allocas(llvm::Function* f, int num_regs);
+  void clear_reg_cache();
   void setup_closure_rest_arguments(int fixed_argc, llvm::Value* actual_argc, llvm::Value* argv_ptr);
 
   llvm::Value* getClosureCodePtr(llvm::Value* closure_tagged);
@@ -307,6 +309,7 @@ class codegen_t {
   FunctionInfo* current_function_info = nullptr;
 
   std::vector<llvm::AllocaInst*> allocas;                   // register index -> alloca
+  std::vector<llvm::Value*> reg_cache;                      // Change 3: register cache to avoid redundant loads/stores within a basic block
   std::unordered_map<scm_obj_t, llvm::BasicBlock*> labels;  // label name -> basic block
 
   // --------------------------------------------------------------------------

@@ -109,6 +109,7 @@ void codegen_t::emit_inst(const Instruction& inst) {
 // ============================================================================
 
 void codegen_t::emit_safepoint(const Instruction& inst) {
+  clear_reg_cache();
   // Get the address of the stop-the-world flag from the heap
   bool* poll_ptr = object_heap_t::current()->stop_the_world_ptr();
   llvm::Value* poll_addr_const = createInt64Constant(CT, (uint64_t)poll_ptr);
@@ -179,6 +180,7 @@ void codegen_t::emit_if(const Instruction& inst) {
   llvm::Value* scm_false_v = this->getScmFalseValue();
   llvm::Value* cmp = BL.CreateICmpNE(cond, scm_false_v, "cond");
   BL.CreateCondBr(cmp, b1, b2);
+  clear_reg_cache();
 }
 
 // Unconditional jump to label
@@ -188,10 +190,12 @@ void codegen_t::emit_jump(const Instruction& inst) {
     fatal("%s:%u codegen: jump target label not found", __FILE__, __LINE__);
   }
   BL.CreateBr(target);
+  clear_reg_cache();
 }
 
 // Set insertion point to label's basic block
 void codegen_t::emit_label(const Instruction& inst) {
+  clear_reg_cache();
   llvm::BasicBlock* block = labels[inst.opr1];
   if (!block) {
     fatal("%s:%u codegen: label basic block not found", __FILE__, __LINE__);
@@ -206,10 +210,14 @@ void codegen_t::emit_label(const Instruction& inst) {
 }
 
 // Return r0 as function result
-void codegen_t::emit_ret(const Instruction& inst) { BL.CreateRet(get_reg(0)); }
+void codegen_t::emit_ret(const Instruction& inst) {
+  BL.CreateRet(get_reg(0));
+  clear_reg_cache();
+}
 
 // Create a closure object with captured environment
 void codegen_t::emit_make_closure(const Instruction& inst) {
+  clear_reg_cache();
   llvm::Function* target_func = function_map[inst.opr1];
   if (!target_func) {
     fatal("%s:%u codegen: closure function not found for label", __FILE__, __LINE__);
@@ -239,7 +247,8 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
 
     // Alloca in the entry block so the lifetime equals the enclosing function call.
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    llvm::AllocaInst* raw = TmpB.CreateAlloca(BL.getInt8Ty(), createInt32Constant(CT, struct_bytes), "clo_stack");
+    llvm::ArrayType* arrayTy = llvm::ArrayType::get(BL.getInt8Ty(), struct_bytes);
+    llvm::AllocaInst* raw = TmpB.CreateAlloca(arrayTy, nullptr, "clo_stack");
     raw->setAlignment(llvm::Align(8));  // required: low 3 bits of address must be 0 for tagging
 
     // Fill fields at the current insertion point.
@@ -318,7 +327,8 @@ void codegen_t::emit_make_closure(const Instruction& inst) {
     llvm::Value* env_array = nullptr;
     if (nenv > 0) {
       llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-      env_array = TmpB.CreateAlloca(intptrTy, createInt32Constant(CT, nenv), "env");
+      llvm::ArrayType* arrayTy = llvm::ArrayType::get(intptrTy, nenv);
+      env_array = TmpB.CreateAlloca(arrayTy, nullptr, "env");
       scm_obj_t curr = inst.free_indices;
       for (int i = 0; i < nenv; i++) {
         int reg_idx = parse_reg(cons_car(curr));
@@ -369,6 +379,7 @@ void codegen_t::emit_global_set(const Instruction& inst) {
 
 // Load global variable value into register
 void codegen_t::emit_global_ref(const Instruction& inst) {
+  clear_reg_cache();
   // Resolve the address of the global variable's value slot at compile time
   scm_obj_t cell = context::environment_variable_cell_ref(inst.opr2);
   scm_cell_rec_t* rec = (scm_cell_rec_t*)to_address(cell);
@@ -630,7 +641,8 @@ void codegen_t::emit_apply_call(const Instruction& inst, bool is_tail) {
   llvm::Value* argv_array = nullptr;
   if (inst.argc > 1) {
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    argv_array = TmpB.CreateAlloca(i64, createInt32Constant(CT, inst.argc - 1), "apply_argv");
+    llvm::ArrayType* arrayTy = llvm::ArrayType::get(i64, inst.argc - 1);
+    argv_array = TmpB.CreateAlloca(arrayTy, nullptr, "apply_argv");
     for (int i = 1; i < inst.argc; i++) {
       llvm::Value* p = BL.CreateGEP(i64, argv_array, createInt32Constant(CT, i - 1));
       BL.CreateStore(get_reg(i), p);
@@ -753,7 +765,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           llvm::Value* argv_array = nullptr;
           if (inst.argc > 0) {
             llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-            argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
+            llvm::ArrayType* arrayTy = llvm::ArrayType::get(this->getInt64Type(), inst.argc);
+            argv_array = TmpB.CreateAlloca(arrayTy, nullptr, "argv");
             for (int i = 0; i < inst.argc; i++) {
               llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
               BL.CreateStore(get_reg(i), arg_ptr);
@@ -837,7 +850,8 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
       llvm::Value* argv_array = nullptr;
       if (inst.argc > 0) {
         llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-        argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
+        llvm::ArrayType* arrayTy = llvm::ArrayType::get(this->getInt64Type(), inst.argc);
+        argv_array = TmpB.CreateAlloca(arrayTy, nullptr, "argv");
         for (int i = 0; i < inst.argc; i++) {
           llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
           BL.CreateStore(get_reg(i), arg_ptr);
@@ -898,7 +912,8 @@ void codegen_t::emit_generic_rest_call(llvm::Value* closure, llvm::Value* code_v
   llvm::Value* argv_array = nullptr;
   if (inst.argc > 0) {
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    argv_array = TmpB.CreateAlloca(this->getInt64Type(), createInt32Constant(CT, inst.argc), "argv");
+    llvm::ArrayType* arrayTy = llvm::ArrayType::get(this->getInt64Type(), inst.argc);
+    argv_array = TmpB.CreateAlloca(arrayTy, nullptr, "argv");
     for (int i = 0; i < inst.argc; i++) {
       llvm::Value* arg_ptr = BL.CreateGEP(this->getInt64Type(), argv_array, createInt32Constant(CT, i));
       BL.CreateStore(get_reg(i), arg_ptr);
@@ -1065,15 +1080,18 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
 
   // --- Rest Block ---
   BL.SetInsertPoint(rest_block);
+  clear_reg_cache();
   emit_generic_rest_call(closure, code_void_ptr, is_cdecl, inst, is_tail, merge_block, rest_exit_block);
 
   // --- Normal Block ---
   BL.SetInsertPoint(normal_block);
+  clear_reg_cache();
   emit_generic_normal_call(closure, code_void_ptr, is_cdecl, inst, is_tail, merge_block, normal_exit_block);
 
   // --- Merge Block ---
   if (!is_tail) {
     BL.SetInsertPoint(merge_block);
+    clear_reg_cache();
     llvm::PHINode* phi = BL.CreatePHI(this->getInt64Type(), 2, "call_result");
 
     // Retrieve the result from the exit blocks by extracting the PHI node
@@ -1104,6 +1122,7 @@ void codegen_t::emit_generic_closure_call(const Instruction& inst, bool is_tail)
 // ============================================================================
 
 void codegen_t::emit_call_common(const Instruction& inst, bool is_tail) {
+  clear_reg_cache();
   if (inst.closure_label == cached_symbol_apply) {
     emit_apply_call(inst, is_tail);
     return;
@@ -1288,6 +1307,7 @@ void codegen_t::emit_reg_cell_set(const Instruction& inst) {
 
 // Create a cell from register value and store in the same register
 void codegen_t::emit_make_cell(const Instruction& inst) {
+  clear_reg_cache();
   if (inst.rn1 < 0) {
     fatal("%s:%u codegen: make-cell missing register operand", __FILE__, __LINE__);
   }
@@ -1300,7 +1320,8 @@ void codegen_t::emit_make_cell(const Instruction& inst) {
   if (inst.stack_alloc) {
     // Alloca in the entry block so the lifetime equals the enclosing function call.
     llvm::IRBuilder<> TmpB(&current_function->getEntryBlock(), current_function->getEntryBlock().begin());
-    llvm::AllocaInst* raw = TmpB.CreateAlloca(BL.getInt8Ty(), createInt32Constant(CT, (int)sizeof(scm_cell_rec_t)), "cell_stack");
+    llvm::ArrayType* arrayTy = llvm::ArrayType::get(BL.getInt8Ty(), sizeof(scm_cell_rec_t));
+    llvm::AllocaInst* raw = TmpB.CreateAlloca(arrayTy, nullptr, "cell_stack");
     raw->setAlignment(llvm::Align(8));  // required: low 3 bits must be 0 for tagging
 
     // Write tag word: make_tc6_tag(tc6_cell) = (9<<8)|0x06
