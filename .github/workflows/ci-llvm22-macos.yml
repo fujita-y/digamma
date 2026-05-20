@@ -25,6 +25,7 @@ jobs:
         run: mkdir -p ${{ github.workspace }}/vcpkg_cache
 
       - name: Cache vcpkg binaries
+        id: cache-vcpkg
         uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}/vcpkg_cache
@@ -65,9 +66,17 @@ jobs:
           ${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
       - name: Pre-download vcpkg dependencies (with retries)
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
         run: |
           for i in {1..3}; do
             ${{ runner.temp }}/vcpkg/vcpkg install --only-downloads --x-manifest-root=. && break || { echo "Attempt $i failed, retrying in 10s..."; sleep 10; }
+          done
+
+      - name: Compile vcpkg dependencies
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        run: |
+          for i in {1..3}; do
+            ${{ runner.temp }}/vcpkg/vcpkg install --x-manifest-root=. && break || { echo "Attempt $i failed, retrying in 10s..."; sleep 10; }
           done
 
       # --- Build ---
