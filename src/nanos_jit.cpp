@@ -21,12 +21,13 @@ nanos_jit_t::nanos_jit_t(std::unique_ptr<ExecutionSession> ES, std::unique_ptr<E
                          DataLayout DL)
     : ES(std::move(ES)),
       EPCIU(std::move(EPCIU)),
-      DL(std::move(DL)),
-      Mangle(*this->ES, this->DL),
+      TargetTriple(JTMB.getTargetTriple()),
       ObjectLayer(std::make_unique<ObjectLinkingLayer>(*this->ES, cantFail(llvm::jitlink::InProcessMemoryManager::Create()))),
       CompileLayer(std::make_unique<IRCompileLayer>(*this->ES, *ObjectLayer, std::make_unique<ConcurrentIRCompiler>(std::move(JTMB)))),
       CODLayer(std::make_unique<CompileOnDemandLayer>(*this->ES, *CompileLayer, this->EPCIU->getLazyCallThroughManager(),
                                                       [this]() { return this->EPCIU->createIndirectStubsManager(); })),
+      DL(std::move(DL)),
+      Mangle(*this->ES, this->DL),
       MainJD(this->ES->createBareJITDylib("<main>")) {
   ExitOnError ExitOnErr;
   ObjectLayer->addPlugin(ExitOnErr(EHFrameRegistrationPlugin::Create(*this->ES)));
@@ -66,7 +67,11 @@ Expected<std::unique_ptr<nanos_jit_t>> nanos_jit_t::Create() {
 
   if (auto Err = setUpInProcessLCTMReentryViaEPCIU(**EPCIU)) return std::move(Err);
 
+#if defined(__APPLE__)
+  JITTargetMachineBuilder JTMB(llvm::Triple("arm64-apple-darwin"));
+#else
   JITTargetMachineBuilder JTMB(ES->getExecutorProcessControl().getTargetTriple());
+#endif
 
   JTMB.setCodeModel(llvm::CodeModel::Small);
   JTMB.setRelocationModel(llvm::Reloc::PIC_);

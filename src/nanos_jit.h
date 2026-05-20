@@ -27,7 +27,7 @@ class nanos_jit_t {
   static llvm::Expected<std::unique_ptr<nanos_jit_t>> Create();
 
   const llvm::DataLayout &getDataLayout() const { return DL; }
-  const llvm::Triple &getTargetTriple() const { return ES->getExecutorProcessControl().getTargetTriple(); }
+  const llvm::Triple &getTargetTriple() const { return TargetTriple; }
   llvm::orc::JITDylib &getMainJITDylib() { return MainJD; }
   llvm::orc::ExecutionSession &getExecutionSession() { return *ES; }
   llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name) { return Mangle(Name); }
@@ -39,6 +39,7 @@ class nanos_jit_t {
 
   std::unique_ptr<llvm::orc::ExecutionSession> ES;
   std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU;
+  llvm::Triple TargetTriple;
   std::unique_ptr<llvm::orc::ObjectLinkingLayer> ObjectLayer;
   std::unique_ptr<llvm::orc::IRCompileLayer> CompileLayer;
   std::unique_ptr<llvm::orc::CompileOnDemandLayer> CODLayer;
