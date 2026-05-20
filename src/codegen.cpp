@@ -438,7 +438,7 @@ void codegen_t::optimize_module(llvm::Module& mod) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-#if defined(__APPLE__) && defined(__aarch64__)
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
   // On macOS/ARM64, the SROA (Scalar Replacement of Aggregates) pass
   // miscompiles alloca-based argument arrays used for closure calls.
   // The promoted register values become corrupted, producing garbage

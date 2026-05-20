@@ -119,7 +119,7 @@
   #define ARCH_PPC   0
   #define ARCH_ARM32 1
   #define ARCH_ARM64 0
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64__)
   #define ARCH_IA32  0
   #define ARCH_AMD64 0
   #define ARCH_PPC   0

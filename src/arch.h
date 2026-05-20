@@ -6,7 +6,7 @@
 #ifndef ARCH_H_INCLUDED
 #define ARCH_H_INCLUDED
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__arm64__)
   #include "arch_arm64.h"
   // Map the portable name to the arm64-specific implementation.
   inline void capture_arch_core_state(uint64_t regs[11]) { capture_arm64_core_state(regs); }
