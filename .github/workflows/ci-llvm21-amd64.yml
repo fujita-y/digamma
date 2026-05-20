@@ -19,6 +19,9 @@ jobs:
         uses: actions/checkout@v4
 
       # --- vcpkg binary caching via GitHub Actions cache ---
+      - name: Create vcpkg binary cache directory
+        run: mkdir -p ${{ github.workspace }}/vcpkg_cache
+
       - name: Cache vcpkg binaries
         uses: actions/cache@v5
         with:
