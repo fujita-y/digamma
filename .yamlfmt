@@ -1,0 +1,6 @@
+formatter:
+  type: basic
+  indent: 2
+  retain_line_breaks: true
+  eof_newline: true
+  trim_trailing_whitespace: true

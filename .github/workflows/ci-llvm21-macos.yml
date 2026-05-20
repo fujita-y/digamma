@@ -2,9 +2,9 @@ name: CI (macos, llvm21)
 
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "opt"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "opt"]
 
 jobs:
   build-and-test:
@@ -101,7 +101,7 @@ jobs:
           done
 
       - name: Run benchmarks
-        run: |
+        run: |-
           for i in 1 2 3; do
             build/nanos --boot boot/core.ir --script bench/run-nanos.scm --load-path bench/gambit-benchmarks:stdlib
           done
