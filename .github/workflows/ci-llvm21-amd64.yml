@@ -27,9 +27,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-${{ runner.os }}-${{ runner.arch }}-
 
       # --- LLVM 21 ---
       - name: Install LLVM ${{ env.LLVM_VERSION }}
