@@ -25,7 +25,6 @@ class reader_t {
   static uint8_t s_char_map[256];
 
  private:
-  int transform_char(int c);
   int get_char();
   void unget_char(int c);
   int peek_char();
@@ -36,7 +35,7 @@ class reader_t {
   scm_obj_t read_vector(bool& err, int close_char);
   scm_obj_t read_u8vector(bool& err, int close_char);
   scm_obj_t read_string(bool& err);
-  scm_obj_t read_symbol(int c);
+  scm_obj_t read_symbol(int c, bool& err);
   scm_obj_t read_number(int c, bool& err);
   scm_obj_t read_char(bool& err);
   scm_obj_t read_quote(bool& err);

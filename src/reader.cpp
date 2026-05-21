@@ -113,9 +113,7 @@ scm_obj_t reader_t::read(bool& err) {
       return read_list(err, ']');
     case ')':
     case ']':
-      err = true;
-      error_message = "unexpected closing bracket";
-      return scm_undef;
+      return report_error(err, "unexpected closing bracket"), scm_undef;
     case '"':
       return read_string(err);
     case '\'':
@@ -160,9 +158,7 @@ scm_obj_t reader_t::read(bool& err) {
         bool ignore_err = false;
         read(ignore_err);
         if (ignore_err) {
-          err = true;
-          error_message = "unexpected end-of-file while reading comments";
-          return scm_undef;
+          return report_error(err, "unexpected end-of-file while reading comments"), scm_undef;
         }
         return read(err);
       }
@@ -213,13 +209,13 @@ scm_obj_t reader_t::read(bool& err) {
       if (c == '.') {
         int next = peek_char();
         if (next == EOF || (s_char_map[next & 0xff] & (CHAR_WHITESPACE | CHAR_DELIMITER))) {
-          return read_symbol(c);
+          return read_symbol(c, err);
         }
         if (s_char_map[next & 0xff] & CHAR_DIGIT) {
           return read_number(c, err);
         }
       }
-      return read_symbol(c);
+      return read_symbol(c, err);
   }
 
   // Placeholder
@@ -234,18 +230,14 @@ scm_obj_t reader_t::read_list(bool& err, int close_char) {
     skip_whitespace();
     int c = peek_char();
     if (c == EOF) {
-      err = true;
-      error_message = "unexpected end-of-file while reading list";
-      return scm_eof;
+      return report_error(err, "unexpected end-of-file while reading list"), scm_eof;
     }
     if (c == ')' || c == ']') {
       if (c == close_char) {
         get_char();
         return head;  // proper list
       } else {
-        err = true;
-        error_message = "mismatched parentheses";
-        return scm_undef;
+        return report_error(err, "mismatched parentheses"), scm_undef;
       }
     }
     if (c == '.' && head != scm_nil) {
@@ -259,9 +251,7 @@ scm_obj_t reader_t::read_list(bool& err, int close_char) {
 
         skip_whitespace();
         if (peek_char() != close_char) {
-          err = true;  // dot must be followed by one element and then close paren
-          error_message = "more than one item following dot('.') while reading list or mismatched parentheses";
-          return scm_undef;
+          return report_error(err, "more than one item following dot('.') while reading list or mismatched parentheses"), scm_undef;
         }
         get_char();  // consume closing bracket
         scm_cons_rec_t* cons = (scm_cons_rec_t*)tail;
@@ -294,18 +284,14 @@ scm_obj_t reader_t::read_vector(bool& err, int close_char) {
     skip_whitespace();
     int c = peek_char();
     if (c == EOF) {
-      err = true;
-      error_message = "unexpected end-of-file while reading vector";
-      return scm_eof;
+      return report_error(err, "unexpected end-of-file while reading vector"), scm_eof;
     }
     if (c == ')' || c == ']') {
       if (c == close_char) {
         get_char();
         break;
       } else {
-        err = true;
-        error_message = "mismatched parentheses";
-        return scm_undef;
+        return report_error(err, "mismatched parentheses"), scm_undef;
       }
     }
     elts.push_back(read(err));
@@ -323,32 +309,24 @@ scm_obj_t reader_t::read_u8vector(bool& err, int close_char) {
     skip_whitespace();
     int c = peek_char();
     if (c == EOF) {
-      err = true;
-      error_message = "unexpected end-of-file while reading u8vector";
-      return scm_eof;
+      return report_error(err, "unexpected end-of-file while reading u8vector"), scm_eof;
     }
     if (c == ')' || c == ']') {
       if (c == close_char) {
         get_char();
         break;
       } else {
-        err = true;
-        error_message = "mismatched parentheses";
-        return scm_undef;
+        return report_error(err, "mismatched parentheses"), scm_undef;
       }
     }
     scm_obj_t obj = read(err);
     if (err) return scm_undef;
     if (!is_fixnum(obj)) {
-      err = true;
-      error_message = "expected fixnum in u8vector";
-      return scm_undef;
+      return report_error(err, "expected fixnum in u8vector"), scm_undef;
     }
     intptr_t val = fixnum(obj);
     if (val < 0 || val > 255) {
-      err = true;
-      error_message = "u8vector element out of range";
-      return scm_undef;
+      return report_error(err, "u8vector element out of range"), scm_undef;
     }
     elts.push_back((uint8_t)val);
   }
@@ -362,9 +340,7 @@ scm_obj_t reader_t::read_string(bool& err) {
   while (true) {
     int c = get_char();
     if (c == EOF) {
-      err = true;  // Error: unexpected EOF in string
-      error_message = "unexpected end-of-file while reading string";
-      return scm_eof;
+      return report_error(err, "unexpected end-of-file while reading string"), scm_eof;
     }
     if (c == '"') {
       break;
@@ -412,9 +388,7 @@ scm_obj_t reader_t::read_string(bool& err) {
               break;
             } else {
               // error in read: inline hex escape missing terminating semi-colon
-              err = true;
-              error_message = "inline hex escape missing terminating semi-colon";
-              return scm_eof;
+              return report_error(err, "inline hex escape missing terminating semi-colon"), scm_eof;
             }
           }
           if (hex < 128) {
@@ -441,7 +415,7 @@ static bool is_symbol_char(int c) {
   return reader_t::s_char_map[c & 0xff] & reader_t::CHAR_SYMBOL;
 }
 
-scm_obj_t reader_t::read_symbol(int c) {
+scm_obj_t reader_t::read_symbol(int c, bool& err) {
   std::string buf;
   if (c == '|') {
     while (true) {
@@ -453,10 +427,19 @@ scm_obj_t reader_t::read_symbol(int c) {
     return make_symbol(buf.c_str());
   }
 
+  if (c & 0x80) {
+    report_error(err, "non-ascii character in symbol");
+    return scm_undef;
+  }
+
   buf.push_back((char)c);
   while (true) {
     int next = peek_char();
     if (next != EOF && (s_char_map[next & 0xff] & CHAR_SYMBOL)) {
+      if (next & 0x80) {
+        report_error(err, "non-ascii character in symbol");
+        return scm_undef;
+      }
       buf.push_back((char)get_char());
     } else {
       break;
@@ -517,9 +500,7 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
 
   std::string num_str = buf.substr(idx);
   if (num_str.empty()) {
-    err = true;
-    error_message = "invalid lexical syntax";
-    return scm_undef;
+    return report_error(err, "invalid lexical syntax"), scm_undef;
   }
 
   // Try to parse as integer
@@ -548,14 +529,10 @@ scm_obj_t reader_t::read_number(int c, bool& err) {
       }
     }
   } catch (...) {
-    err = true;
-    error_message = "invalid lexical syntax";
-    return scm_undef;
+    return report_error(err, "invalid lexical syntax"), scm_undef;
   }
 
-  err = true;
-  error_message = "invalid lexical syntax";
-  return make_fixnum(0);
+  return report_error(err, "invalid lexical syntax"), make_fixnum(0);
 }
 
 scm_obj_t reader_t::read_char(bool& err) {

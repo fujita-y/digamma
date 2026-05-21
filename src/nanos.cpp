@@ -98,7 +98,7 @@ void nanos_t::load_script(std::string filename) {
   filename = expand_home(filename);
   std::ifstream ifs(filename);
   if (!ifs) {
-    puts("Error: failed to open file");
+    puts("load error: failed to open file");
     return;
   }
   reader_t reader(ifs);
@@ -120,7 +120,7 @@ void nanos_t::load_script(std::string filename) {
     } catch (const nanos_exit_t& e) {
       throw;
     } catch (const std::exception& e) {
-      std::cerr << "Exception while loading script: " << e.what() << std::endl;
+      std::cerr << "exception while loading script: " << e.what() << std::endl;
       exit(1);
     }
   }
@@ -130,7 +130,7 @@ void nanos_t::load_ir(std::string filename) {
   filename = expand_home(filename);
   std::ifstream ifs(filename);
   if (!ifs) {
-    puts("Error: failed to open file");
+    puts("load error: failed to open file");
     return;
   }
   reader_t reader(ifs);
@@ -154,7 +154,7 @@ void nanos_t::load_ir(std::string filename) {
       } catch (const nanos_exit_t& e) {
         throw;
       } catch (const std::exception& e) {
-        std::cerr << "Exception while loading boot IR: " << e.what() << std::endl;
+        std::cerr << "exception while loading boot IR: " << e.what() << std::endl;
         exit(1);
       }
     }
@@ -275,7 +275,7 @@ bool nanos_t::repl(replxx::Replxx& rx, std::string& input_buffer, printer_t& pri
       if (reader.get_error_message().find("unexpected end-of-file") != std::string::npos) {
         incomplete = true;
       } else {
-        std::cout << "Error: " << reader.get_error_message() << std::endl;
+        std::cout << "read error: " << reader.get_error_message() << std::endl;
         input_buffer.clear();
       }
       break;
