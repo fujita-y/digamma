@@ -65,3 +65,61 @@ jobs:
           build-args: |
             LLVM_VERSION=${{ matrix.llvm }}
           platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.arch }}-llvm${{ matrix.llvm }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}-llvm${{ matrix.llvm }}
+
+      - name: Clean up old Docker images
+        if: always()
+        run: |
+          docker image prune -af
+
+  cleanup-dockerhub:
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old images from Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          python3 -c "
+          import json, urllib.request, os
+          username = os.environ.get('DOCKERHUB_USERNAME', '')
+          token = os.environ.get('DOCKERHUB_TOKEN', '')
+          repo = '${{ env.IMAGE_NAME }}'
+          
+          # 1. Login to get JWT
+          login_url = 'https://hub.docker.com/v2/users/login/'
+          login_data = json.dumps({'username': username, 'password': token}).encode('utf-8')
+          req = urllib.request.Request(login_url, data=login_data, headers={'Content-Type': 'application/json'})
+          try:
+              with urllib.request.urlopen(req) as response:
+                  jwt = json.loads(response.read().decode())['token']
+          except Exception as e:
+              print(f'Failed to log in to Docker Hub: {e}')
+              exit(0)
+          
+          # 2. Fetch all tags
+          tags_url = f'https://hub.docker.com/v2/repositories/{repo}/tags/?page_size=100'
+          req = urllib.request.Request(tags_url, headers={'Authorization': f'JWT {jwt}'})
+          try:
+              with urllib.request.urlopen(req) as response:
+                  results = json.loads(response.read().decode())['results']
+          except Exception as e:
+              print(f'Failed to fetch tags: {e}')
+              exit(0)
+          
+          # 3. Delete tags that do not start with 'latest'
+          for tag in results:
+              tag_name = tag['name']
+              if not tag_name.startswith('latest'):
+                  print(f'Deleting tag: {tag_name}')
+                  delete_url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag_name}/'
+                  delete_req = urllib.request.Request(delete_url, method='DELETE', headers={'Authorization': f'JWT {jwt}'})
+                  try:
+                      with urllib.request.urlopen(delete_req) as del_resp:
+                          print(f'Deleted {tag_name}: {del_resp.status}')
+                  except Exception as e:
+                      print(f'Failed to delete {tag_name}: {e}')
+          "
