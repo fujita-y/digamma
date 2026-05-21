@@ -519,7 +519,9 @@
   (let ((head (cadr expr)))
     (if (pair? head)
         (expand `(define ,(car head) (lambda ,(cdr head) ,@(cddr expr))) m-env s-env r-env marks)
-        `(define ,head ,(expand (caddr expr) m-env s-env r-env marks)))))
+        (if (null? (cddr expr))
+            `(define ,head (unspecified))
+            `(define ,head ,(expand (caddr expr) m-env s-env r-env marks))))))
 
 (define (expand-cond-form expr m-env s-env r-env marks)
   (let ((clauses (cdr expr)))
@@ -568,6 +570,7 @@
 
 (define (expand-quasiquote-form expr m-env s-env r-env marks) (expand (expand-qq-form (cadr expr)) m-env s-env r-env marks))
 
+#|
 ;; Expand (syntax <template>) outside syntax-case scope.
 ;; Generates runtime calls to expand-syntax using current parameter bindings.
 (define (expand-syntax-form expr m-env s-env r-env marks)
@@ -579,7 +582,9 @@
          ',(list m-env s-env r-env marks)
          (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
          0 '... '() ,suffix-var))))
+|#
 
+#|
 ;; Expand (quasisyntax <template>) outside syntax-case scope.
 ;; Extracts unsyntax/unsyntax-splicing and generates with-syntax + syntax calls.
 (define (expand-quasisyntax-form expr m-env s-env r-env marks)
@@ -606,6 +611,7 @@
                          (_current-syntax-meta-env.145bed32-69c0-4df2-8c06-89f53ab9907f)
                          0 '... '() ,suffix-var)))
                (current-environment)))))))
+|#
 
 ;;=============================================================================
 ;; SECTION 7: Expansion Engine
@@ -736,8 +742,9 @@
     (cons 'let-syntax expand-let-syntax-form)
     (cons 'or expand-or-form)
     (cons 'quasiquote expand-quasiquote-form)
-    (cons 'quasisyntax expand-quasisyntax-form)
     (cons 'quote expand-quote-form)
     (cons 'set! expand-set!-form)
-    (cons 'syntax expand-syntax-form)))
+    ;(cons 'quasisyntax expand-quasisyntax-form)
+    ;(cons 'syntax expand-syntax-form)
+    ))
   
