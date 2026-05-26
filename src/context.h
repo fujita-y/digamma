@@ -50,6 +50,7 @@ class context {
   thread_local static scm_obj_t s_standard_input_port;
   thread_local static scm_obj_t s_standard_output_port;
   thread_local static scm_obj_t s_standard_error_port;
+  thread_local static scm_obj_t s_primitive_environment;
   thread_local static scm_obj_t s_interaction_environment;
   thread_local static scm_obj_t s_system_environment;
   thread_local static std::unordered_set<scm_obj_t> s_literals;

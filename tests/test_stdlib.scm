@@ -243,6 +243,49 @@
       "(a . b)\n")
 
 ;; =============================================================================
+;; Section 4: define-struct
+;; =============================================================================
+(display "\n>>> Section 4: define-struct\n")
+
+(define-struct point (x y))
+
+(test "struct predicate on non-struct"
+      (point? 42)
+      #f)
+
+(test "struct constructor and getters"
+      (let ((p (make-point 10 20)))
+        (list (point? p) (point-x p) (point-y p)))
+      '(#t 10 20))
+
+(test "struct constructor with default/unspecified args"
+      (let ((p (make-point)))
+        (point? p))
+      #t)
+
+(test "struct setters"
+      (let ((p (make-point 1 2)))
+        (point-x-set! p 99)
+        (point-y-set! p 100)
+        (list (point-x p) (point-y p)))
+      '(99 100))
+
+(define-struct point3d (x y z))
+
+(test "point3d constructor and getters"
+      (let ((p (make-point3d 1 2 3)))
+        (list (point3d? p) (point3d-x p) (point3d-y p) (point3d-z p)))
+      '(#t 1 2 3))
+
+(test "point3d setters"
+      (let ((p (make-point3d 1 2 3)))
+        (point3d-x-set! p 10)
+        (point3d-y-set! p 20)
+        (point3d-z-set! p 30)
+        (list (point3d-x p) (point3d-y p) (point3d-z p)))
+      '(10 20 30))
+
+;; =============================================================================
 ;; Summary
 ;; =============================================================================
 (newline)

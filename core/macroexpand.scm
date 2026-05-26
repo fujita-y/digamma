@@ -684,7 +684,11 @@
       (cond ((symbol? e)
              (let ((cached (hashtable-ref cache e #f)))
                (or cached
-                   (let ((result (string->symbol (strip-suffix (symbol->string e)))))
+                   (let* ((original (symbol->string e))
+                          (stripped (strip-suffix original))
+                          (result (if (string=? original stripped)
+                                      e
+                                      (string->symbol stripped))))
                      (hashtable-set! cache e result) result))))
             ((pair? e) (cons (walk (car e)) (walk (cdr e))))
             ((vector? e) (list->vector (map walk (vector->list e))))

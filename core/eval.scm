@@ -24,3 +24,7 @@
                (coreform (lambda-lift optimized))))
           coreform)))
 
+(define (eval expr env)
+  (if (environment? env)
+      (core-eval expr env)
+      (assertion-violation 'eval (format "expected environment, but got ~s, as argument 2" env))))

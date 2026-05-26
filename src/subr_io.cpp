@@ -23,6 +23,13 @@
 // Ports
 // ============================================================================
 
+SUBR subr_put_byte(scm_obj_t self, scm_obj_t port, scm_obj_t byte) {
+  if (!is_port(port)) throw std::runtime_error("put-byte: first argument must be a port");
+  if (!is_output_port(port)) throw std::runtime_error("put-byte: first argument must be an output port");
+  if (!is_fixnum(byte)) throw std::runtime_error("put-byte: second argument must be a fixnum");
+  return port_put_byte(port, byte);
+}
+
 SUBR subr_put_char(scm_obj_t self, scm_obj_t port, scm_obj_t ch) {
   if (!is_port(port)) throw std::runtime_error("put-char: first argument must be a port");
   if (!is_output_port(port)) throw std::runtime_error("put-char: first argument must be an output port");
@@ -259,6 +266,9 @@ SUBR subr_close_port(scm_obj_t self, scm_obj_t a1) {
   return scm_unspecified;
 }
 
+// eof-object  - R6RS 8.2.1
+SUBR subr_eof_object(scm_obj_t self) { return scm_eof; }
+
 // eof-object?  - R6RS 8.2.1
 SUBR subr_eof_object_p(scm_obj_t self, scm_obj_t a1) { return (a1 == scm_eof) ? scm_true : scm_false; }
 
@@ -301,6 +311,7 @@ void init_subr_io() {
   reg("write-with-shared-structure", (void*)subr_write_ss, 1, true);
   reg("display", (void*)subr_display, 1, true);
   reg("newline", (void*)subr_newline, 0, true);
+  reg("put-byte", (void*)subr_put_byte, 2, false);
   reg("put-char", (void*)subr_put_char, 2, false);
   reg("put-string", (void*)subr_put_string, 2, true);
   reg("format", (void*)subr_format, 1, true);
@@ -310,6 +321,7 @@ void init_subr_io() {
   reg("file-exists?", (void*)subr_file_exists_p, 1, false);
   reg("open-string-output-port", (void*)subr_open_string_output_port, 0, false);
   reg("close-port", (void*)subr_close_port, 1, false);
+  reg("eof-object", (void*)subr_eof_object, 0, false);
   reg("eof-object?", (void*)subr_eof_object_p, 1, false);
   reg("read", (void*)subr_read, 0, true);
   reg("get-bytevector-n", (void*)subr_get_bytevector_n, 2, false);

@@ -1,8 +1,8 @@
-;; copy macro builtins to interaction environment
-(copy-environment-macros! (current-environment) (interaction-environment)
+;; copy to primitive environment
+(copy-environment-macros! (current-environment) (primitive-environment)
   (map car (hashtable->alist (environment-macros (current-environment)))))
 
-(copy-environment-variables! (current-environment) (interaction-environment)
+(copy-environment-variables! (current-environment) (primitive-environment)
 '(
 *
 +
@@ -136,6 +136,7 @@ datum->syntax
 display
 display-heap-statistics
 dynamic-wind
+environment?
 environment-macro-contains?
 environment-macro-ref
 environment-macro-set!
@@ -144,12 +145,14 @@ environment-variable-contains?
 environment-variable-ref
 environment-variable-set!
 environment-variables
+eof-object
 eof-object?
 eq?
 equal-hash
 equal?
 eqv?
 error
+eval
 _eval_temp_value.145bed32-69c0-4df2-8c06-89f53ab9907f
 even?
 every
@@ -203,6 +206,7 @@ length
 list
 list->string
 list->vector
+list-copy
 list-head
 list-ref
 list-tail
@@ -219,6 +223,7 @@ make-environment
 make-eq-hashtable
 make-equal-hashtable
 make-eqv-hashtable
+make-list
 make-parameter
 make-string
 make-tuple
@@ -248,8 +253,10 @@ optimize
 pair?
 partition
 positive?
+primitive-environment
 procedure?
 proper-list?
+put-byte
 put-char
 put-string
 put-string-async
@@ -331,3 +338,12 @@ write-with-shared-structure
 write/ss
 zero?
 ))
+
+;; copy to interaction environment
+
+(copy-environment-macros! (primitive-environment) (interaction-environment)
+  (map car (hashtable->alist (environment-macros (primitive-environment)))))
+
+(copy-environment-variables! (primitive-environment) (interaction-environment)
+  (map car (hashtable->alist (environment-variables (primitive-environment)))))
+

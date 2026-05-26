@@ -24,6 +24,9 @@ SUBR subr_make_environment(scm_obj_t self, scm_obj_t a1) {
   return make_environment(a1);
 }
 
+// environment?
+SUBR subr_environment_p(scm_obj_t self, scm_obj_t a1) { return is_environment(a1) ? scm_true : scm_false; }
+
 // copy-environment-variables!
 SUBR subr_copy_environment_variables(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (!is_environment(a1)) throw std::runtime_error("copy-environment-variables!: first argument must be an environment");
@@ -155,6 +158,9 @@ SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1) {
   return context::environment_variable_contains(a1) ? scm_true : scm_false;
 }
 
+// primitive-environment
+SUBR subr_primitive_environment(scm_obj_t self) { return context::s_primitive_environment; }
+
 // interaction-environment - R6RS 11.16
 SUBR subr_interaction_environment(scm_obj_t self) { return context::s_interaction_environment; }
 
@@ -189,6 +195,7 @@ void init_subr_env() {
   };
 
   reg("make-environment", (void*)subr_make_environment, 1, false);
+  reg("environment?", (void*)subr_environment_p, 1, false);
   reg("copy-environment-variables!", (void*)subr_copy_environment_variables, 3, false);
   reg("copy-environment-macros!", (void*)subr_copy_environment_macros, 3, false);
   reg("environment-macros", (void*)subr_environment_macros, 1, false);
@@ -200,6 +207,7 @@ void init_subr_env() {
   reg("environment-variable-set!", (void*)subr_environment_variable_set, 2, false);
   reg("environment-variable-ref", (void*)subr_environment_variable_ref, 1, false);
   reg("environment-variable-contains?", (void*)subr_environment_variable_contains, 1, false);
+  reg("primitive-environment", (void*)subr_primitive_environment, 0, false);
   reg("interaction-environment", (void*)subr_interaction_environment, 0, false);
   reg("system-environment", (void*)subr_system_environment, 0, false);
   reg("lookup-process-environment", (void*)subr_lookup_process_environment, 1, false);

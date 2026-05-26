@@ -21,6 +21,7 @@ thread_local nanos_t* context::s_current_nanos;
 thread_local scm_obj_t context::s_standard_input_port;
 thread_local scm_obj_t context::s_standard_output_port;
 thread_local scm_obj_t context::s_standard_error_port;
+thread_local scm_obj_t context::s_primitive_environment;
 thread_local scm_obj_t context::s_interaction_environment;
 thread_local scm_obj_t context::s_system_environment;
 thread_local std::unordered_set<scm_obj_t> context::s_literals;
@@ -79,6 +80,7 @@ void context::init() {
   s_current_input_port = s_standard_input_port;
   s_current_output_port = s_standard_output_port;
   s_current_error_port = s_standard_error_port;
+  s_primitive_environment = make_environment(make_symbol("primitive-environment"));
   s_interaction_environment = make_environment(make_symbol("interaction-environment"));
   s_system_environment = make_environment(make_symbol("system-environment"));
   s_current_environment = s_system_environment;
@@ -97,6 +99,7 @@ void context::destroy() {
   port_finalize((scm_port_rec_t*)to_address(s_standard_error_port));
   s_literals.clear();
   s_gc_protected.clear();
+  s_primitive_environment = scm_undef;
   s_interaction_environment = scm_undef;
   s_system_environment = scm_undef;
   s_current_environment = scm_undef;

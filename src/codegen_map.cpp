@@ -147,6 +147,7 @@ void codegen_t::init_opcode_map() {
   no_gc_code_set.insert((void*)subr_standard_output_port);
   no_gc_code_set.insert((void*)subr_standard_error_port);
   no_gc_code_set.insert((void*)subr_file_exists_p);
+  no_gc_code_set.insert((void*)subr_eof_object);
   no_gc_code_set.insert((void*)subr_eof_object_p);
   no_gc_code_set.insert((void*)subr_fixnum_p);
   no_gc_code_set.insert((void*)subr_undefined);

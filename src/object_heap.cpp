@@ -318,6 +318,7 @@ void object_heap_t::snapshot_root() {
     enqueue_root(it->first);
     enqueue_root(it->second);
   }
+  enqueue_root(context::s_primitive_environment);
   enqueue_root(context::s_interaction_environment);
   enqueue_root(context::s_system_environment);
   enqueue_root(context::s_current_environment);

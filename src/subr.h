@@ -143,6 +143,7 @@ SUBR subr_environment_variable_contains(scm_obj_t self, scm_obj_t a1);
 SUBR subr_environment_variable_ref(scm_obj_t self, scm_obj_t a1);
 SUBR subr_environment_variable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_environment_variables(scm_obj_t self, scm_obj_t a1);
+SUBR subr_eof_object(scm_obj_t self);
 SUBR subr_eof_object_p(scm_obj_t self, scm_obj_t a1);
 SUBR subr_eq_p(scm_obj_t self, scm_obj_t a1, scm_obj_t a2);
 SUBR subr_equal_hash(scm_obj_t self, scm_obj_t a1);

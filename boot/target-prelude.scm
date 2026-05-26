@@ -168,12 +168,31 @@
         acc
         (loop (cdr lst) (proc (car lst) acc)))))
 
-;; Returns a list of integers from 0 to n-1.
-(define (iota n)
-  (let loop ((i 0) (acc '()))
-    (if (= i n)
-        (reverse acc)
-        (loop (+ i 1) (cons i acc)))))
+;; Returns a list of integers
+(define (iota count . maybe-start+step)
+  (let ((start (if (pair? maybe-start+step)
+                   (car maybe-start+step)
+                   0))
+        (step (if (and (pair? maybe-start+step) (pair? (cdr maybe-start+step)))
+                  (cadr maybe-start+step)
+                  1)))
+    (let loop ((n 0) (result '()))
+      (if (= n count)
+          (reverse result)
+          (loop (+ n 1) (cons (+ start (* n step)) result))))))
+
+(define (list-copy lst)
+  (let loop ((lst lst))
+    (if (pair? lst)
+        (cons (car lst) (loop (cdr lst)))
+        lst)))
+
+(define (make-list n . fill)
+  (let ((x (if (pair? fill) (car fill) #f)))
+    (let loop ((i n) (ans '()))
+      (if (<= i 0)
+          ans
+          (loop (- i 1) (cons x ans))))))
 
 ;; Partition lst into two lists: those that satisfy pred and those that do not.
 (define (partition pred lst)
