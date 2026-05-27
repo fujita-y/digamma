@@ -790,13 +790,22 @@ void codegen_t::emit_known_closure_call(const Instruction& inst, bool is_tail) {
           }
         }
 
-        // Create function pointer
-        llvm::Value* funcPtr = createInt64Constant(CT, (uint64_t)code_ptr);
-        llvm::Value* typedFuncPtr = BL.CreateIntToPtr(funcPtr, BL.getPtrTy());
+        // Register the native code pointer with the JIT dylib via absoluteSymbols
+        // so the linker resolves a clean, untagged function address.
+        //
+        // On ARM64 with HWASan, directly embedding (uint64_t)code_ptr as an
+        // integer constant and converting it back via IntToPtr at call time
+        // preserves any tag bits in the top byte — producing a non-executable
+        // tagged address that causes a SIGBUS on macOS/ARM64.
+        // Using get_or_create_external_function registers the symbol address
+        // through absoluteSymbols, which strips instrumentation tags and lets
+        // JITLink patch in the real executable address.
+        std::string synth_name = "__nanos_subr_" + std::to_string(reinterpret_cast<uintptr_t>(code_ptr));
+        llvm::Function* external_func = get_or_create_external_function(synth_name.c_str(), funcType, code_ptr);
 
         // Emit call
         // If cdecl == 0 (Scheme), use tailcc. If cdecl == 1 (C), use generic ccc.
-        llvm::CallInst* call = BL.CreateCall(funcType, typedFuncPtr, args, is_tail ? "tail_call_global" : "call_global");
+        llvm::CallInst* call = BL.CreateCall(funcType, external_func, args, is_tail ? "tail_call_global" : "call_global");
 
         if (cdecl == 0) {
           call->setCallingConv(CLOSURE_CALLING_CONV);
