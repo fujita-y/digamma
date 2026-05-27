@@ -1,52 +1,13 @@
 (define-module (core test-lite)
   (export test-begin test-end test-comment test-report
-          test-eval! test-eq test-eqv test-equal
-          test test-values test-assert)
+          test-eval! test-eq test-eqv test-equal)
   (import (core struct) (core parameterize))
 
   (define-struct section (name pass-count fail-count skip-count skip-list on-test on-final env lib))
 
-  (define test-helper
-    (lambda (res ans name)
-      (cond
-        ((not (equal? res ans))
-         (newline)
-         (display "FAIL: ")
-         (write name)
-         (newline)
-         (display "expected: ")
-         (write ans)
-         (newline)
-         (display "but got: ")
-         (write res)
-         (newline)
-         (exit 1))
-        (else
-         (section-pass-count-inc! (section-current))
-         (put-byte (current-output-port) #x0d)
-         (format #t "Passed ~a~!" (section-pass-count (section-current)))))))
-
-  (define-syntax test
-    (syntax-rules ()
-      ((_ expected expr)
-       (test expected expr 'expr))
-      ((_ expected expr name)
-       (test-helper expected expr name))))
-
-  (define-syntax test-values
-    (syntax-rules ()
-      ((_ expected expr)
-       (let ((expr-values (call-with-values (lambda () expr) list))
-             (expected-values (call-with-values (lambda () expected) list)))
-        (test-helper expected-values expr-values 'expr)))))
-
-  (define-syntax test-assert
-    (syntax-rules ()
-      ((_ str expr) (test #t expr str))))
-
   (define test-result (make-parameter ""))
 
-  (define test-report (lambda () (format #t "~%~a~%" (test-result)) (test-result "") (unspecified)))
+  (define test-report (lambda () (format #t "~%~a~%~!" (test-result)) (test-result "") (unspecified)))
 
   (define copy-primitive-environment
     (lambda ()
@@ -98,8 +59,7 @@
     (lambda (sec test passed? form expect got)
       (cond (passed?
              (section-pass-count-inc! sec)
-             (put-byte (current-output-port) #x0d)
-             (format #t "Passed ~a~!" (section-pass-count sec)))
+             (format #t "\rpassed ~a~!" (section-pass-count sec)))
             (else
              (section-fail-count-inc! sec)
              (format #t "~%; *** ### TEST FAILURE ###")
@@ -149,15 +109,17 @@
        (test-expression name 'expr 'value eq?))
       ((_ expr => value)
        (test-expression "" 'expr 'value eq?))
-      ((_ expr value)
-       (test-expression "" 'expr 'value eq?))))
+      ((_ name value expr)
+       (test-expression name 'expr 'value eq?))))
 
   (define-syntax test-eqv
     (syntax-rules (=>)
       ((_ name expr => value)
        (test-expression name 'expr 'value eqv?))
       ((_ expr => value)
-       (test-expression "" 'expr 'value eqv?))))
+       (test-expression "" 'expr 'value eqv?))
+      ((_ name value expr)
+       (test-expression name 'expr 'value eqv?))))
 
   (define-syntax test-equal
     (syntax-rules (=>)
@@ -165,15 +127,7 @@
        (test-expression name 'expr 'value equal?))
       ((_ expr => value)
        (test-expression "" 'expr 'value equal?))
-      ((_ expr value)
-       (test-expression "" 'expr 'value equal?))))
+      ((_ name value expr)
+       (test-expression name 'expr 'value equal?))))
 
   )
-
-#|
-(import (core test-lite))
-(test-begin "foo")
-(test-equal "pass" (list 1 2 3) => (1 2 3))
-(test-equal "fail" (list 1) => (1 2 3))
-(test-end)
-}#
