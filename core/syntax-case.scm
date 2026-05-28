@@ -268,6 +268,18 @@
                       (expand-syntax p (append iter-bindings bindings) context meta-env (+ depth 1) ellipsis literals suffix)))
                   (iota len))))
        (append new-template-list (expand-syntax (cddr template) bindings context meta-env depth ellipsis literals suffix))))
+    ;; Quasisyntax unsyntax placeholder in cdr (dotted-pair) position:
+    ;; (#,@list . #,var) generates a (**splice-unsyntax** var) template for the
+    ;; cdr.  Expand it by substituting the bound value directly so that the cdr
+    ;; is set correctly rather than appended as a list tail.
+    ((and (pair? template)
+          (eq? (car template) '**splice-unsyntax**)
+          (pair? (cdr template))
+          (null? (cddr template)))
+     (let ((b (assq (cadr template) bindings)))
+       (if b
+           (apply-syntax-object-context (cdr b) suffix)
+           (cadr template))))
     ((pair? template)
      (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals suffix)
            (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals suffix)))

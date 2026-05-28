@@ -12,6 +12,9 @@
 #include "context.h"
 
 #include <mutex>
+#if defined(__has_feature) && __has_feature(hwaddress_sanitizer)
+#include <sanitizer/hwasan_interface.h>
+#endif
 #include <string>
 #include <unordered_map>
 
@@ -107,6 +110,14 @@ inline void* object_heap_t::alloc_object(concurrent_slab_t& slab) {
   do {
     void* obj = slab.new_collectible_object();
     if (obj) [[likely]] {
+      // The slab is backed by mmap memory. HWASan assigns random shadow tags
+      // to mmap pages, but the returned pointer carries tag 0x00 (plain pointer
+      // arithmetic with no HWASan-tagged allocation). Reset the shadow tag of
+      // this slot to 0 so that tag-0 accesses via scm_obj_t/raw-pointer casts
+      // do not trigger a HWASan tag-mismatch.
+#if defined(__has_feature) && __has_feature(hwaddress_sanitizer)
+      __hwasan_tag_memory(obj, 0, (size_t)slab.m_object_size);
+#endif
       return obj;
     }
   } while (m_concurrent_pool.extend_pool(SLAB_SIZE));
@@ -152,6 +163,9 @@ inline void* object_heap_t::alloc_collectible(size_t nsize) {
     do {
       void* obj = m_collectibles[bucket].new_collectible_object();
       if (obj) [[likely]] {
+#if defined(__has_feature) && __has_feature(hwaddress_sanitizer)
+        __hwasan_tag_memory(obj, 0, m_collectibles[bucket].m_object_size);
+#endif
         return obj;
       }
     } while (m_concurrent_pool.extend_pool(SLAB_SIZE));

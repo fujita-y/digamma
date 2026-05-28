@@ -59,7 +59,7 @@
     (lambda (sec test passed? form expect got)
       (cond (passed?
              (section-pass-count-inc! sec)
-             (format #t "\rpassed ~a~!" (section-pass-count sec)))
+             (format #t "\rpassed: ~a ~!" (section-pass-count sec)))
             (else
              (section-fail-count-inc! sec)
              (format #t "~%; *** ### TEST FAILURE ###")
@@ -84,7 +84,7 @@
         (section-on-test-set! sec test-default-on-test-proc)
         (section-on-final-set! sec test-default-on-final-proc)
         (section-current sec)
-        (format #t "~a~%~!" name)
+        (format #t "~%~s~%~!" name)
         (unspecified))))
 
   (define test-end

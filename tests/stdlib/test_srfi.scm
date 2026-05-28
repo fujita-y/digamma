@@ -1,6 +1,6 @@
 (import (core test-lite))
 
-(test-begin "Pipeline Operators")
+(test-begin "srfi-197: pipeline operators")
 
 (test-eval! (import (core)))
 (test-eval! (import (srfi :197)))
@@ -174,14 +174,14 @@
    "bar"
    "baz"))
 
-(test-equal "nest" '(1 2 (3 (4) 5))
+(test-equal "nest" (1 2 (3 (4) 5))
   (nest (quote _)
         (1 2 _)
         (3 _ 5)
         (_)
         4))
 
-(test-equal "nest with custom _" '(1 2 (3 (4) 5))
+(test-equal "nest with custom _" (1 2 (3 (4) 5))
   (nest <>
         (quote <>)
         (1 2 <>)
@@ -189,19 +189,19 @@
         (<>)
         4))
 
-(test-equal "nested nest" '(1 2 3 (4 5 6))
+(test-equal "nested nest" (1 2 3 (4 5 6))
   (nest (nest _2 (quote _2) (1 2 3 _2) _ 6)
         (_ 5 _2)
         4))
 
-(test-equal "nest-reverse" '(1 2 (3 (4) 5))
+(test-equal "nest-reverse" (1 2 (3 (4) 5))
   (nest-reverse 4
                 (_)
                 (3 _ 5)
                 (1 2 _)
                 (quote _)))
 
-(test-equal "nest-reverse with custom _" '(1 2 (3 (4) 5))
+(test-equal "nest-reverse with custom _" (1 2 (3 (4) 5))
   (nest-reverse 4 <>
                 (<>)
                 (3 <> 5)
@@ -209,3 +209,6 @@
                 (quote <>)))
 
 (test-end)
+
+(test-report)
+(exit)

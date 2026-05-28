@@ -1203,8 +1203,14 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
   // Step 1: call producer thunk
   scm_obj_t result = (scm_obj_t)bridge(producer, 0, nullptr);
 
-  // Step 2: spread values (or single value) to consumer
+  // Step 2: spread values (or single value) to consumer.
+  // IMPORTANT: The consumer call may allocate heap objects (e.g. rest-list
+  // cons cells), triggering GC.  If 'result' is a values object, its 'elts'
+  // pointer is passed directly into the JIT closure frame.  We must GC-protect
+  // the values object for the entire duration of the consumer call to keep the
+  // elts array alive.
   if (is_values(result)) {
+    scoped_gc_protect protect_result(result);
     int n = values_nsize(result);
     scm_obj_t* elts = values_elts(result);
     return (scm_obj_t)bridge(consumer, n, elts);

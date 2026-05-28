@@ -19,7 +19,11 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # Iterate over all test files
-for test_file in test_*.scm; do
+for test_file in test_*.scm stdlib/test_*.scm; do
+    # Ensure the glob pattern matched an actual file
+    if [ ! -f "$test_file" ]; then
+        continue
+    fi
     echo "Running $test_file..."
     
     # Run the test and capture output
