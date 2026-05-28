@@ -271,6 +271,7 @@ scheme-load-paths
 set-car!
 set-cdr!
 sin
+split-at
 sqrt
 standard-error-port
 standard-input-port

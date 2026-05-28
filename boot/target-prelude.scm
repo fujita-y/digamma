@@ -194,12 +194,17 @@
           ans
           (loop (- i 1) (cons x ans))))))
 
-;; Partition lst into two lists: those that satisfy pred and those that do not.
 (define (partition pred lst)
   (let loop ((lst lst) (in '()) (out '()))
     (cond ((null? lst) (values (reverse in) (reverse out)))
           ((pred (car lst)) (loop (cdr lst) (cons (car lst) in) out))
           (else (loop (cdr lst) in (cons (car lst) out))))))
+
+(define (split-at lst k)
+  (let loop ((l '()) (r lst) (k k))
+    (if (or (null? r) (= k 0))
+        (values (reverse l) r)
+        (loop (cons (car r) l) (cdr r) (- k 1)))))
 
 (define scheme-load-paths (make-parameter '()))
 

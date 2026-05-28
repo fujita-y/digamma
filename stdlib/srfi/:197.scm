@@ -1,6 +1,6 @@
 (define-module (srfi :197)
 (export chain chain-and chain-when chain-lambda nest nest-reverse)
-(import (core))
+(import (core let-values))
 
 ;;; SPDX-FileCopyrightText: 2020 Adam R. Nelson <adam@nels.onl>
 ;;;

@@ -650,7 +650,7 @@
                         (lookup-builtin-handler id)
                         (environment-macro-contains? id)
                         (environment-variable-contains? id))
-              (assertion-violation 'define-module (format "unbound variable ~s in ~s" id mod-name))))
+              (assertion-violation 'define-module (format "unbound identifier ~s in ~s" id mod-name))))
           refs)))
     (let* ((imp-defs (map (lambda (b) `(define ,(car b) ',(cdr b))) runtime-i))
            (wrapper `(lambda () ,@imp-defs ,@rt-forms (list ,@def-ids))))

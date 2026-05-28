@@ -47,7 +47,7 @@
 (define (make-syntax-object datum context)
   (if (syntax-object? datum)
       datum
-      (if (or (symbol? datum) (pair? datum) (tuple? datum))
+      (if (or (symbol? datum) (pair? datum) (vector? datum) (tuple? datum))
           (tuple 'syntax datum context)
           datum)))
 
@@ -145,6 +145,8 @@
     ((pair? pattern)
      (append (collect-pattern-vars (car pattern) literals ellipsis)
              (collect-pattern-vars (cdr pattern) literals ellipsis)))
+    ((vector? pattern)
+     (collect-pattern-vars (vector->list pattern) literals ellipsis))
     (else '())))
 
 ;; Group values matched by an ellipsis pattern by variable.
@@ -189,6 +191,14 @@
                  (m2 (syntax-case-match literals (cdr pattern) (make-syntax-object (cdr input-datum) input-context) ellipsis)))
              (and m1 m2 (append m1 m2)))
            #f)))
+    ((vector? pattern)
+     (let ((input-datum (syntax-object-datum input))
+           (input-context (syntax-object-context input)))
+       (if (vector? input-datum)
+           (syntax-case-match literals (vector->list pattern)
+                               (make-syntax-object (vector->list input-datum) input-context)
+                               ellipsis)
+           #f)))
     (else (if (equal? pattern (syntax-object-datum input)) '() #f))))
 
 ;;=============================================================================
@@ -207,6 +217,8 @@
     ((pair? pattern)
      (append (syntax-depth-map (car pattern) literals ellipsis depth)
              (syntax-depth-map (cdr pattern) literals ellipsis depth)))
+    ((vector? pattern)
+     (syntax-depth-map (vector->list pattern) literals ellipsis depth))
     (else '())))
 
 (define (apply-syntax-object-context val suffix)
@@ -283,6 +295,8 @@
     ((pair? template)
      (cons (expand-syntax (car template) bindings context meta-env depth ellipsis literals suffix)
            (expand-syntax (cdr template) bindings context meta-env depth ellipsis literals suffix)))
+    ((vector? template)
+     (list->vector (expand-syntax (vector->list template) bindings context meta-env depth ellipsis literals suffix)))
     (else template)))
 
 

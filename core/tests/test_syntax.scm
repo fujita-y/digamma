@@ -1088,31 +1088,6 @@
 ;; =============================================================================
 (display "\n>>> Section 3: Definition by syntax-case\n")
 
-;; Helper for eval tests (from test_syntax_rules.scm)
-(define (test-eval expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr) (current-environment))))
-    (if (equal? expected expanded)
-        (begin
-          (set! *pass-count* (+ *pass-count* 1))
-          (display "PASS: ") (display msg) (newline))
-        (begin
-          (set! *fail-count* (+ *fail-count* 1))
-          (display "FAIL: ") (display msg) (newline)
-          (display "  Expected: ") (display expected) (newline)
-          (display "  Actual:   ") (display expanded) (newline)))))
-
-(define (test-eval-strip expected expr msg)
-  (let ((expanded (core-eval (macroexpand expr 'strip) (current-environment))))
-    (if (equal? expected expanded)
-        (begin 
-          (set! *pass-count* (+ *pass-count* 1))
-          (display "PASS: ") (display msg) (newline))
-        (begin 
-          (set! *fail-count* (+ *fail-count* 1))
-          (display "FAIL: ") (display msg) (newline)
-          (display "  Expected: ") (display expected) (newline)
-          (display "  Actual:   ") (display expanded) (newline)))))
-
 ;; Define syntax-rules using syntax-case (shadowing core syntax-rules)
 (macroexpand
  '(define-syntax syntax-rules
@@ -1124,26 +1099,26 @@
                ((dummy . pattern) (syntax template)) ...))))))))
 
 ;; Pitfall 3.1
-(test-eval 4
+(test-eval "Pitfall 3.1: Hygiene with shadowed global operator"
       '(let-syntax ((foo
                      (syntax-rules ()
                        ((_ expr) (+ expr 1)))))
          (let ((+ *))
            (foo 3)))
-      "Pitfall 3.1: Hygiene with shadowed global operator")
+      4)
 
 ;; Pitfall 3.2
-(test-eval 2
+(test-eval "Pitfall 3.2: let-syntax inside let with begin and cond"
       '(let-syntax ((foo (syntax-rules ()
                            ((_ var) (define var 1)))))
          (let ((x 2))
            (begin (define foo +))
            (cond (else (foo x)))
            x))
-      "Pitfall 3.2: let-syntax inside let with begin and cond")
+      2)
 
 ;; Pitfall 3.3
-(test-eval 1
+(test-eval "Pitfall 3.3: Nested let-syntax hygiene"
       '(let ((x 1))
          (let-syntax
              ((foo (syntax-rules ()
@@ -1152,27 +1127,28 @@
                                         ((_) (let ((x 2)) y)))))
                               (bar))))))
            (foo x)))
-      "Pitfall 3.3: Nested let-syntax hygiene")
+      1)
 
 ;; Pitfall 3.4
-(test-eval 1
+(test-eval "Pitfall 3.4: let-syntax with no clauses"
       '(let-syntax ((x (syntax-rules ()))) 1)
-      "Pitfall 3.4: let-syntax with no clauses")
+      1)
 
 ;; Pitfall 8.1
-(test-eval -1
+(test-eval "Pitfall 8.1: named let with name -"
       '(let - ((n (- 1))) n)
-      "Pitfall 8.1: named let with name -")
+      -1)
 
 ;; Pitfall 8.3 (R6RS)
-(test-eval-strip 2
+(test-eval-strip "Pitfall 8.3: let-syntax and local define"
       '(let ((x 1))
          (let-syntax ((foo (syntax-rules () ((_) 2))))
            (define x (foo))
            3)
          x)
-      "Pitfall 8.3: let-syntax and local define")
+      2)
 
+;; ==========================================================================
 (newline)
 (display "Total tests: ") (display (+ *pass-count* *fail-count*)) (newline)
 
@@ -1419,6 +1395,144 @@
 (test "sc-elli-esc no args"  (macroexpand '(sc-elli-esc)       'strip) ''...)
 (test "sc-elli-esc 1 arg"   (macroexpand '(sc-elli-esc 100)    'strip) ''(100 ...))
 (test "sc-elli-esc 2 args"  (macroexpand '(sc-elli-esc 100 200) 'strip) ''(... 100 200))
+
+
+;; =============================================================================
+;; Vector patterns and templates in syntax-case
+;; =============================================================================
+(display "\n>>> Vector patterns and templates in syntax-case\n")
+
+;; ---- Pattern matching -------------------------------------------------------
+
+;; 1. Constant vector pattern: #() matches empty vector
+(macroexpand
+ '(define-syntax sc-vec-empty
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #()) (syntax 'empty))))))
+(test-eval "sc-vec-empty matches #()"
+           '(sc-vec-empty #())
+           'empty)
+
+;; 2. Single pattern variable bound from a vector element
+(macroexpand
+ '(define-syntax sc-vec-first
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(a)) (syntax a))))))
+(test-eval "sc-vec-first extracts single element"
+           '(sc-vec-first #(42))
+           42)
+
+;; 3. Two pattern variables bound from a two-element vector
+(macroexpand
+ '(define-syntax sc-vec-pair
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(a b)) (syntax (cons a b)))))))
+(test-eval "sc-vec-pair binds two elements"
+           '(sc-vec-pair #(1 2))
+           '(1 . 2))
+
+;; 4. Three pattern variables from a three-element vector
+(macroexpand
+ '(define-syntax sc-vec3
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(a b c)) (syntax (list a b c)))))))
+(test-eval "sc-vec3 binds three elements"
+           '(sc-vec3 #(10 20 30))
+           '(10 20 30))
+
+;; 5. Non-matching vector length falls through to next clause
+(macroexpand
+ '(define-syntax sc-vec-len
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(a))    (syntax 'one))
+        ((_ #(a b))  (syntax 'two))
+        ((_ _)       (syntax 'other))))))
+(test-eval "sc-vec-len dispatches on length 1" '(sc-vec-len #(x))   'one)
+(test-eval "sc-vec-len dispatches on length 2" '(sc-vec-len #(x y)) 'two)
+(test-eval "sc-vec-len falls through for list"  '(sc-vec-len '(x))   'other)
+
+;; 6. Ellipsis inside a vector pattern
+(macroexpand
+ '(define-syntax sc-vec-elli
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(e ...)) (syntax (list e ...)))))))
+(test-eval "sc-vec-elli empty"    '(sc-vec-elli #())       '())
+(test-eval "sc-vec-elli one"      '(sc-vec-elli #(1))      '(1))
+(test-eval "sc-vec-elli three"    '(sc-vec-elli #(1 2 3))  '(1 2 3))
+
+;; 7. Literal identifier inside a vector pattern
+(macroexpand
+ '(define-syntax sc-vec-lit
+    (lambda (x)
+      (syntax-case x (=>)
+        ((_ #(=> v)) (syntax v))
+        ((_ _)       (syntax 'no-match))))))
+(test-eval "sc-vec-lit matches literal =>"
+           '(sc-vec-lit #(=> 99))
+           99)
+(test-eval "sc-vec-lit skips non-literal"
+           '(sc-vec-lit #(foo 99))
+           'no-match)
+
+;; ---- Template construction --------------------------------------------------
+
+;; 8. Vector template: produce a vector in the output
+(macroexpand
+ '(define-syntax sc-vec-tmpl
+    (lambda (x)
+      (syntax-case x ()
+        ((_ a b) (syntax #(a b)))))))
+(test-eval "sc-vec-tmpl produces a vector"
+           '(sc-vec-tmpl 3 4)
+           #(3 4))
+
+;; 9. Ellipsis expansion into a vector template
+(macroexpand
+ '(define-syntax sc-vec-tmpl-elli
+    (lambda (x)
+      (syntax-case x ()
+        ((_ e ...) (syntax #(e ...)))))))
+(test-eval "sc-vec-tmpl-elli empty"  '(sc-vec-tmpl-elli)        #())
+(test-eval "sc-vec-tmpl-elli one"    '(sc-vec-tmpl-elli 7)      #(7))
+(test-eval "sc-vec-tmpl-elli three"  '(sc-vec-tmpl-elli 1 2 3)  #(1 2 3))
+
+;; 10. Round-trip: vector pattern + vector template (reversal)
+(macroexpand
+ '(define-syntax sc-vec-roundtrip
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(a b c)) (syntax #(c b a)))))))
+(test-eval "sc-vec-roundtrip reverses elements"
+           '(sc-vec-roundtrip #(1 2 3))
+           #(3 2 1))
+
+;; 11. Nested vectors in pattern and template
+(macroexpand
+ '(define-syntax sc-vec-nested
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(#(a b) c)) (syntax (list a b c)))))))
+(test-eval "sc-vec-nested destructures nested vector"
+           '(sc-vec-nested #(#(10 20) 30))
+           '(10 20 30))
+
+;; 12. Mix vector pattern with ellipsis and a fixed head element
+(macroexpand
+ '(define-syntax sc-vec-elli-head
+    (lambda (x)
+      (syntax-case x ()
+        ((_ #(first rest ...)) (syntax (cons first (list rest ...))))))))
+(test-eval "sc-vec-elli-head splits head from rest"
+           '(sc-vec-elli-head #(1 2 3 4))
+           '(1 2 3 4))
+
+(display "All vector pattern/template tests done.\n")
 
 
 (newline)
