@@ -443,7 +443,6 @@
 ;; -------------------------------------
 (test-begin "srfi-197: pipeline operators")
 
-(test-eval! (import (core))) ; [TODO]: will be eliminated after module bug fixed
 (test-eval! (import (srfi :197)))
 (test-eval! (define (exclamation x) (string-append x "!")))
 (test-eval! (define (foo+bar x) (values (string-append x "foo") (string-append x "bar"))))
