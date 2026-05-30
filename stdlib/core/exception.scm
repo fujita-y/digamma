@@ -2,7 +2,7 @@
 ;;; See LICENSE file for terms and conditions of use.
 
 (define-module (core exception)
-  (export current-exception-handler with-exception-handler raise raise-continuable)
+  (export current-exception-handler with-exception-handler)
   (import (core parameterize))
 
   (define current-exception-handler
@@ -15,12 +15,5 @@
     (parameterize ((parent-exception-handler (current-exception-handler))
                    (current-exception-handler handler)) 
       (with-cpp-exception-handler handler thunk)))
-
-  (define (raise x) 
-    ((current-exception-handler) x)
-    ((parent-exception-handler) "raise: returned from non-continuable exception"))
-
-  (define (raise-continuable x) 
-    ((current-exception-handler) x))
 
 ) ;[end]
