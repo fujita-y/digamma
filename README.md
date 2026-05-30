@@ -72,7 +72,7 @@ The fiber scheduler is wired directly into Boost.Asio's `io_context`, so I/O com
 
 ---
 
-### Google Cloud AI Integration
+### Async grpc - Google Cloud AI Integration
 
 Digamma provides **built-in, non-blocking access to Vertex AI (Gemini) and Dialogflow CX** directly from Scheme.
 Unlike typical FFI wrappers that stall the interpreter, every AI call is dispatched through the fiber scheduler using `asio-grpc`, so other fibers keep running while cloud inference is in flight.
@@ -136,7 +136,7 @@ Nanos uses **LLVM ORC** (JITLink + CompileOnDemand) to compile each Scheme expre
 The pipeline runs entirely in-process with no ahead-of-time batch step:
 
 ```
-Source → Macro Expand → Optimize → Lambda Lift → Compile → LLVM IR → Native Code
+Source → Macro Expand → Optimize → Lambda Lift → Closure Conversion → LLVM IR → Native Code
 ```
 
 Key code-generation optimizations:
@@ -169,7 +169,7 @@ The GC is a **mostly-concurrent, mark-sweep collector** running on a dedicated t
 
 - **Slab allocator** — fixed-size object pools with per-slab bitmaps for fast allocation and sweep.
 - **Tri-color marking** — concurrent marking with write barriers and a shade queue for mutator cooperation.
-- **Multi-phase STW** — three short stop-the-world pauses (root snapshot → concurrent mark → final mark) minimize mutator pause times.
+- **Multi-phase STW** — multiple short stop-the-world pauses (root snapshot → concurrent mark x N → final mark) minimize mutator pause times.
 - **Safepoints** — the compiler inserts cooperative safepoints; fiber stacks are included in the root set.
 
 ---
