@@ -183,6 +183,7 @@ generate-temporaries
 gensym
 get-bytevector-n 
 get-bytevector-n-async
+get-char
 hashtable->alist
 hashtable-clear!
 hashtable-contains?
@@ -248,6 +249,7 @@ number?
 odd?
 open-file-input-port
 open-file-output-port
+open-string-input-port
 open-string-output-port
 optimize
 pair?
@@ -278,6 +280,7 @@ standard-input-port
 standard-output-port
 string
 string->list
+string->vector
 string->number
 string->symbol
 string->utf8/nul
@@ -327,6 +330,7 @@ uuid
 values
 vector
 vector->list
+vector->string
 vector-length
 vector-ref
 vector-set!

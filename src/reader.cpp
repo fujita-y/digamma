@@ -407,6 +407,7 @@ scm_obj_t reader_t::read_string(bool& err) {
     }
     buf.push_back((char)c);
   }
+  if (!is_utf8_valid((const uint8_t*)buf.c_str())) return report_error(err, "invalid UTF-8 string"), scm_undef;
   return make_string(buf.c_str());
 }
 

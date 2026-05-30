@@ -146,6 +146,11 @@ scm_obj_t port_open_string_output_port() {
   return port_object(make_symbol("string-output-port"), nullptr, nullptr, new std::stringstream(), -1);
 }
 
+scm_obj_t port_open_string_input_port(const char* s) {
+  auto* iss = new std::istringstream(s);
+  return port_object(make_symbol("string-input-port"), iss, nullptr, nullptr, -1);
+}
+
 scm_obj_t port_get_output_string(scm_obj_t port) {
   assert(is_port(port));
   scm_port_rec_t* rec = (scm_port_rec_t*)to_address(port);

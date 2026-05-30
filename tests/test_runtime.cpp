@@ -650,6 +650,7 @@ void test_string_length() {
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("")) == make_fixnum(0));
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("hello")) == make_fixnum(5));
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("abc")) == make_fixnum(3));
+  ASSERT_TRUE(subr_string_length(scm_nil, make_string("a€b")) == make_fixnum(3));
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +664,10 @@ void test_string_ref() {
   ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(4)) == make_char('o'));
   // Each ASCII char is its own byte, so index == byte offset
   ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(1)) == make_char('e'));
+  scm_obj_t u = make_string("a€b");
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(0)) == make_char('a'));
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(1)) == make_char(0x20ac));
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(2)) == make_char('b'));
 }
 
 void test_string_compare() {
@@ -719,6 +724,20 @@ void test_string_extra() {
     ASSERT_TRUE(strcmp((const char*)string_name(s2), "abc") == 0);
   }
   {
+    // UTF-8: "a€b" — 3 Unicode characters: U+0061, U+20AC (€), U+0062
+    scm_obj_t s = make_string("a€b");
+    scm_obj_t l = subr_string_to_list(scm_nil, s);
+    ASSERT_TRUE(subr_length(scm_nil, l) == make_fixnum(3));
+    ASSERT_TRUE(subr_list_ref(scm_nil, l, make_fixnum(0)) == make_char('a'));
+    ASSERT_TRUE(subr_list_ref(scm_nil, l, make_fixnum(1)) == make_char(0x20ac));
+    ASSERT_TRUE(subr_list_ref(scm_nil, l, make_fixnum(2)) == make_char('b'));
+  }
+  {
+    scm_obj_t l = make_cons(make_char('a'), make_cons(make_char(0x20ac), make_cons(make_char('b'), scm_nil)));
+    scm_obj_t s = subr_list_to_string(scm_nil, l);
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "a€b") == 0);
+  }
+  {
     scm_obj_t s1 = make_string("abc");
     scm_obj_t s2 = subr_string_copy(scm_nil, s1);
     ASSERT_TRUE(s1 != s2);
@@ -729,6 +748,67 @@ void test_string_extra() {
   PRED_VAR_TRUE(subr_string_ci_gt, make_string("abd"), make_string("ABC"));
   PRED_VAR_TRUE(subr_string_ci_le, make_string("abc"), make_string("ABC"));
   PRED_VAR_TRUE(subr_string_ci_ge, make_string("ABC"), make_string("abc"));
+  // string->vector
+  {
+    // ASCII: "abc" → #(a b c)
+    scm_obj_t v = subr_string_to_vector(scm_nil, make_string("abc"));
+    ASSERT_TRUE(is_vector(v));
+    ASSERT_TRUE(subr_vector_length(scm_nil, v) == make_fixnum(3));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(0)) == make_char('a'));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(1)) == make_char('b'));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(2)) == make_char('c'));
+  }
+  {
+    // UTF-8: "a€b" → #(a € b)  (€ = U+20AC, 3-byte sequence)
+    scm_obj_t v = subr_string_to_vector(scm_nil, make_string("a€b"));
+    ASSERT_TRUE(is_vector(v));
+    ASSERT_TRUE(subr_vector_length(scm_nil, v) == make_fixnum(3));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(0)) == make_char('a'));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(1)) == make_char(0x20ac));
+    ASSERT_TRUE(subr_vector_ref(scm_nil, v, make_fixnum(2)) == make_char('b'));
+  }
+  {
+    // empty string → empty vector
+    scm_obj_t v = subr_string_to_vector(scm_nil, make_string(""));
+    ASSERT_TRUE(is_vector(v));
+    ASSERT_TRUE(subr_vector_length(scm_nil, v) == make_fixnum(0));
+  }
+  // vector->string
+  {
+    // ASCII chars: #(h e l l o) → "hello"
+    scm_obj_t v = make_vector(5, scm_undef);
+    vector_elts(v)[0] = make_char('h');
+    vector_elts(v)[1] = make_char('e');
+    vector_elts(v)[2] = make_char('l');
+    vector_elts(v)[3] = make_char('l');
+    vector_elts(v)[4] = make_char('o');
+    scm_obj_t s = subr_vector_to_string(scm_nil, v);
+    ASSERT_TRUE(is_string(s));
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "hello") == 0);
+  }
+  {
+    // UTF-8 chars: #(a € b) → "a€b"
+    scm_obj_t v = make_vector(3, scm_undef);
+    vector_elts(v)[0] = make_char('a');
+    vector_elts(v)[1] = make_char(0x20ac);
+    vector_elts(v)[2] = make_char('b');
+    scm_obj_t s = subr_vector_to_string(scm_nil, v);
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "a€b") == 0);
+  }
+  {
+    // empty vector → ""
+    scm_obj_t v = make_vector(0, scm_undef);
+    scm_obj_t s = subr_vector_to_string(scm_nil, v);
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "") == 0);
+  }
+  {
+    // round-trip: string->vector->string
+    scm_obj_t s1 = make_string("こんにちは");
+    scm_obj_t v  = subr_string_to_vector(scm_nil, s1);
+    ASSERT_TRUE(subr_vector_length(scm_nil, v) == make_fixnum(5));
+    scm_obj_t s2 = subr_vector_to_string(scm_nil, v);
+    ASSERT_TRUE(strcmp((const char*)string_name(s2), "こんにちは") == 0);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -776,6 +856,66 @@ void test_substring() {
   // (substring s 0 11) → whole string
   scm_obj_t r4 = subr_substring(scm_nil, s, make_fixnum(0), make_fixnum(11));
   ASSERT_TRUE(strcmp((const char*)string_name(r4), "hello world") == 0);
+  scm_obj_t u = make_string("a€b");
+  scm_obj_t r5 = subr_substring(scm_nil, u, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r5), "€") == 0);
+
+  // UTF-8 Greek letters: "α β γ" (3 characters)
+  scm_obj_t greek = make_string("α β γ");
+  // (substring "α β γ" 0 1) → "α"
+  scm_obj_t r6 = subr_substring(scm_nil, greek, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r6), "α") == 0);
+  // (substring "α β γ" 1 2) → " "
+  scm_obj_t r7 = subr_substring(scm_nil, greek, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r7), " ") == 0);
+  // (substring "α β γ" 2 3) → "β"
+  scm_obj_t r8 = subr_substring(scm_nil, greek, make_fixnum(2), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r8), "β") == 0);
+  // (substring "α β γ" 0 3) → "α β"
+  scm_obj_t r9 = subr_substring(scm_nil, greek, make_fixnum(0), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r9), "α β") == 0);
+
+  // UTF-8 emoji: "😀😁😂" (3 emoji characters)
+  scm_obj_t emoji = make_string("😀😁😂");
+  // (substring "😀😁😂" 0 1) → "😀"
+  scm_obj_t r10 = subr_substring(scm_nil, emoji, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r10), "😀") == 0);
+  // (substring "😀😁😂" 1 2) → "😁"
+  scm_obj_t r11 = subr_substring(scm_nil, emoji, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r11), "😁") == 0);
+  // (substring "😀😁😂" 0 2) → "😀😁"
+  scm_obj_t r12 = subr_substring(scm_nil, emoji, make_fixnum(0), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r12), "😀😁") == 0);
+
+  // UTF-8 mixed scripts: "Hello Привет" (Russian)
+  scm_obj_t mixed = make_string("Hello Привет");
+  // (substring "Hello Привет" 0 5) → "Hello"
+  scm_obj_t r13 = subr_substring(scm_nil, mixed, make_fixnum(0), make_fixnum(5));
+  ASSERT_TRUE(strcmp((const char*)string_name(r13), "Hello") == 0);
+  // (substring "Hello Привет" 6 9) → "При"
+  scm_obj_t r14 = subr_substring(scm_nil, mixed, make_fixnum(6), make_fixnum(9));
+  ASSERT_TRUE(strcmp((const char*)string_name(r14), "При") == 0);
+
+  // UTF-8 Japanese: "こんにちは" (5 characters)
+  scm_obj_t japanese = make_string("こんにちは");
+  // (substring "こんにちは" 0 1) → "こ"
+  scm_obj_t r15 = subr_substring(scm_nil, japanese, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r15), "こ") == 0);
+  // (substring "こんにちは" 2 4) → "にち"
+  scm_obj_t r16 = subr_substring(scm_nil, japanese, make_fixnum(2), make_fixnum(4));
+  ASSERT_TRUE(strcmp((const char*)string_name(r16), "にち") == 0);
+  // (substring "こんにちは" 0 5) → whole string
+  scm_obj_t r17 = subr_substring(scm_nil, japanese, make_fixnum(0), make_fixnum(5));
+  ASSERT_TRUE(strcmp((const char*)string_name(r17), "こんにちは") == 0);
+
+  // UTF-8 café (Latin): "café" (4 characters: c, a, f, é)
+  scm_obj_t cafe = make_string("café");
+  // (substring "café" 0 3) → "caf"
+  scm_obj_t r18 = subr_substring(scm_nil, cafe, make_fixnum(0), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r18), "caf") == 0);
+  // (substring "café" 3 4) → "é"
+  scm_obj_t r19 = subr_substring(scm_nil, cafe, make_fixnum(3), make_fixnum(4));
+  ASSERT_TRUE(strcmp((const char*)string_name(r19), "é") == 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1827,30 +1967,93 @@ void test_port_subrs() {
   ASSERT_TRUE(subr_standard_error_port(scm_nil) == context::s_standard_error_port);
 
   // setters
-  scm_obj_t p = make_port(make_symbol("test-port"));
-  scm_obj_t args[] = {p};
+  // setters: use real standard ports (they have valid istream/ostream)
+  scm_obj_t real_in  = context::s_standard_input_port;
+  scm_obj_t real_out = context::s_standard_output_port;
+  scm_obj_t real_err = context::s_standard_error_port;
+
+  scm_obj_t in_args[]  = {real_in};
+  scm_obj_t out_args[] = {real_out};
+  scm_obj_t err_args[] = {real_err};
 
   scm_obj_t old_in = context::s_current_input_port;
-  subr_current_input_port(scm_nil, 1, args);
-  ASSERT_TRUE(context::s_current_input_port == p);
-  context::s_current_input_port = old_in;  // restore
+  subr_current_input_port(scm_nil, 1, in_args);
+  ASSERT_TRUE(context::s_current_input_port == real_in);
+  context::s_current_input_port = old_in;
 
   scm_obj_t old_out = context::s_current_output_port;
-  subr_current_output_port(scm_nil, 1, args);
-  ASSERT_TRUE(context::s_current_output_port == p);
-  context::s_current_output_port = old_out;  // restore
+  subr_current_output_port(scm_nil, 1, out_args);
+  ASSERT_TRUE(context::s_current_output_port == real_out);
+  context::s_current_output_port = old_out;
 
   scm_obj_t old_err = context::s_current_error_port;
-  subr_current_error_port(scm_nil, 1, args);
-  ASSERT_TRUE(context::s_current_error_port == p);
-  context::s_current_error_port = old_err;  // restore
+  subr_current_error_port(scm_nil, 1, err_args);
+  ASSERT_TRUE(context::s_current_error_port == real_err);
+  context::s_current_error_port = old_err;
 
   // flush-output-port
   subr_flush_output_port(scm_nil, 0, nullptr);
-  scm_obj_t out_port_args[] = {context::s_standard_output_port};
-  subr_flush_output_port(scm_nil, 1, out_port_args);
+  scm_obj_t stdout_args[] = {context::s_standard_output_port};
+  subr_flush_output_port(scm_nil, 1, stdout_args);
+}
 
-  port_finalize((scm_port_rec_t*)to_address(p));
+// ---------------------------------------------------------------------------
+// get-char  - R6RS 8.2.9
+// ---------------------------------------------------------------------------
+
+void test_get_char() {
+  printf("--- get-char ---\n");
+
+  // Helper: build a temp input port from a byte buffer.
+  auto make_str_input_port = [](const uint8_t* data, size_t n) -> scm_obj_t {
+    char tmpname[] = "/tmp/digamma_test_get_char_XXXXXX";
+    int fd = mkstemp(tmpname);
+    assert(fd >= 0);
+    write(fd, data, n);
+    close(fd);
+    scm_obj_t port = subr_open_file_input_port(scm_nil, make_string(tmpname));
+    unlink(tmpname);
+    return port;
+  };
+
+  // ASCII: read 'a', 'b', 'c' then EOF.
+  {
+    const uint8_t bytes[] = {'a', 'b', 'c'};
+    scm_obj_t port = make_str_input_port(bytes, 3);
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char('a'));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char('b'));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char('c'));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == scm_eof);
+    port_close(port);
+  }
+
+  // UTF-8: 'a' (0x61), U+20AC '€' (0xE2 0x82 0xAC), 'b' (0x62), then EOF.
+  {
+    const uint8_t bytes[] = {0x61, 0xE2, 0x82, 0xAC, 0x62};
+    scm_obj_t port = make_str_input_port(bytes, 5);
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char('a'));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char(0x20AC));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char('b'));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == scm_eof);
+    port_close(port);
+  }
+
+  // Empty input: immediately EOF.
+  {
+    const uint8_t bytes[] = {};
+    scm_obj_t port = make_str_input_port(bytes, 0);
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == scm_eof);
+    port_close(port);
+  }
+
+  // 4-byte UTF-8: U+1F600 😀 (0xF0 0x9F 0x98 0x80).
+  {
+    const uint8_t bytes[] = {0xF0, 0x9F, 0x98, 0x80};
+    scm_obj_t port = make_str_input_port(bytes, 4);
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == make_char(0x1F600));
+    ASSERT_TRUE(subr_get_char(scm_nil, port) == scm_eof);
+    port_close(port);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2078,6 +2281,8 @@ int run_test(int argc, char** argv) {
   test_char_extra();
   test_string_extra();
   test_error_procedures();
+  test_port_subrs();
+  test_get_char();
 
   context::destroy();
 

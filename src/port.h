@@ -22,6 +22,7 @@ scm_obj_t port_flush_output(scm_obj_t port);
 void port_format(scm_obj_t port, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
 void port_close(scm_obj_t port);
 scm_obj_t port_open_string_output_port();
+scm_obj_t port_open_string_input_port(const char* s);
 scm_obj_t port_get_output_string(scm_obj_t port);
 scm_obj_t port_standard_input();
 scm_obj_t port_standard_output();

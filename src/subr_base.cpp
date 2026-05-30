@@ -11,6 +11,7 @@
 #include "object_heap.h"
 #include "printer.h"
 #include "subr.h"
+#include "utf8.h"
 
 #include <cerrno>
 #include <cmath>
@@ -501,23 +502,25 @@ SUBR subr_vector_to_list(scm_obj_t self, scm_obj_t a1) {
 // Strings  - R6RS 11.12
 // ============================================================================
 
-// string-length  - R6RS 11.12 (byte length - ASCII/UTF-8 byte count)
+// string-length  - R6RS 11.12 (Unicode character count)
 SUBR subr_string_length(scm_obj_t self, scm_obj_t a1) {
   if (!is_string(a1)) throw std::runtime_error("string-length: argument must be a string");
-  return make_fixnum((intptr_t)strlen((const char*)string_name(a1)));
+  return make_fixnum((intptr_t)utf8_string_length((const uint8_t*)string_name(a1)));
 }
 
-// string-ref  - R6RS 11.12 (byte index → char)
+// string-ref  - R6RS 11.12 (character index → char)
 SUBR subr_string_ref(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   if (!is_string(a1)) throw std::runtime_error("string-ref: first argument must be a string");
   if (!is_fixnum(a2)) throw std::runtime_error("string-ref: second argument must be an exact integer");
   const char* s = (const char*)string_name(a1);
   intptr_t idx = fixnum(a2);
   intptr_t len = (intptr_t)strlen(s);
-  if (idx < 0 || idx >= len) throw std::runtime_error("string-ref: index out of bounds: " + to_string(a1) + ", " + to_string(a2));
-  // Decode UTF-8 character at byte position idx
-  const uint8_t* p = (const uint8_t*)s + idx;
-  uint32_t ucs4 = *p;  // [TODO] unicode support
+  if (idx < 0) throw std::runtime_error("string-ref: index must be non-negative");
+  int offset = utf8_char_index_to_byte_offset((const uint8_t*)s, (int)idx, (int)len);
+  if (offset < 0) throw std::runtime_error("string-ref: index out of bounds: " + to_string(a1) + ", " + to_string(a2));
+  uint32_t ucs4;
+  int count = cnvt_utf8_to_ucs4((const uint8_t*)s + offset, &ucs4);
+  if (count < 0) throw std::runtime_error("string-ref: invalid UTF-8 sequence");
   return make_char(ucs4);
 }
 
@@ -602,7 +605,7 @@ SUBR subr_string_append(scm_obj_t self, int argc, scm_obj_t argv[]) {
   return make_string(buf.c_str());
 }
 
-// substring  - R6RS 11.12 (byte offsets)
+// substring  - R6RS 11.12 (character offsets)
 SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   if (!is_string(a1)) throw std::runtime_error("substring: first argument must be a string");
   if (!is_fixnum(a2)) throw std::runtime_error("substring: second argument must be an exact integer");
@@ -611,10 +614,14 @@ SUBR subr_substring(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3) {
   intptr_t len = (intptr_t)strlen(s);
   intptr_t from = fixnum(a2);
   intptr_t to = fixnum(a3);
-  if (from < 0 || from > len) throw std::runtime_error("substring: start index out of bounds");
-  if (to < 0 || to > len) throw std::runtime_error("substring: end index out of bounds");
+  int char_len = utf8_string_length((const uint8_t*)s);
+  if (from < 0 || from > char_len) throw std::runtime_error("substring: start index out of bounds");
+  if (to < 0 || to > char_len) throw std::runtime_error("substring: end index out of bounds");
   if (to < from) throw std::runtime_error("substring: end index before start index");
-  std::string buf(s + from, s + to);
+  int byte_from = (from == char_len) ? (int)len : utf8_char_index_to_byte_offset((const uint8_t*)s, (int)from, (int)len);
+  int byte_to = (to == char_len) ? (int)len : utf8_char_index_to_byte_offset((const uint8_t*)s, (int)to, (int)len);
+  if (byte_from < 0 || byte_to < 0) throw std::runtime_error("substring: start or end index out of bounds");
+  std::string buf(s + byte_from, s + byte_to);
   return make_string(buf.c_str());
 }
 
@@ -970,11 +977,44 @@ SUBR subr_string(scm_obj_t self, int argc, scm_obj_t argv[]) {
 // string->list  - R6RS 11.12
 SUBR subr_string_to_list(scm_obj_t self, scm_obj_t a1) {
   if (!is_string(a1)) throw std::runtime_error("string->list: argument must be a string");
-  const char* s = (const char*)string_name(a1);
+  const uint8_t* s = (const uint8_t*)string_name(a1);
+  // First pass: collect code points into a temporary vector so we can build
+  // the result list in reverse without a second scan.
+  std::vector<uint32_t> codepoints;
+  int i = 0;
+  int byte_len = (int)strlen((const char*)s);
+  while (i < byte_len) {
+    uint32_t ucs4;
+    int count = cnvt_utf8_to_ucs4(s + i, &ucs4);
+    if (count < 1) throw std::runtime_error("string->list: invalid UTF-8 sequence");
+    codepoints.push_back(ucs4);
+    i += count;
+  }
   scm_obj_t result = scm_nil;
-  int len = (int)strlen(s);
-  for (int i = len - 1; i >= 0; i--) result = make_cons(make_char((uint32_t)(unsigned char)s[i]), result);
+  for (int j = (int)codepoints.size() - 1; j >= 0; j--)
+    result = make_cons(make_char(codepoints[j]), result);
   return result;
+}
+
+// string->vector  - R6RS 11.12
+SUBR subr_string_to_vector(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("string->vector: argument must be a string");
+  const uint8_t* s = (const uint8_t*)string_name(a1);
+  std::vector<uint32_t> codepoints;
+  int i = 0;
+  int byte_len = (int)strlen((const char*)s);
+  while (i < byte_len) {
+    uint32_t ucs4;
+    int count = cnvt_utf8_to_ucs4(s + i, &ucs4);
+    if (count < 1) throw std::runtime_error("string->vector: invalid UTF-8 sequence");
+    codepoints.push_back(ucs4);
+    i += count;
+  }
+  int n = (int)codepoints.size();
+  scm_obj_t v = make_vector(n, scm_undef);
+  scm_obj_t* elts = vector_elts(v);
+  for (int j = 0; j < n; j++) elts[j] = make_char(codepoints[j]);
+  return v;
 }
 
 // list->string  - R6RS 11.12
@@ -985,11 +1025,28 @@ SUBR subr_list_to_string(scm_obj_t self, scm_obj_t a1) {
     scm_obj_t c = cons_car(cur);
     if (!is_char(c)) throw std::runtime_error("list->string: list must contain only characters");
     uint32_t ucs4 = char_ucs4(c);
-    if (ucs4 > 127) throw std::runtime_error("list->string: non-ASCII character not supported");
-    buf += (char)ucs4;
+    uint8_t utf8[4];
+    int count = cnvt_ucs4_to_utf8(ucs4, utf8);
+    buf.append((const char*)utf8, count);
     cur = cons_cdr(cur);
   }
   if (cur != scm_nil) throw std::runtime_error("list->string: argument must be a proper list");
+  return make_string(buf.c_str());
+}
+
+// vector->string  - R6RS 11.12
+SUBR subr_vector_to_string(scm_obj_t self, scm_obj_t a1) {
+  if (!is_vector(a1)) throw std::runtime_error("vector->string: argument must be a vector");
+  int n = vector_nsize(a1);
+  scm_obj_t* elts = vector_elts(a1);
+  std::string buf;
+  for (int i = 0; i < n; i++) {
+    if (!is_char(elts[i])) throw std::runtime_error("vector->string: vector must contain only characters");
+    uint32_t ucs4 = (uint32_t)((uintptr_t)elts[i] >> 32);
+    uint8_t utf8[4];
+    int count = cnvt_ucs4_to_utf8(ucs4, utf8);
+    buf.append((const char*)utf8, count);
+  }
   return make_string(buf.c_str());
 }
 
@@ -1336,7 +1393,9 @@ void init_subr_base() {
   reg("make-string", (void*)subr_make_string, 1, true);
   reg("string", (void*)subr_string, 0, true);
   reg("string->list", (void*)subr_string_to_list, 1, false);
+  reg("string->vector", (void*)subr_string_to_vector, 1, false);
   reg("list->string", (void*)subr_list_to_string, 1, false);
+  reg("vector->string", (void*)subr_vector_to_string, 1, false);
   reg("string-copy", (void*)subr_string_copy, 1, false);
   reg("string-ci=?", (void*)subr_string_ci_eq, 2, true);
   reg("string-ci<?", (void*)subr_string_ci_lt, 2, true);

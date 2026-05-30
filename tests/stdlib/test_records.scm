@@ -3,7 +3,7 @@
 ;; -------------------------------------
 ;; (core records)
 ;; -------------------------------------
-(test-begin "r6rs records")
+(test-begin "core records")
 
 (test-eval! (import (core records)))
 

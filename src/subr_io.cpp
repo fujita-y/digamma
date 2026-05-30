@@ -259,6 +259,12 @@ SUBR subr_open_string_output_port(scm_obj_t self) {
   return result;
 }
 
+// open-string-input-port  - R6RS 8.2.7
+SUBR subr_open_string_input_port(scm_obj_t self, scm_obj_t a1) {
+  if (!is_string(a1)) throw std::runtime_error("open-string-input-port: argument must be a string");
+  return port_open_string_input_port((const char*)string_name(a1));
+}
+
 // close-port  - R6RS 8.2.6
 SUBR subr_close_port(scm_obj_t self, scm_obj_t a1) {
   if (!is_port(a1)) throw std::runtime_error("close-port: argument must be a port");
@@ -301,6 +307,26 @@ SUBR subr_get_bytevector_n(scm_obj_t self, scm_obj_t a1, scm_obj_t a2) {
   return port_get_bytes_n(port, count);
 }
 
+// get-char  - R6RS 8.2.9
+SUBR subr_get_char(scm_obj_t self, scm_obj_t a1) {
+  if (!is_port(a1)) throw std::runtime_error("get-char: argument must be a port");
+  if (!is_input_port(a1)) throw std::runtime_error("get-char: argument must be an input port");
+  std::istream* is = port_get_istream(a1);
+  int first = is->get();
+  if (first == std::istream::traits_type::eof()) return scm_eof;
+  uint8_t buf[4];
+  buf[0] = (uint8_t)first;
+  int n = utf8_byte_count(buf[0]);  // 1..4
+  for (int i = 1; i < n; i++) {
+    int b = is->get();
+    if (b == std::istream::traits_type::eof()) throw std::runtime_error("get-char: unexpected EOF inside UTF-8 sequence");
+    buf[i] = (uint8_t)b;
+  }
+  uint32_t ucs4 = 0;
+  if (cnvt_utf8_to_ucs4(buf, &ucs4) < 1) throw std::runtime_error("get-char: invalid UTF-8 sequence");
+  return make_char(ucs4);
+}
+
 void init_subr_io() {
   auto reg = [](const char* name, void* func, int req, bool opt) {
     context::environment_variable_set(make_symbol(name), make_closure(func, req, opt ? 1 : 0, 0, nullptr, 1));
@@ -320,10 +346,12 @@ void init_subr_io() {
   reg("open-file-output-port", (void*)subr_open_file_output_port, 1, false);
   reg("file-exists?", (void*)subr_file_exists_p, 1, false);
   reg("open-string-output-port", (void*)subr_open_string_output_port, 0, false);
+  reg("open-string-input-port", (void*)subr_open_string_input_port, 1, false);
   reg("close-port", (void*)subr_close_port, 1, false);
   reg("eof-object", (void*)subr_eof_object, 0, false);
   reg("eof-object?", (void*)subr_eof_object_p, 1, false);
   reg("read", (void*)subr_read, 0, true);
+  reg("get-char", (void*)subr_get_char, 1, false);
   reg("get-bytevector-n", (void*)subr_get_bytevector_n, 2, false);
   reg("current-input-port", (void*)subr_current_input_port, 0, true);
   reg("current-output-port", (void*)subr_current_output_port, 0, true);

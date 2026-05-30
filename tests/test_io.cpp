@@ -628,6 +628,23 @@ void test_reader() {
     object_heap_t* heap = new object_heap_t();
     heap->init(4 * 1024 * 1024, 128 * 1024);
     context::init();
+    std::string invalid = std::string("\"") + char(0xC0) + "\"";
+    std::stringstream ss(invalid);
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (!err) fatal("read should fail for invalid UTF-8 string");
+    assert(reader.get_error_message().find("invalid UTF-8") != std::string::npos);
+    std::cout << "Invalid UTF-8 string rejected passed" << std::endl;
+    context::destroy();
+    heap->destroy();
+    delete heap;
+  }
+
+  {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    context::init();
     std::stringstream ss("(1 2 3)");
     reader_t reader(ss);
     bool err = false;
@@ -1562,6 +1579,189 @@ int run_test(int argc, char** argv) {
 
 }  // namespace test_r7rs
 
+namespace test_string_input_port {
+
+// Forward-declare the subr so we can call get-char through the C++ API.
+SUBR subr_get_char(scm_obj_t self, scm_obj_t a1);
+
+#define SIP_CHECK(cond, msg)                                                 \
+  do {                                                                       \
+    if (!(cond)) {                                                           \
+      printf("\033[31mFAIL: %s\033[0m\n", msg);                              \
+      some_test_failed = true;                                               \
+    } else {                                                                 \
+      printf("\033[32mPASS: %s\033[0m\n", msg);                              \
+    }                                                                        \
+  } while (0)
+
+static void test_is_a_port() {
+  scm_obj_t p = port_open_string_input_port("hello");
+  SIP_CHECK(is_port(p),        "open-string-input-port returns a port");
+  SIP_CHECK(is_input_port(p),  "open-string-input-port is an input port");
+  SIP_CHECK(!is_output_port(p),"open-string-input-port is not an output port");
+  port_close(p);
+}
+
+static void test_ascii_get_char() {
+  scm_obj_t p = port_open_string_input_port("abc");
+  scm_obj_t c1 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c1) && (uint32_t)(c1 >> 32) == 'a',
+            "get-char reads 'a' from string input port");
+  scm_obj_t c2 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c2) && (uint32_t)(c2 >> 32) == 'b',
+            "get-char reads 'b' from string input port");
+  scm_obj_t c3 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c3) && (uint32_t)(c3 >> 32) == 'c',
+            "get-char reads 'c' from string input port");
+  port_close(p);
+}
+
+static void test_eof_on_empty() {
+  scm_obj_t p = port_open_string_input_port("");
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof,
+            "get-char on empty string returns eof-object");
+  port_close(p);
+}
+
+static void test_eof_after_content() {
+  scm_obj_t p = port_open_string_input_port("x");
+  subr_get_char(scm_nil, p);  // consume 'x'
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof,
+            "get-char after content returns eof-object");
+  port_close(p);
+}
+
+static void test_utf8_two_byte() {
+  // U+00E9 LATIN SMALL LETTER E WITH ACUTE: 0xC3 0xA9
+  scm_obj_t p = port_open_string_input_port("\xC3\xA9");
+  scm_obj_t ch = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(ch) && (uint32_t)(ch >> 32) == 0x00E9,
+            "get-char reads 2-byte UTF-8 codepoint U+00E9");
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof,
+            "EOF after 2-byte UTF-8 char");
+  port_close(p);
+}
+
+static void test_utf8_three_byte() {
+  // U+03B1 GREEK SMALL LETTER ALPHA: 0xCE 0xB1
+  scm_obj_t p = port_open_string_input_port("\xCE\xB1");
+  scm_obj_t ch = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(ch) && (uint32_t)(ch >> 32) == 0x03B1,
+            "get-char reads 3-byte UTF-8 codepoint U+03B1 (alpha)");
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof,
+            "EOF after 3-byte UTF-8 char");
+  port_close(p);
+}
+
+static void test_utf8_four_byte() {
+  // U+1F600 GRINNING FACE: 0xF0 0x9F 0x98 0x80
+  scm_obj_t p = port_open_string_input_port("\xF0\x9F\x98\x80");
+  scm_obj_t ch = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(ch) && (uint32_t)(ch >> 32) == 0x1F600,
+            "get-char reads 4-byte UTF-8 codepoint U+1F600 (grinning face)");
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof,
+            "EOF after 4-byte UTF-8 char");
+  port_close(p);
+}
+
+static void test_mixed_ascii_and_utf8() {
+  // "A" + U+03B1 + "Z"
+  scm_obj_t p = port_open_string_input_port("A\xCE\xB1Z");
+  scm_obj_t c1 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c1) && (uint32_t)(c1 >> 32) == 'A',  "mixed: first char 'A'");
+  scm_obj_t c2 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c2) && (uint32_t)(c2 >> 32) == 0x03B1, "mixed: second char U+03B1");
+  scm_obj_t c3 = subr_get_char(scm_nil, p);
+  SIP_CHECK(is_char(c3) && (uint32_t)(c3 >> 32) == 'Z',  "mixed: third char 'Z'");
+  SIP_CHECK(subr_get_char(scm_nil, p) == scm_eof, "mixed: EOF after last char");
+  port_close(p);
+}
+
+static void test_reader_integration() {
+  scm_obj_t p = port_open_string_input_port("(+ 1 2)");
+  std::istream* is = port_get_istream(p);
+  SIP_CHECK(is != nullptr, "string input port exposes a valid istream");
+
+  reader_t reader(*is);
+  bool err = false;
+  scm_obj_t obj = reader.read(err);
+
+  SIP_CHECK(!err, "reader_t reads from string input port without error");
+  SIP_CHECK(is_cons(obj), "reader result is a cons cell");
+  scm_obj_t head = ((scm_cons_rec_t*)obj)->car;
+  SIP_CHECK(is_symbol(head) && std::string((char*)symbol_name(head)) == "+",
+            "reader parsed symbol '+' as car");
+  port_close(p);
+}
+
+static void test_multiple_forms() {
+  scm_obj_t p = port_open_string_input_port("42 \"hello\" #t");
+  std::istream* is = port_get_istream(p);
+  reader_t reader(*is);
+  bool err = false;
+
+  scm_obj_t n = reader.read(err);
+  SIP_CHECK(!err && is_fixnum(n) && fixnum(n) == 42,
+            "reads fixnum 42 from string input port");
+
+  scm_obj_t s = reader.read(err);
+  SIP_CHECK(!err && is_string(s) && std::string((char*)string_name(s)) == "hello",
+            "reads string \"hello\" from string input port");
+
+  scm_obj_t b = reader.read(err);
+  SIP_CHECK(!err && b == scm_true,
+            "reads #t from string input port");
+
+  scm_obj_t eof_obj = reader.read(err);
+  SIP_CHECK(!err && eof_obj == scm_eof,
+            "reader returns EOF after all forms consumed");
+  port_close(p);
+}
+
+static void test_independent_ports() {
+  scm_obj_t p1 = port_open_string_input_port("ABC");
+  scm_obj_t p2 = port_open_string_input_port("xyz");
+
+  scm_obj_t a = subr_get_char(scm_nil, p1);
+  scm_obj_t x = subr_get_char(scm_nil, p2);
+  SIP_CHECK(is_char(a) && (uint32_t)(a >> 32) == 'A', "independent ports: p1 first char 'A'");
+  SIP_CHECK(is_char(x) && (uint32_t)(x >> 32) == 'x', "independent ports: p2 first char 'x'");
+
+  scm_obj_t b_ = subr_get_char(scm_nil, p1);
+  scm_obj_t y  = subr_get_char(scm_nil, p2);
+  SIP_CHECK(is_char(b_) && (uint32_t)(b_ >> 32) == 'B', "independent ports: p1 second char 'B'");
+  SIP_CHECK(is_char(y)  && (uint32_t)(y  >> 32) == 'y', "independent ports: p2 second char 'y'");
+
+  port_close(p1);
+  port_close(p2);
+}
+
+int run_test(int argc, char** argv) {
+  object_heap_t* heap = new object_heap_t();
+  heap->init(1024 * 1024 * 2, 1024 * 1024);
+  context::init();
+
+  test_is_a_port();
+  test_ascii_get_char();
+  test_eof_on_empty();
+  test_eof_after_content();
+  test_utf8_two_byte();
+  test_utf8_three_byte();
+  test_utf8_four_byte();
+  test_mixed_ascii_and_utf8();
+  test_reader_integration();
+  test_multiple_forms();
+  test_independent_ports();
+
+  context::destroy();
+  heap->destroy();
+  delete heap;
+
+  return some_test_failed ? 1 : 0;
+}
+
+}  // namespace test_string_input_port
+
 int main(int argc, char** argv) {
   test_port::run_test(argc, argv);
   test_async_port::run_test(argc, argv);
@@ -1570,5 +1770,6 @@ int main(int argc, char** argv) {
   test_printer::run_test(argc, argv);
   test_radix::run_test(argc, argv);
   test_r7rs::run_test(argc, argv);
+  test_string_input_port::run_test(argc, argv);
   return some_test_failed ? 1 : 0;
 }
