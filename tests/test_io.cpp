@@ -628,6 +628,23 @@ void test_reader() {
     object_heap_t* heap = new object_heap_t();
     heap->init(4 * 1024 * 1024, 128 * 1024);
     context::init();
+    std::string invalid = std::string("\"") + char(0xC0) + "\"";
+    std::stringstream ss(invalid);
+    reader_t reader(ss);
+    bool err = false;
+    scm_obj_t obj = reader.read(err);
+    if (!err) fatal("read should fail for invalid UTF-8 string");
+    assert(reader.get_error_message().find("invalid UTF-8") != std::string::npos);
+    std::cout << "Invalid UTF-8 string rejected passed" << std::endl;
+    context::destroy();
+    heap->destroy();
+    delete heap;
+  }
+
+  {
+    object_heap_t* heap = new object_heap_t();
+    heap->init(4 * 1024 * 1024, 128 * 1024);
+    context::init();
     std::stringstream ss("(1 2 3)");
     reader_t reader(ss);
     bool err = false;

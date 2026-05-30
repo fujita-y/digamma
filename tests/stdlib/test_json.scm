@@ -35,6 +35,22 @@
 (test-equal "control chars string to json" "\"line1\\nline2\\tindent\""
   (generate-json-string "line1\nline2\tindent"))
 
+;; UTF-8 Strings
+(test-equal "UTF-8 ASCII to json" "\"hello\""
+  (generate-json-string "hello"))
+
+(test-equal "UTF-8 latin extended to json" "\"café\""
+  (generate-json-string "café"))
+
+(test-equal "UTF-8 greek letters to json" "\"α β γ δ\""
+  (generate-json-string "α β γ δ"))
+
+(test-equal "UTF-8 emoji to json" "\"😀😁😂🤣\""
+  (generate-json-string "😀😁😂🤣"))
+
+(test-equal "UTF-8 mixed scripts to json" "\"Hello Привет こんにちは\""
+  (generate-json-string "Hello Привет こんにちは"))
+
 ;; 4. Symbols
 (test-equal "symbol to json string" "\"sym\""
   (generate-json-string 'sym))
@@ -96,6 +112,28 @@
 
 (test-equal "parse unicode escape string" "hello \n world"
   (parse-json-string "\"hello \\u000a world\""))
+
+;; UTF-8 Parsing Tests
+(test-equal "parse UTF-8 latin extended" "café"
+  (parse-json-string "\"café\""))
+
+(test-equal "parse UTF-8 greek letters" "α β γ"
+  (parse-json-string "\"α β γ\""))
+
+(test-equal "parse UTF-8 emoji" "😀😁😂"
+  (parse-json-string "\"😀😁😂\""))
+
+(test-equal "parse UTF-8 mixed scripts" "Hello Привет こんにちは"
+  (parse-json-string "\"Hello Привет こんにちは\""))
+
+(test-equal "parse UTF-8 in object key" (("café" . 42))
+  (parse-json-string "{ \"café\": 42 }"))
+
+(test-equal "parse UTF-8 in object value" (("greeting" . "Здравствуй"))
+  (parse-json-string "{ \"greeting\": \"Здравствуй\" }"))
+
+(test-equal "parse UTF-8 in array" #("hello" "café" "😀")
+  (parse-json-string "[\"hello\", \"café\", \"😀\"]"))
 
 (test-equal "parse empty array" #()
   (parse-json-string "[]"))

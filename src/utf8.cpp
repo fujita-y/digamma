@@ -12,22 +12,15 @@ int ascii_cstring_pred(const char* s) {
   return 1;
 }
 
-int utf8_sizeof_ucs4(uint32_t ucs4) {
-  if (ucs4 < 0x80) return 1;
-  if (ucs4 < 0x800) return 2;
-  if (ucs4 < 0x10000) return 3;
-  if (ucs4 < 0x200000) return 4;
-  fatal("utf8_sizeof_ucs4() out of range");
-}
-
-int utf8_byte_count(const uint8_t datum) {
-  if (datum < 0x80) return 1;
-  if (datum < 0xc2) return 1;  // cnvt_utf8_to_ucs4() detect this
-  if (datum < 0xe0) return 2;
-  if (datum < 0xf0) return 3;
-  if (datum < 0xf8) return 4;
-  if (datum < 0xfc) return 5;
-  return 6;
+bool is_utf8_valid(const uint8_t* utf8) {
+  if (!utf8) return false;
+  uint32_t ucs4;
+  while (*utf8) {
+    int count = cnvt_utf8_to_ucs4(utf8, &ucs4);
+    if (count < 0) return false;
+    utf8 += count;
+  }
+  return true;
 }
 
 int utf8_string_length(const uint8_t* utf8) {

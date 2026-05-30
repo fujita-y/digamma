@@ -789,6 +789,63 @@ void test_substring() {
   scm_obj_t u = make_string("a€b");
   scm_obj_t r5 = subr_substring(scm_nil, u, make_fixnum(1), make_fixnum(2));
   ASSERT_TRUE(strcmp((const char*)string_name(r5), "€") == 0);
+
+  // UTF-8 Greek letters: "α β γ" (3 characters)
+  scm_obj_t greek = make_string("α β γ");
+  // (substring "α β γ" 0 1) → "α"
+  scm_obj_t r6 = subr_substring(scm_nil, greek, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r6), "α") == 0);
+  // (substring "α β γ" 1 2) → " "
+  scm_obj_t r7 = subr_substring(scm_nil, greek, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r7), " ") == 0);
+  // (substring "α β γ" 2 3) → "β"
+  scm_obj_t r8 = subr_substring(scm_nil, greek, make_fixnum(2), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r8), "β") == 0);
+  // (substring "α β γ" 0 3) → "α β"
+  scm_obj_t r9 = subr_substring(scm_nil, greek, make_fixnum(0), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r9), "α β") == 0);
+
+  // UTF-8 emoji: "😀😁😂" (3 emoji characters)
+  scm_obj_t emoji = make_string("😀😁😂");
+  // (substring "😀😁😂" 0 1) → "😀"
+  scm_obj_t r10 = subr_substring(scm_nil, emoji, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r10), "😀") == 0);
+  // (substring "😀😁😂" 1 2) → "😁"
+  scm_obj_t r11 = subr_substring(scm_nil, emoji, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r11), "😁") == 0);
+  // (substring "😀😁😂" 0 2) → "😀😁"
+  scm_obj_t r12 = subr_substring(scm_nil, emoji, make_fixnum(0), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r12), "😀😁") == 0);
+
+  // UTF-8 mixed scripts: "Hello Привет" (Russian)
+  scm_obj_t mixed = make_string("Hello Привет");
+  // (substring "Hello Привет" 0 5) → "Hello"
+  scm_obj_t r13 = subr_substring(scm_nil, mixed, make_fixnum(0), make_fixnum(5));
+  ASSERT_TRUE(strcmp((const char*)string_name(r13), "Hello") == 0);
+  // (substring "Hello Привет" 6 9) → "При"
+  scm_obj_t r14 = subr_substring(scm_nil, mixed, make_fixnum(6), make_fixnum(9));
+  ASSERT_TRUE(strcmp((const char*)string_name(r14), "При") == 0);
+
+  // UTF-8 Japanese: "こんにちは" (5 characters)
+  scm_obj_t japanese = make_string("こんにちは");
+  // (substring "こんにちは" 0 1) → "こ"
+  scm_obj_t r15 = subr_substring(scm_nil, japanese, make_fixnum(0), make_fixnum(1));
+  ASSERT_TRUE(strcmp((const char*)string_name(r15), "こ") == 0);
+  // (substring "こんにちは" 2 4) → "にち"
+  scm_obj_t r16 = subr_substring(scm_nil, japanese, make_fixnum(2), make_fixnum(4));
+  ASSERT_TRUE(strcmp((const char*)string_name(r16), "にち") == 0);
+  // (substring "こんにちは" 0 5) → whole string
+  scm_obj_t r17 = subr_substring(scm_nil, japanese, make_fixnum(0), make_fixnum(5));
+  ASSERT_TRUE(strcmp((const char*)string_name(r17), "こんにちは") == 0);
+
+  // UTF-8 café (Latin): "café" (4 characters: c, a, f, é)
+  scm_obj_t cafe = make_string("café");
+  // (substring "café" 0 3) → "caf"
+  scm_obj_t r18 = subr_substring(scm_nil, cafe, make_fixnum(0), make_fixnum(3));
+  ASSERT_TRUE(strcmp((const char*)string_name(r18), "caf") == 0);
+  // (substring "café" 3 4) → "é"
+  scm_obj_t r19 = subr_substring(scm_nil, cafe, make_fixnum(3), make_fixnum(4));
+  ASSERT_TRUE(strcmp((const char*)string_name(r19), "é") == 0);
 }
 
 // ---------------------------------------------------------------------------

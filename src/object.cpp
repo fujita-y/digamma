@@ -7,6 +7,7 @@
 #include "hash.h"
 #include "object_heap.h"
 #include "printer.h"
+#include "utf8.h"
 
 #include <sstream>
 
@@ -126,6 +127,7 @@ uint8_t* symbol_name(scm_obj_t x) {
 }
 
 scm_obj_t make_string(const char* name) {
+  assert(name);
   object_heap_t& heap = *object_heap_t::current();
   int n = strlen(name) + 1;
   scm_string_rec_t* rec;
