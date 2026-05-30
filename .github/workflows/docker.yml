@@ -65,8 +65,7 @@ jobs:
           build-args: |
             LLVM_VERSION=${{ matrix.llvm }}
           platforms: ${{ matrix.platform }}
-          cache-from: type=gha,scope=${{ matrix.arch }}-llvm${{ matrix.llvm }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}-llvm${{ matrix.llvm }}
+          no-cache: true
 
       - name: Clean up old Docker images
         if: always()
