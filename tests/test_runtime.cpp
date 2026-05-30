@@ -650,6 +650,7 @@ void test_string_length() {
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("")) == make_fixnum(0));
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("hello")) == make_fixnum(5));
   ASSERT_TRUE(subr_string_length(scm_nil, make_string("abc")) == make_fixnum(3));
+  ASSERT_TRUE(subr_string_length(scm_nil, make_string("a€b")) == make_fixnum(3));
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +664,10 @@ void test_string_ref() {
   ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(4)) == make_char('o'));
   // Each ASCII char is its own byte, so index == byte offset
   ASSERT_TRUE(subr_string_ref(scm_nil, s, make_fixnum(1)) == make_char('e'));
+  scm_obj_t u = make_string("a€b");
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(0)) == make_char('a'));
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(1)) == make_char(0x20ac));
+  ASSERT_TRUE(subr_string_ref(scm_nil, u, make_fixnum(2)) == make_char('b'));
 }
 
 void test_string_compare() {
@@ -717,6 +722,11 @@ void test_string_extra() {
     ASSERT_TRUE(subr_list_ref(scm_nil, l, make_fixnum(0)) == make_char('a'));
     scm_obj_t s2 = subr_list_to_string(scm_nil, l);
     ASSERT_TRUE(strcmp((const char*)string_name(s2), "abc") == 0);
+  }
+  {
+    scm_obj_t l = make_cons(make_char('a'), make_cons(make_char(0x20ac), make_cons(make_char('b'), scm_nil)));
+    scm_obj_t s = subr_list_to_string(scm_nil, l);
+    ASSERT_TRUE(strcmp((const char*)string_name(s), "a€b") == 0);
   }
   {
     scm_obj_t s1 = make_string("abc");
@@ -776,6 +786,9 @@ void test_substring() {
   // (substring s 0 11) → whole string
   scm_obj_t r4 = subr_substring(scm_nil, s, make_fixnum(0), make_fixnum(11));
   ASSERT_TRUE(strcmp((const char*)string_name(r4), "hello world") == 0);
+  scm_obj_t u = make_string("a€b");
+  scm_obj_t r5 = subr_substring(scm_nil, u, make_fixnum(1), make_fixnum(2));
+  ASSERT_TRUE(strcmp((const char*)string_name(r5), "€") == 0);
 }
 
 // ---------------------------------------------------------------------------

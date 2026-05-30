@@ -12,6 +12,24 @@ int ascii_cstring_pred(const char* s) {
   return 1;
 }
 
+int utf8_sizeof_ucs4(uint32_t ucs4) {
+  if (ucs4 < 0x80) return 1;
+  if (ucs4 < 0x800) return 2;
+  if (ucs4 < 0x10000) return 3;
+  if (ucs4 < 0x200000) return 4;
+  fatal("utf8_sizeof_ucs4() out of range");
+}
+
+int utf8_byte_count(const uint8_t datum) {
+  if (datum < 0x80) return 1;
+  if (datum < 0xc2) return 1;  // cnvt_utf8_to_ucs4() detect this
+  if (datum < 0xe0) return 2;
+  if (datum < 0xf0) return 3;
+  if (datum < 0xf8) return 4;
+  if (datum < 0xfc) return 5;
+  return 6;
+}
+
 int utf8_string_length(const uint8_t* utf8) {
   int end = strlen((const char*)utf8);
   int c = 0;
@@ -19,6 +37,13 @@ int utf8_string_length(const uint8_t* utf8) {
     n += utf8_byte_count(utf8[n]);
   }
   return c;
+}
+
+int utf8_char_index_to_byte_offset(const uint8_t datum[], int index, int limit) {
+  int n = 0;
+  for (int c = 0; c < index && n < limit; c++) n += utf8_byte_count(datum[n]);
+  if ((index < 0) || (n >= limit)) return -1;
+  return n;
 }
 
 int cnvt_ucs4_to_utf8(uint32_t ucs4, uint8_t utf8[4]) {
@@ -84,29 +109,4 @@ int cnvt_utf8_to_ucs4(const uint8_t* utf8, uint32_t* ucs4) {
     return 4;
   }
   return -1;
-}
-
-int utf8_sizeof_ucs4(uint32_t ucs4) {
-  if (ucs4 < 0x80) return 1;
-  if (ucs4 < 0x800) return 2;
-  if (ucs4 < 0x10000) return 3;
-  if (ucs4 < 0x200000) return 4;
-  fatal("utf8_sizeof_ucs4() out of range");
-}
-
-int utf8_byte_count(const uint8_t datum) {
-  if (datum < 0x80) return 1;
-  if (datum < 0xc2) return 1;  // cnvt_utf8_to_ucs4() detect this
-  if (datum < 0xe0) return 2;
-  if (datum < 0xf0) return 3;
-  if (datum < 0xf8) return 4;
-  if (datum < 0xfc) return 5;
-  return 6;
-}
-
-int utf8_char_index_to_byte_offset(const uint8_t datum[], int index, int limit) {
-  int n = 0;
-  for (int c = 0; c < index && n < limit; c++) n += utf8_byte_count(datum[n]);
-  if ((index < 0) || (n >= limit)) return -1;
-  return n;
 }
