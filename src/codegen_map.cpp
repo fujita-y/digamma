@@ -44,6 +44,7 @@ void codegen_t::init_opcode_map() {
   unary_code_map[(void*)subr_pair_p] = &codegen_t::emit_pair_p_subr;
 
   binary_code_map[(void*)subr_eq_p] = &codegen_t::emit_eq_p_subr;
+  binary_code_map[(void*)subr_char_eq] = &codegen_t::emit_eq_p_subr;
   binary_code_map[(void*)subr_num_add] = &codegen_t::emit_num_add_subr;
   binary_code_map[(void*)subr_num_sub] = &codegen_t::emit_num_sub_subr;
   binary_code_map[(void*)subr_num_mul] = &codegen_t::emit_num_mul_subr;
