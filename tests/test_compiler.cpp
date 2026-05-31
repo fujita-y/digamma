@@ -65,6 +65,7 @@ SUBR subr_hashtable_entries(scm_obj_t self, scm_obj_t a1);
 SUBR subr_make_eq_hashtable(scm_obj_t self, int argc, scm_obj_t argv[]);
 SUBR subr_hashtable_set(scm_obj_t self, scm_obj_t a1, scm_obj_t a2, scm_obj_t a3);
 SUBR subr_codegen_and_run(scm_obj_t self, scm_obj_t coreform);
+SUBR subr_char_eq(scm_obj_t self, int argc, scm_obj_t argv[]);
 
 static scm_obj_t codegen_and_run(scm_obj_t inst_list) {
   scoped_gc_protect protect(inst_list);
@@ -965,6 +966,54 @@ int run_test(int argc, char** argv) {
       codegen_and_run(code);
     } catch (const std::runtime_error& e) {
       if (std::string(e.what()).find("car: argument must be a pair") != std::string::npos) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  run_test("InlinedCharEqTrue", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("char=?"), make_closure((void*)subr_char_eq, 2, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 #\\a) "
+        "(const r2 #\\a) "
+        "(global-ref r3 char=?) "
+        "(mov r0 r1) "
+        "(mov r1 r2) "
+        "(call r3 2) "
+        "(ret))");
+    scm_obj_t result = (scm_obj_t)codegen_and_run(code);
+    return result == scm_true;
+  });
+
+  run_test("InlinedCharEqFalse", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("char=?"), make_closure((void*)subr_char_eq, 2, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 #\\a) "
+        "(const r2 #\\b) "
+        "(global-ref r3 char=?) "
+        "(mov r0 r1) "
+        "(mov r1 r2) "
+        "(call r3 2) "
+        "(ret))");
+    scm_obj_t result = (scm_obj_t)codegen_and_run(code);
+    return result == scm_false;
+  });
+
+  run_test("InlinedCharEqError", [](CodegenTest& env) -> bool {
+    c_global_set(make_symbol("char=?"), make_closure((void*)subr_char_eq, 2, 0, 0, nullptr, 1));
+    scm_obj_t code = env.read_code(
+        "((const r1 #\\a) "
+        "(const r2 123) "
+        "(global-ref r3 char=?) "
+        "(mov r0 r1) "
+        "(mov r1 r2) "
+        "(call r3 2) "
+        "(ret))");
+    try {
+      codegen_and_run(code);
+    } catch (const std::runtime_error& e) {
+      if (std::string(e.what()).find("char=?: arguments must be characters") != std::string::npos) {
         return true;
       }
     }

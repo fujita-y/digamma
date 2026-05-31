@@ -234,6 +234,7 @@ class codegen_t {
   void emit_pair_p_subr(bool is_tail);
   void emit_tc6_predicate(int tc6_num, bool is_tail);
   void emit_eq_p_subr(bool is_tail);
+  void emit_char_eq_subr(bool is_tail);
   void emit_not_subr(bool is_tail);
   void emit_car_subr(bool is_tail);
   void emit_cdr_subr(bool is_tail);

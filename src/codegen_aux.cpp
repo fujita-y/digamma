@@ -36,6 +36,7 @@ bool is_never_return_aux_helper(const char* name) {
   if (starts_with(name, "c_error_vector_set")) return true;
   if (starts_with(name, "c_error_tuple_ref")) return true;
   if (starts_with(name, "c_error_tuple_set")) return true;
+  if (starts_with(name, "c_error_char_eq")) return true;
   return false;
 }
 
@@ -195,6 +196,10 @@ extern "C" void c_error_tuple_set(scm_obj_t tup, scm_obj_t idx, scm_obj_t val) {
 
 extern "C" void c_error_closure_bridge(int64_t argc) {
   throw std::runtime_error("error: closure bridge: too many fixed arguments: " + std::to_string(argc));
+}
+
+extern "C" void c_error_char_eq(scm_obj_t arg1, scm_obj_t arg2) {
+  throw std::runtime_error("error: char=?: arguments must be characters: " + to_string(arg1) + " " + to_string(arg2));
 }
 
 extern "C" scm_obj_t c_append2(scm_obj_t arg1, scm_obj_t arg2) {

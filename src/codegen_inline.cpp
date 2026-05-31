@@ -156,6 +156,52 @@ void codegen_t::emit_eq_p_subr(bool is_tail) {
   }
 }
 
+void codegen_t::emit_char_eq_subr(bool is_tail) {
+  clear_reg_cache();
+  llvm::Value* arg1 = get_reg(0);
+  llvm::Value* arg2 = get_reg(1);
+
+  llvm::Value* mask_val = createInt64Constant(CT, 0xf7);
+  llvm::Value* masked_arg1 = BL.CreateAnd(arg1, mask_val, "masked_arg1");
+  llvm::Value* char_tag_val = createInt64Constant(CT, 0x16);
+  llvm::Value* is_char1 = BL.CreateICmpEQ(masked_arg1, char_tag_val, "is_char1");
+
+  llvm::Value* masked_arg2 = BL.CreateAnd(arg2, mask_val, "masked_arg2");
+  llvm::Value* is_char2 = BL.CreateICmpEQ(masked_arg2, char_tag_val, "is_char2");
+
+  llvm::Value* both_char = BL.CreateAnd(is_char1, is_char2, "both_char");
+
+  llvm::Function* f = BL.GetInsertBlock()->getParent();
+  llvm::BasicBlock* compare_bb = llvm::BasicBlock::Create(CT, "compare_bb", f);
+  llvm::BasicBlock* err_bb = llvm::BasicBlock::Create(CT, "err_bb", f);
+  llvm::BasicBlock* cont_bb = llvm::BasicBlock::Create(CT, "cont_bb", f);
+
+  llvm::MDBuilder mdb(CT);
+  llvm::MDNode* branch_weights = mdb.createBranchWeights(2000, 1);
+  BL.CreateCondBr(both_char, compare_bb, err_bb, branch_weights);
+
+  // --- compare path ---
+  BL.SetInsertPoint(compare_bb);
+  llvm::Value* is_pred_cmp = BL.CreateICmpEQ(arg1, arg2, "is_pred_cmp");
+  llvm::Value* compare_res = emit_boolean_select(is_pred_cmp);
+  BL.CreateBr(cont_bb);
+
+  // --- error path ---
+  BL.SetInsertPoint(err_bb);
+  llvm::FunctionType* c_error_char_eq_ft = llvm::FunctionType::get(llvm::Type::getVoidTy(CT), {getInt64Type(), getInt64Type()}, false);
+  llvm::Function* c_error_char_eq_func = get_or_create_external_function("c_error_char_eq", c_error_char_eq_ft, (void*)&c_error_char_eq);
+  BL.CreateCall(c_error_char_eq_ft, c_error_char_eq_func, {arg1, arg2});
+  BL.CreateUnreachable();
+
+  // --- merge path ---
+  BL.SetInsertPoint(cont_bb);
+  if (is_tail) {
+    BL.CreateRet(compare_res);
+  } else {
+    set_reg(0, compare_res);
+  }
+}
+
 void codegen_t::emit_tc6_predicate(int tc6_num, bool is_tail) {
   clear_reg_cache();
   llvm::Value* arg = get_reg(0);
