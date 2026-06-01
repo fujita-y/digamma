@@ -301,20 +301,20 @@ int run_test(int argc, char** argv) {
 
     // Run test case
     scm_obj_t test_case = env.read_code(R"(
-      ((make-closure r0 C1 () 1 #f) 
-       (mov r2 r0) 
-       (const r3 (1 2 3)) 
-       (global-ref r4 map) 
-       (mov r1 r3) 
-       (call r4 2) 
-       (ret) 
-       (label C1) 
-       (mov r2 r0) 
-       (const r3 5) 
-       (mov r4 r2) 
-       (global-ref r5 -) 
-       (mov r0 r3) 
-       (mov r1 r4) 
+      ((make-closure r0 C1 () 1 #f)
+       (mov r2 r0)
+       (const r3 (1 2 3))
+       (global-ref r4 map)
+       (mov r1 r3)
+       (call r4 2)
+       (ret)
+       (label C1)
+       (mov r2 r0)
+       (const r3 5)
+       (mov r4 r2)
+       (global-ref r5 -)
+       (mov r0 r3)
+       (mov r1 r4)
        (tail-call r5 2))
     )");
     intptr_t result = (intptr_t)codegen_and_run(test_case);
@@ -359,6 +359,43 @@ int run_test(int argc, char** argv) {
     return true;
   });
 
+  run_test("JITRootCaptureRegression", [](CodegenTest& env) -> bool {
+    object_heap_t* heap = object_heap_t::current();
+    register_core_primitives();
+    uint64_t old_trip_bytes = heap->m_collect_trip_bytes;
+
+    scm_obj_t make_closure_code = env.read_code(R"(
+      ((const r3 #f)
+       (make-closure r0 C1 (r3) 0 #f)
+       (mov r1 r0)
+       (const r3 #f)
+       (make-closure r0 C1 (r3) 0 #f)
+       (safepoint)
+       (mov r0 r1)
+       (call r0 0)
+       (ret)
+       (label C1)
+       (const r0 0)
+       (ret))
+    )");
+    intptr_t result = 0;
+    try {
+      compiled_code_t func = codegen_t::current()->compile(make_closure_code);
+      heap->m_collect_trip_bytes = 1;
+      result = func.release_and_run();
+      heap->m_collect_trip_bytes = old_trip_bytes;
+      heap->collect();
+    } catch (const std::bad_alloc& e) {
+      heap->m_collect_trip_bytes = old_trip_bytes;
+      throw;
+    }
+    if (result != make_fixnum(0)) {
+      printf("JITRootCaptureRegression failed: expected 0, got %ld\n", fixnum((scm_obj_t)result));
+      return false;
+    }
+    return true;
+  });
+
   run_test("NQueensTest", [](CodegenTest& env) -> bool {
     register_core_primitives();
 
@@ -367,6 +404,7 @@ int run_test(int argc, char** argv) {
     codegen_and_run(set_trace);
 
     // Define nqueens and its helper functions
+    printf("NQueensTest: reading nqueens code\n"); fflush(stdout);
     scm_obj_t nqueens_code = env.read_code(R"(
       ((make-closure r0 C1 () 1 #f) (global-set! nqueens r0) (ret)
        (label C1) (mov r3 r0) (const r0 *undefined*) (mov r4 r0) (make-cell r4) (const r0 *undefined*) (mov r5 r0) (make-cell r5) (const r0 *undefined*) (mov r6 r0) (make-cell r6) (make-closure r0 C2 () 1 #f) (reg-cell-set! r4 r0) (make-closure r0 C4 (r6 r5) 3 #f) (reg-cell-set! r5 r0) (make-closure r0 C5 (r6) 3 #f) (reg-cell-set! r6 r0) (mov r8 r3) (reg-cell-ref r9 r4) (mov r0 r8) (call r9 1) (mov r7 r0) (const r8 ()) (const r9 ()) (reg-cell-ref r10 r5) (mov r1 r8) (mov r2 r9) (tail-call r10 3)
@@ -375,18 +413,36 @@ int run_test(int argc, char** argv) {
        (label C2) (mov r1 r0) (const r0 #f) (mov r2 r0) (closure-self r2) (make-closure r0 C3 (r2) 2 #f) (mov r2 r0) (mov r3 r1) (const r0 ()) (mov r4 r0) (mov r5 r2) (mov r0 r3) (mov r1 r4) (tail-call r5 2)
        (label C3) (mov r3 r1) (mov r2 r0) (mov r4 r0) (const r5 0) (global-ref r6 =) (mov r1 r5) (call r6 2) (if L1 L2) (label L1) (mov r0 r3) (ret) (label L2) (mov r5 r2) (const r6 1) (global-ref r7 -) (mov r0 r5) (mov r1 r6) (call r7 2) (mov r4 r0) (mov r6 r2) (mov r7 r3) (global-ref r8 cons) (mov r0 r6) (mov r1 r7) (call r8 2) (mov r5 r0) (closure-self r0) (mov r6 r0) (mov r0 r4) (mov r1 r5) (tail-call r6 2)))
     )");
-    codegen_and_run(nqueens_code);
+    printf("NQueensTest: compiled nqueens code\n"); fflush(stdout);
+    try {
+      compiled_code_t func = codegen_t::current()->compile(nqueens_code);
+      printf("NQueensTest: about to run nqueens code\n"); fflush(stdout);
+      func.release_and_run();
+      printf("NQueensTest: nqueens code ran\n"); fflush(stdout);
+    } catch (const std::bad_alloc& e) {
+      printf("NQueensTest: bad_alloc while running nqueens code: %s\n", e.what()); fflush(stdout);
+      throw;
+    }
 
     // Run test case: (nqueens 8)
     scm_obj_t test_case = env.read_code(R"(
       ((const r1 8) (global-ref r2 nqueens) (mov r0 r1) (call r2 1) (ret))
     )");
-    intptr_t result = (intptr_t)codegen_and_run(test_case);
+    try {
+      printf("NQueensTest: compiling test case\n"); fflush(stdout);
+      compiled_code_t func = codegen_t::current()->compile(test_case);
+      printf("NQueensTest: running test case\n"); fflush(stdout);
+      intptr_t result = (intptr_t)func.release_and_run();
+      printf("NQueensTest: test case ran\n"); fflush(stdout);
 
-    // Expected: 92
-    if (result != make_fixnum(92)) {
-      printf("NQueensTest failed: expected 92, got %ld\n", fixnum((scm_obj_t)result));
-      return false;
+      // Expected: 92
+      if (result != make_fixnum(92)) {
+        printf("NQueensTest failed: expected 92, got %ld\n", fixnum((scm_obj_t)result));
+        return false;
+      }
+    } catch (const std::bad_alloc& e) {
+      printf("NQueensTest: bad_alloc while compiling/running test case: %s\n", e.what()); fflush(stdout);
+      throw;
     }
 
     return true;
