@@ -991,8 +991,7 @@ SUBR subr_string_to_list(scm_obj_t self, scm_obj_t a1) {
     i += count;
   }
   scm_obj_t result = scm_nil;
-  for (int j = (int)codepoints.size() - 1; j >= 0; j--)
-    result = make_cons(make_char(codepoints[j]), result);
+  for (int j = (int)codepoints.size() - 1; j >= 0; j--) result = make_cons(make_char(codepoints[j]), result);
   return result;
 }
 
@@ -1260,6 +1259,7 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
   // Step 1: call producer thunk
   scm_obj_t result = (scm_obj_t)bridge(producer, 0, nullptr);
 
+  // current jit logic no need this since there are no safepoint() called
   // Step 2: spread values (or single value) to consumer.
   // IMPORTANT: The consumer call may allocate heap objects (e.g. rest-list
   // cons cells), triggering GC.  If 'result' is a values object, its 'elts'
@@ -1267,7 +1267,7 @@ SUBR subr_call_with_values(scm_obj_t self, scm_obj_t producer, scm_obj_t consume
   // the values object for the entire duration of the consumer call to keep the
   // elts array alive.
   if (is_values(result)) {
-    scoped_gc_protect protect_result(result);
+    // scoped_gc_protect protect_result(result);
     int n = values_nsize(result);
     scm_obj_t* elts = values_elts(result);
     return (scm_obj_t)bridge(consumer, n, elts);
