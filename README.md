@@ -266,7 +266,7 @@ ypsilon boot/build-core-ir.scm   # or: gosh boot/build-core-ir.scm
 ### Usage
 
 ```bash
-./build/nanos --boot boot/core.ir                   # Interactive REPL
+./build/nanos --boot boot/core.ir                    # Interactive REPL
 ./build/nanos --boot boot/core.ir --script foo.scm   # Run a script
 ```
 
